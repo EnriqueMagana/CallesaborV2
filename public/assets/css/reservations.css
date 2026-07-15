@@ -1,0 +1,47 @@
+/* ── FullCalendar responsive ── */
+    #reservations-calendar { width: 100%; min-width: 0; }
+
+    .fc { width: 100%; }
+    .fc .fc-toolbar { flex-wrap: wrap; gap: 6px; }
+    .fc .fc-toolbar-title { font-size: clamp(.9rem, 2.5vw, 1.25rem); white-space: nowrap; }
+    .fc .fc-button  { padding: .28rem .5rem; font-size: .76rem; line-height: 1.4; }
+    .fc .fc-button-group .fc-button { padding: .28rem .45rem; }
+    .fc .fc-daygrid-day-number { font-size: .78rem; }
+    .fc .fc-col-header-cell-cushion { font-size: .78rem; }
+    .fc .fc-event   { font-size: .7rem; border-radius: 4px; padding: 1px 4px; cursor: pointer; }
+    .fc .fc-more-link { font-size: .68rem; }
+    .fc .fc-list-event-title { font-size: .82rem; }
+
+    @media (max-width: 640px) {
+.fc .fc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+.fc .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center;
+}
+.fc .fc-toolbar-chunk:first-child {
+    justify-content: space-between;
+}
+.fc .fc-button-group {
+    flex: 1;
+    display: flex;
+}
+.fc .fc-button-group .fc-button {
+    flex: 1;
+    font-size: .72rem;
+    padding: .25rem .3rem;
+}
+.fc .fc-toolbar-title {
+    font-size: .88rem;
+}
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion {
+    font-size: .68rem;
+    padding: 2px 3px;
+}
+.fc .fc-daygrid-day-events { min-height: unset; }
+    }
+

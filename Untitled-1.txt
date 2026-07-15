@@ -1,0 +1,2418 @@
+{{-- resources/views/livewire/app/pos.blade.php --}}
+{{-- Punto de Venta — Full-screen SaaS POS --}}
+<div x-data="{
+    sidebarOpen: false,
+    activeTab: 'catalog',
+    panels: { mesas: false, orders: false, reprint: false, pickup: false }
+}" class="pos-root">
+
+    {{-- ════════════════════════════════════════════
+     TOAST NOTIFICATIONS
+════════════════════════════════════════════ --}}
+    <div x-data="{ show: false, msg: '', type: 'success' }"
+        x-on:notify.window="msg=$event.detail.message; type=$event.detail.type??'success'; show=true; setTimeout(()=>show=false,3500)"
+        x-show="show" x-transition class="pos-toast-wrap">
+        <div class="pos-toast" :class="type">
+            <i class="bx" :class="type === 'success' ? 'bx-check-circle' : 'bx-error-circle'"></i>
+            <span class="pos-toast-msg" x-text="msg"></span>
+        </div>
+    </div>
+
+    {{-- ════════════════════════════════════════════
+     SIN NEGOCIO
+════════════════════════════════════════════ --}}
+    @if (!$business)
+        <div class="pos-shell pos-no-business">
+            <div class="pos-no-business-card">
+                <div class="pos-no-business-logo">
+                    <img src="{{ asset('assets/img/logo.svg') }}" alt="Logo">
+                </div>
+                <div class="pos-no-business-badge">
+                    <i class="bx bx-store-alt"></i> Sin negocio
+                </div>
+                <h5>Necesitas crear un negocio</h5>
+                <p>Para usar el Punto de Venta, primero debes crear tu negocio y al menos una sucursal.</p>
+                @if (Route::has('app.business.settings'))
+                    <div class="pos-no-business-actions">
+                        <a href="{{ route('app.business.settings') }}" class="pos-btn pos-btn-primary">
+                            <i class="bx bx-plus-circle"></i> Crear mi negocio
+                        </a>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Sin sucursal en sesión → indicar al usuario que use el sidebar --}}
+    @elseif ($needsBranchSelect)
+        <div class="pos-shell align-items-center justify-content-center">
+            <div class="pos-branch-select" style="text-align:center">
+                <div
+                    style="width:64px;height:64px;border-radius:16px;background:rgba(108,122,252,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+                    <i class="bx bx-map-pin" style="font-size:28px;color:var(--pos-accent)"></i>
+                </div>
+                <h5 style="color:var(--pos-text);margin:0 0 8px;font-family:var(--ff-heading)">Sin sucursal seleccionada
+                </h5>
+                <p style="color:var(--pos-muted);font-size:.82rem;margin:0 0 18px;line-height:1.5">
+                    Selecciona una sucursal desde el <strong style="color:var(--pos-text)">menú lateral</strong> para
+                    iniciar el punto de venta.
+                </p>
+                <div
+                    style="display:flex;align-items:center;gap:8px;background:rgba(108,122,252,.06);border:1px solid rgba(108,122,252,.2);border-radius:10px;padding:11px 14px;text-align:left">
+                    <i class="bx bx-left-arrow-alt" style="font-size:20px;color:var(--pos-accent);flex-shrink:0"></i>
+                    <span style="font-size:.8rem;color:var(--pos-text)">Usa el selector de sucursal en la barra lateral
+                        izquierda</span>
+                </div>
+            </div>
+        </div>
+
+        {{-- ════════════════════════════════════════════
+     POS PRINCIPAL
+════════════════════════════════════════════ --}}
+    @else
+        {{-- ── Gate: sin caja abierta ── --}}
+        @if (!$hasOpenRegister)
+            <div class="pos-shell pos-no-business">
+                <div class="pos-no-business-card">
+                    <div class="pos-no-business-logo">
+                        <img src="{{ asset('assets/img/logo.svg') }}" alt="Logo">
+                    </div>
+                    <div class="pos-no-business-badge">
+                        <i class="bx bx-lock-alt"></i> Caja no abierta
+                    </div>
+                    <h5>Sin caja activa</h5>
+                    <p>
+                        La sucursal <strong style="color:var(--pos-text)">{{ $branch->name }}</strong>
+                        no tiene una caja abierta.<br>
+                        Un cajero debe abrir la caja antes de usar el POS.
+                    </p>
+                    <div class="pos-no-business-actions">
+                        <a href="{{ route('app.caja.index') }}" class="pos-btn pos-btn-primary">
+                            <i class="bx bx-door-open"></i> Ir a la caja
+                        </a>
+                        <button wire:click="refreshRegister" class="pos-btn pos-btn-secondary">
+                            <i class="bx bx-refresh"></i> Verificar de nuevo
+                        </button>
+                        @if (count($availableBranches) > 1)
+                            <button wire:click="$set('needsBranchSelect', true)" class="pos-btn pos-btn-ghost"
+                                style="font-size:.8rem">
+                                <i class="bx bx-transfer-alt"></i> Cambiar sucursal
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @else
+            <div x-data="{ showCart: false }" class="pos-shell">
+
+                {{-- ── HEADER (Top Bar) ── --}}
+                <div class="pos-header">
+                    <div class="pos-header-left">
+                        <div class="pos-logo">
+                            <img src="{{ asset('assets/img/logo.svg') }}"
+                                 alt="{{ config('app.name') }}"
+                                 class="pos-logo-img"
+                                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                            <i class="bx bx-restaurant" style="display:none"></i>
+                        </div>
+                        <div class="pos-header-info">
+                            <span class="pos-system-name">{{ config('app.name') }}</span>
+                            <span class="pos-page-title">Punto de Venta</span>
+                        </div>
+                    </div>
+                    <div class="pos-header-right">
+                        {{-- Botón de notificaciones (pide permiso al hacer click) --}}
+                        <button class="btn-header-action"
+                                onclick="posRequestNotifPermission()"
+                                title="Activar notificaciones"
+                                x-data
+                                x-show="typeof Notification !== 'undefined' && Notification.permission === 'default'"
+                                x-cloak>
+                            <i class="bx bx-bell"></i>
+                            <span>Alertas</span>
+                        </button>
+                        <a href="{{ route('app.dashboard') }}" class="btn-header-action">
+                            <i class="bx bx-home-alt"></i>
+                            <span>Dashboard</span>
+                        </a>
+                        {{-- Botón Carrito --}}
+                        <button class="btn-cart-toggle" @click="showCart = !showCart" :class="showCart ? 'active' : ''">
+                            <i class="bx bx-cart"></i>
+                            @if (!empty($this->cart))
+                                <span class="cart-count">{{ $this->cartCount }}</span>
+                            @endif
+                            <span>Carrito</span>
+                        </button>
+
+                        @if ($branch)
+                            <div class="pos-branch-selector">
+                                <i class="bx {{ $branch->is_matriz ? 'bx-home' : 'bx-store' }}"></i>
+                                <span>{{ $branch->name }}</span>
+                                @if (count($availableBranches) > 1)
+                                    <button wire:click="$set('needsBranchSelect', true)" class="btn-change-branch">
+                                        <i class="bx bx-chevron-down"></i>
+                                    </button>
+                                @endif
+                            </div>
+                        @endif
+
+                    </div>
+                </div>
+
+                {{-- ── BODY ── --}}
+                <div class="pos-main-layout">
+                    <div class="pos-body-with-toolbar">
+                        <div class="pos-body">
+                            {{-- ══ CATÁLOGO ══ --}}
+                            <div class="pos-catalog">
+
+                                {{-- Search bar --}}
+                                <div class="catalog-search-bar">
+                                    <div class="search-wrap">
+                                        <i class="bx bx-search si-icon"></i>
+                                        <input type="text" wire:model.live.debounce.250ms="productSearch"
+                                            class="pos-input" placeholder="Buscar platillo…">
+                                    </div>
+                                    <select wire:model.live="filterCategory" class="pos-select">
+                                        <option value="">Todas las categorías</option>
+                                        @foreach ($categories as $cat)
+                                            <option value="{{ $cat }}">{{ $cat }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- Category tabs --}}
+                                <div class="cat-tabs">
+                                    <button wire:click="$set('filterCategory', '')"
+                                        class="cat-tab {{ !$filterCategory ? 'active' : '' }}">Todos</button>
+                                    @foreach ($categories as $cat)
+                                        <button wire:click="$set('filterCategory', '{{ $cat }}')"
+                                            class="cat-tab {{ $filterCategory === $cat ? 'active' : '' }}">{{ $cat }}</button>
+                                    @endforeach
+                                </div>
+
+                                {{-- Product grid --}}
+                                <div class="catalog-grid">
+                                    @forelse ($products as $product)
+                                        @php
+                                            $baseKey = 'product_' . $product->id;
+                                            $inCart = isset($this->cart[$baseKey]);
+                                            $cartQty = $inCart ? $this->cart[$baseKey]['quantity'] : 0;
+                                            $hasAddons = $product->addon_groups_count > 0;
+                                            $price = $product->pivot->price ?? $product->base_price;
+                                        @endphp
+                                        <div wire:click="addToCart({{ $product->id }})"
+                                            class="prod-card {{ $inCart ? 'in-cart' : '' }}">
+                                            <div class="prod-img">
+                                                @if ($product->image)
+                                                    <img src="{{ asset('storage/' . $product->image) }}"
+                                                        alt="">
+                                                @else
+                                                    <i class="bx bx-dish no-img"></i>
+                                                @endif
+                                                @if ($inCart)
+                                                    <div class="prod-badge-qty">{{ $cartQty }}</div>
+                                                @endif
+                                                @if ($hasAddons)
+                                                    <div class="prod-badge-addon">+ADD</div>
+                                                @endif
+                                                @if ($product->area)
+                                                    <div class="prod-area-badge bg-{{ $product->area->color }}">
+                                                        {{ $product->area->name }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div class="prod-info">
+                                                <div class="prod-name">
+                                                    {{ $product->pivot->name_override ?? $product->name }}</div>
+                                                <div class="prod-price">${{ number_format($price, 2) }}</div>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="prod-card-empty">
+                                            <i class="bx bx-food-menu"></i>
+                                            <span>No hay productos disponibles</span>
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            {{-- ── TOOLBAR (Bottom) ── --}}
+                            <div class="pos-toolbar-bottom">
+                                <button class="tb-btn" @click="panels.mesas = true">
+                                    <i class="bx bx-table"></i>
+                                    <span>Cobrar mesa</span>
+                                    @if ($waitingTables->count() > 0)
+                                        <span class="badge-dot" style="background:#ea580c"></span>
+                                    @endif
+                                </button>
+                                <button class="tb-btn" @click="panels.orders = true">
+                                    <i class="bx bx-receipt"></i>
+                                    <span>Pedidos</span>
+                                    @if ($recentOrders->count() > 0)
+                                        <span class="badge-dot"></span>
+                                    @endif
+                                </button>
+                                <button class="tb-btn" @click="panels.pickup = true">
+                                    <i class="bx bx-store-alt"></i>
+                                    <span>Pasar a buscar</span>
+                                    @if ($pickupOrders->count() > 0)
+                                        <span class="badge-dot" style="background:#f59e0b"></span>
+                                    @endif
+                                </button>
+                                <button class="tb-btn" @click="panels.reprint = true">
+                                    <i class="bx bx-printer"></i>
+                                    <span>Reimprimir</span>
+                                </button>
+                                <button class="tb-btn" wire:click="openExpenseModal">
+                                    <i class="bx bx-wallet"></i>
+                                    <span>Gastos</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ══════════════════════════════════════
+                 PANEL: CARRITO (Fijo a la derecha - Desktop)
+            ══════════════════════════════════════ --}}
+                    <div class="pos-cart-fixed">
+                        <div class="cart-panel">
+                            <div class="cart-header">
+                                <i class="bx bx-receipt" style="color:var(--pos-accent);font-size:1.1rem"></i>
+                                <h5>Pedido actual</h5>
+                                @if (!empty($this->cart))
+                                    <span class="cart-badge">{{ $this->cartCount }}</span>
+                                @endif
+                            </div>
+
+                            <div class="cart-items">
+                                @forelse ($this->cart as $key => $item)
+                                    <div class="cart-item">
+                                        <div class="cart-qty-controls">
+                                            <button wire:click="decrementQuantity('{{ $key }}')"
+                                                class="qty-btn">
+                                                <i class="bx bx-minus"></i>
+                                            </button>
+                                            <span class="qty-val">{{ $item['quantity'] ?? 1 }}</span>
+                                            <button wire:click="incrementQuantity('{{ $key }}')"
+                                                class="qty-btn"
+                                                style="border-color:var(--pos-accent);color:var(--pos-accent)">
+                                                <i class="bx bx-plus"></i>
+                                            </button>
+                                        </div>
+                                        <div class="cart-item-detail">
+                                            <div class="cart-item-name">{{ $item['name'] ?? 'Producto' }}</div>
+                                            @if (!empty($item['addons_text']))
+                                                <div class="cart-item-addon">
+                                                    <i class="bx bx-plus-circle me-1"></i>{{ $item['addons_text'] }}
+                                                </div>
+                                            @endif
+                                            @if (!empty($item['notes']))
+                                                <div class="cart-item-note">
+                                                    <i class="bx bx-note me-1"></i>{{ $item['notes'] ?? '' }}
+                                                </div>
+                                            @endif
+                                            <div
+                                                style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:3px">
+                                                <button wire:click="openNotes('{{ $key }}')"
+                                                    class="btn-note">
+                                                    {{ !empty($item['notes'] ?? '') ? '✏ Nota' : '+ Nota' }}
+                                                </button>
+                                                <button wire:click="openProductDiscount('{{ $key }}')"
+                                                    class="btn-note"
+                                                    style="color:{{ !empty($item['discount_pct'] ?? 0) ? '#fb923c' : 'var(--pos-muted)' }}">
+                                                    <i class="bx bx-purchase-tag"></i>
+                                                    {{ !empty($item['discount_pct'] ?? 0) ? $item['discount_pct'] . '% desc.' : '% Desc.' }}
+                                                </button>
+                                            </div>
+                                            @if ($showNotesFor && $notesKey === $key)
+                                                <div class="note-input-wrap">
+                                                    <input type="text" wire:model="cart.{{ $key }}.notes"
+                                                        class="note-input" placeholder="Instrucción…"
+                                                        wire:keydown.enter="closeNotes" autofocus>
+                                                </div>
+                                            @endif
+                                            @if ($discountingKey === $key)
+                                                <div class="note-input-wrap"
+                                                    style="display:flex;gap:6px;align-items:center">
+                                                    <input type="number" wire:model.live="productDiscountPct"
+                                                        class="note-input" placeholder="%" min="0"
+                                                        max="100" step="1" style="width:70px" autofocus>
+                                                    <button wire:click="applyProductDiscount" class="btn-note"
+                                                        style="background:var(--pos-accent);color:#fff;border-color:var(--pos-accent)">
+                                                        <i class="bx bx-check"></i>
+                                                    </button>
+                                                    <button wire:click="$set('discountingKey', null)"
+                                                        class="btn-note">
+                                                        <i class="bx bx-x"></i>
+                                                    </button>
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div class="cart-item-right">
+                                            <div class="cart-item-price">
+                                                @if (!empty($item['discount_pct'] ?? 0))
+                                                    <span
+                                                        style="font-size:.65rem;color:var(--pos-muted);text-decoration:line-through;display:block;text-align:right">
+                                                        ${{ number_format($item['original_price'] ?? $item['total_price'], 2) }}
+                                                    </span>
+                                                @endif
+                                                ${{ number_format($item['total_price'] ?? 0, 2) }}
+                                            </div>
+                                            <button wire:click="removeFromCart('{{ $key }}')"
+                                                class="btn-remove mt-1">
+                                                <i class="bx bx-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="cart-empty">
+                                        <i class="bx bx-cart"></i>
+                                        <p>Selecciona platillos del catálogo</p>
+                                    </div>
+                                @endforelse
+                            </div>
+
+                            <div class="cart-footer">
+                                @if (!empty($this->cart))
+                                    <div class="cart-note-bar">
+                                        <i class="bx bx-message-dots"></i>
+                                        <input type="text" wire:model="notes" class="pos-input"
+                                            style="flex:1;background:var(--pos-bg)" placeholder="Nota general…">
+                                    </div>
+                                    <div class="cart-totals">
+                                        @if ($this->orderDiscountAmount > 0)
+                                            <div class="total-row" style="color:var(--pos-muted);font-size:.8rem">
+                                                <span>Subtotal</span>
+                                                <span>${{ number_format($this->cartRawTotal, 2) }}</span>
+                                            </div>
+                                            <div class="total-row" style="color:#fb923c;font-size:.8rem">
+                                                <span>Descuento</span>
+                                                <span>-${{ number_format($this->orderDiscountAmount, 2) }}</span>
+                                            </div>
+                                        @endif
+                                        <div class="total-row main">
+                                            <span>Total</span>
+                                            <span>${{ number_format($this->subtotal, 2) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="cart-cta">
+                                        <button wire:click="openCheckoutModal" wire:loading.attr="disabled"
+                                            class="btn-checkout">
+                                            <span wire:loading wire:target="openCheckoutModal"
+                                                class="spinner-border spinner-border-sm"
+                                                style="width:14px;height:14px;margin-right:6px"></span>
+                                            <i wire:loading.remove wire:target="openCheckoutModal"
+                                                class="bx bx-credit-card"></i>
+                                            Cobrar pedido
+                                        </button>
+                                    </div>
+                                @else
+                                    <div class="cart-cta">
+                                        <div class="btn-checkout-ghost">
+                                            <i class="bx bx-info-circle me-1"></i>Agrega platillos para continuar
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ══════════════════════════════════════
+                 PANEL: CARRITO (Slide-over para tablet/móvil)
+            ══════════════════════════════════════ --}}
+                    <div class="cart-overlay" :class="showCart ? 'show' : ''" @click="showCart = false">
+                        <div class="cart-panel" @click.stop>
+                            <div class="cart-header">
+                                <i class="bx bx-receipt" style="color:var(--pos-accent);font-size:1.1rem"></i>
+                                <h5>Pedido actual</h5>
+                                @if (!empty($this->cart))
+                                    <span class="cart-badge">{{ $this->cartCount }}</span>
+                                @endif
+                            </div>
+
+                            <div class="cart-items">
+                                @forelse ($this->cart as $key => $item)
+                                    <div class="cart-item">
+                                        <div class="cart-qty-controls">
+                                            <button wire:click="decrementQuantity('{{ $key }}')"
+                                                class="qty-btn">
+                                                <i class="bx bx-minus"></i>
+                                            </button>
+                                            <span class="qty-val">{{ $item['quantity'] ?? 1 }}</span>
+                                            <button wire:click="incrementQuantity('{{ $key }}')"
+                                                class="qty-btn"
+                                                style="border-color:var(--pos-accent);color:var(--pos-accent)">
+                                                <i class="bx bx-plus"></i>
+                                            </button>
+                                        </div>
+                                        <div class="cart-item-detail">
+                                            <div class="cart-item-name">{{ $item['name'] ?? 'Producto' }}</div>
+                                            @if (!empty($item['addons_text']))
+                                                <div class="cart-item-addon">
+                                                    <i class="bx bx-plus-circle me-1"></i>{{ $item['addons_text'] }}
+                                                </div>
+                                            @endif
+                                            @if (!empty($item['notes']))
+                                                <div class="cart-item-note">
+                                                    <i class="bx bx-note me-1"></i>{{ $item['notes'] ?? '' }}
+                                                </div>
+                                            @endif
+                                            <div
+                                                style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:3px">
+                                                <button wire:click="openNotes('{{ $key }}')"
+                                                    class="btn-note">
+                                                    {{ !empty($item['notes'] ?? '') ? '✏ Nota' : '+ Nota' }}
+                                                </button>
+                                                <button wire:click="openProductDiscount('{{ $key }}')"
+                                                    class="btn-note"
+                                                    style="color:{{ !empty($item['discount_pct'] ?? 0) ? '#fb923c' : 'var(--pos-muted)' }}">
+                                                    <i class="bx bx-purchase-tag"></i>
+                                                    {{ !empty($item['discount_pct'] ?? 0) ? $item['discount_pct'] . '% desc.' : '% Desc.' }}
+                                                </button>
+                                            </div>
+                                            @if ($showNotesFor && $notesKey === $key)
+                                                <div class="note-input-wrap">
+                                                    <input type="text" wire:model="cart.{{ $key }}.notes"
+                                                        class="note-input" placeholder="Instrucción…"
+                                                        wire:keydown.enter="closeNotes" autofocus>
+                                                </div>
+                                            @endif
+                                            @if ($discountingKey === $key)
+                                                <div class="note-input-wrap"
+                                                    style="display:flex;gap:6px;align-items:center">
+                                                    <input type="number" wire:model.live="productDiscountPct"
+                                                        class="note-input" placeholder="%" min="0"
+                                                        max="100" step="1" style="width:70px" autofocus>
+                                                    <button wire:click="applyProductDiscount" class="btn-note"
+                                                        style="background:var(--pos-accent);color:#fff;border-color:var(--pos-accent)">
+                                                        <i class="bx bx-check"></i>
+                                                    </button>
+                                                    <button wire:click="$set('discountingKey', null)"
+                                                        class="btn-note">
+                                                        <i class="bx bx-x"></i>
+                                                    </button>
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div class="cart-item-right">
+                                            <div class="cart-item-price">
+                                                @if (!empty($item['discount_pct'] ?? 0))
+                                                    <span
+                                                        style="font-size:.65rem;color:var(--pos-muted);text-decoration:line-through;display:block;text-align:right">
+                                                        ${{ number_format($item['original_price'] ?? $item['total_price'], 2) }}
+                                                    </span>
+                                                @endif
+                                                ${{ number_format($item['total_price'] ?? 0, 2) }}
+                                            </div>
+                                            <button wire:click="removeFromCart('{{ $key }}')"
+                                                class="btn-remove mt-1">
+                                                <i class="bx bx-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="cart-empty">
+                                        <i class="bx bx-cart"></i>
+                                        <p>Selecciona platillos del catálogo</p>
+                                    </div>
+                                @endforelse
+                            </div>
+
+                            <div class="cart-footer">
+                                @if (!empty($this->cart))
+                                    <div class="cart-note-bar">
+                                        <i class="bx bx-message-dots"></i>
+                                        <input type="text" wire:model="notes" class="pos-input"
+                                            style="flex:1;background:var(--pos-bg)" placeholder="Nota general…">
+                                    </div>
+                                    <div class="cart-totals">
+                                        @if ($this->orderDiscountAmount > 0)
+                                            <div class="total-row" style="color:var(--pos-muted);font-size:.8rem">
+                                                <span>Subtotal</span>
+                                                <span>${{ number_format($this->cartRawTotal, 2) }}</span>
+                                            </div>
+                                            <div class="total-row" style="color:#fb923c;font-size:.8rem">
+                                                <span>Descuento</span>
+                                                <span>-${{ number_format($this->orderDiscountAmount, 2) }}</span>
+                                            </div>
+                                        @endif
+                                        <div class="total-row main">
+                                            <span>Total</span>
+                                            <span>${{ number_format($this->subtotal, 2) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="cart-cta">
+                                        <button wire:click="openCheckoutModal" wire:loading.attr="disabled"
+                                            class="btn-checkout">
+                                            <span wire:loading wire:target="openCheckoutModal"
+                                                class="spinner-border spinner-border-sm"
+                                                style="width:14px;height:14px;margin-right:6px"></span>
+                                            <i wire:loading.remove wire:target="openCheckoutModal"
+                                                class="bx bx-credit-card"></i>
+                                            Cobrar pedido
+                                        </button>
+                                    </div>
+                                @else
+                                    <div class="cart-cta">
+                                        <div class="btn-checkout-ghost">
+                                            <i class="bx bx-cart me-1"></i>Agrega platillos para continuar
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ══════════════════════════════════════
+                     MODAL: CHECKOUT
+                ══════════════════════════════════════ --}}
+                    @if ($showCheckoutModal)
+                        @php
+                            // Datos para el encabezado del modo mesa
+                            $tcoSession =
+                                $tableCheckoutMode && $tableCheckoutSessionId
+                                    ? \App\Models\TableSession::with('table')->find($tableCheckoutSessionId)
+                                    : null;
+                            $tcoPart =
+                                $tableCheckoutMode && $tableCheckoutPartId
+                                    ? \App\Models\SplitPart::find($tableCheckoutPartId)
+                                    : null;
+                        @endphp
+                        <div class="pos-modal-wrap show"
+                            wire:click.self="
+                            $set('showCheckoutModal', false);
+                            $set('tableCheckoutMode', false);
+                        ">
+                            <div class="pos-modal" @click.stop>
+                                <div class="modal-header-pos">
+                                    <i class="bx {{ $tableCheckoutMode ? 'bx-table' : 'bx-receipt' }}"
+                                        style="font-size:1.3rem;color:var(--pos-accent)"></i>
+                                    <h4>
+                                        @if ($tableCheckoutMode)
+                                            @if ($tcoPart)
+                                                {{ $tcoPart->label }} —
+                                            @endif
+                                            {{ $tcoSession?->table?->name ?? 'Cobrar mesa' }}
+                                        @else
+                                            Confirmar pedido
+                                        @endif
+                                    </h4>
+                                    <button
+                                        wire:click="$set('showCheckoutModal', false); $set('tableCheckoutMode', false);"
+                                        class="pos-btn pos-btn-secondary" style="padding:4px 8px;font-size:.85rem">
+                                        <i class="bx bx-x"></i>
+                                    </button>
+                                </div>
+                                <div class="modal-body-pos">
+                                    <div class="co-section-title"><i class="bx bx-list-ul me-1"></i>Resumen</div>
+
+                                    @if ($tableCheckoutMode)
+                                        {{-- RESUMEN MODO MESA: tabla/sub-cuenta --}}
+                                        <div class="co-summary">
+                                            @if ($tcoPart && !empty($tcoPart->item_ids))
+                                                @foreach (\App\Models\OrderItem::whereIn('id', $tcoPart->item_ids)->get() as $tcoItem)
+                                                    <div class="co-sum-item">
+                                                        <div class="co-sum-name">{{ $tcoItem->quantity }}×
+                                                            {{ $tcoItem->name }}</div>
+                                                        <div class="co-sum-price">
+                                                            ${{ number_format($tcoItem->total_price, 2) }}</div>
+                                                    </div>
+                                                @endforeach
+                                            @elseif($tcoSession)
+                                                @foreach ($tcoSession->orders->whereNotIn('status', ['cancelled']) as $tcoOrder)
+                                                    @foreach ($tcoOrder->items->whereNotIn('status', ['cancelled']) as $tcoItem)
+                                                        <div class="co-sum-item">
+                                                            <div class="co-sum-name">{{ $tcoItem->quantity }}×
+                                                                {{ $tcoItem->name }}</div>
+                                                            <div class="co-sum-price">
+                                                                ${{ number_format($tcoItem->total_price, 2) }}</div>
+                                                        </div>
+                                                    @endforeach
+                                                @endforeach
+                                            @endif
+                                            @if ($this->orderDiscountAmount > 0)
+                                                <div class="co-sum-item"
+                                                    style="color:var(--pos-muted);font-size:.78rem">
+                                                    <div>Subtotal</div>
+                                                    <div class="co-sum-price">
+                                                        ${{ number_format($tableCheckoutBaseAmt, 2) }}</div>
+                                                </div>
+                                                <div class="co-sum-item" style="color:#fb923c;font-size:.78rem">
+                                                    <div>Descuento</div>
+                                                    <div class="co-sum-price">
+                                                        -${{ number_format($this->orderDiscountAmount, 2) }}</div>
+                                                </div>
+                                            @endif
+                                            <div class="co-sum-total">
+                                                <span>Total a cobrar</span>
+                                                <span>${{ number_format($this->subtotal, 2) }}</span>
+                                            </div>
+                                        </div>
+                                    @else
+                                        {{-- RESUMEN MODO CARRITO --}}
+                                        <div class="co-summary">
+                                            @foreach ($this->cart as $key => $item)
+                                                @php
+                                                    $baseUnit = $item['unit_price'] ?? 0;
+                                                    $addonSum = collect($item['addons'] ?? [])->sum('price');
+                                                    $itemTotal = $item['total_price'] ?? 0;
+                                                @endphp
+                                                <div class="co-sum-item">
+                                                    <div>
+                                                        <div class="co-sum-name">{{ $item['quantity'] ?? 1 }}×
+                                                            {{ $item['name'] ?? 'Producto' }}
+                                                        </div>
+                                                        @if (!empty($item['addons_text']))
+                                                            <div class="co-sum-addon">+ {{ $item['addons_text'] }}
+                                                            </div>
+                                                        @endif
+                                                        @if ($addonSum > 0)
+                                                            <div
+                                                                style="font-size:.65rem;color:var(--pos-accent);font-weight:600">
+                                                                Base ${{ number_format($baseUnit - $addonSum, 2) }} +
+                                                                extras ${{ number_format($addonSum, 2) }}
+                                                            </div>
+                                                        @endif
+                                                        @if (!empty($item['notes']))
+                                                            <div
+                                                                style="font-size:.65rem;color:var(--pos-muted);font-style:italic">
+                                                                {{ $item['notes'] }}</div>
+                                                        @endif
+                                                    </div>
+                                                    <div class="co-sum-price">
+                                                        ${{ number_format($itemTotal, 2) }}
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                            @if ($this->orderDiscountAmount > 0)
+                                                <div class="co-sum-item"
+                                                    style="color:var(--pos-muted);font-size:.78rem">
+                                                    <div>Subtotal</div>
+                                                    <div class="co-sum-price">
+                                                        ${{ number_format($this->cartRawTotal, 2) }}</div>
+                                                </div>
+                                                <div class="co-sum-item" style="color:#fb923c;font-size:.78rem">
+                                                    <div>Descuento orden</div>
+                                                    <div class="co-sum-price">
+                                                        -${{ number_format($this->orderDiscountAmount, 2) }}</div>
+                                                </div>
+                                            @endif
+                                            <div class="co-sum-total">
+                                                <span>Total</span>
+                                                <span>${{ number_format($this->subtotal, 2) }}</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="co-section-title"><i class="bx bx-category me-1"></i>Tipo de venta
+                                        </div>
+                                        <div class="type-pills">
+                                            <div wire:click="$set('type', 'takeout')"
+                                                class="type-pill takeout {{ $type === 'takeout' ? 'active' : '' }}">
+                                                <i class="bx bx-store"></i>
+                                                <div class="pill-label">Ventanilla</div>
+                                            </div>
+                                            <div wire:click="$set('type', 'delivery')"
+                                                class="type-pill delivery {{ $type === 'delivery' ? 'active' : '' }}">
+                                                <i class="bx bx-cycling"></i>
+                                                <div class="pill-label">Delivery</div>
+                                            </div>
+                                        </div>
+                                    @endif {{-- /tableCheckoutMode --}}
+
+                                    {{-- ── Cliente ── --}}
+                                    <div class="co-section-title"><i class="bx bx-user me-1"></i>Cliente</div>
+
+                                    @if ($selectedCustomerId)
+                                        {{-- Cliente del CRM seleccionado --}}
+                                        <div
+                                            style="background:rgba(34,197,94,.07);border:1.5px solid rgba(34,197,94,.3);
+                                            border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                                            <div
+                                                style="width:34px;height:34px;border-radius:50%;background:var(--pos-accent);
+                                                display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                                <span
+                                                    style="font-size:.9rem;font-weight:700;color:#fff">{{ strtoupper(substr($customer_name, 0, 1)) }}</span>
+                                            </div>
+                                            <div style="min-width:0;flex:1">
+                                                <div style="font-size:.85rem;font-weight:600;color:var(--pos-text)">
+                                                    {{ $customer_name }}</div>
+                                                <div style="font-size:.72rem;color:var(--pos-muted)">
+                                                    {{ $customer_phone }}@if ($customer_email)
+                                                        · {{ $customer_email }}
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <button wire:click="clearSelectedCustomer"
+                                                style="background:none;border:1px solid var(--pos-border);border-radius:6px;
+                                                    color:var(--pos-muted);font-size:.7rem;padding:4px 8px;cursor:pointer;flex-shrink:0">
+                                                <i class="bx bx-x"></i> Cambiar
+                                            </button>
+                                        </div>
+                                    @else
+                                        {{-- Barra de búsqueda + botón Nuevo --}}
+                                        <div style="display:flex;gap:6px;margin-bottom:8px">
+                                            <div style="position:relative;flex:1">
+                                                <i class="bx bx-search"
+                                                    style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:15px;pointer-events:none"></i>
+                                                <input type="text" wire:model.live.debounce.300ms="customerSearch"
+                                                    class="co-input" style="padding-left:30px;padding-right:8px"
+                                                    placeholder="Buscar en CRM…" autocomplete="off">
+                                            </div>
+                                            <button wire:click="openAddCustomerModal"
+                                                style="background:var(--pos-accent);border:none;border-radius:8px;
+                                                    color:#fff;font-size:.75rem;font-weight:600;padding:0 12px;
+                                                    cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px">
+                                                <i class="bx bx-user-plus"></i> Nuevo
+                                            </button>
+                                        </div>
+
+                                        {{-- Dropdown sugerencias --}}
+                                        @if ($showCustomerSuggestions && count($customerSuggestions))
+                                            <div
+                                                style="border:1px solid var(--pos-border);border-radius:8px;
+                                                overflow:hidden;margin-bottom:8px;box-shadow:0 4px 12px rgba(0,0,0,.12)">
+                                                @foreach ($customerSuggestions as $cs)
+                                                    <button wire:click="selectCustomer({{ $cs['id'] }})"
+                                                        style="width:100%;background:none;border:none;border-bottom:1px solid var(--pos-border);
+                                                            text-align:left;padding:9px 12px;cursor:pointer;
+                                                            display:flex;align-items:center;gap:10px"
+                                                        onmouseover="this.style.background='rgba(99,91,252,.08)'"
+                                                        onmouseout="this.style.background='transparent'">
+                                                        <div
+                                                            style="width:30px;height:30px;border-radius:50%;background:var(--pos-accent);
+                                                            display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                                            <span
+                                                                style="font-size:.78rem;font-weight:700;color:#fff">{{ strtoupper(substr($cs['name'], 0, 1)) }}</span>
+                                                        </div>
+                                                        <div style="min-width:0;flex:1">
+                                                            <div
+                                                                style="font-size:.82rem;font-weight:600;color:var(--pos-text)">
+                                                                {{ $cs['name'] }}</div>
+                                                            <div style="font-size:.7rem;color:var(--pos-muted)">
+                                                                {{ $cs['phone'] ?? '' }}
+                                                                @if (!empty($cs['email']))
+                                                                    · {{ $cs['email'] }}
+                                                                @endif
+                                                                @if (!empty($cs['address']))
+                                                                    <span style="display:block"><i class="bx bx-map"
+                                                                            style="vertical-align:middle"></i>
+                                                                        {{ $cs['address'] }}</span>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @elseif(strlen(trim($customerSearch)) >= 2 && !$showCustomerSuggestions)
+                                            <div
+                                                style="font-size:.75rem;color:var(--pos-muted);margin-bottom:8px;padding:6px 0">
+                                                <i class="bx bx-info-circle me-1"></i>Sin resultados. Usa
+                                                <strong>Nuevo</strong> para registrar.
+                                            </div>
+                                        @endif
+
+                                        {{-- Nombre y teléfono rápido (pedidos sin cliente CRM) --}}
+                                        <div class="co-grid">
+                                            <div>
+                                                <label class="co-label">Nombre</label>
+                                                <input type="text" wire:model="customer_name" class="co-input"
+                                                    placeholder="Nombre del cliente">
+                                            </div>
+                                            <div>
+                                                <label class="co-label">Teléfono</label>
+                                                <input type="tel" wire:model="customer_phone" class="co-input"
+                                                    placeholder="+52 999…">
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    @if ($type === 'delivery')
+                                        <div class="co-grid full">
+                                            <div>
+                                                <label class="co-label"><i class="bx bx-map me-1"></i>Dirección <span
+                                                        class="req">*</span></label>
+                                                <input type="text" wire:model="delivery_address" class="co-input"
+                                                    placeholder="Calle, número, colonia">
+                                            </div>
+                                        </div>
+                                        <div class="co-grid full" style="margin-top:-4px">
+                                            <div>
+                                                <label class="co-label">Referencia</label>
+                                                <input type="text" wire:model="delivery_reference"
+                                                    class="co-input" placeholder="Casa azul, frente al parque…">
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    {{-- ── Descuento por orden ── --}}
+                                    <div class="co-section-title" style="margin-top:16px">
+                                        <i class="bx bx-purchase-tag me-1"></i>Descuento
+                                        @if ($this->orderDiscountAmount > 0)
+                                            <span
+                                                style="margin-left:auto;font-size:.7rem;font-weight:400;color:#fb923c">
+                                                -${{ number_format($this->orderDiscountAmount, 2) }} aplicado
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div
+                                        style="background:var(--pos-bg);border:1px solid var(--pos-border);border-radius:var(--pos-radius-sm);padding:10px;margin-bottom:4px">
+                                        <div style="display:flex;gap:6px;align-items:center">
+                                            <div
+                                                style="display:flex;background:var(--pos-card);border:1px solid var(--pos-border);border-radius:6px;overflow:hidden;flex-shrink:0">
+                                                <button wire:click="$set('orderDiscountType','pct')"
+                                                    style="padding:6px 10px;border:none;font-size:.75rem;font-weight:700;cursor:pointer;
+                                                       background:{{ $orderDiscountType === 'pct' ? 'var(--pos-accent)' : 'transparent' }};
+                                                       color:{{ $orderDiscountType === 'pct' ? '#fff' : 'var(--pos-muted)' }}">%</button>
+                                                <button wire:click="$set('orderDiscountType','fixed')"
+                                                    style="padding:6px 10px;border:none;font-size:.75rem;font-weight:700;cursor:pointer;
+                                                       background:{{ $orderDiscountType === 'fixed' ? 'var(--pos-accent)' : 'transparent' }};
+                                                       color:{{ $orderDiscountType === 'fixed' ? '#fff' : 'var(--pos-muted)' }}">$</button>
+                                            </div>
+                                            <input type="number" wire:model.live="orderDiscountValue"
+                                                class="co-input" placeholder="0" min="0" step="0.5"
+                                                style="flex:1">
+                                            <button wire:click="applyOrderDiscount" class="pos-btn pos-btn-primary"
+                                                style="white-space:nowrap;padding:8px 12px;font-size:.78rem">
+                                                Aplicar
+                                            </button>
+                                            @if ($this->orderDiscountAmount > 0)
+                                                <button wire:click="clearOrderDiscount"
+                                                    class="pos-btn pos-btn-secondary"
+                                                    style="padding:8px 10px;font-size:.78rem">
+                                                    <i class="bx bx-x"></i>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    {{-- ── Pagos agregados ── --}}
+                                    <div class="co-section-title" style="margin-top:16px">
+                                        <i class="bx bx-credit-card me-1"></i>Pagos
+                                        @php
+                                            $paidTotal = collect($payments)->sum('amount');
+                                            $remaining = max(0, round($this->subtotal - $paidTotal, 2));
+                                        @endphp
+                                        <span style="margin-left:auto;font-size:.7rem;font-weight:400">
+                                            Pagado: <strong>${{ number_format($paidTotal, 2) }}</strong>
+                                            &nbsp;·&nbsp;
+                                            Pendiente: <strong
+                                                style="color:{{ $remaining > 0 ? 'var(--pos-danger,#dc3545)' : 'var(--pos-accent3,#28a745)' }}">${{ number_format($remaining, 2) }}</strong>
+                                        </span>
+                                    </div>
+
+                                    @if (!empty($payments))
+                                        <div style="margin-bottom:8px">
+                                            @foreach ($payments as $pi => $p)
+                                                <div
+                                                    style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--pos-bg);border-radius:var(--pos-radius-sm);margin-bottom:4px;font-size:.8rem">
+                                                    <span>
+                                                        @if ($p['method'] === 'cash')
+                                                            <i class="bx bx-money"></i> Efectivo
+                                                        @elseif($p['method'] === 'card')
+                                                            <i class="bx bx-credit-card-front"></i> Tarjeta
+                                                            @if (!empty($p['card_last4']))
+                                                                *{{ $p['card_last4'] }}
+                                                            @endif
+                                                        @elseif($p['method'] === 'transfer')
+                                                            <i class="bx bx-transfer"></i> Transferencia @if (!empty($p['transfer_reference']))
+                                                                ({{ $p['transfer_reference'] }})
+                                                            @endif
+                                                        @elseif($p['method'] === 'delivery')
+                                                            <i class="bx bx-cycling"></i> Contraentrega (Delivery)
+                                                        @endif
+                                                    </span>
+                                                    <span style="display:flex;align-items:center;gap:8px">
+                                                        <strong>${{ number_format($p['amount'], 2) }}</strong>
+                                                        <button wire:click="removePayment({{ $pi }})"
+                                                            style="background:none;border:none;color:var(--pos-danger,#dc3545);cursor:pointer;padding:0;line-height:1"><i
+                                                                class="bx bx-x"></i></button>
+                                                    </span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    {{-- Agregar pago --}}
+                                    <div
+                                        style="background:var(--pos-bg);border:1px solid var(--pos-border);border-radius:var(--pos-radius-sm);padding:10px;margin-bottom:4px">
+                                        <div class="pay-methods" style="margin-bottom:8px">
+                                            <button wire:click="$set('pay_method', 'cash')"
+                                                class="pay-btn {{ $pay_method === 'cash' ? 'active' : '' }}">
+                                                <i class="bx bx-money"></i>
+                                                <div class="pay-label">Efectivo</div>
+                                            </button>
+                                            <button wire:click="$set('pay_method', 'card')"
+                                                class="pay-btn {{ $pay_method === 'card' ? 'active' : '' }}">
+                                                <i class="bx bx-credit-card-front"></i>
+                                                <div class="pay-label">Tarjeta</div>
+                                            </button>
+                                            <button wire:click="$set('pay_method', 'transfer')"
+                                                class="pay-btn {{ $pay_method === 'transfer' ? 'active' : '' }}">
+                                                <i class="bx bx-transfer"></i>
+                                                <div class="pay-label">Transferencia</div>
+                                            </button>
+                                            @if ($type === 'delivery')
+                                                <button wire:click="$set('pay_method', 'delivery')"
+                                                    class="pay-btn {{ $pay_method === 'delivery' ? 'active' : '' }}">
+                                                    <i class="bx bx-cycling"></i>
+                                                    <div class="pay-label">Contraentrega</div>
+                                                </button>
+                                            @endif
+                                        </div>
+
+                                        <div class="co-grid" style="margin-bottom:6px">
+                                            <div>
+                                                <label class="co-label">Monto</label>
+                                                <input type="number" wire:model="pay_amount" class="co-input"
+                                                    placeholder="0.00" step="0.50" min="0">
+                                            </div>
+                                            @if ($pay_method === 'cash')
+                                                <div>
+                                                    <label class="co-label">Con cuánto paga</label>
+                                                    <input type="number" wire:model="pay_cash_received"
+                                                        class="co-input" placeholder="0.00" step="0.50"
+                                                        min="0">
+                                                </div>
+                                            @elseif($pay_method === 'card')
+                                                <div>
+                                                    <label class="co-label">Últimos 4 dígitos</label>
+                                                    <input type="text" wire:model="pay_card_last4"
+                                                        class="co-input" placeholder="0000" maxlength="4">
+                                                </div>
+                                            @elseif($pay_method === 'transfer')
+                                                <div>
+                                                    <label class="co-label">Referencia</label>
+                                                    <input type="text" wire:model="pay_transfer_ref"
+                                                        class="co-input" placeholder="Núm. de referencia">
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        @if ($pay_method === 'cash' && $pay_cash_received > 0 && $pay_amount > 0)
+                                            <div
+                                                style="font-size:.75rem;color:var(--pos-accent3,#28a745);padding:4px 0">
+                                                Cambio:
+                                                ${{ number_format(max(0, $pay_cash_received - $pay_amount), 2) }}
+                                            </div>
+                                        @endif
+
+                                        <button wire:click="addPayment" class="pos-btn pos-btn-secondary"
+                                            style="width:100%;margin-top:4px;font-size:.8rem">
+                                            <i class="bx bx-plus me-1"></i>Agregar pago
+                                        </button>
+                                    </div>
+
+                                    @if ($notes)
+                                        <div
+                                            style="margin-top:12px;padding:8px 12px;background:var(--pos-bg);border-radius:var(--pos-radius-sm);border:1px solid var(--pos-border);font-size:.75rem;color:var(--pos-muted)">
+                                            <i class="bx bx-note me-1"></i>{{ $notes }}
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="modal-footer-pos">
+                                    <button wire:click="$set('showCheckoutModal', false)"
+                                        class="pos-btn pos-btn-secondary">
+                                        Cancelar
+                                    </button>
+
+                                    @if ($tableCheckoutMode)
+                                        <button wire:click="confirmTableCheckout" wire:loading.attr="disabled"
+                                            class="pos-btn pos-btn-primary">
+                                            <span wire:loading wire:target="confirmTableCheckout"
+                                                class="spinner-border spinner-border-sm"
+                                                style="width:14px;height:14px"></span>
+                                            <i wire:loading.remove wire:target="confirmTableCheckout"
+                                                class="bx bx-check-circle"></i>
+                                            Confirmar cobro
+                                        </button>
+                                    @else
+                                        {{-- Botón: Para recoger — envía a cocina sin cobrar, paga al pasar --}}
+                                        @if ($type !== 'delivery')
+                                        <button wire:click="submitPickupLater"
+                                                wire:loading.attr="disabled"
+                                                wire:target="submitPickupLater"
+                                                class="pos-btn pos-btn-pickup"
+                                                title="Envía el pedido a cocina ahora. El cliente paga cuando pase a recogerlo."
+                                                style="margin-right:auto">
+                                            <span wire:loading wire:target="submitPickupLater"
+                                                class="spinner-border spinner-border-sm"
+                                                style="width:14px;height:14px"></span>
+                                            <i wire:loading.remove wire:target="submitPickupLater"
+                                                class="bx bx-store-alt"></i>
+                                            Para recoger
+                                        </button>
+                                        @endif
+
+                                        <button wire:click="submitOrder" wire:loading.attr="disabled"
+                                            wire:target="submitOrder"
+                                            class="pos-btn pos-btn-primary">
+                                            <span wire:loading wire:target="submitOrder"
+                                                class="spinner-border spinner-border-sm"
+                                                style="width:14px;height:14px"></span>
+                                            <i wire:loading.remove wire:target="submitOrder" class="bx bx-send"></i>
+                                            Cobrar y enviar
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- ══════════════════════════════════════
+         MODAL: ADDON
+    ══════════════════════════════════════ --}}
+                    @if ($showAddonModal)
+                        <div class="pos-modal-wrap show" wire:click.self="$set('showAddonModal', false)">
+                            <div class="pos-modal addon-modal" @click.stop>
+                                <div class="modal-header-pos">
+                                    <div style="flex:1">
+                                        <h4 style="margin-bottom:2px">{{ $addonProductName }}</h4>
+                                        <small style="color:var(--pos-muted);font-size:.72rem">
+                                            Base: ${{ number_format($addonBasePrice, 2) }}
+                                        </small>
+                                    </div>
+                                    <button wire:click="$set('showAddonModal', false)"
+                                        class="pos-btn pos-btn-secondary" style="padding:4px 8px">
+                                        <i class="bx bx-x"></i>
+                                    </button>
+                                </div>
+                                <div class="modal-body-pos">
+                                    <div class="addon-qty-bar">
+                                        <span>Cantidad</span>
+                                        <div class="addon-qty-controls">
+                                            <button wire:click="$set('addonQty', max(1, addonQty - 1))"
+                                                class="addon-qty-btn">
+                                                <i class="bx bx-minus"></i>
+                                            </button>
+                                            <span class="addon-qty-val">{{ $addonQty }}</span>
+                                            <button wire:click="$set('addonQty', addonQty + 1)" class="addon-qty-btn">
+                                                <i class="bx bx-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    @foreach ($addonGroups as $group)
+                                        <div style="margin-bottom:20px">
+                                            <div class="addon-group-title">
+                                                {{ $group['name'] }}
+                                                @if ($group['is_required'])
+                                                    <span
+                                                        style="font-size:.6rem;padding:2px 7px;border-radius:20px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--pos-danger);font-weight:600">Obligatorio</span>
+                                                @else
+                                                    <span
+                                                        style="font-size:.6rem;padding:2px 7px;border-radius:20px;background:rgba(107,114,128,.1);border:1px solid var(--pos-border);color:var(--pos-muted);font-weight:600">Opcional</span>
+                                                @endif
+                                                @if ($group['type'] === 'multiple' && $group['max'] > 1)
+                                                    <span style="font-size:.6rem;color:var(--pos-muted)">Máx.
+                                                        {{ $group['max'] }}</span>
+                                                @endif
+                                            </div>
+                                            @foreach ($group['options'] as $option)
+                                                @php
+                                                    $sel = $addonSelections[$group['id']] ?? null;
+                                                    $checked = is_array($sel)
+                                                        ? in_array($option['id'], $sel)
+                                                        : $sel === $option['id'];
+                                                @endphp
+                                                <div wire:click="toggleAddonOption({{ $group['id'] }}, {{ $option['id'] }})"
+                                                    class="addon-option {{ $checked ? 'selected' : '' }}">
+                                                    <div class="addon-opt-left">
+                                                        <div
+                                                            class="addon-check {{ $group['type'] === 'single' ? 'radio' : '' }} {{ $checked ? 'selected' : '' }}">
+                                                            @if ($checked && $group['type'] !== 'single')
+                                                                <i class="bx bx-check"
+                                                                    style="color:#fff;font-size:.6rem"></i>
+                                                            @endif
+                                                        </div>
+                                                        <span class="addon-opt-name">{{ $option['name'] }}</span>
+                                                    </div>
+                                                    @if ($option['price'] > 0)
+                                                        <span
+                                                            class="addon-opt-price">+${{ number_format($option['price'], 2) }}</span>
+                                                    @else
+                                                        <span class="addon-opt-free">Gratis</span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                                <div class="modal-footer-pos">
+                                    <button wire:click="$set('showAddonModal', false)"
+                                        class="pos-btn pos-btn-secondary">Cancelar</button>
+                                    <button wire:click="confirmAddons" class="pos-btn pos-btn-primary">
+                                        <i class="bx bx-check"></i>
+                                        Agregar ·
+                                        @php
+                                            $extraTotal = 0;
+                                            foreach ($addonGroups as $g) {
+                                                $sel = $addonSelections[$g['id']] ?? null;
+                                                $ids = is_array($sel) ? $sel : ($sel !== null ? [$sel] : []);
+                                                foreach ($ids as $oid) {
+                                                    $opt = collect($g['options'])->firstWhere('id', $oid);
+                                                    if ($opt) {
+                                                        $extraTotal += $opt['price'];
+                                                    }
+                                                }
+                                            }
+                                        @endphp
+                                        ${{ number_format(($addonBasePrice + $extraTotal) * $addonQty, 2) }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- ══════════════════════════════════════
+         MODAL: GASTOS
+    ══════════════════════════════════════ --}}
+                    @if ($showExpenseModal)
+                        <div class="pos-modal-wrap show" wire:click.self="closeExpenseModal">
+                            <div class="pos-modal expense-modal" @click.stop>
+                                <div class="modal-header-pos">
+                                    <i class="bx bx-wallet" style="font-size:1.2rem;color:var(--pos-accent2)"></i>
+                                    <h4>Registrar gasto</h4>
+                                    <button wire:click="closeExpenseModal" class="pos-btn pos-btn-secondary"
+                                        style="padding:4px 8px">
+                                        <i class="bx bx-x"></i>
+                                    </button>
+                                </div>
+                                <div class="modal-body-pos">
+                                    <div class="co-grid">
+                                        <div>
+                                            <label class="co-label">Monto <span class="req">*</span></label>
+                                            <input type="number" wire:model="expense_amount" class="co-input"
+                                                placeholder="0.00" step="0.01">
+                                        </div>
+                                        <div>
+                                            <label class="co-label">Categoría</label>
+                                            <select wire:model="expense_category" class="co-input">
+                                                <option value="insumos">Insumos</option>
+                                                <option value="operativo">Operativo</option>
+                                                <option value="personal">Personal</option>
+                                                <option value="otro">Otro</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="co-grid full">
+                                        <div>
+                                            <label class="co-label">Descripción <span class="req">*</span></label>
+                                            <input type="text" wire:model="expense_description" class="co-input"
+                                                placeholder="¿En qué se gastó?">
+                                        </div>
+                                    </div>
+                                    <div class="co-grid">
+                                        <div>
+                                            <label class="co-label">Método de pago</label>
+                                            <select wire:model="expense_payment" class="co-input">
+                                                <option value="cash">Efectivo</option>
+                                                <option value="card">Tarjeta</option>
+                                                <option value="transfer">Transferencia</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer-pos">
+                                    <button wire:click="closeExpenseModal"
+                                        class="pos-btn pos-btn-secondary">Cancelar</button>
+                                    <button wire:click="saveExpense" wire:loading.attr="disabled"
+                                        class="pos-btn pos-btn-primary">
+                                        <i class="bx bx-save"></i> Guardar gasto
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- ══════════════════════════════════════
+         PANEL: MESAS
+    ══════════════════════════════════════ --}}
+                    <div class="pos-overlay-panel" :class="panels.mesas ? 'show' : ''">
+                        <div class="pos-overlay-backdrop" @click="panels.mesas = false"></div>
+                        <div class="pos-panel">
+                            <div class="panel-header">
+                                <i class="bx bx-table" style="font-size:1.1rem;color:var(--pos-accent)"></i>
+                                <h5>Cobrar mesa</h5>
+                                @if ($waitingTables->count() > 0)
+                                    <span
+                                        style="font-size:.68rem;padding:2px 8px;background:rgba(234,88,12,.15);color:#fb923c;border-radius:20px;font-weight:700">
+                                        {{ $waitingTables->count() }} esperando
+                                    </span>
+                                @endif
+                                <button class="btn-panel-close" @click="panels.mesas = false">
+                                    <i class="bx bx-x"></i>
+                                </button>
+                            </div>
+                            <div class="panel-body">
+                                @if ($waitingTables->isEmpty())
+                                    <div style="text-align:center;padding:48px 20px;color:var(--pos-muted)">
+                                        <i class="bx bx-table"
+                                            style="font-size:3rem;display:block;margin-bottom:10px;opacity:.3"></i>
+                                        <div style="font-weight:600;margin-bottom:4px;">Sin mesas esperando cobro</div>
+                                        <div style="font-size:.78rem;">Cuando un mesero envíe una mesa a caja,
+                                            aparecerá aquí.</div>
+                                    </div>
+                                @else
+                                    <div
+                                        style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--pos-muted);margin-bottom:12px;">
+                                        {{ $waitingTables->count() }} mesa(s) esperando cobro
+                                    </div>
+
+                                    @foreach ($waitingTables as $ts)
+                                        @php
+                                            $isSelected = $tableSessionId === $ts->id;
+                                            $activeOrders = $ts->orders->whereNotIn('status', ['cancelled'])->values();
+                                            $waitingTime = $ts->updated_at->diffForHumans(null, true);
+                                        @endphp
+                                        <div style="background:var(--pos-card);border:2px solid {{ $isSelected ? '#ea580c' : 'var(--pos-border)' }};
+                                            border-radius:14px;margin-bottom:12px;overflow:hidden;transition:border-color .15s;cursor:pointer;"
+                                            wire:click="selectTableSession({{ $ts->id }})">
+
+                                            {{-- Cabecera --}}
+                                            <div style="padding:14px 16px;display:flex;align-items:center;gap:12px;">
+                                                <div
+                                                    style="width:42px;height:42px;border-radius:10px;background:var(--pos-bg);
+                                                    display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                                    <i class="bx bx-table"
+                                                        style="font-size:1.3rem;color:#ea580c;"></i>
+                                                </div>
+                                                <div style="flex:1;min-width:0;">
+                                                    <div
+                                                        style="font-weight:800;color:var(--pos-text);font-size:.95rem;">
+                                                        {{ $ts->table?->name }}</div>
+                                                    <div
+                                                        style="font-size:.7rem;color:var(--pos-muted);margin-top:2px;">
+                                                        <i class="bx bx-time"></i> {{ $waitingTime }}
+                                                        @if ($ts->party_name)
+                                                            · {{ $ts->party_name }}
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div style="text-align:right;flex-shrink:0;">
+                                                    <div style="font-size:1.2rem;font-weight:900;color:#fb923c;">
+                                                        ${{ number_format($ts->total, 2) }}</div>
+                                                </div>
+                                                <i class="bx {{ $isSelected ? 'bx-chevron-up' : 'bx-chevron-down' }}"
+                                                    style="color:var(--pos-muted);font-size:1.1rem;flex-shrink:0;"></i>
+                                            </div>
+
+                                            {{-- Detalle expandido --}}
+                                            @if ($isSelected)
+                                                <div style="border-top:1px solid var(--pos-border);" wire:click.stop>
+
+                                                    {{-- Items --}}
+                                                    <div style="padding:12px 16px;background:var(--pos-bg);">
+                                                        <div
+                                                            style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--pos-muted);margin-bottom:8px;">
+                                                            Consumo
+                                                        </div>
+                                                        @foreach ($activeOrders as $order)
+                                                            @foreach ($order->items as $item)
+                                                                <div
+                                                                    style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--pos-border);">
+                                                                    <span
+                                                                        style="background:var(--pos-card);color:var(--pos-muted);border-radius:6px;
+                                                             width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+                                                             font-size:.72rem;font-weight:800;flex-shrink:0;">{{ $item->quantity }}</span>
+                                                                    <span
+                                                                        style="flex:1;font-size:.82rem;color:var(--pos-text);">{{ $item->name }}</span>
+                                                                    <span
+                                                                        style="font-size:.82rem;font-weight:700;color:var(--pos-text-muted);">${{ number_format($item->total_price, 2) }}</span>
+                                                                </div>
+                                                            @endforeach
+                                                        @endforeach
+                                                        <div
+                                                            style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:2px solid var(--pos-border);">
+                                                            <span
+                                                                style="font-size:.85rem;font-weight:700;color:var(--pos-muted);">TOTAL</span>
+                                                            <span
+                                                                style="font-size:1.3rem;font-weight:900;color:#fb923c;">${{ number_format($ts->total, 2) }}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Cobro --}}
+                                                    <div style="padding:16px;" wire:click.stop>
+                                                        @php
+                                                            $tsSplitParts = \App\Models\SplitPart::where(
+                                                                'table_session_id',
+                                                                $ts->id,
+                                                            )
+                                                                ->orderBy('part_number')
+                                                                ->get();
+                                                            $hasSplitParts = $tsSplitParts->isNotEmpty();
+                                                        @endphp
+
+                                                        {{-- ── SUB-CUENTAS (si el mesero dividió la cuenta) ── --}}
+                                                        @if ($hasSplitParts)
+                                                            <div
+                                                                style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--pos-muted);margin-bottom:8px;">
+                                                                <i class="bx bx-food-menu me-1"></i>Sub-cuentas
+                                                                ({{ $tsSplitParts->where('status', 'paid')->count() }}/{{ $tsSplitParts->count() }}
+                                                                cobradas)
+                                                            </div>
+
+                                                            @foreach ($tsSplitParts as $sp)
+                                                                @php
+                                                                    $spColor =
+                                                                        $sp->status === 'paid'
+                                                                            ? '#4ade80'
+                                                                            : ($sp->status === 'pending_payment'
+                                                                                ? '#fb923c'
+                                                                                : 'var(--pos-border)');
+                                                                @endphp
+                                                                <div
+                                                                    style="border:2px solid {{ $spColor }};border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--pos-card);">
+                                                                    {{-- Part header --}}
+                                                                    <div
+                                                                        style="padding:10px 12px;display:flex;align-items:center;gap:10px;background:{{ $sp->status === 'paid' ? 'rgba(74,222,128,.08)' : 'var(--pos-bg)' }};">
+                                                                        <div
+                                                                            style="width:26px;height:26px;border-radius:50%;background:{{ $sp->status === 'paid' ? '#4ade80' : '#ea580c' }};display:flex;align-items:center;justify-content:center;color:#fff;font-size:.72rem;font-weight:800;flex-shrink:0;">
+                                                                            {{ $sp->status === 'paid' ? '' : $sp->part_number }}
+                                                                        </div>
+                                                                        <div style="flex:1;min-width:0;">
+                                                                            <div
+                                                                                style="font-size:.82rem;font-weight:700;color:var(--pos-text);">
+                                                                                {{ $sp->label }}</div>
+                                                                            @if ($sp->status === 'paid')
+                                                                                <div
+                                                                                    style="font-size:.68rem;color:#4ade80;font-weight:600;">
+                                                                                    Pagado ·
+                                                                                    {{ ucfirst($sp->payment_method ?? '') }}
+                                                                                </div>
+                                                                            @elseif($sp->status === 'pending_payment')
+                                                                                <div
+                                                                                    style="font-size:.68rem;color:#fb923c;font-weight:600;">
+                                                                                    En caja — pendiente de cobro
+                                                                                </div>
+                                                                            @endif
+                                                                        </div>
+                                                                        <div
+                                                                            style="font-size:.92rem;font-weight:900;color:#fb923c;">
+                                                                            ${{ number_format($sp->total, 2) }}</div>
+
+                                                                        @if ($sp->status !== 'paid')
+                                                                            {{-- Abre el modal de checkout reutilizado --}}
+                                                                            <button
+                                                                                wire:click="openTableCheckoutModal({{ $ts->id }}, {{ $sp->id }})"
+                                                                                style="padding:5px 10px;border-radius:7px;border:none;font-size:.72rem;font-weight:700;cursor:pointer;background:#ea580c;color:#fff;">
+                                                                                Cobrar
+                                                                            </button>
+                                                                        @endif
+                                                                    </div>
+
+                                                                    {{-- Items de la sub-cuenta --}}
+                                                                    @if (!empty($sp->item_ids))
+                                                                        <div
+                                                                            style="padding:6px 12px 8px;border-top:1px solid var(--pos-border);">
+                                                                            @foreach (\App\Models\OrderItem::whereIn('id', $sp->item_ids)->get() as $spItem)
+                                                                                <div
+                                                                                    style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--pos-muted);padding:2px 0;">
+                                                                                    <span>{{ $spItem->quantity }}×
+                                                                                        {{ $spItem->name }}</span>
+                                                                                    <span>${{ number_format($spItem->total_price, 2) }}</span>
+                                                                                </div>
+                                                                            @endforeach
+                                                                        </div>
+                                                                    @endif
+                                                                </div>
+                                                            @endforeach
+
+                                                            {{-- Show full payment section only when no split parts or all paid --}}
+                                                            @if ($tsSplitParts->where('status', '!=', 'paid')->isEmpty())
+                                                                <div
+                                                                    style="text-align:center;padding:12px;font-size:.78rem;color:#4ade80;font-weight:700;">
+                                                                    <i class="bx bx-check-circle"
+                                                                        style="font-size:1.5rem;display:block;margin-bottom:4px;"></i>
+                                                                    Todas las sub-cuentas han sido cobradas
+                                                                </div>
+                                                            @endif
+                                                        @else
+                                                            {{-- ── COBRO COMPLETO (sin división) — abre el modal de checkout reutilizado ── --}}
+                                                            <div
+                                                                style="padding:16px;display:flex;flex-direction:column;gap:8px;">
+                                                                <div
+                                                                    style="background:var(--pos-bg);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:.82rem">
+                                                                    <span style="color:var(--pos-muted)">Total a
+                                                                        cobrar</span>
+                                                                    <span
+                                                                        style="font-size:1.2rem;font-weight:900;color:#fb923c">${{ number_format($ts->total, 2) }}</span>
+                                                                </div>
+                                                                <button
+                                                                    wire:click="openTableCheckoutModal({{ $ts->id }})"
+                                                                    wire:loading.attr="disabled"
+                                                                    style="width:100%;padding:13px;border-radius:10px;border:none;cursor:pointer;font-weight:800;font-size:.9rem;
+                                                                background:linear-gradient(135deg,#ea580c,#c2410c);color:#fff;
+                                                                display:flex;align-items:center;justify-content:center;gap:8px;
+                                                                box-shadow:0 4px 14px rgba(234,88,12,.3);">
+                                                                    <span wire:loading.remove
+                                                                        wire:target="openTableCheckoutModal">
+                                                                        <i class="bx bx-credit-card me-1"></i>
+                                                                        Cobrar mesa —
+                                                                        ${{ number_format($ts->total, 2) }}
+                                                                    </span>
+                                                                    <span wire:loading
+                                                                        wire:target="openTableCheckoutModal">
+                                                                        <span
+                                                                            class="spinner-border spinner-border-sm"></span>
+                                                                        Cargando…
+                                                                    </span>
+                                                                </button>
+                                                                <button data-bs-toggle="modal"
+                                                                    data-bs-target="#modalReabrirMesa"
+                                                                    data-session-id="{{ $ts->id }}"
+                                                                    style="width:100%;padding:9px;border-radius:9px;border:1.5px solid var(--pos-border);background:var(--pos-bg);
+                                                                color:var(--pos-muted);font-size:.78rem;font-weight:700;cursor:pointer;">
+                                                                    <i class="bx bx-door-open me-1"></i>Reabrir mesa
+                                                                </button>
+                                                                <div
+                                                                    style="text-align:center;font-size:.7rem;color:var(--pos-muted);">
+                                                                    Al confirmar, la mesa quedará libre automáticamente
+                                                                </div>
+                                                            </div>
+                                                        @endif {{-- /hasSplitParts --}}
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ══════════════════════════════════════
+         PANEL: PEDIDOS DE HOY
+    ══════════════════════════════════════ --}}
+                    <div class="pos-overlay-panel" :class="panels.orders ? 'show' : ''">
+                        <div class="pos-overlay-backdrop" @click="panels.orders = false"></div>
+                        <div class="pos-panel pos-panel-right">
+                            <div class="panel-header">
+                                <i class="bx bx-receipt" style="font-size:1.1rem;color:var(--pos-accent)"></i>
+                                <h5>Pedidos de hoy</h5>
+                                <a href="{{ route('app.orders.index') }}"
+                                    style="font-size:.72rem;color:var(--pos-accent);text-decoration:none;margin-right:8px">Ver
+                                    todos →</a>
+                                <button class="btn-panel-close" @click="panels.orders = false">
+                                    <i class="bx bx-x"></i>
+                                </button>
+                            </div>
+                            <div class="panel-body">
+                                @forelse($recentOrders as $ro)
+                                    <div class="recent-order-row">
+                                        <i class="{{ $ro->type_icon }} text-{{ $ro->type_color }}"
+                                            style="font-size:1.1rem;flex-shrink:0"></i>
+                                        <div class="recent-order-info">
+                                            <div style="display:flex;align-items:center;gap:6px">
+                                                <span class="recent-order-num">#{{ $ro->order_number }}</span>
+                                                <span class="recent-order-name">{{ $ro->customer_summary }}</span>
+                                            </div>
+                                            <div class="recent-order-meta">{{ $ro->items->count() }} ítem(s) ·
+                                                ${{ number_format($ro->total, 2) }}</div>
+                                        </div>
+                                        <span class="status-pill"
+                                            style="background:rgba(108,122,252,.1);border:1px solid rgba(108,122,252,.25);color:var(--pos-accent)">
+                                            {{ $ro->status_label }}
+                                        </span>
+                                    </div>
+                                @empty
+                                    <div style="text-align:center;padding:40px 20px;color:var(--pos-muted)">
+                                        <i class="bx bx-receipt"
+                                            style="font-size:2.5rem;display:block;margin-bottom:8px"></i>
+                                        <span style="font-size:.82rem">Sin pedidos por el momento</span>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ══════════════════════════════════════
+         PANEL: PASAR A BUSCAR (PICKUP PAYMENT)
+    ══════════════════════════════════════ --}}
+                    <div class="pos-overlay-panel" :class="panels.pickup ? 'show' : ''">
+                        <div class="pos-overlay-backdrop" @click="panels.pickup = false; $wire.clearPickupOrder()">
+                        </div>
+                        <div class="pos-panel pos-panel-right" style="width:420px;max-width:100vw">
+                            <div class="panel-header">
+                                <i class="bx bx-store-alt" style="font-size:1.1rem;color:#f59e0b"></i>
+                                <h5>Pasar a buscar</h5>
+                                <button class="btn-panel-close"
+                                    @click="panels.pickup = false; $wire.clearPickupOrder()">
+                                    <i class="bx bx-x"></i>
+                                </button>
+                            </div>
+
+                            @if (!$pickupOrderId)
+                                {{-- Vista: listado de pedidos pendientes --}}
+                                <div class="panel-body">
+                                    <div style="margin-bottom:12px">
+                                        <div class="search-wrap">
+                                            <i class="bx bx-search si-icon"></i>
+                                            <input type="text" class="pos-input"
+                                                style="width:100%;padding-left:32px"
+                                                wire:model.live.debounce.300ms="pickupSearch"
+                                                placeholder="# pedido, nombre o teléfono…">
+                                        </div>
+                                    </div>
+                                    <div
+                                        style="font-size:.72rem;color:var(--pos-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
+                                        Pedidos pendientes de cobro
+                                    </div>
+                                    @forelse($pickupOrders as $po)
+                                        @php $poIsPosPickup = $po->payments->isEmpty(); @endphp
+                                        <div class="recent-order-row" style="cursor:pointer"
+                                            wire:click="selectPickupOrder({{ $po->id }})">
+                                            <div
+                                                style="width:36px;height:36px;border-radius:10px;background:{{ $poIsPosPickup ? 'rgba(245,158,11,.18)' : 'rgba(245,158,11,.12)' }};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                                <i class="bx {{ $poIsPosPickup ? 'bx-store-alt' : 'bx-mobile-alt' }}" style="color:#f59e0b;font-size:1rem"></i>
+                                            </div>
+                                            <div class="recent-order-info" style="flex:1">
+                                                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                                                    <span class="recent-order-num">#{{ $po->order_number }}</span>
+                                                    <span class="badge"
+                                                        style="background:rgba(245,158,11,.15);color:#b45309;font-size:.65rem;border-radius:100px;padding:2px 8px">
+                                                        @if($poIsPosPickup)
+                                                            <i class="bx bx-store-alt" style="font-size:.6rem"></i> Para recoger
+                                                        @else
+                                                            {{ $po->type === 'online' ? 'Digital' : 'Ventanilla' }}
+                                                        @endif
+                                                    </span>
+                                                    <span class="badge bg-label-{{ $po->status_color ?? 'warning' }}"
+                                                        style="font-size:.65rem">
+                                                        {{ $po->status_label ?? $po->status }}
+                                                    </span>
+                                                </div>
+                                                <div style="font-size:.8rem;color:var(--pos-text)">
+                                                    {{ $po->customer_name ?: 'Sin nombre' }}
+                                                    @if ($po->customer_phone)
+                                                        · <span
+                                                            style="color:var(--pos-muted)">{{ $po->customer_phone }}</span>
+                                                    @endif
+                                                </div>
+                                                <div style="font-size:.75rem;color:var(--pos-muted)">
+                                                    {{ $po->items->count() }} art. ·
+                                                    {{ $po->created_at->format('H:i') }}
+                                                </div>
+                                            </div>
+                                            <div
+                                                style="font-size:.9rem;font-weight:700;color:var(--pos-text);flex-shrink:0">
+                                                ${{ number_format($po->total, 2) }}
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div style="text-align:center;padding:40px 20px;color:var(--pos-muted)">
+                                            <i class="bx bx-check-circle"
+                                                style="font-size:2.5rem;display:block;margin-bottom:8px;color:#22c55e"></i>
+                                            <span style="font-size:.82rem">Sin pedidos pendientes de cobro</span>
+                                        </div>
+                                    @endforelse
+                                </div>
+                            @else
+                                {{-- Vista: cobrar pedido seleccionado --}}
+                                @php
+                                    $po = $pickupOrders->firstWhere('id', $pickupOrderId)
+                                        ?? \App\Models\Order::with(['items','payments'])->find($pickupOrderId);
+                                    $isDigital  = $po && $po->payments->whereNull('cash_register_id')->isNotEmpty();
+                                    $isPosPickup = $po && $po->payments->isEmpty(); // POS "Para recoger"
+                                    $intentLabel = match($pickupIntentMethod) {
+                                        'transfer' => 'Transferencia',
+                                        'cash'     => 'Efectivo',
+                                        default    => 'Pago al recoger',
+                                    };
+                                @endphp
+                                @if ($po)
+                                    <div class="panel-body" style="display:flex;flex-direction:column;gap:14px">
+
+                                        {{-- Header del pedido --}}
+                                        <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:12px 14px">
+                                            {{-- Título y botón volver --}}
+                                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                                                <div style="display:flex;align-items:center;gap:8px">
+                                                    <span style="font-weight:700;font-size:.9rem">#{{ $po->order_number }}</span>
+                                                    @if ($isPosPickup)
+                                                    <span class="badge" style="background:rgba(245,158,11,.2);color:#b45309;font-size:.62rem;border-radius:100px;padding:2px 8px">
+                                                        <i class="bx bx-store-alt" style="font-size:.6rem"></i> Para recoger
+                                                    </span>
+                                                    @else
+                                                    <span class="badge" style="background:rgba(245,158,11,.2);color:#b45309;font-size:.62rem;border-radius:100px;padding:2px 8px">
+                                                        {{ $po->type === 'online' ? 'Digital' : 'Ventanilla' }}
+                                                    </span>
+                                                    @endif
+                                                    <span class="badge bg-label-{{ $po->status_color }}" style="font-size:.62rem">
+                                                        {{ $po->status_label }}
+                                                    </span>
+                                                </div>
+                                                <button wire:click="clearPickupOrder" style="background:none;border:none;color:var(--pos-muted);cursor:pointer;padding:2px">
+                                                    <i class="bx bx-arrow-back" style="font-size:.9rem"></i> Volver
+                                                </button>
+                                            </div>
+
+                                            {{-- Cliente --}}
+                                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                                                <div style="width:32px;height:32px;border-radius:50%;background:rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                                                    <i class="bx bx-user" style="color:#f59e0b;font-size:1rem"></i>
+                                                </div>
+                                                <div>
+                                                    <div style="font-size:.85rem;font-weight:600;color:var(--pos-text)">
+                                                        {{ $po->customer_name ?: 'Sin nombre' }}
+                                                    </div>
+                                                    @if ($po->customer_phone)
+                                                        <div style="font-size:.75rem;color:var(--pos-muted)">
+                                                            <i class="bx bx-phone" style="font-size:.7rem"></i>
+                                                            {{ $po->customer_phone }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            {{-- Ítems --}}
+                                            <div style="border-top:1px dashed rgba(245,158,11,.3);padding-top:8px">
+                                                @foreach ($po->items as $item)
+                                                    <div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--pos-muted);margin-bottom:2px">
+                                                        <span>{{ $item->quantity }}× {{ $item->name }}</span>
+                                                        <span>${{ number_format($item->total_price, 2) }}</span>
+                                                    </div>
+                                                @endforeach
+
+                                                {{-- Subtotal + descuento + total --}}
+                                                @if ($pickupDiscount > 0)
+                                                    <div style="border-top:1px dashed rgba(245,158,11,.2);margin-top:6px;padding-top:6px">
+                                                        <div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--pos-muted)">
+                                                            <span>Subtotal</span>
+                                                            <span>${{ number_format($pickupSubtotal, 2) }}</span>
+                                                        </div>
+                                                        <div style="display:flex;justify-content:space-between;font-size:.78rem;color:#22c55e">
+                                                            <span><i class="bx bx-purchase-tag-alt"></i> Descuento (cupón)</span>
+                                                            <span>-${{ number_format($pickupDiscount, 2) }}</span>
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                                <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.95rem;margin-top:6px;border-top:1px solid rgba(245,158,11,.3);padding-top:6px">
+                                                    <span>Total</span>
+                                                    <span style="color:#f59e0b">${{ number_format($po->total, 2) }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- Banner: método de pago declarado por el cliente --}}
+                                        @if ($pickupIntentMethod === 'transfer')
+                                            <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:10px 12px">
+                                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                                                    <i class="bx bx-transfer" style="color:#3b82f6;font-size:1.1rem"></i>
+                                                    <span style="font-size:.8rem;font-weight:600;color:#1d4ed8">Cliente indicó pago por transferencia</span>
+                                                </div>
+                                                @if ($pickupIntentRef)
+                                                    <div style="font-size:.75rem;color:var(--pos-muted)">
+                                                        Referencia: <strong style="color:var(--pos-text)">{{ $pickupIntentRef }}</strong>
+                                                    </div>
+                                                @else
+                                                    <div style="font-size:.75rem;color:var(--pos-muted)">Sin referencia proporcionada</div>
+                                                @endif
+                                            </div>
+                                        @elseif ($pickupIntentMethod === 'delivery' || $pickupIntentMethod === null && $isDigital)
+                                            <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:10px;padding:10px 12px">
+                                                <div style="display:flex;align-items:center;gap:8px">
+                                                    <i class="bx bx-store-alt" style="color:#22c55e;font-size:1rem"></i>
+                                                    <span style="font-size:.8rem;color:#15803d">Cliente paga al recoger (efectivo u otro)</span>
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        {{-- Pagos registrados --}}
+                                        @if (!empty($pickupPayments))
+                                            <div>
+                                                <div
+                                                    style="font-size:.72rem;color:var(--pos-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+                                                    Pagos</div>
+                                                @foreach ($pickupPayments as $pi => $pp)
+                                                    <div
+                                                        style="display:flex;align-items:center;justify-content:space-between;background:var(--pos-surface);border:1px solid var(--pos-border);border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:.82rem">
+                                                        <div style="display:flex;align-items:center;gap:8px">
+                                                            <i class="bx {{ $pp['method'] === 'cash' ? 'bx-money' : ($pp['method'] === 'card' ? 'bx-credit-card' : 'bx-transfer') }}"
+                                                                style="color:var(--pos-accent)"></i>
+                                                            <span>{{ ['cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia'][$pp['method']] ?? $pp['method'] }}</span>
+                                                            @if (isset($pp['cash_change']) && $pp['cash_change'] > 0)
+                                                                <span
+                                                                    style="color:var(--pos-muted);font-size:.72rem">cambio:
+                                                                    ${{ number_format($pp['cash_change'], 2) }}</span>
+                                                            @endif
+                                                        </div>
+                                                        <div style="display:flex;align-items:center;gap:8px">
+                                                            <span
+                                                                style="font-weight:700">${{ number_format($pp['amount'], 2) }}</span>
+                                                            <button
+                                                                wire:click="removePickupPayment({{ $pi }})"
+                                                                style="background:none;border:none;color:var(--pos-danger);cursor:pointer;padding:0 2px"><i
+                                                                    class="bx bx-x"></i></button>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                                @php
+                                                    $pickupPaid = collect($pickupPayments)->sum('amount');
+                                                    $pickupRemaining = max(0, $po->total - $pickupPaid);
+                                                @endphp
+                                                @if ($pickupRemaining > 0)
+                                                    <div
+                                                        style="font-size:.8rem;color:var(--pos-muted);text-align:right">
+                                                        Restante: <strong
+                                                            style="color:var(--pos-danger)">${{ number_format($pickupRemaining, 2) }}</strong>
+                                                    </div>
+                                                @else
+                                                    <div
+                                                        style="font-size:.8rem;color:#22c55e;text-align:right;font-weight:700">
+                                                        <i class="bx bx-check-circle"></i> Pago completo
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+
+                                        {{-- Nuevo pago --}}
+                                        @php
+                                            $pickupPaidTotal = collect($pickupPayments)->sum('amount');
+                                            $pickupRem = max(0, $po->total - $pickupPaidTotal);
+                                        @endphp
+                                        @if ($pickupRem > 0 || empty($pickupPayments))
+                                            <div
+                                                style="background:var(--pos-surface);border:1px solid var(--pos-border);border-radius:12px;padding:14px">
+                                                <div
+                                                    style="font-size:.72rem;color:var(--pos-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+                                                    Forma de pago</div>
+                                                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+                                                    @foreach (['cash' => ['Efectivo', 'bx-money'], 'card' => ['Tarjeta', 'bx-credit-card'], 'transfer' => ['Transferencia', 'bx-transfer']] as $m => [$ml, $mi])
+                                                        <button
+                                                            wire:click="$set('pickupPayMethod','{{ $m }}')"
+                                                            class="pos-btn {{ $pickupPayMethod === $m ? 'pos-btn-primary' : 'pos-btn-secondary' }}"
+                                                            style="flex:1;padding:7px 8px;font-size:.75rem;min-width:80px">
+                                                            <i class="bx {{ $mi }}"></i>
+                                                            {{ $ml }}
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                                <div style="margin-bottom:8px">
+                                                    <div
+                                                        style="font-size:.72rem;color:var(--pos-muted);margin-bottom:4px">
+                                                        Monto</div>
+                                                    <input type="number" wire:model.live="pickupPayAmount"
+                                                        class="pos-input" style="width:100%" placeholder="0.00"
+                                                        step="0.01" min="0">
+                                                </div>
+                                                @if ($pickupPayMethod === 'cash')
+                                                    <div style="margin-bottom:8px">
+                                                        <div
+                                                            style="font-size:.72rem;color:var(--pos-muted);margin-bottom:4px">
+                                                            Efectivo recibido</div>
+                                                        <input type="number" wire:model.live="pickupPayReceived"
+                                                            class="pos-input" style="width:100%" placeholder="0.00"
+                                                            step="0.01" min="0">
+                                                        @if ((float) $pickupPayReceived > 0 && (float) $pickupPayAmount > 0)
+                                                            <div
+                                                                style="font-size:.78rem;color:var(--pos-muted);margin-top:4px">
+                                                                Cambio: <strong
+                                                                    style="color:var(--pos-text)">${{ number_format(max(0, (float) $pickupPayReceived - (float) $pickupPayAmount), 2) }}</strong>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                @elseif($pickupPayMethod === 'card')
+                                                    <div style="margin-bottom:8px">
+                                                        <div
+                                                            style="font-size:.72rem;color:var(--pos-muted);margin-bottom:4px">
+                                                            Últimos 4 dígitos</div>
+                                                        <input type="text" wire:model="pickupPayCard"
+                                                            class="pos-input" style="width:100%" placeholder="0000"
+                                                            maxlength="4">
+                                                    </div>
+                                                @elseif($pickupPayMethod === 'transfer')
+                                                    <div style="margin-bottom:8px">
+                                                        <div
+                                                            style="font-size:.72rem;color:var(--pos-muted);margin-bottom:4px">
+                                                            Referencia</div>
+                                                        <input type="text" wire:model="pickupPayRef"
+                                                            class="pos-input" style="width:100%"
+                                                            placeholder="Ref. transferencia">
+                                                    </div>
+                                                @endif
+                                                <button wire:click="addPickupPayment"
+                                                    class="pos-btn pos-btn-secondary"
+                                                    style="width:100%;margin-top:4px">
+                                                    <i class="bx bx-plus"></i> Agregar pago
+                                                </button>
+                                            </div>
+                                        @endif
+
+                                        {{-- Confirmar --}}
+                                        @php $canConfirm = !empty($pickupPayments) && collect($pickupPayments)->sum('amount') >= $po->total; @endphp
+                                        <button wire:click="confirmPickupPayment" wire:loading.attr="disabled"
+                                            wire:target="confirmPickupPayment" @click="panels.pickup = false"
+                                            class="pos-btn pos-btn-primary"
+                                            style="width:100%;padding:13px;font-size:.95rem;{{ $canConfirm ? '' : 'opacity:.5;cursor:not-allowed' }}"
+                                            {{ $canConfirm ? '' : 'disabled' }}>
+                                            <span wire:loading wire:target="confirmPickupPayment"><i
+                                                    class="bx bx-loader-alt bx-spin"></i></span>
+                                            <i wire:loading.remove wire:target="confirmPickupPayment"
+                                                class="bx bx-check-circle"></i>
+                                            Confirmar cobro · ${{ number_format($po->total, 2) }}
+                                        </button>
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- ══════════════════════════════════════
+         PANEL: REIMPRIMIR
+    ══════════════════════════════════════ --}}
+                    <div class="pos-overlay-panel" :class="panels.reprint ? 'show' : ''">
+                        <div class="pos-overlay-backdrop" @click="panels.reprint = false"></div>
+                        <div class="pos-panel pos-panel-right">
+                            <div class="panel-header">
+                                <i class="bx bx-printer" style="font-size:1.1rem;color:var(--pos-accent)"></i>
+                                <h5>Reimprimir ticket</h5>
+                                <button class="btn-panel-close" @click="panels.reprint = false">
+                                    <i class="bx bx-x"></i>
+                                </button>
+                            </div>
+                            <div class="panel-body">
+                                <div style="margin-bottom:12px">
+                                    <div class="search-wrap">
+                                        <i class="bx bx-search si-icon"></i>
+                                        <input type="text" class="pos-input" style="width:100%;padding-left:32px"
+                                            wire:model.live.debounce.300ms="reprintSearch"
+                                            placeholder="Buscar por # pedido o cliente…">
+                                    </div>
+                                </div>
+                                @forelse($recentOrders as $ro)
+                                    <div class="recent-order-row">
+                                        <i class="{{ $ro->type_icon }} text-{{ $ro->type_color }}"
+                                            style="font-size:1.1rem;flex-shrink:0"></i>
+                                        <div class="recent-order-info">
+                                            <div style="display:flex;align-items:center;gap:6px">
+                                                <span class="recent-order-num">#{{ $ro->order_number }}</span>
+                                                <span class="recent-order-name">{{ $ro->customer_summary }}</span>
+                                            </div>
+                                            <div class="recent-order-meta">${{ number_format($ro->total, 2) }}</div>
+                                        </div>
+                                        <button wire:click="openReprintModal({{ $ro->id }})"
+                                            @click="panels.reprint = false" class="pos-btn pos-btn-secondary"
+                                            style="padding:5px 10px;font-size:.72rem">
+                                            <i class="bx bx-printer"></i>
+                                        </button>
+                                    </div>
+                                @empty
+                                    <div style="text-align:center;padding:40px 20px;color:var(--pos-muted)">
+                                        <i class="bx bx-printer"
+                                            style="font-size:2.5rem;display:block;margin-bottom:8px"></i>
+                                        <span style="font-size:.82rem">Sin pedidos para reimprimir</span>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>{{-- /pos-shell --}}
+        @endif {{-- /hasOpenRegister --}}
+    @endif {{-- /@else (business + branch) --}}
+
+    {{-- ══════════════════════════════════════
+         MODAL BOOTSTRAP: REIMPRIMIR TICKET
+    ══════════════════════════════════════ --}}
+    {{-- Modal ticket — Bootstrap controla apertura/cierre; Livewire NO toca el DOM --}}
+    <div class="modal fade" id="posReprintModal" tabindex="-1" aria-labelledby="posReprintModalLabel"
+        aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-1">
+                    <h5 class="modal-title fw-bold" id="posReprintModalLabel">
+                        <i class='bx bx-receipt me-2' style="color:var(--pos-accent)"></i>Ticket
+                    </h5>
+                    {{-- Solo data-bs-dismiss — sin wire:click para no provocar re-render --}}
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <iframe id="pos-reprint-iframe"
+                        style="width:100%;height:500px;border:none;border-radius:0 0 8px 8px;"
+                        srcdoc=""></iframe>
+                </div>
+                <div class="modal-footer border-0 pt-1 gap-2">
+                    <button type="button" class="btn btn-outline-success btn-sm"
+                            onclick="posShareWhatsapp()" title="Enviar por WhatsApp">
+                        <i class='bx bxl-whatsapp me-1'></i>WhatsApp
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            onclick="posDownloadTicket()" title="Descargar HTML imprimible">
+                        <i class='bx bx-download me-1'></i>Descargar
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        <i class='bx bx-x me-1'></i>Cerrar
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="posReprintPrint()">
+                        <i class='bx bx-printer me-1'></i>Imprimir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Solicitar permiso de notificación solo desde un gesto explícito del usuario
+        // (los navegadores bloquean requestPermission fuera de un evento de usuario)
+        function posRequestNotifPermission() {
+            if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
+        // ── Todos los Livewire.on() dentro de livewire:init — Livewire 3 requiere esto ──
+        document.addEventListener('livewire:init', function () {
+
+        // pos-print-ticket: print the ticket HTML via iframe
+        Livewire.on('pos-print-ticket', ({
+            html
+        }) => {
+            const f = document.getElementById('pos-reprint-iframe');
+            if (f) {
+                f.srcdoc = html;
+                f.onload = () => {
+                    try {
+                        f.contentWindow.print();
+                    } catch (e) {}
+                };
+            }
+        });
+
+        document.addEventListener('download-pdf', function(event) {
+            event.stopImmediatePropagation();
+            setTimeout(function() {
+                try {
+                    const {
+                        content,
+                        filename
+                    } = event.detail;
+                    const binary = atob(content);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], {
+                        type: 'application/pdf'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.error('Error downloading PDF:', e);
+                }
+            }, 100);
+        });
+
+        document.addEventListener('download-ticket', function(event) {
+            event.stopImmediatePropagation();
+            setTimeout(function() {
+                try {
+                    const {
+                        html,
+                        filename
+                    } = event.detail;
+                    const blob = new Blob([html], {
+                        type: 'text/html'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.error('Error downloading ticket:', e);
+                }
+            }, 100);
+        });
+
+        document.addEventListener('open-whatsapp', function(event) {
+            event.stopImmediatePropagation();
+            setTimeout(function() {
+                try {
+                    const {
+                        url
+                    } = event.detail;
+                    window.open(url, '_blank');
+                } catch (e) {
+                    console.error('Error opening WhatsApp:', e);
+                }
+            }, 100);
+        });
+
+        Livewire.on('pos-show-bill', ({
+            html
+        }) => {
+            document.getElementById('pos-bill-iframe').srcdoc = html;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('posModalTicket')).show();
+        });
+
+        // Abrir modal de reimpresión/cobro vía evento de Livewire
+        Livewire.on('pos-reprint-show', ({
+            html
+        }) => {
+            const iframe = document.getElementById('pos-reprint-iframe');
+            const modalEl = document.getElementById('posReprintModal');
+            if (!iframe || !modalEl) return;
+
+            iframe.srcdoc = html;
+            // Auto-print solo cuando el iframe termina de cargar y el modal está visible
+            iframe.onload = function() {
+                try {
+                    iframe.contentWindow.print();
+                } catch (e) {}
+            };
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        });
+
+        }); // fin livewire:init
+
+        window.posPrintBill = function() {
+            try { document.getElementById('pos-bill-iframe').contentWindow.print(); } catch(e) {}
+        };
+
+        window.posReprintPrint = function() {
+            try { document.getElementById('pos-reprint-iframe').contentWindow.print(); } catch(e) {}
+        };
+
+        // Descargar el HTML del ticket directamente desde el iframe (sin PDF, sin backend)
+        window.posDownloadTicket = function() {
+            try {
+                const iframe = document.getElementById('pos-reprint-iframe');
+                const html = iframe?.srcdoc || '';
+                if (!html) return;
+                const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href = url;
+                a.download = 'ticket-' + Date.now() + '.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch(e) { console.warn('posDownloadTicket:', e); }
+        };
+
+        // Compartir por WhatsApp — delegado al handler de Livewire
+        window.posShareWhatsapp = function() {
+            const comp = Livewire.getByName('pos')[0] ?? null;
+            if (comp) comp.call('shareTicketWhatsapp');
+        };
+
+        // ── Limpiar backdrop zombi al cerrar el modal ────────────────────────────
+        // Razón: si Livewire re-renderiza mientras Bootstrap anima el cierre, el
+        // backdrop puede quedar en el DOM. Este handler lo limpia siempre.
+        const _reprintModal = document.getElementById('posReprintModal');
+        if (_reprintModal) {
+            _reprintModal.addEventListener('hidden.bs.modal', function() {
+                // Forzar limpieza de cualquier backdrop residual
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            });
+        }
+        const _billModal = document.getElementById('posModalTicket');
+        if (_billModal) {
+            _billModal.addEventListener('hidden.bs.modal', function() {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            });
+        }
+
+        // Wire up the reabrir confirm button dynamically
+        const reabrirModal = document.getElementById('modalReabrirMesa');
+        if (reabrirModal) {
+            reabrirModal.addEventListener('show.bs.modal', function(e) {
+                const sessionId = e.relatedTarget?.dataset?.sessionId;
+                if (sessionId) {
+                    document.getElementById('btnConfirmReabrir').onclick = function() {
+                        @this.reopenTable(parseInt(sessionId));
+                    };
+                }
+            });
+        }
+
+        // ── Reverb/Echo real-time subscriptions ─────────────────────────────────
+        @if ($branch ?? false)
+            document.addEventListener('livewire:initialized', () => {
+                if (!window.Echo) return;
+
+                const branchId = {{ $branch->id ?? 0 }};
+
+                window.Echo.private('branch.' + branchId)
+                    .listen('.OrderCreated', (e) => {
+                        posAddNotification('Nuevo pedido', '#' + (e.order_number ?? '') + ' — ' + (e
+                            .type_label ?? ''), 'info');
+                    })
+                    .listen('.TableStatusChanged', (e) => {
+                        if (e.new_status === 'waiting_payment') {
+                            posAddNotification('🪑 Mesa lista para cobrar', e.table_name ?? 'Mesa', 'warning');
+                        }
+                        if (e.new_status === 'available') {
+                            posAddNotification('Mesa liberada', (e.table_name ?? 'Mesa'), 'success');
+                        }
+                    });
+
+                document.addEventListener('livewire:navigating', () => {
+                    window.Echo.leave('branch.' + branchId);
+                }, {
+                    once: true
+                });
+            });
+
+            function posAddNotification(title, body, type) {
+                // Dispatch toast via Alpine
+                window.dispatchEvent(new CustomEvent('notify', {
+                    detail: {
+                        message: title + (body ? ': ' + body : ''),
+                        type: type || 'info'
+                    }
+                }));
+
+                // Browser notification
+                if (Notification.permission === 'granted') {
+                    new Notification(title, {
+                        body: body,
+                        icon: '/favicon.ico'
+                    });
+                }
+            }
+        @endif
+    </script>
+
+    {{-- ══ MODAL BOOTSTRAP: TICKET DE MESA ═══════════════════════════════════ --}}
+    <div class="modal fade" id="posModalTicket" tabindex="-1" aria-labelledby="posModalTicketLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="posModalTicketLabel">
+                        <i class='bx bx-receipt me-2' style="color:var(--pos-accent)"></i>Ticket de mesa
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <iframe id="pos-bill-iframe"
+                        style="width:100%;height:500px;border:none;border-radius:0 0 8px 8px;"
+                        srcdoc=""></iframe>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        <i class='bx bx-x me-1'></i>Cerrar
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="posPrintBill()">
+                        <i class='bx bx-printer me-1'></i>Imprimir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ══ MODAL BOOTSTRAP: CONFIRMAR REABRIR MESA ════════════════════════════ --}}
+    <div class="modal fade" id="modalReabrirMesa" tabindex="-1" aria-labelledby="modalReabrirMesaLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="modalReabrirMesaLabel">
+                        <i class='bx bx-door-open me-2 text-info'></i>Reabrir mesa
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-3">
+                    <p class="mb-1" style="font-size:.9rem;">¿Reabrir esta mesa?</p>
+                    <p class="text-muted" style="font-size:.8rem;">El mesero podrá agregar más pedidos.</p>
+                </div>
+                <div class="modal-footer border-0 pt-0 justify-content-center gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm px-4"
+                        data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info btn-sm px-4 text-white" id="btnConfirmReabrir"
+                        data-bs-dismiss="modal">
+                        <i class='bx bx-door-open me-1'></i>Reabrir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ══ MODAL: NUEVO CLIENTE ══════════════════════════════════════════════ --}}
+    @if ($showAddCustomerModal)
+        <div
+            style="
+        position:fixed;inset:0;z-index:1060;
+        background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
+        display:flex;align-items:center;justify-content:center;padding:16px;
+    ">
+            <div
+                style="
+            background:var(--pos-surface);border:1px solid var(--pos-border);
+            border-radius:16px;width:100%;max-width:420px;
+            box-shadow:0 20px 60px rgba(0,0,0,.4);
+        ">
+                <div
+                    style="padding:20px 20px 16px;border-bottom:1px solid var(--pos-border);display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <i class="bx bx-user-plus" style="font-size:20px;color:var(--pos-accent)"></i>
+                        <span style="font-weight:700;font-size:.95rem;color:var(--pos-text)">Registrar nuevo
+                            cliente</span>
+                    </div>
+                    <button wire:click="$set('showAddCustomerModal', false)"
+                        style="background:none;border:none;color:var(--pos-muted);font-size:20px;cursor:pointer;padding:0;line-height:1">
+                        <i class="bx bx-x"></i>
+                    </button>
+                </div>
+
+                <div style="padding:20px">
+                    @error('newCustomerName')
+                        <div
+                            style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;
+                                padding:8px 12px;font-size:.78rem;color:#ef4444;margin-bottom:14px">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                    @error('newCustomerPhone')
+                        <div
+                            style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;
+                                padding:8px 12px;font-size:.78rem;color:#ef4444;margin-bottom:14px">
+                            {{ $message }}
+                        </div>
+                    @enderror
+
+                    <div style="margin-bottom:12px">
+                        <label class="co-label">Nombre <span class="req">*</span></label>
+                        <input type="text" wire:model="newCustomerName" class="co-input"
+                            placeholder="Nombre completo" autofocus>
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label class="co-label">Teléfono <span class="req">*</span></label>
+                        <input type="tel" wire:model="newCustomerPhone" class="co-input"
+                            placeholder="+52 999 000 0000">
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label class="co-label">Correo <span
+                                style="color:var(--pos-muted);font-size:.7rem">(opcional)</span></label>
+                        <input type="email" wire:model="newCustomerEmail" class="co-input"
+                            placeholder="cliente@correo.com">
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <label class="co-label"><i class="bx bx-map me-1"></i>Dirección <span
+                                style="color:var(--pos-muted);font-size:.7rem">(opcional)</span></label>
+                        <input type="text" wire:model="newCustomerAddress" class="co-input"
+                            placeholder="Calle, número, colonia">
+                    </div>
+                    <div style="margin-bottom:20px">
+                        <label class="co-label">Referencias <span
+                                style="color:var(--pos-muted);font-size:.7rem">(opcional)</span></label>
+                        <input type="text" wire:model="newCustomerStreet" class="co-input"
+                            placeholder="Casa azul, frente al parque…">
+                    </div>
+
+                    <div style="display:flex;gap:8px">
+                        <button wire:click="$set('showAddCustomerModal', false)"
+                            style="flex:1;padding:10px;background:transparent;border:1px solid var(--pos-border);
+                               border-radius:8px;color:var(--pos-muted);font-size:.82rem;cursor:pointer">
+                            Cancelar
+                        </button>
+                        <button wire:click="saveNewCustomer" wire:loading.attr="disabled"
+                            wire:target="saveNewCustomer"
+                            style="flex:2;padding:10px;background:var(--pos-accent);border:none;
+                               border-radius:8px;color:#fff;font-size:.82rem;font-weight:600;cursor:pointer;
+                               display:flex;align-items:center;justify-content:center;gap:6px">
+                            <span wire:loading.remove wire:target="saveNewCustomer">
+                                <i class="bx bx-save"></i> Guardar y usar
+                            </span>
+                            <span wire:loading wire:target="saveNewCustomer">
+                                <span
+                                    style="width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block"></span>
+                                Guardando…
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ══ MODAL FORZADO: ABRIR CAJA AL INICIO DEL TURNO ═════════════════════ --}}
+    @if ($showForcedRegisterModal)
+    <div style="position:fixed;inset:0;z-index:1070;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;">
+        <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden">
+            {{-- Header --}}
+            <div style="background:linear-gradient(135deg,#1e7e34 0%,#28a745 100%);padding:20px 24px;color:#fff">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <i class="bx bx-lock-open" style="font-size:1.4rem"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:1rem">Abrir caja para el turno</div>
+                        <div style="font-size:.8rem;opacity:.85">{{ $branch?->name }}</div>
+                    </div>
+                </div>
+            </div>
+            {{-- Body --}}
+            <div style="padding:24px">
+                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:.82rem;color:#856404;display:flex;gap:8px;align-items:flex-start">
+                    <i class="bx bx-info-circle" style="flex-shrink:0;font-size:1rem;margin-top:1px"></i>
+                    <span>{{ $forcedRegisterReason }}</span>
+                </div>
+
+                <div style="margin-bottom:16px">
+                    <label style="display:block;font-weight:600;margin-bottom:6px;font-size:.88rem">
+                        Fondo inicial en caja <span style="color:#dc3545">*</span>
+                    </label>
+                    <div style="display:flex;border:1.5px solid #dee2e6;border-radius:8px;overflow:hidden;background:#fff">
+                        <span style="background:#f8f9fa;padding:10px 14px;font-weight:600;color:#6c757d;border-right:1px solid #dee2e6">$</span>
+                        <input type="number" step="0.01" min="0"
+                               wire:model="forcedInitialCash"
+                               style="border:none;outline:none;padding:10px 14px;width:100%;font-size:1rem;font-weight:600"
+                               placeholder="0.00"
+                               autofocus>
+                    </div>
+                    @error('forcedInitialCash')
+                    <span style="font-size:.75rem;color:#dc3545;margin-top:4px;display:block">{{ $message }}</span>
+                    @enderror
+                    <span style="font-size:.75rem;color:#6c757d;margin-top:4px;display:block">Billetes y monedas disponibles al inicio del turno.</span>
+                </div>
+
+                <div style="margin-bottom:4px">
+                    <label style="display:block;font-weight:600;margin-bottom:6px;font-size:.88rem">Notas de apertura <span style="font-weight:400;color:#6c757d">(opcional)</span></label>
+                    <textarea wire:model="forcedOpeningNotes"
+                              style="width:100%;border:1.5px solid #dee2e6;border-radius:8px;padding:10px 14px;resize:none;font-size:.88rem;outline:none"
+                              rows="2" placeholder="ej. Turno matutino, relevo de Ana…"></textarea>
+                </div>
+            </div>
+            {{-- Footer --}}
+            <div style="padding:0 24px 24px;display:flex;gap:10px">
+                <button wire:click="openRegisterFromPOS"
+                        wire:loading.attr="disabled"
+                        style="flex:1;background:#28a745;color:#fff;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+                    <span wire:loading wire:target="openRegisterFromPOS" class="spinner-border spinner-border-sm"></span>
+                    <i wire:loading.remove wire:target="openRegisterFromPOS" class="bx bx-check-circle" style="font-size:1.1rem"></i>
+                    <span wire:loading.remove wire:target="openRegisterFromPOS">Abrir caja e iniciar turno</span>
+                    <span wire:loading wire:target="openRegisterFromPOS">Abriendo…</span>
+                </button>
+                @canany(['owner', 'admin'])
+                <button wire:click="dismissForcedRegisterModal"
+                        style="background:#f8f9fa;color:#6c757d;border:1.5px solid #dee2e6;border-radius:8px;padding:12px 16px;font-size:.82rem;cursor:pointer"
+                        title="Solo disponible fuera de horario">
+                    Omitir
+                </button>
+                @endcanany
+            </div>
+        </div>
+    </div>
+    @endif
+
+</div>

@@ -12,19 +12,15 @@ new class extends Component
     public string $password = '';
     public string $password_confirmation = '';
 
-    /**
-     * Update the password for the currently authenticated user.
-     */
     public function updatePassword(): void
     {
         try {
             $validated = $this->validate([
                 'current_password' => ['required', 'string', 'current_password'],
-                'password' => ['required', 'string', Password::defaults(), 'confirmed'],
+                'password'         => ['required', 'string', Password::defaults(), 'confirmed'],
             ]);
         } catch (ValidationException $e) {
             $this->reset('current_password', 'password', 'password_confirmation');
-
             throw $e;
         }
 
@@ -33,47 +29,88 @@ new class extends Component
         ]);
 
         $this->reset('current_password', 'password', 'password_confirmation');
-
         $this->dispatch('password-updated');
     }
 }; ?>
 
-<section>
-    <header>
-        <h2 class="text-lg font-medium text-gray-900">
-            {{ __('Update Password') }}
-        </h2>
-
-        <p class="mt-1 text-sm text-gray-600">
-            {{ __('Ensure your account is using a long, random password to stay secure.') }}
-        </p>
-    </header>
-
-    <form wire:submit="updatePassword" class="mt-6 space-y-6">
-        <div>
-            <x-input-label for="update_password_current_password" :value="__('Current Password')" />
-            <x-text-input wire:model="current_password" id="update_password_current_password" name="current_password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
-            <x-input-error :messages="$errors->get('current_password')" class="mt-2" />
+<div>
+    <form wire:submit="updatePassword">
+        <div class="row">
+            <div class="mb-3 col-md-6">
+                <label for="current_password" class="form-label">Contraseña actual</label>
+                <div class="input-group">
+                    <input wire:model="current_password" type="password" id="current_password"
+                           class="form-control @error('current_password') is-invalid @enderror"
+                           placeholder="············" autocomplete="current-password" />
+                    <span class="input-group-text cursor-pointer" onclick="togglePassword('current_password')">
+                        <i class="bx bx-hide" id="icon_current_password"></i>
+                    </span>
+                    @error('current_password')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
         </div>
 
-        <div>
-            <x-input-label for="update_password_password" :value="__('New Password')" />
-            <x-text-input wire:model="password" id="update_password_password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        <div class="row">
+            <div class="mb-3 col-md-6">
+                <label for="new_password" class="form-label">Nueva contraseña</label>
+                <div class="input-group">
+                    <input wire:model="password" type="password" id="new_password"
+                           class="form-control @error('password') is-invalid @enderror"
+                           placeholder="············" autocomplete="new-password" />
+                    <span class="input-group-text cursor-pointer" onclick="togglePassword('new_password')">
+                        <i class="bx bx-hide" id="icon_new_password"></i>
+                    </span>
+                    @error('password')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="mb-3 col-md-6">
+                <label for="password_confirmation" class="form-label">Confirmar contraseña</label>
+                <div class="input-group">
+                    <input wire:model="password_confirmation" type="password" id="password_confirmation"
+                           class="form-control @error('password_confirmation') is-invalid @enderror"
+                           placeholder="············" autocomplete="new-password" />
+                    <span class="input-group-text cursor-pointer" onclick="togglePassword('password_confirmation')">
+                        <i class="bx bx-hide" id="icon_password_confirmation"></i>
+                    </span>
+                    @error('password_confirmation')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
         </div>
 
-        <div>
-            <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" />
-            <x-text-input wire:model="password_confirmation" id="update_password_password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
+        <div class="mt-2 d-flex align-items-center gap-3">
+            <button type="submit" class="btn btn-primary">
+                <span wire:loading.remove wire:target="updatePassword">Actualizar contraseña</span>
+                <span wire:loading wire:target="updatePassword">
+                    <span class="spinner-border spinner-border-sm me-1"></span> Actualizando...
+                </span>
+            </button>
 
-        <div class="flex items-center gap-4">
-            <x-primary-button>{{ __('Save') }}</x-primary-button>
-
-            <x-action-message class="me-3" on="password-updated">
-                {{ __('Saved.') }}
-            </x-action-message>
+            <div x-data="{ show: false }" x-on:password-updated.window="show = true; setTimeout(() => show = false, 3000)" x-show="show" x-transition>
+                <span class="badge bg-label-success"><i class="bx bx-check me-1"></i>Contraseña actualizada</span>
+            </div>
         </div>
     </form>
-</section>
+</div>
+
+@push('scripts')
+<script>
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const icon = document.getElementById('icon_' + id);
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bx-hide', 'bx-show');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bx-show', 'bx-hide');
+    }
+}
+</script>
+@endpush

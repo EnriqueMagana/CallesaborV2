@@ -4,9 +4,11 @@ namespace App\Livewire\Forms;
 
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
@@ -26,11 +28,14 @@ class LoginForm extends Form
      *
      * @throws ValidationException
      */
-    public function authenticate(): void
+    public function authenticate(): bool
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only(['email', 'password']), $this->remember)) {
+        $guard = Auth::guard('web');
+        $user = $guard->getProvider()->retrieveByCredentials(['email' => $this->email]);
+
+        if (! $user || ! $guard->getProvider()->validateCredentials($user, ['password' => $this->password])) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -39,6 +44,25 @@ class LoginForm extends Form
         }
 
         RateLimiter::clear($this->throttleKey());
+
+        if (Hash::needsRehash($user->getAuthPassword())) {
+            $user->forceFill(['password' => Hash::make($this->password)])->save();
+        }
+
+        if ($user->hasEnabledTwoFactorAuthentication()) {
+            session()->put([
+                'login.id' => $user->getKey(),
+                'login.remember' => $this->remember,
+            ]);
+
+            TwoFactorAuthenticationChallenged::dispatch($user);
+
+            return true;
+        }
+
+        $guard->login($user, $this->remember);
+
+        return false;
     }
 
     /**
