@@ -27,6 +27,9 @@ class GlobalSearch extends Component
             ['label' => 'Constructor de Menú', 'icon' => 'bx-restaurant',     'route' => 'app.constructor-menu', 'keywords' => 'menu productos categorias ingredientes platos',  'permission' => 'ver menu'],
             ['label' => 'Usuarios',            'icon' => 'bx-group',          'route' => 'app.usuarios',         'keywords' => 'usuarios empleados staff personal',             'permission' => 'ver usuarios'],
             ['label' => 'Roles y Permisos',    'icon' => 'bx-shield-quarter', 'route' => 'app.roles-permisos',   'keywords' => 'roles permisos acceso configuracion',           'permission' => 'gestionar roles'],
+            ['label' => 'Configuración de Kioscos', 'icon' => 'bx-devices',    'route' => 'app.kioscos',          'keywords' => 'kiosco terminal token autoservicio ajustes',     'permission' => 'gestionar kioscos'],
+            ['label' => 'Configuración del negocio', 'icon' => 'bx-cog',       'route' => 'app.configuracion-negocio', 'keywords' => 'negocio empresa logo rfc whatsapp tickets impresora plantilla', 'permission' => 'gestionar configuracion negocio'],
+            ['label' => 'Menú lateral',          'icon' => 'bx-list-ul',       'route' => 'app.configuracion-negocio.menu', 'keywords' => 'sidebar navegacion menu iconos ordenar agrupar', 'permission' => 'ver menu sidebar'],
             ['label' => 'Mi Perfil',           'icon' => 'bx-user',           'route' => 'profile',              'keywords' => 'perfil cuenta avatar contraseña',               'permission' => null],
         ];
     }
@@ -36,7 +39,7 @@ class GlobalSearch extends Component
         $user = auth()->user();
         if (!$user) return false;
         // super-admin bypasa todo (Spatie Gate::before)
-        if ($user->hasRole('super-admin')) return true;
+        if ($user->hasAnyRole(['owner', 'super-admin'])) return true;
         return $user->can($permission);
     }
 

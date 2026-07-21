@@ -39,7 +39,16 @@ class CorteDeCaja extends Component
     {
         return Order::where('cash_register_id', $this->registerId)
             ->where('status', 'pagada')
-            ->with('payments')
+            ->with(['payments', 'seller'])
+            ->get();
+    }
+
+    #[Computed]
+    public function auditOrders(): \Illuminate\Support\Collection
+    {
+        return Order::where('cash_register_id', $this->registerId)
+            ->with(['payments', 'seller', 'cancelledBy'])
+            ->orderBy('created_at')
             ->get();
     }
 
@@ -99,6 +108,32 @@ class CorteDeCaja extends Component
                 'total'    => $delivery->sum('total'),
             ],
         ];
+    }
+
+    #[Computed]
+    public function operatorTotals(): array
+    {
+        return $this->orders
+            ->groupBy('served_by')
+            ->map(function ($orders) {
+                $first = $orders->first();
+                $byArea = fn (string $type) => $orders->filter(fn ($order) => $type === 'ventanilla'
+                    ? in_array($order->type, ['ventanilla', 'pick_up'], true)
+                    : $order->type === $type);
+                $areaTotals = [];
+                foreach (['ventanilla', 'mesa', 'delivery'] as $area) {
+                    $areaTotals[$area] = (float) $byArea($area)->sum('total');
+                }
+
+                return [
+                    'id' => $first->served_by,
+                    'name' => $first->seller?->name ?? 'Usuario eliminado',
+                    'orders' => $orders->count(),
+                    'total' => (float) $orders->sum('total'),
+                    'cash' => (float) $orders->flatMap(fn ($order) => $order->payments->where('method', 'efectivo'))->sum('amount'),
+                    'areas' => $areaTotals,
+                ];
+            })->values()->all();
     }
 
     #[Computed]
@@ -173,6 +208,9 @@ class CorteDeCaja extends Component
             'difference'          => $this->difference,
             'cut_data'            => [
                 'orders_count' => $this->orders->count(),
+                'audit_orders_count' => $this->auditOrders->count(),
+                'cancelled_orders_count' => $this->auditOrders->where('status', 'cancelada')->count(),
+                'operators' => $this->operatorTotals,
                 'expenses'     => $this->expenses->toArray(),
             ],
             'generated_at' => now(),

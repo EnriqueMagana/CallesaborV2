@@ -5,39 +5,40 @@
     $ppoPaidAmt = collect($pickupPayments)->sum('amount');
     $ppoRem = $ppo ? max(0, $ppo->total - $ppoPaidAmt) : 0;
     $ppoCanConfirm = !empty($pickupPayments) && $ppoPaidAmt >= ($ppo->total ?? 0) - 0.01;
+    $ppoIsContraDelivery = $ppo && $ppo->type === 'delivery' && $ppo->delivery_method === 'contra_entrega';
 @endphp
-<div class="pos-modal-wrap show" style="z-index:1450" wire:click.self="closePickupPayModal">
-    <div class="pos-modal" style="max-width:480px">
+<div class="pos-modal-wrap show" data-ui="xui-6jaq3m" wire:click.self="closePickupPayModal">
+    <div class="pos-modal" data-ui="xui-6rsuae">
         <div class="modal-header-pos">
-            <i class="bx bx-dollar-circle" style="font-size:1.1rem;color:#16a34a"></i>
-            <h5 style="margin:0 0 0 8px;font-size:1rem;font-weight:700">Cobrar y entregar</h5>
-            <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+            <i class="bx bx-dollar-circle" data-ui="xui-13aobil"></i>
+            <h5 data-ui="xui-b8vstq">Cobrar pedido listo</h5>
+            <div data-ui="xui-17xfp9b">
                 @if($ppo)
-                    <span style="font-size:.75rem;color:var(--pos-muted)">Pedido #{{ $ppo->id }}</span>
+                    <span data-ui="xui-y4gxmi">Pedido #{{ $ppo->display_folio }}</span>
                 @endif
-                <button class="pos-btn pos-btn-ghost" style="padding:4px 8px" wire:click="closePickupPayModal">
-                    <i class="bx bx-x" style="font-size:1.1rem"></i>
+                <button class="pos-btn pos-btn-ghost" data-ui="xui-1a0g5qw" wire:click="closePickupPayModal">
+                    <i class="bx bx-x" data-ui="xui-miwya2"></i>
                 </button>
             </div>
         </div>
 
-        <div class="modal-body-pos" style="padding:16px;max-height:65vh;overflow-y:auto">
+        <div class="modal-body-pos" data-ui="xui-1d9bqu5">
 
             @if($ppo)
-            <div style="background:var(--pos-bg);border-radius:10px;padding:12px;margin-bottom:16px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <span style="font-size:.78rem;font-weight:700;color:var(--pos-muted);text-transform:uppercase;letter-spacing:.04em">Resumen</span>
+            <div data-ui="xui-1rz9ctb">
+                <div data-ui="xui-1beedj5">
+                    <span data-ui="xui-6mock9">Resumen</span>
                     @if($ppo->customer_name)
-                        <span style="font-size:.8rem;color:var(--pos-text)"><i class="bx bx-user" style="font-size:.8rem"></i> {{ $ppo->customer_name }}</span>
+                        <span data-ui="xui-abc7jm"><i class="bx bx-user" data-ui="xui-19cyg9q"></i> {{ $ppo->customer_name }}</span>
                     @endif
                 </div>
                 @foreach($ppoItems as $item)
-                    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--pos-border);font-size:.85rem">
+                    <div data-ui="xui-1iolvfd">
                         <span>{{ $item->quantity }}x {{ $item->product->name ?? $item->product_name }}</span>
-                        <span style="font-weight:600">${{ number_format($item->subtotal, 2) }}</span>
+                        <span data-ui="xui-y9mhin">${{ number_format($item->subtotal, 2) }}</span>
                     </div>
                 @endforeach
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:1rem;font-weight:700;color:var(--pos-text)">
+                <div data-ui="xui-1s0et43">
                     <span>Total</span>
                     <span>${{ number_format($ppo->total, 2) }}</span>
                 </div>
@@ -45,17 +46,17 @@
             @endif
 
             @if(!empty($pickupPayments))
-                <div style="margin-bottom:12px">
+                <div data-ui="xui-n3c866">
                     @foreach($pickupPayments as $pi => $pp)
-                        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(34,197,94,.08);border-radius:8px;margin-bottom:4px;font-size:.83rem">
-                            <span><i class="bx bx-check-circle" style="color:#22c55e;margin-right:4px"></i>{{ ['cash'=>'Efectivo','card'=>'Tarjeta','transfer'=>'Transferencia'][$pp['method']] ?? ucfirst($pp['method']) }}</span>
-                            <div style="display:flex;align-items:center;gap:8px">
+                        <div data-ui="xui-qr2m4u">
+                            <span><i class="bx bx-check-circle" data-ui="xui-1dncjhl"></i>{{ ['cash'=>'Efectivo','card'=>'Tarjeta','transfer'=>'Transferencia'][$pp['method']] ?? ucfirst($pp['method']) }}</span>
+                            <div data-ui="xui-1a303bl">
                                 <strong>${{ number_format($pp['amount'], 2) }}</strong>
-                                <button wire:click="removePickupPayment({{ $pi }})" style="background:none;border:none;color:var(--pos-danger);cursor:pointer;padding:0"><i class="bx bx-x"></i></button>
+                                <button wire:click="removePickupPayment({{ $pi }})" data-ui="xui-u6hbsq"><i class="bx bx-x"></i></button>
                             </div>
                         </div>
                     @endforeach
-                    <div style="font-size:.8rem;text-align:right;{{ $ppoRem > 0 ? 'color:var(--pos-danger)' : 'color:#22c55e;font-weight:700' }}">
+                    <div class="pos-payment-balance {{ $ppoRem > 0 ? 'is-pending' : 'is-complete' }}">
                         @if($ppoRem > 0) Restante: ${{ number_format($ppoRem, 2) }}
                         @else <i class="bx bx-check-circle"></i> Pagado completo @endif
                     </div>
@@ -63,31 +64,37 @@
             @endif
 
             @if($ppoRem > 0 || empty($pickupPayments))
-                <div style="display:flex;gap:6px;margin-bottom:12px">
-                    @foreach(['cash'=>'Efectivo','card'=>'Tarjeta','transfer'=>'Transferencia'] as $m => $label)
+                <div data-ui="xui-1qqbkl9">
+                    @foreach(($ppoIsContraDelivery ? ['contra_entrega'=>'Contra entrega'] : ['cash'=>'Efectivo','contra_entrega'=>'Contra entrega','card'=>'Tarjeta','transfer'=>'Transferencia']) as $m => $label)
                         <button wire:click="$set('pickupPayMethod','{{ $m }}')"
                                 class="pos-btn {{ $pickupPayMethod===$m ? 'pos-btn-primary' : 'pos-btn-secondary' }}"
-                                style="flex:1;justify-content:center;font-size:.78rem;padding:7px 4px">
+                                data-ui="xui-1hwm503">
                             {{ $label }}
                         </button>
                     @endforeach
                 </div>
 
-                @if($pickupPayMethod === 'cash')
-                    <div style="display:flex;gap:8px;margin-bottom:8px">
-                        <div style="position:relative;flex:1">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:.82rem">$</span>
-                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" style="padding-left:22px"
+                @if($pickupPayMethod === 'contra_entrega')
+                    <div class="pos-payment-deferred">
+                        <i class="bx bx-cycling"></i>
+                        <div><strong>Cobro contra entrega</strong><small>El repartidor cobra este importe. No se registra en la caja del local.</small></div>
+                    </div>
+                    <input type="hidden" wire:model="pickupPayAmount" value="{{ number_format($ppoRem, 2, '.', '') }}">
+                @elseif($pickupPayMethod === 'cash')
+                    <div data-ui="xui-167pdlk">
+                        <div data-ui="xui-1x8awyf">
+                            <span data-ui="xui-1n7u11m">$</span>
+                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
                                    placeholder="{{ number_format($ppoRem, 2) }}"
                                    value="{{ $pickupPayAmount ?: number_format($ppoRem, 2) }}"
                                    step="0.01" min="0">
-                            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--pos-muted);pointer-events:none">Monto</span>
+                            <span data-ui="xui-1p3z5bq">Monto</span>
                         </div>
-                        <div style="position:relative;flex:1">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:.82rem">$</span>
-                            <input type="number" wire:model.live="pickupPayReceived" class="pos-input" style="padding-left:22px"
+                        <div data-ui="xui-1x8awyf">
+                            <span data-ui="xui-1n7u11m">$</span>
+                            <input type="number" wire:model.live="pickupPayReceived" class="pos-input" data-ui="xui-78yyj2"
                                    placeholder="Recibido" step="0.01" min="0">
-                            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--pos-muted);pointer-events:none">Recibido</span>
+                            <span data-ui="xui-1p3z5bq">Recibido</span>
                         </div>
                     </div>
                     @php
@@ -95,7 +102,7 @@
                         $ppoRecibido = (float)$pickupPayReceived;
                     @endphp
                     @if($ppoRecibido > 0)
-                        <div style="font-size:.78rem;{{ $ppoRecibido >= $ppoMonto ? 'color:#16a34a;font-weight:700' : 'color:var(--pos-danger)' }};margin-bottom:8px">
+                        <div class="pos-payment-received {{ $ppoRecibido >= $ppoMonto ? 'is-complete' : 'is-pending' }}">
                             @if($ppoRecibido >= $ppoMonto)
                                 <i class="bx bx-check-circle"></i> Cambio: <strong>${{ number_format($ppoRecibido - $ppoMonto, 2) }}</strong>
                             @else
@@ -104,42 +111,42 @@
                         </div>
                     @endif
                 @elseif($pickupPayMethod === 'card')
-                    <div style="display:flex;gap:8px;margin-bottom:8px">
-                        <div style="position:relative;flex:1">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:.82rem">$</span>
-                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" style="padding-left:22px"
+                    <div data-ui="xui-167pdlk">
+                        <div data-ui="xui-1x8awyf">
+                            <span data-ui="xui-1n7u11m">$</span>
+                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
                                    placeholder="{{ number_format($ppoRem, 2) }}" step="0.01" min="0">
-                            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--pos-muted);pointer-events:none">Monto</span>
+                            <span data-ui="xui-1p3z5bq">Monto</span>
                         </div>
-                        <div style="position:relative;flex:1">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:.82rem">#</span>
-                            <input type="text" wire:model="pickupPayCard" class="pos-input" style="padding-left:22px" placeholder="Últimos 4" maxlength="4">
-                            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--pos-muted);pointer-events:none">Tarjeta</span>
+                        <div data-ui="xui-1x8awyf">
+                            <span data-ui="xui-1n7u11m">#</span>
+                            <input type="text" wire:model="pickupPayCard" class="pos-input" data-ui="xui-78yyj2" placeholder="Últimos 4" maxlength="4">
+                            <span data-ui="xui-1p3z5bq">Tarjeta</span>
                         </div>
                     </div>
                 @elseif($pickupPayMethod === 'transfer')
-                    <div style="display:flex;gap:8px;margin-bottom:8px">
-                        <div style="position:relative;flex:1">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:.82rem">$</span>
-                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" style="padding-left:22px"
+                    <div data-ui="xui-167pdlk">
+                        <div data-ui="xui-1x8awyf">
+                            <span data-ui="xui-1n7u11m">$</span>
+                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
                                    placeholder="{{ number_format($ppoRem, 2) }}" step="0.01" min="0">
-                            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--pos-muted);pointer-events:none">Monto</span>
+                            <span data-ui="xui-1p3z5bq">Monto</span>
                         </div>
-                        <div style="position:relative;flex:1">
-                            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--pos-muted);font-size:.75rem">#</span>
-                            <input type="text" wire:model="pickupPayRef" class="pos-input" style="padding-left:22px" placeholder="Referencia">
-                            <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--pos-muted);pointer-events:none">Ref.</span>
+                        <div data-ui="xui-1x8awyf">
+                            <span data-ui="xui-13xqprg">#</span>
+                            <input type="text" wire:model="pickupPayRef" class="pos-input" data-ui="xui-78yyj2" placeholder="Referencia">
+                            <span data-ui="xui-1p3z5bq">Ref.</span>
                         </div>
                     </div>
                 @endif
 
-                <button wire:click="addPickupPayment" class="pos-btn pos-btn-secondary" style="width:100%;justify-content:center;margin-bottom:4px">
+                <button wire:click="addPickupPayment" class="pos-btn pos-btn-secondary" data-ui="xui-5q5jzi">
                     <i class="bx bx-plus"></i> Agregar pago
                 </button>
             @endif
         </div>
 
-        <div class="modal-footer-pos" style="justify-content:flex-end;gap:8px">
+        <div class="modal-footer-pos" data-ui="xui-c1sc8d">
             <button class="pos-btn pos-btn-ghost pos-btn-lg" wire:click="closePickupPayModal">Cancelar</button>
             <button wire:click="confirmPickupPayment"
                     wire:loading.attr="disabled" wire:target="confirmPickupPayment"
@@ -147,7 +154,7 @@
                     {{ $ppoCanConfirm ? '' : 'disabled' }}>
                 <span wire:loading wire:target="confirmPickupPayment" class="pos-btn-spinner"></span>
                 <i wire:loading.remove wire:target="confirmPickupPayment" class="bx bx-check-circle"></i>
-                Cobrar y entregar
+                Confirmar pago
             </button>
         </div>
     </div>

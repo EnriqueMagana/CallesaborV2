@@ -7,10 +7,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Laravel') }} - Admin</title>
+    <title>{{ $businessSettings?->platform_name ?? config('app.name', 'Laravel') }} - Admin</title>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="{{ asset('assets/img/favicon/favicon.ico') }}" />
+    <link rel="icon" href="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -35,8 +35,20 @@
     <!-- App CSS -->
     <link rel="stylesheet" href="{{ asset('assets/css/global-search.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/mesa-orden.css') }}" />
-    <link rel="stylesheet" href="{{ asset('assets/css/app-ui.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/app-ui.css') }}?v={{ filemtime(public_path('assets/css/app-ui.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/profile.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/reservations.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/menu-builder.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/mesas.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/admin-pages.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/user-management.css') }}?v={{ filemtime(public_path('assets/css/user-management.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/kiosk-admin.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/cash-cut.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/sales-history.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/business-settings.css') }}?v={{ filemtime(public_path('assets/css/business-settings.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/delivery.css') }}?v={{ filemtime(public_path('assets/css/delivery.css')) }}" />
 
     @stack('styles')
 
@@ -77,7 +89,7 @@
                             class="container-xxl d-flex flex-wrap justify-content-between py-2 flex-md-row flex-column">
                             <div class="mb-2 mb-md-0">
                                 © {{ date('Y') }}, Creado por ❤️ Cubittech <a href="#"
-                                    class="fw-bolder">{{ config('app.name') }}</a>
+                                    class="fw-bolder">{{ $businessSettings?->platform_name ?? config('app.name') }}</a>
                             </div>
                         </div>
                     </footer>
@@ -110,7 +122,7 @@
     <script src="{{ asset('assets/vendor/libs/apex-charts/apexcharts.js') }}" data-navigate-once></script>
 
     <!-- Main JS -->
-    <script src="{{ asset('assets/js/main.js') }}" data-navigate-once></script>
+    <script src="{{ asset('assets/js/main.js') }}?v={{ filemtime(public_path('assets/js/main.js')) }}" data-navigate-once></script>
 
     @livewireScripts
 

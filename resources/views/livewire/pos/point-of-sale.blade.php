@@ -1,7 +1,8 @@
 {{-- Punto de Venta --}}
 <div x-data="{
     showCart: false,
-    panels: { mesas: false, pickup: false, orders: false, reprint: false, kitchen: false }
+    showSaved: false,
+    panels: { mesas: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false }
 }" class="pos-root">
 
 {{-- Toast --}}
@@ -23,7 +24,7 @@
         </div>
         <h5>Sin caja activa</h5>
         <p>Abre una caja para comenzar a usar el Punto de Venta.</p>
-        <a href="{{ route('app.caja') }}" class="pos-btn pos-btn-primary" style="width:100%;justify-content:center;text-decoration:none">
+        <a href="{{ route('app.caja') }}" class="pos-btn pos-btn-primary pos-btn-block">
             <i class="bx bx-door-open"></i> Ir a Caja
         </a>
     </div>
@@ -57,8 +58,8 @@
 {{-- Panels laterales --}}
 @include('livewire.pos.partials.panels.mesas')
 @include('livewire.pos.partials.panels.pickup')
-@include('livewire.pos.partials.panels.reprint')
 @include('livewire.pos.partials.panels.kitchen')
+@include('livewire.pos.partials.panels.reprint')
 
 {{-- Modals --}}
 @include('livewire.pos.partials.modals.customize')
@@ -69,6 +70,7 @@
 @include('livewire.pos.partials.modals.new-customer')
 @include('livewire.pos.partials.modals.order-success')
 @include('livewire.pos.partials.modals.pickup-pay')
+@include('livewire.pos.partials.modals.convert-delivery')
 @include('livewire.pos.partials.modals.mesa-pay')
 @include('livewire.pos.partials.modals.ticket')
 
@@ -82,27 +84,27 @@ document.addEventListener('livewire:init', function () {
         document.getElementById('iframe-cliente').srcdoc = html_cliente || '';
         document.getElementById('iframe-cocina').srcdoc  = html_cocina  || '';
         posTicketTab('cliente');
-        document.getElementById('posTicketModal').style.display = 'flex';
+        document.getElementById('posTicketModal').classList.add('is-open');
     });
 
     Livewire.on('pos-reprint-show-cocina', ({ html_cliente, html_cocina }) => {
         document.getElementById('iframe-cliente').srcdoc = html_cliente || '';
         document.getElementById('iframe-cocina').srcdoc  = html_cocina  || '';
         posTicketTab('cocina');
-        document.getElementById('posTicketModal').style.display = 'flex';
+        document.getElementById('posTicketModal').classList.add('is-open');
     });
 });
 
 window.posTicketTab = function (tab) {
     window._posTicketTab = tab;
-    document.getElementById('pane-cliente').style.display = tab === 'cliente' ? '' : 'none';
-    document.getElementById('pane-cocina').style.display  = tab === 'cocina'  ? '' : 'none';
+    document.getElementById('pane-cliente').classList.toggle('is-hidden', tab !== 'cliente');
+    document.getElementById('pane-cocina').classList.toggle('is-hidden', tab !== 'cocina');
     document.getElementById('tab-cliente').className = 'pos-btn pos-btn-sm ' + (tab === 'cliente' ? 'pos-btn-primary' : 'pos-btn-secondary');
     document.getElementById('tab-cocina').className  = 'pos-btn pos-btn-sm ' + (tab === 'cocina'  ? 'pos-btn-primary' : 'pos-btn-secondary');
 };
 
 window.posTicketClose = function () {
-    document.getElementById('posTicketModal').style.display = 'none';
+    document.getElementById('posTicketModal').classList.remove('is-open');
 };
 
 window.posTicketPrint = function () {

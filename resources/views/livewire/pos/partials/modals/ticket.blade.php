@@ -1,9 +1,9 @@
-<div id="posTicketModal" class="pos-modal-wrap" style="z-index:1500;display:none">
-    <div class="pos-modal" style="max-width:500px">
-        <div class="modal-header-pos" style="gap:0;padding:10px 16px">
-            <i class="bx bx-receipt" style="font-size:1.1rem;color:var(--pos-accent);margin-right:8px"></i>
-            <h4 style="flex:1">Ticket</h4>
-            <div style="display:flex;gap:4px;margin-right:12px">
+<div id="posTicketModal" class="pos-modal-wrap pos-ticket-modal">
+    <div class="pos-modal pos-modal-modern pos-ticket-preview" data-ui="xui-1iwymxt">
+        <div class="modal-header-pos pos-modal-modern__header" data-ui="xui-1138a9d">
+            <i class="bx bx-receipt" data-ui="xui-1ewflap"></i>
+            <h4 data-ui="xui-ckcaff">Ticket</h4>
+            <div data-ui="xui-rg0c4e">
                 <button type="button" id="tab-cliente" onclick="posTicketTab('cliente')"
                         class="pos-btn pos-btn-sm pos-btn-primary">
                     <i class="bx bx-user"></i> Cliente
@@ -14,20 +14,20 @@
                 </button>
             </div>
             <button type="button" onclick="posTicketClose()" class="pos-btn pos-btn-ghost pos-btn-sm">
-                <i class="bx bx-x" style="font-size:1.1rem"></i>
+                <i class="bx bx-x" data-ui="xui-miwya2"></i>
             </button>
         </div>
 
-        <div id="pane-cliente" class="modal-body-pos" style="padding:0">
-            <iframe id="iframe-cliente" style="width:100%;height:500px;border:none" srcdoc=""></iframe>
+        <div id="pane-cliente" class="modal-body-pos pos-ticket-pane" data-ui="xui-1uykvw">
+            <iframe id="iframe-cliente" data-ui="xui-1e59nxt" srcdoc=""></iframe>
         </div>
-        <div id="pane-cocina" class="modal-body-pos" style="padding:0;display:none">
-            <iframe id="iframe-cocina" style="width:100%;height:500px;border:none" srcdoc=""></iframe>
+        <div id="pane-cocina" class="modal-body-pos pos-ticket-pane is-hidden">
+            <iframe id="iframe-cocina" data-ui="xui-1e59nxt" srcdoc=""></iframe>
         </div>
 
-        <div class="modal-footer-pos">
+        <div class="modal-footer-pos pos-modal-modern__footer">
             <button type="button" onclick="posTicketClose()" class="pos-btn pos-btn-ghost">Cerrar</button>
-            <span style="flex:1"></span>
+            <span data-ui="xui-ckcaff"></span>
             <button type="button" id="btn-print-active" onclick="posTicketPrint()" class="pos-btn pos-btn-primary pos-btn-lg">
                 <i class="bx bx-printer"></i> Imprimir
             </button>

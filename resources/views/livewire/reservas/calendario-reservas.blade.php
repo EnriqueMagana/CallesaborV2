@@ -19,18 +19,25 @@
 
     {{-- Leyenda de colores --}}
     <div class="app-legend" aria-label="Estados de las reservaciones">
-        @foreach(['pendiente'=>['#f59e0b','Pendiente'],'confirmada'=>['#10b981','Confirmada'],'completada'=>['#6366f1','Completada'],'cancelada'=>['#ef4444','Cancelada']] as $s=>[$color,$label])
+        @foreach(['pendiente'=>['warning','Pendiente'],'confirmada'=>['success','Confirmada'],'completada'=>['primary','Completada'],'cancelada'=>['danger','Cancelada']] as $s=>[$tone,$label])
             <span class="app-legend-item">
-                <span class="app-legend-dot" style="color:{{ $color }};background:{{ $color }}" aria-hidden="true"></span>
+                <span class="app-legend-dot app-legend-dot--{{ $tone }}" aria-hidden="true"></span>
                 {{ $label }}
             </span>
         @endforeach
     </div>
 
     {{-- Calendario — siempre ancho completo --}}
-    <section class="card app-card" aria-label="Calendario de reservaciones">
-        <div class="card-body p-3 p-md-4">
-            <div id="reservations-calendar" data-lwid="{{ $this->getId() }}"></div>
+    <section class="card app-card reservations-calendar-card" aria-labelledby="reservations-calendar-title">
+        <div class="reservations-calendar-card__header">
+            <div>
+                <h2 id="reservations-calendar-title">Agenda de reservaciones</h2>
+                <p>Selecciona un día para crear una reserva o toca un evento para ver sus detalles.</p>
+            </div>
+            <span class="reservations-calendar-card__hint"><i class="bx bx-mouse"></i> Clic o toque para interactuar</span>
+        </div>
+        <div class="card-body p-3 p-md-4 reservations-calendar-shell">
+            <div id="reservations-calendar" wire:ignore wire:key="reservations-calendar" data-lwid="{{ $this->getId() }}" aria-label="Calendario interactivo de reservaciones"></div>
         </div>
     </section>
 
@@ -38,11 +45,9 @@
          MODAL: Nueva / Editar reserva
     ══════════════════════════════════════ --}}
     @if($panelMode === 'new' || $panelMode === 'edit')
-    <div class="modal app-modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
-         style="background:rgba(0,0,0,.45)"
+    <div class="modal app-modal reservation-modal-overlay fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
          wire:click.self="closePanel">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"
-             style="max-width:480px" @click.stop>
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable reservation-modal-form" @click.stop>
             <div class="modal-content">
 
                 <div class="modal-header border-0 pb-0">
@@ -60,25 +65,21 @@
 
                     {{-- Buscar cliente existente --}}
                     <div class="mb-3 position-relative">
-                        <label class="form-label fw-semibold" style="font-size:.82rem">Buscar cliente existente</label>
+                        <label class="form-label fw-semibold app-text-sm">Buscar cliente existente</label>
                         <input type="text" wire:model.live.debounce.250ms="customerSearch"
                                class="form-control form-control-sm"
                                placeholder="Nombre o teléfono…"
                                autocomplete="off">
                         @if($this->customerSuggestions->count())
-                            <div class="border rounded bg-white shadow-sm position-absolute w-100"
-                                 style="z-index:1060;top:calc(100% + 2px);max-height:180px;overflow-y:auto">
+                            <div class="reservation-suggestions border rounded bg-white shadow-sm position-absolute w-100">
                                 @foreach($this->customerSuggestions as $c)
-                                    <div wire:click="selectCustomer({{ $c->id }})"
-                                         class="px-3 py-2 border-bottom"
-                                         style="cursor:pointer;font-size:.82rem"
-                                         onmouseover="this.style.background='#f5f5ff'"
-                                         onmouseout="this.style.background=''">
+                                    <button type="button" wire:click="selectCustomer({{ $c->id }})"
+                                         class="reservation-suggestion w-100 px-3 py-2 border-0 border-bottom bg-white text-start app-text-sm">
                                         <div class="fw-semibold">{{ $c->name }}</div>
                                         @if($c->phone)
-                                            <div class="text-muted" style="font-size:.75rem">{{ $c->phone }}</div>
+                                            <div class="text-muted app-text-xs">{{ $c->phone }}</div>
                                         @endif
-                                    </div>
+                                    </button>
                                 @endforeach
                             </div>
                         @endif
@@ -86,7 +87,7 @@
 
                     {{-- Nombre --}}
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" style="font-size:.82rem">
+                        <label class="form-label fw-semibold app-text-sm">
                             Nombre <span class="text-danger">*</span>
                         </label>
                         <input type="text" wire:model="customerName"
@@ -97,7 +98,7 @@
 
                     {{-- Teléfono --}}
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" style="font-size:.82rem">Teléfono</label>
+                        <label class="form-label fw-semibold app-text-sm">Teléfono</label>
                         <input type="tel" wire:model="customerPhone"
                                class="form-control form-control-sm"
                                placeholder="Opcional">
@@ -106,7 +107,7 @@
                     {{-- Fecha + Hora --}}
                     <div class="row g-2 mb-3">
                         <div class="col-7">
-                            <label class="form-label fw-semibold" style="font-size:.82rem">
+                            <label class="form-label fw-semibold app-text-sm">
                                 Fecha <span class="text-danger">*</span>
                             </label>
                             <input type="date" wire:model="reservedDate"
@@ -114,7 +115,7 @@
                             @error('reservedDate')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-5">
-                            <label class="form-label fw-semibold" style="font-size:.82rem">
+                            <label class="form-label fw-semibold app-text-sm">
                                 Hora <span class="text-danger">*</span>
                             </label>
                             <input type="time" wire:model="reservedTime"
@@ -125,10 +126,10 @@
 
                     {{-- Asistentes --}}
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" style="font-size:.82rem">
+                        <label class="form-label fw-semibold app-text-sm">
                             Personas <span class="text-danger">*</span>
                         </label>
-                        <div class="input-group input-group-sm" style="max-width:160px">
+                        <div class="input-group input-group-sm reservation-guests-control">
                             <button type="button" wire:click="decrementGuests"
                                     class="btn btn-outline-secondary px-3">−</button>
                             <input type="number" wire:model="guests" min="1"
@@ -136,12 +137,12 @@
                             <button type="button" wire:click="incrementGuests"
                                     class="btn btn-outline-secondary px-3">+</button>
                         </div>
-                        @error('guests')<div class="text-danger mt-1" style="font-size:.75rem">{{ $message }}</div>@enderror
+                        @error('guests')<div class="text-danger mt-1 app-text-xs">{{ $message }}</div>@enderror
                     </div>
 
                     {{-- Notas --}}
                     <div class="mb-1">
-                        <label class="form-label fw-semibold" style="font-size:.82rem">Notas</label>
+                        <label class="form-label fw-semibold app-text-sm">Notas</label>
                         <textarea wire:model="notes" class="form-control form-control-sm"
                                   rows="2" placeholder="Ocasión especial, alergias…"></textarea>
                     </div>
@@ -180,11 +181,9 @@
             'cancelada'  => 'bg-label-danger',
         ];
     @endphp
-    <div class="modal app-modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
-         style="background:rgba(0,0,0,.45)"
+    <div class="modal app-modal reservation-modal-overlay fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
          wire:click.self="closePanel">
-        <div class="modal-dialog modal-dialog-centered"
-             style="max-width:440px" @click.stop>
+        <div class="modal-dialog modal-dialog-centered reservation-modal-detail" @click.stop>
             <div class="modal-content">
 
                 <div class="modal-header border-0 pb-0">
@@ -198,7 +197,7 @@
                 </div>
 
                 <div class="modal-body">
-                    <div class="d-flex flex-column gap-2" style="font-size:.88rem">
+                    <div class="d-flex flex-column gap-2 reservation-detail-list">
                         @if($r->customer_phone)
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bx bx-phone text-muted"></i>
@@ -226,14 +225,14 @@
                     </div>
 
                     @if($r->status === 'cancelada' && $r->cancellation_reason)
-                        <div class="alert alert-danger py-2 mt-3 mb-0" style="font-size:.82rem">
+                        <div class="alert alert-danger py-2 mt-3 mb-0 app-text-sm">
                             <strong>Motivo de cancelación:</strong> {{ $r->cancellation_reason }}
                         </div>
                     @endif
 
                     {{-- Form cancelación inline --}}
                     @if($showCancelForm)
-                        <div class="mt-3 p-3 bg-light rounded border" style="font-size:.84rem">
+                        <div class="mt-3 p-3 bg-light rounded border reservation-cancel-form">
                             <label class="form-label fw-semibold mb-1">Motivo (opcional)</label>
                             <textarea wire:model="cancelReason" class="form-control form-control-sm mb-2"
                                       rows="2" placeholder="Motivo de cancelación…"></textarea>
@@ -324,6 +323,22 @@
                 eventDisplay: 'block',
                 dayMaxEvents: 3,
                 nowIndicator: true,
+                eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
+                eventDidMount: function(info) {
+                    const start = info.event.start ? info.event.start.toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+                    info.el.setAttribute('aria-label', `${info.event.title}. ${start}`);
+                    info.el.setAttribute('tabindex', '0');
+                    info.el.addEventListener('keydown', function(event) {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            const cmp = getComponent();
+                            if (cmp) cmp.call('openDetail', parseInt(info.event.id));
+                        }
+                    });
+                },
+                loading: function(isLoading) {
+                    el.classList.toggle('is-loading', isLoading);
+                },
                 events: function(info, successCallback, failureCallback) {
                     fetch(`/app/reservas/events?start=${info.startStr}&end=${info.endStr}`)
                         .then(r => r.json())
@@ -366,5 +381,3 @@
     })();
     </script>
 </div>
-
-

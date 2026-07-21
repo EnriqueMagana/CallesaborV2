@@ -1,0 +1,86 @@
+.menu-filter-search { width: 220px; }
+.menu-filter-select { width: 160px; }
+.menu-empty-icon { font-size: 3rem; }
+.menu-image-column { width: 56px; }
+.menu-object-cover,
+.menu-media,
+.menu-preview-image { object-fit: cover; }
+
+.menu-media { flex-shrink: 0; }
+.menu-media-40 { width: 40px; height: 40px; }
+.menu-media-52 { width: 52px; height: 52px; }
+.menu-media-64 { width: 64px; height: 64px; }
+.menu-media-80 { width: 80px; height: 80px; }
+.menu-preview-image { width: 120px; height: 90px; }
+
+.menu-media-placeholder {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    color: #8592a3;
+    background: #eaecf0;
+}
+.menu-placeholder-icon { display: block; color: #8592a3; line-height: 1; }
+.menu-icon-11 { font-size: 1.1rem; }
+.menu-icon-12 { font-size: 1.2rem; }
+.menu-icon-14 { font-size: 1.4rem; }
+.menu-icon-16 { font-size: 1.6rem; }
+.menu-icon-20 { font-size: 2rem; }
+.menu-icon-25 { font-size: 2.5rem; }
+
+.menu-text-micro { font-size: 0.65rem !important; }
+.menu-text-xxs { font-size: 0.7rem !important; }
+.menu-dynamic-badge { color: var(--app-primary-dark); background: var(--app-primary-soft); }
+.menu-accent-card { border-left: 4px solid var(--app-primary) !important; }
+.menu-color-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    color: var(--app-primary);
+    background: var(--app-primary-soft);
+}
+.menu-color-icon-glyph { color: var(--app-primary); font-size: 1.5rem; line-height: 1; }
+.menu-scroll-sm { max-height: 200px; overflow-y: auto; }
+.menu-scroll-lg { max-height: 380px; overflow-y: auto; }
+.menu-loading { gap: 0.4rem; }
+.menu-modal-440 { max-width: 440px; }
+.menu-modal-480 { max-width: 480px; }
+.menu-modal-500 { max-width: 500px; }
+.menu-modal-540 { max-width: 540px; }
+.menu-icon-choice { width: 38px; height: 38px; flex-shrink: 0; }
+.menu-color-input { width: 30px !important; height: 30px !important; min-height: 30px !important; padding: 0; }
+.menu-soft-panel { background: #f8f9ff; }
+.menu-upload-frame { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+.menu-upload-trigger {
+    width: 80px;
+    height: 80px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    background: #f8f9fa;
+}
+.menu-section-divider { border-bottom: 1px solid #eaecf0; }
+.menu-clickable { cursor: pointer; }
+
+/* Ingredient image preview */
+.menu-ingredient-upload { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; margin-bottom: 18px; padding: 15px; border: 1px solid var(--app-border); border-radius: 14px; background: #fcfbfe; }
+.menu-ingredient-upload__label { display: block; margin-bottom: 7px; color: var(--app-muted); font-size: .63rem; font-weight: 700; text-transform: uppercase; }
+.menu-ingredient-upload__media { position: relative; aspect-ratio: 8 / 5; overflow: hidden; border: 1px dashed #cec8dc; border-radius: 12px; background: #f1eff5; }
+.menu-ingredient-upload__media > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.menu-ingredient-upload__fallback { width: 100%; height: 100%; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 12px; color: var(--app-muted); text-align: center; font-size: .63rem; }
+.menu-ingredient-upload__fallback i { color: var(--app-primary); font-size: 28px; }
+.menu-ingredient-upload__loading { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--app-ink); background: rgba(255,255,255,.9); font-size: .67rem; }
+.menu-ingredient-upload__controls { align-self: center; min-width: 0; }
+.menu-upload-success { display: flex; align-items: center; gap: 7px; margin-top: 9px; padding: 8px 10px; color: #116a4a; border-radius: 9px; background: #e8f7f0; font-size: .68rem; }
+.menu-upload-success i { font-size: 17px; }
+.menu-remove-image { margin-top: 10px; padding: 9px 10px 9px 34px; border: 1px solid #f0c8ce; border-radius: 9px; background: #fff5f6; }
+@media (max-width: 767.98px) {
+    .menu-filter-search,
+    .menu-filter-select { width: 100%; }
+    .menu-builder-page .modal-dialog { margin: 0.75rem; }
+    .menu-ingredient-upload { grid-template-columns: 1fr; }
+    .menu-ingredient-upload__preview { max-width: 300px; }
+}

@@ -1,30 +1,67 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
-
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
-            <div>
-                <a href="/" wire:navigate>
-                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
+    <title>{{ $businessSettings?->platform_name ?? config('app.name', 'Calle Sabor') }}</title>
+    <link rel="icon" href="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="stylesheet" href="{{ asset('assets/css/login.css') }}?v={{ filemtime(public_path('assets/css/login.css')) }}">
+</head>
+<body class="auth-body">
+    <main class="auth-shell">
+        <section class="auth-brand-panel" aria-label="Información del negocio">
+            @if($businessSettings?->banner_path)
+                <img class="auth-brand-panel__image" src="{{ Storage::url($businessSettings->banner_path) }}" alt="Ambiente de {{ $businessSettings->business_name }}">
+            @endif
+            <div class="auth-brand-panel__overlay" aria-hidden="true"></div>
+            <div class="auth-brand-panel__content">
+                <a href="/" class="auth-brand" aria-label="Ir al inicio de {{ $businessSettings?->business_name ?? config('app.name') }}">
+                    <span class="auth-brand__logo"><x-application-logo /></span>
+                    <span><strong>{{ $businessSettings?->platform_name ?? config('app.name', 'Calle Sabor') }}</strong><small>{{ $businessSettings?->business_name ?? 'Administración del restaurante' }}</small></span>
                 </a>
+
+                <div class="auth-brand-message">
+                    <span class="auth-brand-message__eyebrow"><i class="bx bx-shield-quarter" aria-hidden="true"></i> Acceso seguro</span>
+                    <h1>Tu operación empieza aquí.</h1>
+                    <p>Administra ventas, mesas, cocina y servicio desde un espacio diseñado para trabajar con claridad.</p>
+                    <ul>
+                        <li><i class="bx bx-check" aria-hidden="true"></i><span>Información centralizada y disponible según tus permisos.</span></li>
+                        <li><i class="bx bx-check" aria-hidden="true"></i><span>Protección de cuenta y autenticación en dos pasos.</span></li>
+                    </ul>
+                </div>
+
+                @if($businessSettings?->phone || $businessSettings?->email || $businessSettings?->full_address)
+                    <address class="auth-business-contact">
+                        @if($businessSettings?->phone)<span><i class="bx bx-phone" aria-hidden="true"></i>{{ $businessSettings->phone }}</span>@endif
+                        @if($businessSettings?->email)<span><i class="bx bx-envelope" aria-hidden="true"></i>{{ $businessSettings->email }}</span>@endif
+                        @if($businessSettings?->full_address)<span><i class="bx bx-map" aria-hidden="true"></i>{{ $businessSettings->full_address }}</span>@endif
+                    </address>
+                @endif
+            </div>
+        </section>
+
+        <section class="auth-content">
+            <div class="auth-mobile-brand">
+                <span class="auth-brand__logo"><x-application-logo /></span>
+                <span><strong>{{ $businessSettings?->platform_name ?? config('app.name', 'Calle Sabor') }}</strong><small>{{ $businessSettings?->business_name ?? 'Administración del restaurante' }}</small></span>
             </div>
 
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
+            <div class="auth-card">
                 {{ $slot }}
             </div>
-        </div>
-    </body>
+
+            <footer class="auth-footer">
+                <span><i class="bx bx-lock-alt" aria-hidden="true"></i> Conexión protegida</span>
+                <span>© {{ now()->year }} {{ $businessSettings?->business_name ?? config('app.name') }}</span>
+            </footer>
+        </section>
+    </main>
+</body>
 </html>

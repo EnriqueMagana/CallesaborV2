@@ -17,10 +17,35 @@ class SplitCuenta extends Component
     public int    $equalParts = 2;
     public array  $accounts   = []; // [['label' => 'Cuenta 1', 'item_ids' => []]]
     public ?int   $confirmed  = null; // split id after save
+    public bool   $showCancelConfirm = false;
 
     public function mount(Mesa $mesa): void
     {
         $this->mesaId = $mesa->id;
+
+        // Si la mesa ya tiene una división pendiente (por ejemplo, al volver
+        // desde POS o tras recargar la pantalla), retomamos esa división en
+        // lugar de crear subcuentas duplicadas.
+        $existing = MesaSplit::where('mesa_id', $mesa->id)
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            $this->confirmed = $existing->id;
+            $this->accounts = collect($existing->split_data ?? [])->map(function (array $account) {
+                return [
+                    'label' => $account['label'] ?? 'Cuenta',
+                    'items' => $account['items'] ?? [],
+                    'item_ids' => collect($account['items'] ?? [])->pluck('id')->all(),
+                    'paid' => (bool) ($account['paid'] ?? false),
+                    'total' => (float) ($account['total'] ?? 0),
+                ];
+            })->values()->all();
+
+            return;
+        }
+
         $this->accounts = [
             ['label' => 'Cuenta 1', 'item_ids' => [], 'paid' => false],
             ['label' => 'Cuenta 2', 'item_ids' => [], 'paid' => false],
@@ -38,7 +63,9 @@ class SplitCuenta extends Component
     {
         return OrderItem::whereHas('order', function ($q) {
                 $q->where('mesa_id', $this->mesaId)
-                  ->whereIn('status', ['pendiente', 'en_preparacion']);
+                  // Las órdenes del kiosko pueden llegar a split ya listas.
+                  // Solo excluimos las que ya fueron cobradas o canceladas.
+                  ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']);
             })
             ->with(['order', 'addons'])
             ->get();
@@ -167,6 +194,8 @@ class SplitCuenta extends Component
 
     public function markPaid(int $idx): void
     {
+        abort(403, 'El cobro de cuentas divididas se realiza únicamente desde el POS.');
+
         if (isset($this->accounts[$idx])) {
             $this->accounts[$idx]['paid'] = true;
         }
@@ -226,7 +255,7 @@ class SplitCuenta extends Component
             if ($this->mode === 'igual') {
                 $items = $this->allItems->map(fn($i) => [
                     'id'       => $i->id,
-                    'name'     => $i->name,
+                    'name'     => $i->product_name,
                     'qty'      => $i->quantity,
                     'subtotal' => round((float) $i->subtotal / $this->equalParts, 2),
                 ])->toArray();
@@ -236,7 +265,7 @@ class SplitCuenta extends Component
                     if ($item) {
                         $items[] = [
                             'id'       => $item->id,
-                            'name'     => $item->name,
+                            'name'     => $item->product_name,
                             'qty'      => $item->quantity,
                             'subtotal' => (float) $item->subtotal,
                         ];
@@ -264,7 +293,7 @@ class SplitCuenta extends Component
         $this->mesa->update(['status' => 'en_cuenta']);
         unset($this->mesa, $this->accountTotals);
 
-        session()->flash('success', 'Split guardado. Procede a cobrar cada cuenta.');
+        session()->flash('success', 'Split guardado y enviado a caja para su cobro.');
     }
 
     public function cancelConfirm(): void
@@ -273,8 +302,20 @@ class SplitCuenta extends Component
         // Delete the MesaSplit record and reset status back to ocupada
         MesaSplit::destroy($this->confirmed);
         $this->confirmed = null;
+        $this->showCancelConfirm = false;
         Mesa::find($this->mesaId)?->update(['status' => 'ocupada']);
         unset($this->mesa);
+    }
+
+    public function requestCancelConfirm(): void
+    {
+        if (! $this->confirmed) return;
+        $this->showCancelConfirm = true;
+    }
+
+    public function closeCancelConfirm(): void
+    {
+        $this->showCancelConfirm = false;
     }
 
     public function render()

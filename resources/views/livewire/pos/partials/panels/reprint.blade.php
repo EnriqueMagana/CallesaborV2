@@ -1,89 +1,72 @@
 <div class="pos-overlay-panel" :class="panels.reprint ? 'show' : ''">
     <div class="pos-overlay-backdrop" @click="panels.reprint = false"></div>
-    <div class="pos-panel">
-        <div class="panel-header">
-            <i class="bx bx-printer" style="font-size:1.1rem;color:var(--pos-accent)"></i>
-            <h5>Reimprimir ticket</h5>
-            <button class="btn-panel-close" @click="panels.reprint = false"><i class="bx bx-x"></i></button>
-        </div>
+    <section class="pos-panel pos-area-panel pos-reprint-panel" role="dialog" aria-modal="true" aria-labelledby="pos-reprint-title">
+        <header class="panel-header pos-area-panel__header">
+            <span class="pos-area-panel__mark is-reprint"><i class="bx bx-printer"></i></span>
+            <div>
+                <span class="pos-area-panel__eyebrow">Documentos</span>
+                <h2 id="pos-reprint-title">Reimprimir tickets</h2>
+                <p>Cocina imprime productos por área; Cliente muestra productos, precios y total.</p>
+            </div>
+            <button type="button" class="btn-panel-close" @click="panels.reprint = false" aria-label="Cerrar Reimpresión"><i class="bx bx-x"></i></button>
+        </header>
 
-        {{-- Tabs --}}
-        <div style="display:flex;border-bottom:1px solid var(--pos-border)">
-            @foreach(['ventanilla'=>'Ventanilla','mesas'=>'Mesas','delivery'=>'Delivery'] as $type => $label)
-                <button wire:click="$set('reprintType','{{ $type }}')"
-                        style="flex:1;padding:11px 6px;font-size:.74rem;font-weight:600;border:none;background:none;cursor:pointer;
-                               border-bottom:2px solid {{ $reprintType===$type ? 'var(--pos-accent)' : 'transparent' }};
-                               color:{{ $reprintType===$type ? 'var(--pos-accent)' : 'var(--pos-muted)' }};
-                               transition:color .15s,border-color .15s">
-                    {{ $label }}
+        <div class="pos-reprint-tabs" role="tablist" aria-label="Filtrar pedidos por área">
+            @foreach (['ventanilla' => ['Ventanilla', 'bx-store-alt'], 'delivery' => ['Delivery', 'bx-cycling'], 'mesas' => ['Mesas', 'bx-table']] as $type => [$label, $icon])
+                <button type="button" wire:click="$set('reprintType', '{{ $type }}')"
+                    class="pos-reprint-tab {{ $reprintType === $type ? 'is-active' : '' }}" role="tab" aria-selected="{{ $reprintType === $type ? 'true' : 'false' }}">
+                    <i class="bx {{ $icon }}"></i>{{ $label }}
                 </button>
             @endforeach
         </div>
 
-        <div class="panel-body">
-            {{-- Búsqueda --}}
-            <div style="margin-bottom:12px">
-                <div class="search-wrap">
-                    <i class="bx bx-search si-icon"></i>
-                    <input type="text" class="pos-input" style="width:100%;padding-left:32px"
-                           wire:model.live.debounce.300ms="reprintSearch"
-                           placeholder="# pedido o nombre…">
-                </div>
-            </div>
-
-            {{-- Lista --}}
-            @forelse($this->recentOrders as $ro)
-                @php
-                    // Pill de tipo
-                    if ($ro->type === 'pick_up') {
-                        $pillLabel = 'Para recoger';
-                        $pillColor = 'rgba(245,158,11,.15)';
-                        $pillText  = '#b45309';
-                    } elseif ($ro->type === 'delivery') {
-                        $pillMap   = ['contra_entrega'=>'Contra entrega','card'=>'Tarjeta online','transfer'=>'Transferencia'];
-                        $pillLabel = $pillMap[$ro->delivery_method] ?? 'Delivery';
-                        $pillColor = 'rgba(105,108,255,.1)';
-                        $pillText  = 'var(--pos-accent)';
-                    } else {
-                        $pillLabel = 'Ventanilla';
-                        $pillColor = 'rgba(34,197,94,.1)';
-                        $pillText  = '#16a34a';
-                    }
-                @endphp
-                <div class="recent-order-row">
-                    <div style="width:34px;height:34px;border-radius:9px;background:rgba(105,108,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                        <i class="bx bx-receipt" style="color:var(--pos-accent)"></i>
-                    </div>
-                    <div class="recent-order-info" style="flex:1;min-width:0">
-                        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-                            <span class="recent-order-num">#{{ $ro->id }}</span>
-                            <span style="background:{{ $pillColor }};color:{{ $pillText }};font-size:.6rem;border-radius:20px;padding:1px 7px;font-weight:700;white-space:nowrap">
-                                {{ $pillLabel }}
-                            </span>
-                        </div>
-                        <div style="font-size:.8rem;color:var(--pos-text);margin-top:1px">{{ $ro->customer_name ?: 'Anónimo' }}</div>
-                        <div class="recent-order-meta">
-                            ${{ number_format($ro->total,2) }}
-                            · {{ $ro->created_at->format('g:i A') }}
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:5px;flex-shrink:0">
-                        <button wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false"
-                                class="pos-btn pos-btn-secondary pos-btn-sm" title="Ticket cliente">
-                            <i class="bx bx-user"></i>
-                        </button>
-                        <button wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false; $nextTick(() => posTicketTab('cocina'))"
-                                class="pos-btn pos-btn-secondary pos-btn-sm" title="Ticket cocina">
-                            <i class="bx bx-dish"></i>
-                        </button>
-                    </div>
-                </div>
-            @empty
-                <div style="text-align:center;padding:40px 20px;color:var(--pos-muted)">
-                    <i class="bx bx-printer" style="font-size:2.5rem;display:block;margin-bottom:8px;opacity:.3"></i>
-                    <span style="font-size:.82rem">Sin pedidos hoy</span>
-                </div>
-            @endforelse
+        <div class="pos-area-panel__tools">
+            <label class="pos-area-search">
+                <i class="bx bx-search"></i>
+                <span class="visually-hidden">Buscar orden para reimprimir</span>
+                <input type="search" class="pos-input" wire:model.live.debounce.300ms="reprintSearch" placeholder="Número de pedido o cliente">
+            </label>
         </div>
-    </div>
+
+        <div class="panel-body pos-area-panel__body">
+            @if ($reprintType === 'mesas')
+                @forelse ($this->reprintMesaGroups as $group)
+                    <article class="pos-reprint-table-group">
+                        <header>
+                            <div><span><i class="bx bx-table"></i></span><div><strong>{{ $group->mesa?->display_name ?: 'Sin mesa asignada' }}</strong><small>{{ $group->orders->count() }} {{ $group->orders->count() === 1 ? 'orden' : 'órdenes' }}</small></div></div>
+                            <strong>${{ number_format($group->total, 2) }}</strong>
+                        </header>
+                        <div class="pos-reprint-order-list">
+                            @foreach ($group->orders as $ro)
+                                <div class="pos-reprint-order-row" wire:key="reprint-table-order-{{ $ro->id }}">
+                                    <div><strong>#{{ $ro->id }}</strong><span>{{ $ro->customer_name ?: 'Cliente de mesa' }} · {{ $ro->created_at->format('H:i') }}</span></div>
+                                    <div class="pos-reprint-actions">
+                                        <button type="button" wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-secondary"><i class="bx bx-receipt"></i>Cliente</button>
+                                        <button type="button" wire:click="reprintKitchenOrder({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-primary"><i class="bx bx-dish"></i>Cocina</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </article>
+                @empty
+                    <div class="pos-area-empty"><span><i class="bx bx-printer"></i></span><h3>Sin órdenes de mesa</h3><p>No encontramos tickets de hoy con ese criterio.</p></div>
+                @endforelse
+            @else
+                @forelse ($this->recentOrders as $ro)
+                    <article class="pos-reprint-order-card" wire:key="reprint-order-{{ $ro->id }}">
+                        <div class="pos-reprint-order-card__identity">
+                            <span><i class="bx {{ $reprintType === 'delivery' ? 'bx-cycling' : 'bx-store-alt' }}"></i></span>
+                            <div><strong>Orden #{{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ $ro->created_at->format('H:i') }}</small><b>${{ number_format($ro->total, 2) }}</b></div>
+                        </div>
+                        <div class="pos-reprint-actions">
+                            <button type="button" wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-secondary"><i class="bx bx-receipt"></i>Cliente</button>
+                            <button type="button" wire:click="reprintKitchenOrder({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-primary"><i class="bx bx-dish"></i>Cocina</button>
+                        </div>
+                    </article>
+                @empty
+                    <div class="pos-area-empty"><span><i class="bx bx-printer"></i></span><h3>Sin pedidos para reimprimir</h3><p>No encontramos tickets de hoy con ese criterio.</p></div>
+                @endforelse
+            @endif
+        </div>
+    </section>
 </div>

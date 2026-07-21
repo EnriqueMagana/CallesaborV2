@@ -1,10 +1,4 @@
-<div>
-    {{-- ══════════════════════════════════════════════════════════
-         ASSET: mesas.css
-    ══════════════════════════════════════════════════════════ --}}
-    @once
-        <link rel="stylesheet" href="{{ asset('assets/css/mesas.css') }}">
-    @endonce
+<div class="app-page mesas-page">
 
     {{-- Flash --}}
     @if(session('success'))
@@ -53,6 +47,12 @@
                 <span>Mis Mesas</span>
                 <span class="mesas-tab-badge badge-blue">{{ $this->myActiveMesaCount }}</span>
             </button>
+            <button class="mesas-tab mesas-tab--kiosk {{ $tab === 'kiosko' ? 'active' : '' }}"
+                    wire:click="setTab('kiosko')">
+                <i class="bx bx-desktop"></i>
+                <span>Kiosko</span>
+                <span class="mesas-tab-badge badge-purple">{{ $this->kioskCount }}</span>
+            </button>
             @can('gestionar mesas')
             <button class="mesas-tab {{ $tab === 'todas' ? 'active' : '' }}"
                     wire:click="setTab('todas')">
@@ -86,8 +86,7 @@
                     wire:click="$set('areaFilter', null)">Todas</button>
             @foreach($this->areas as $area)
                 <button class="mesas-filter-pill {{ $areaFilter === $area->id ? 'active' : '' }}"
-                        wire:click="$set('areaFilter', {{ $area->id }})"
-                        style="{{ $areaFilter === $area->id ? "background:{$area->color};border-color:{$area->color};color:#fff;" : '' }}">
+                        wire:click="$set('areaFilter', {{ $area->id }})">
                     <i class="bx {{ $area->icon }}"></i> {{ $area->name }}
                 </button>
             @endforeach
@@ -98,19 +97,16 @@
         <div class="mesas-filter-group">
             <span class="mesas-filter-label">Ver:</span>
             {{-- "Todas activas" = sin filtro específico → muestra ocupada + en_cuenta --}}
-            <button class="mesas-filter-pill {{ $statusFilter === '' ? 'active' : '' }}"
-                    wire:click="$set('statusFilter', '')"
-                    style="{{ $statusFilter === '' ? 'background:#696cff;border-color:#696cff;color:#fff;' : '' }}">
+            <button class="mesas-filter-pill mesas-filter-pill--primary {{ $statusFilter === '' ? 'active' : '' }}"
+                    wire:click="$set('statusFilter', '')">
                 <i class="bx bx-grid-alt me-1"></i> Todas activas
             </button>
-            <button class="mesas-filter-pill {{ $statusFilter === 'ocupada' ? 'active' : '' }}"
-                    wire:click="$set('statusFilter', '{{ $statusFilter === 'ocupada' ? '' : 'ocupada' }}')"
-                    style="{{ $statusFilter === 'ocupada' ? 'background:#3b82f6;border-color:#3b82f6;color:#fff;' : '' }}">
+            <button class="mesas-filter-pill mesas-filter-pill--info {{ $statusFilter === 'ocupada' ? 'active' : '' }}"
+                    wire:click="$set('statusFilter', '{{ $statusFilter === 'ocupada' ? '' : 'ocupada' }}')">
                 <i class="bx bx-user-check me-1"></i> Ocupadas
             </button>
-            <button class="mesas-filter-pill {{ $statusFilter === 'en_cuenta' ? 'active' : '' }}"
-                    wire:click="$set('statusFilter', '{{ $statusFilter === 'en_cuenta' ? '' : 'en_cuenta' }}')"
-                    style="{{ $statusFilter === 'en_cuenta' ? 'background:#f59e0b;border-color:#f59e0b;color:#fff;' : '' }}">
+            <button class="mesas-filter-pill mesas-filter-pill--warning {{ $statusFilter === 'en_cuenta' ? 'active' : '' }}"
+                    wire:click="$set('statusFilter', '{{ $statusFilter === 'en_cuenta' ? '' : 'en_cuenta' }}')">
                 <i class="bx bx-receipt me-1"></i> En cuenta
             </button>
         </div>
@@ -141,19 +137,23 @@
             {{-- Empty state --}}
             <div class="mesas-empty">
                 @if($tab === 'disponibles')
-                    <i class="bx bx-check-circle mesas-empty-icon" style="color:#22c55e"></i>
+                    <i class="bx bx-check-circle mesas-empty-icon" data-ui="xui-1cjvn4l"></i>
                     <h5>No hay mesas disponibles</h5>
                     <p>Todas las mesas están ocupadas o bloqueadas en este momento.</p>
                 @elseif($tab === 'mis_mesas')
-                    <i class="bx bx-user mesas-empty-icon" style="color:#696cff"></i>
+                    <i class="bx bx-user mesas-empty-icon" data-ui="xui-eqavzl"></i>
                     <h5>No tienes mesas asignadas</h5>
                     <p>Ve a <strong>Disponibles</strong> para asignarte una mesa.</p>
+                @elseif($tab === 'kiosko')
+                    <i class="bx bx-desktop mesas-empty-icon"></i>
+                    <h5>No hay mesas con pedidos de kiosko</h5>
+                    <p>Cuando un cliente seleccione una mesa en el kiosko, aparecerá aquí para que puedas tomarla.</p>
                 @elseif($tab === 'todas')
-                    <i class="bx bx-table mesas-empty-icon" style="color:#9ca3af"></i>
+                    <i class="bx bx-table mesas-empty-icon" data-ui="xui-ea0on8"></i>
                     <h5>Sin mesas activas</h5>
                     <p>No hay mesas ocupadas ni en cuenta en este momento.</p>
                 @else
-                    <i class="bx bx-search-alt mesas-empty-icon" style="color:#9ca3af"></i>
+                    <i class="bx bx-search-alt mesas-empty-icon" data-ui="xui-ea0on8"></i>
                     <h5>Sin resultados</h5>
                     <p>Prueba cambiando los filtros de búsqueda.</p>
                 @endif
@@ -161,7 +161,7 @@
         @else
             @php
                 // disponibles + todas: group by area. mis_mesas: flat.
-                $groupByArea = in_array($tab, ['disponibles', 'todas']);
+                $groupByArea = in_array($tab, ['disponibles', 'kiosko', 'todas']);
                 $mesasByArea = $groupByArea
                     ? $mesas->groupBy('area_id')
                     : collect(['_flat' => $mesas]);
@@ -172,7 +172,7 @@
                     @php $areaModel = $areaMesas->first()->area; @endphp
                     <div class="mesas-area-block">
                     <div class="mesas-area-section">
-                        <div class="mesas-area-header {{ $tab === 'disponibles' ? 'mesas-area-header--compact' : '' }}" style="--area-color: {{ $areaModel->color ?? '#696cff' }}">
+                        <div class="mesas-area-header {{ $tab === 'disponibles' ? 'mesas-area-header--compact' : '' }}">
                             <div class="mesas-area-header-left">
                                 <div class="mesas-area-icon">
                                     <i class="bx {{ $areaModel->icon ?? 'bx-map-pin' }}"></i>
@@ -192,8 +192,7 @@
                                 @foreach(['ocupada','en_cuenta','reservada'] as $st)
                                     @php $cnt = $areaMesas->where('status', $st)->count(); @endphp
                                     @if($cnt)
-                                        @php $stColor = match($st){ 'ocupada'=>'#3b82f6','en_cuenta'=>'#f59e0b','reservada'=>'#8b5cf6',default=>'#6b7280' }; @endphp
-                                        <span class="mesas-area-stat-pill" style="background:{{ $stColor }}20;color:{{ $stColor }}">
+                                        <span class="mesas-area-stat-pill mesas-area-stat-pill--{{ $st }}">
                                             {{ $cnt }} {{ match($st){ 'ocupada'=>'ocupada(s)','en_cuenta'=>'en cuenta','reservada'=>'reservada(s)',default=>$st } }}
                                         </span>
                                     @endif
@@ -214,10 +213,10 @@
                             $renderedGroups[] = $mesa->mesa_group_id;
                             $groupMesas = $mesas->where('mesa_group_id', $mesa->mesa_group_id);
                             $firstMesa  = $groupMesas->first();
+                            $activeSplit = $firstMesa->splits->first();
                         @endphp
                         {{-- GROUP CARD --}}
                         <div class="mesa-card mesa-card-group status-{{ $firstMesa->status }}"
-                             style="--status-color: {{ $firstMesa->status_color }}"
                              x-data="{ open: false }" :class="{ 'menu-open': open }">
 
                             <div class="mesa-card-topbar">
@@ -229,6 +228,9 @@
                                     <i class="bx {{ $firstMesa->status_icon }}"></i>
                                     {{ $firstMesa->status_label }}
                                 </div>
+                                @if($firstMesa->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
+                                    <span class="mesa-kiosk-badge"><i class="bx bx-desktop"></i> Pedido kiosko</span>
+                                @endif
                             </div>
 
                             <div class="mesa-card-body">
@@ -256,7 +258,7 @@
                             <div class="mesa-card-footer">
                                 @if($firstMesa->currentAssignment)
                                     @if($tab === 'mis_mesas' && $firstMesa->status === 'ocupada')
-                                        <button class="btn-asignarme" style="border-color:#696cff;color:#696cff;background:rgba(105,108,255,.08)"
+                                        <button class="btn-asignarme" data-ui="xui-18yv2pi"
                                                 wire:click="goToOrden({{ $firstMesa->id }})">
                                             <i class="bx bx-receipt"></i> Ordenar
                                         </button>
@@ -277,6 +279,10 @@
                                     <button class="btn-asignarme" wire:click="openAssign({{ $firstMesa->id }})">
                                         <i class="bx bx-user-plus"></i> Asignarme
                                     </button>
+                                @elseif($firstMesa->status === 'ocupada' && $groupMesas->flatMap->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
+                                    <button class="btn-asignarme btn-asignarme--kiosk" wire:click="openAssign({{ $firstMesa->id }})">
+                                        <i class="bx bx-desktop"></i> Tomar mesa de kiosco
+                                    </button>
                                 @else
                                     <div class="mesa-waiter mesa-waiter--none">
                                         <i class="bx bx-user-x"></i> Sin asignar
@@ -295,8 +301,8 @@
                                             <button wire:click="goToOrden({{ $firstMesa->id }})" @click="open=false">
                                                 <i class="bx bx-receipt"></i> Ordenar
                                             </button>
-                                            <button wire:click="closeMesa({{ $firstMesa->id }})" @click="open=false">
-                                                <i class="bx bx-lock"></i> Cerrar cuenta
+                                            <button type="button" wire:click="closeMesa({{ $firstMesa->id }})" wire:loading.attr="disabled" wire:target="closeMesa" @click="open=false" aria-label="Cerrar mesa y dividir la cuenta">
+                                                <i class="bx bx-split"></i> Cerrar y dividir cuenta
                                             </button>
                                         @endif
                                         @if(in_array($firstMesa->status, ['ocupada', 'en_cuenta']))
@@ -304,7 +310,11 @@
                                                 <i class="bx bx-list-ul"></i> Ver órdenes
                                             </a>
                                         @endif
-                                        @if($firstMesa->status === 'en_cuenta')
+                                        @if($activeSplit)
+                                            <button wire:click="goToSplit({{ $firstMesa->id }})" @click="open=false">
+                                                <i class="bx bx-check-circle"></i> Ver cuenta dividida
+                                            </button>
+                                        @elseif($firstMesa->status === 'en_cuenta')
                                             <button wire:click="goToSplit({{ $firstMesa->id }})" @click="open=false">
                                                 <i class="bx bx-split"></i> Dividir cuenta
                                             </button>
@@ -336,12 +346,12 @@
 
                     @elseif(!$mesa->mesa_group_id)
                         {{-- SINGLE CARD --}}
+                        @php $activeSplit = $mesa->splits->first(); @endphp
                         <div class="mesa-card status-{{ $mesa->status }}"
-                             style="--status-color: {{ $mesa->status_color }}"
                              x-data="{ open: false }" :class="{ 'menu-open': open }">
 
                             <div class="mesa-card-topbar">
-                                <div class="mesa-area-tag" style="color: {{ $mesa->area->color ?? '#696cff' }}">
+                                <div class="mesa-area-tag">
                                     <i class="bx {{ $mesa->area->icon ?? 'bx-map-pin' }}"></i>
                                     {{ $mesa->area->name ?? '–' }}
                                 </div>
@@ -349,6 +359,9 @@
                                     <i class="bx {{ $mesa->status_icon }}"></i>
                                     {{ $mesa->status_label }}
                                 </div>
+                                @if($mesa->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
+                                    <span class="mesa-kiosk-badge"><i class="bx bx-desktop"></i> Pedido kiosko</span>
+                                @endif
                             </div>
 
                             <div class="mesa-card-body">
@@ -377,7 +390,7 @@
                             <div class="mesa-card-footer">
                                 @if($mesa->currentAssignment)
                                     @if($tab === 'mis_mesas' && $mesa->status === 'ocupada')
-                                        <button class="btn-asignarme" style="border-color:#696cff;color:#696cff;background:rgba(105,108,255,.08)"
+                                        <button class="btn-asignarme" data-ui="xui-18yv2pi"
                                                 wire:click="goToOrden({{ $mesa->id }})">
                                             <i class="bx bx-receipt"></i> Ordenar
                                         </button>
@@ -397,6 +410,10 @@
                                 @elseif($mesa->status === 'disponible')
                                     <button class="btn-asignarme" wire:click="openAssign({{ $mesa->id }})">
                                         <i class="bx bx-user-plus"></i> Asignarme
+                                    </button>
+                                @elseif($mesa->status === 'ocupada' && $mesa->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
+                                    <button class="btn-asignarme btn-asignarme--kiosk" wire:click="openAssign({{ $mesa->id }})">
+                                        <i class="bx bx-desktop"></i> Tomar mesa de kiosco
                                     </button>
                                 @elseif($mesa->status === 'bloqueada')
                                     <div class="mesa-waiter mesa-waiter--blocked">
@@ -421,8 +438,8 @@
                                             <button wire:click="goToOrden({{ $mesa->id }})" @click="open=false">
                                                 <i class="bx bx-receipt"></i> Ordenar
                                             </button>
-                                            <button wire:click="closeMesa({{ $mesa->id }})" @click="open=false">
-                                                <i class="bx bx-lock"></i> Cerrar cuenta
+                                            <button type="button" wire:click="closeMesa({{ $mesa->id }})" wire:loading.attr="disabled" wire:target="closeMesa" @click="open=false" aria-label="Cerrar mesa y dividir la cuenta">
+                                                <i class="bx bx-split"></i> Cerrar y dividir cuenta
                                             </button>
                                         @endif
                                         @if(in_array($mesa->status, ['ocupada', 'en_cuenta']))
@@ -430,7 +447,11 @@
                                                 <i class="bx bx-list-ul"></i> Ver órdenes
                                             </a>
                                         @endif
-                                        @if($mesa->status === 'en_cuenta')
+                                        @if($activeSplit)
+                                            <button wire:click="goToSplit({{ $mesa->id }})" @click="open=false">
+                                                <i class="bx bx-check-circle"></i> Ver cuenta dividida
+                                            </button>
+                                        @elseif($mesa->status === 'en_cuenta')
                                             <button wire:click="goToSplit({{ $mesa->id }})" @click="open=false">
                                                 <i class="bx bx-split"></i> Dividir cuenta
                                             </button>
@@ -498,6 +519,12 @@
                 <i class="bx bx-user-check"></i>
                 Mis Mesas
             </button>
+            <button class="mbn-item {{ $tab === 'kiosko' ? 'active' : '' }}"
+                    wire:click="setTab('kiosko')">
+                @if($this->kioskCount > 0)<span class="mbn-badge">{{ $this->kioskCount }}</span>@endif
+                <i class="bx bx-desktop"></i>
+                Kiosko
+            </button>
             @can('gestionar mesas')
             <button class="mbn-item {{ $tab === 'todas' ? 'active' : '' }}"
                     wire:click="setTab('todas')">
@@ -516,7 +543,7 @@
     @if($showAssignModal && $this->assignMesa)
     <div class="mesas-modal-backdrop" wire:click.self="$set('showAssignModal', false)">
         <div class="mesas-modal mesas-modal--sm">
-            <div class="mesas-modal-icon" style="background:#696cff20;color:#696cff">
+            <div class="mesas-modal-icon" data-ui="xui-71m8uj">
                 <i class="bx bx-user-plus"></i>
             </div>
             <h5>¿Asignarte la Mesa {{ $this->assignMesa->number }}?</h5>
@@ -604,7 +631,7 @@
     @if($showReleaseModal)
     <div class="mesas-modal-backdrop" wire:click.self="$set('showReleaseModal', false)">
         <div class="mesas-modal mesas-modal--sm">
-            <div class="mesas-modal-icon" style="background:#ef444420;color:#ef4444">
+            <div class="mesas-modal-icon" data-ui="xui-rhcfj3">
                 <i class="bx bx-user-minus"></i>
             </div>
             <h5>Liberar mesa</h5>
@@ -628,7 +655,7 @@
     @if($showStatusModal)
     <div class="mesas-modal-backdrop" wire:click.self="$set('showStatusModal', false)">
         <div class="mesas-modal mesas-modal--sm">
-            <div class="mesas-modal-icon" style="background:#f59e0b20;color:#f59e0b">
+            <div class="mesas-modal-icon" data-ui="xui-1eoxxj">
                 <i class="bx bx-refresh"></i>
             </div>
             <h5>Cambiar estado</h5>
@@ -678,8 +705,7 @@
                         <div class="mesas-grid mesas-grid--compact">
                             @foreach($areaMesasGroup as $m)
                                 <div class="mesa-card-mini {{ in_array($m->id, $groupSelection) ? 'selected' : '' }}"
-                                     wire:click="toggleGroupSelection({{ $m->id }})"
-                                     style="{{ in_array($m->id, $groupSelection) ? '--status-color:#696cff' : '--status-color:#22c55e' }}">
+                                     wire:click="toggleGroupSelection({{ $m->id }})">
                                     <span class="mesa-mini-num">{{ $m->number }}</span>
                                     @if(in_array($m->id, $groupSelection))
                                         <i class="bx bx-check mesa-mini-check"></i>
@@ -709,7 +735,7 @@
     @if($showUngroupModal)
     <div class="mesas-modal-backdrop" wire:click.self="$set('showUngroupModal', false)">
         <div class="mesas-modal mesas-modal--sm">
-            <div class="mesas-modal-icon" style="background:#f59e0b20;color:#f59e0b">
+            <div class="mesas-modal-icon" data-ui="xui-1eoxxj">
                 <i class="bx bx-unlink"></i>
             </div>
             <h5>Desagrupar mesa</h5>
@@ -742,8 +768,8 @@
                     <div class="col-6">
                         <label class="form-label fw-semibold">Color</label>
                         <div class="d-flex gap-2 align-items-center">
-                            <input type="color" class="form-control form-control-color" wire:model="areaColor" style="width:48px;height:38px;padding:2px">
-                            <span class="form-control text-muted small" style="flex:1">{{ $areaColor }}</span>
+                            <input type="color" class="form-control form-control-color" wire:model="areaColor" data-ui="xui-pah3lq">
+                            <span class="form-control text-muted small" data-ui="xui-ckcaff">{{ $areaColor }}</span>
                         </div>
                     </div>
                     <div class="col-6">
@@ -762,11 +788,11 @@
                     <label class="form-label fw-semibold text-muted small">Áreas existentes</label>
                     <div class="d-flex flex-column gap-1">
                         @foreach($this->areas as $a)
-                        <div class="d-flex align-items-center justify-content-between p-2 rounded" style="background:#f5f5f9">
+                        <div class="d-flex align-items-center justify-content-between p-2 rounded" data-ui="xui-6n8fwb">
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bx {{ $a->icon }}" style="color:{{ $a->color }};font-size:1.1rem"></i>
+                                <i class="bx {{ $a->icon }} mesas-area-list-icon"></i>
                                 <span class="fw-semibold">{{ $a->name }}</span>
-                                <span class="badge" style="background:{{ $a->color }}20;color:{{ $a->color }}">
+                                <span class="badge bg-label-primary">
                                     {{ $a->mesas_count }} mesa(s)
                                 </span>
                             </div>
@@ -849,7 +875,7 @@
     @if($showDeleteMesaModal)
     <div class="mesas-modal-backdrop" wire:click.self="$set('showDeleteMesaModal', false)">
         <div class="mesas-modal mesas-modal--sm">
-            <div class="mesas-modal-icon" style="background:#ef444420;color:#ef4444">
+            <div class="mesas-modal-icon" data-ui="xui-rhcfj3">
                 <i class="bx bx-trash"></i>
             </div>
             <h5>Eliminar mesa</h5>
@@ -869,14 +895,14 @@
         <div class="mesas-modal mesas-modal--xl">
             <div class="mesas-modal-header">
                 <div class="d-flex align-items-center gap-3">
-                    <div class="mesa-detail-number" style="background: {{ $dm->status_color }}20; color: {{ $dm->status_color }}">
+                    <div class="mesa-detail-number mesa-detail-status--{{ $dm->status }}">
                         {{ $dm->number }}
                     </div>
                     <div>
                         <h5 class="mb-0">{{ $dm->display_name }}</h5>
                         <small class="text-muted">
                             {{ $dm->area->name ?? '–' }} · Capacidad {{ $dm->capacity }}p ·
-                            <span class="badge" style="background:{{ $dm->status_color }}20;color:{{ $dm->status_color }}">
+                            <span class="badge mesa-detail-status--{{ $dm->status }}">
                                 <i class="bx {{ $dm->status_icon }}"></i> {{ $dm->status_label }}
                             </span>
                         </small>
@@ -899,6 +925,11 @@
                     <button class="mesas-inner-tab" :class="{ active: tab === 'asignaciones' }" @click="tab = 'asignaciones'">
                         <i class="bx bx-user-pin"></i> Asignaciones
                     </button>
+                    @if($dm->splits->isNotEmpty())
+                        <button class="mesas-inner-tab" :class="{ active: tab === 'split' }" @click="tab = 'split'" aria-label="Ver cuentas divididas">
+                            <i class="bx bx-split"></i> Cuenta dividida
+                        </button>
+                    @endif
                 </div>
 
                 {{-- Órdenes activas --}}
@@ -921,7 +952,7 @@
                                     @foreach($order->items as $item)
                                         <div class="detail-item">
                                             <span class="detail-item-qty">{{ $item->quantity }}×</span>
-                                            <span class="detail-item-name">{{ $item->name }}</span>
+                                        <span class="detail-item-name">{{ $item->product_name }}</span>
                                             <span class="detail-item-price">${{ number_format($item->subtotal, 2) }}</span>
                                         </div>
                                     @endforeach
@@ -1030,19 +1061,52 @@
                         </div>
                     @endif
                 </div>
+
+                @if($dm->splits->isNotEmpty())
+                    <div x-show="tab === 'split'" x-cloak>
+                        @php $detailSplit = $dm->splits->first(); @endphp
+                        <div class="detail-orders-list" aria-label="Resumen de la cuenta dividida">
+                            <div class="detail-order-row">
+                                <div class="detail-order-header">
+                                    <span class="fw-semibold"><i class="bx bx-split me-1"></i>Split enviado a caja</span>
+                                    <span class="badge bg-label-warning">{{ $detailSplit->status_label }}</span>
+                                </div>
+                                <p class="text-muted small mb-3">Caja cobrará cada subcuenta individualmente. La mesa se libera al pagar la última.</p>
+                                @foreach($detailSplit->split_data as $account)
+                                    <div class="detail-history-row py-2">
+                                        <div class="detail-history-icon bg-label-{{ ($account['paid'] ?? false) ? 'success' : 'warning' }}">
+                                            <i class="bx {{ ($account['paid'] ?? false) ? 'bx-check' : 'bx-wallet' }}"></i>
+                                        </div>
+                                        <div class="flex-grow-1 min-width-0">
+                                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                                <strong>{{ $account['label'] ?? 'Cuenta' }}</strong>
+                                                <strong>${{ number_format((float) ($account['total'] ?? 0), 2) }}</strong>
+                                            </div>
+                                            <small class="text-muted">{{ count($account['items'] ?? []) }} producto(s) · {{ ($account['paid'] ?? false) ? 'Pagada' : 'Pendiente de cobro en POS' }}</small>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <div class="mesas-modal-actions">
                 <button class="btn btn-outline-secondary" wire:click="$set('showDetailModal', false)">Cerrar</button>
                 @if($dm->status === 'ocupada')
-                    <button class="btn btn-outline-warning" wire:click="closeMesa({{ $dm->id }}); $set('showDetailModal', false)">
-                        <i class="bx bx-lock me-1"></i> Cerrar cuenta
+                    <button type="button" class="btn btn-outline-warning" wire:click="closeMesa({{ $dm->id }})" wire:loading.attr="disabled" wire:target="closeMesa" aria-label="Cerrar mesa y dividir la cuenta">
+                        <i class="bx bx-split me-1"></i> Cerrar y dividir cuenta
                     </button>
                     <button class="btn btn-primary" wire:click="goToOrden({{ $dm->id }})">
                         <i class="bx bx-receipt me-1"></i> Ordenar
                     </button>
                 @endif
-                @if($dm->status === 'en_cuenta')
+                @if($dm->splits->isNotEmpty())
+                    <button class="btn btn-primary" wire:click="goToSplit({{ $dm->id }})">
+                        <i class="bx bx-check-circle me-1"></i> Ver cuenta dividida
+                    </button>
+                @elseif($dm->status === 'en_cuenta')
                     <button class="btn btn-primary" wire:click="goToSplit({{ $dm->id }})">
                         <i class="bx bx-split me-1"></i> Dividir cuenta
                     </button>

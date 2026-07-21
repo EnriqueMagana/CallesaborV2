@@ -1,70 +1,35 @@
 <div>
-@if($show)
-@php
-    $cfg = match($type) {
-        'warning' => ['bg'=>'bg-warning',   'text'=>'text-warning',   'btn'=>'btn-warning',   'icon'=>'bx-error-circle'],
-        'info'    => ['bg'=>'bg-info',      'text'=>'text-info',      'btn'=>'btn-info',       'icon'=>'bx-info-circle'],
-        'success' => ['bg'=>'bg-success',   'text'=>'text-success',   'btn'=>'btn-success',    'icon'=>'bx-check-circle'],
-        default   => ['bg'=>'bg-danger',    'text'=>'text-danger',    'btn'=>'btn-danger',     'icon'=>'bx-trash-alt'],
-    };
-@endphp
-
-{{-- Backdrop --}}
-<div class="modal-backdrop fade show" style="z-index:1140;" wire:click="cancel"></div>
-
-{{-- Modal --}}
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1145;" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
-        <div class="modal-content border-0 shadow-lg overflow-hidden">
-
-            <div class="modal-header border-0 pb-0 px-4 pt-4">
-                <div class="d-flex align-items-center gap-3 w-100">
-                    <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center
-                                bg-label-{{ $type }}"
-                         style="width:52px;height:52px;">
-                        <i class="bx {{ $cfg['icon'] }} fs-3 {{ $cfg['text'] }}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <h5 class="modal-title fw-bold mb-0">{{ $title }}</h5>
-                    </div>
-                    <button type="button" class="btn-close ms-auto" wire:click="cancel"
-                            aria-label="Cerrar"></button>
+    @if($show)
+        @php
+            $cfg = match($type) {
+                'warning' => ['modifier'=>'is-warning', 'icon'=>'bx-error-circle'],
+                'info' => ['modifier'=>'is-info', 'icon'=>'bx-info-circle'],
+                'success' => ['modifier'=>'is-success', 'icon'=>'bx-check-circle'],
+                default => ['modifier'=>'is-danger', 'icon'=>'bx-shield-x'],
+            };
+        @endphp
+        <div class="confirm-dialog-backdrop" wire:click="cancel"></div>
+        <div class="confirm-dialog-layer" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+            <section class="confirm-dialog {{ $cfg['modifier'] }}">
+                <header class="confirm-dialog-header">
+                    <span class="confirm-dialog-icon"><i class="bx {{ $cfg['icon'] }}"></i></span>
+                    <div><small>Confirmación requerida</small><h2 id="confirm-dialog-title">{{ $title }}</h2></div>
+                    <button type="button" class="confirm-dialog-close" wire:click="cancel" aria-label="Cerrar"><i class="bx bx-x"></i></button>
+                </header>
+                <div class="confirm-dialog-body">
+                    <div class="confirm-dialog-message">{!! $message !!}</div>
+                    @if($type === 'warning')
+                        <div class="confirm-dialog-notice"><i class="bx bx-info-circle"></i><span>Esta acción tendrá efecto inmediatamente.</span></div>
+                    @endif
                 </div>
-            </div>
-
-            <div class="modal-body px-4 py-3">
-                <p class="text-muted mb-0" style="font-size:.95rem;line-height:1.5;">
-                    {!! $message !!}
-                </p>
-            </div>
-
-            <div class="modal-footer border-0 px-4 pb-4 pt-2 gap-2 justify-content-end">
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        wire:click="cancel"
-                        wire:loading.attr="disabled">
-                    {{ $cancelText }}
-                </button>
-
-                <button type="button"
-                        class="btn {{ $cfg['btn'] }} d-inline-flex align-items-center gap-2"
-                        wire:click="confirm"
-                        wire:loading.attr="disabled"
-                        wire:target="confirm">
-                    <span wire:loading.remove wire:target="confirm">
-                        <i class="bx {{ $cfg['icon'] }} me-1"></i>{{ $confirmText }}
-                    </span>
-                    <span wire:loading wire:target="confirm"
-                          style="gap:.4rem;">
-                        <span class="spinner-border spinner-border-sm"
-                              style="width:.9rem;height:.9rem;border-width:2px;"></span>
-                        Procesando...
-                    </span>
-                </button>
-            </div>
-
+                <footer class="confirm-dialog-actions">
+                    <button type="button" class="confirm-dialog-secondary" wire:click="cancel" wire:loading.attr="disabled">{{ $cancelText }}</button>
+                    <button type="button" class="confirm-dialog-primary" wire:click="confirm" wire:loading.attr="disabled" wire:target="confirm">
+                        <span wire:loading.remove wire:target="confirm"><i class="bx {{ $cfg['icon'] }}"></i>{{ $confirmText }}</span>
+                        <span wire:loading wire:target="confirm"><i class="bx bx-loader-alt bx-spin"></i>Procesando…</span>
+                    </button>
+                </footer>
+            </section>
         </div>
-    </div>
-</div>
-@endif
+    @endif
 </div>

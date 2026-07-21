@@ -11,7 +11,7 @@
             <div>
                 <div class="app-eyebrow">Operación · Ventas</div>
                 <h1 class="app-page-title">Órdenes</h1>
-                <p class="app-page-subtitle">Consulta, filtra y administra cada orden desde un solo lugar.</p>
+                <p class="app-page-subtitle">Órdenes de la caja abierta. Las ventas cerradas se conservan en el historial de caja.</p>
             </div>
         </div>
         <div class="app-page-actions">
@@ -21,6 +21,20 @@
             </span>
         </div>
     </header>
+
+    <nav class="orders-channel-tabs" aria-label="Canal de las órdenes">
+        @foreach([
+            '' => ['bx-grid-alt', 'Todas', $this->channelCounts['all']],
+            'ventanilla' => ['bx-store', 'Ventanilla', $this->channelCounts['ventanilla']],
+            'mesa' => ['bx-table', 'Mesas', $this->channelCounts['mesa']],
+            'delivery' => ['bx-cycling', 'Domicilio', $this->channelCounts['delivery']],
+            'kiosk' => ['bx-desktop', 'Kiosco', $this->channelCounts['kiosk']],
+        ] as $channel => $tab)
+            <button type="button" class="orders-channel-tab {{ $typeFilter === $channel ? 'is-active' : '' }} {{ $channel === 'kiosk' ? 'is-kiosk' : '' }}" wire:click="filterByChannel('{{ $channel }}')" aria-pressed="{{ $typeFilter === $channel ? 'true' : 'false' }}">
+                <i class="bx {{ $tab[0] }}" aria-hidden="true"></i><span>{{ $tab[1] }}</span><b>{{ $tab[2] }}</b>
+            </button>
+        @endforeach
+    </nav>
 
     <section class="app-card app-filter-card" aria-labelledby="orders-filter-title">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
@@ -46,17 +60,21 @@
                     <option value="">Todos los estados</option>
                     <option value="pendiente">Pendiente</option>
                     <option value="en_preparacion">En preparación</option>
+                    <option value="lista">Listo</option>
+                    <option value="en_reparto">Delivery asignado</option>
+                    <option value="entregada">Entregado</option>
                     <option value="pagada">Pagada</option>
                     <option value="cancelada">Cancelada</option>
                 </select>
             </div>
             <div class="col-sm-6 col-xl-2">
-                <label class="form-label" for="orders-type">Tipo</label>
+                <label class="form-label" for="orders-type">Canal</label>
                 <select id="orders-type" wire:model.live="typeFilter" class="form-select">
-                    <option value="">Todos los tipos</option>
+                    <option value="">Todos los canales</option>
                     <option value="mesa">Mesa</option>
                     <option value="ventanilla">Ventanilla</option>
                     <option value="delivery">Delivery</option>
+                    <option value="kiosk">Kiosco</option>
                 </select>
             </div>
             <div class="col-sm-6 col-xl-2">
@@ -69,7 +87,7 @@
             </div>
             <div class="col-sm-6 col-xl-1">
                 <button type="button"
-                    wire:click="$set('search',''); $set('statusFilter',''); $set('typeFilter',''); $set('dateFrom',''); $set('dateTo','')"
+                    wire:click="clearFilters"
                     class="btn btn-outline-secondary w-100 px-xl-2" aria-label="Limpiar todos los filtros">
                     <i class="bx bx-reset fs-5" aria-hidden="true"></i>
                     <span class="d-xl-none ms-1">Limpiar</span>
@@ -81,8 +99,14 @@
     <section class="app-card app-table-card" aria-labelledby="orders-table-title">
         <div class="app-card-header">
             <div>
-                <h2 id="orders-table-title" class="app-card-title">Historial de órdenes</h2>
-                <p class="app-card-description">Información comercial y estado operativo actualizado.</p>
+                <h2 id="orders-table-title" class="app-card-title">Órdenes de caja abierta</h2>
+                <p class="app-card-description">
+                    @if($this->activeCashRegister)
+                        {{ $this->activeCashRegister->name }} · Solo se muestran pedidos vinculados a este turno.
+                    @else
+                        No hay una caja abierta; abre una caja para comenzar a recibir órdenes.
+                    @endif
+                </p>
             </div>
             <span class="app-count-pill">Página {{ $this->orders->currentPage() }} de {{ $this->orders->lastPage() }}</span>
         </div>
@@ -114,13 +138,15 @@
                             @php
                                 $statusClass = match($order->status) {
                                     'pagada' => 'success',
+                                    'lista' => 'success',
                                     'cancelada' => 'danger',
                                     'en_preparacion' => 'info',
                                     default => 'warning',
                                 };
+                                $isKioskOrder = $order->source === 'kiosk';
                             @endphp
-                            <tr wire:key="order-row-{{ $order->id }}">
-                                <td><span class="fw-bold text-primary">#{{ $order->id }}</span></td>
+                                    <tr wire:key="order-row-{{ $order->id }}">
+                                <td><span class="fw-bold text-primary">#{{ $order->display_folio }}</span><div class="small app-muted">ID {{ $order->id }}</div></td>
                                 <td>
                                     <div class="fw-semibold">{{ $order->display_name }}</div>
                                     @if($order->customer_phone)
@@ -128,9 +154,12 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <span class="app-status app-status--neutral">
-                                        <i class="bx {{ $order->type_icon }}" aria-hidden="true"></i>{{ $order->type_label }}
+                                    <span class="app-status {{ $isKioskOrder ? 'app-status--primary orders-kiosk-badge' : 'app-status--neutral' }}">
+                                        <i class="bx {{ $isKioskOrder ? 'bx-desktop' : $order->type_icon }}" aria-hidden="true"></i>{{ $isKioskOrder ? 'Kiosco' : $order->type_label }}
                                     </span>
+                                    @if($isKioskOrder)
+                                        <div class="small app-muted mt-1">{{ match($order->fulfillment) { 'dine_in' => 'Comer aquí', 'delivery' => 'Para domicilio', default => 'Para llevar' } }}</div>
+                                    @endif
                                     @if($order->table_identifier)
                                         <div class="small app-muted mt-1">{{ $order->table_identifier }}</div>
                                     @endif
@@ -182,10 +211,10 @@
     </section>
 
     @if($showStatusModal)
-        <div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showStatusModal',false)"></div>
-        <div class="modal app-modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog"
+        <div class="modal-backdrop app-modal-backdrop fade show" wire:click="$set('showStatusModal',false)"></div>
+        <div class="modal app-modal app-modal-layer fade show d-block" tabindex="-1" role="dialog"
             aria-modal="true" aria-labelledby="status-modal-title">
-            <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+            <div class="modal-dialog modal-dialog-centered app-modal-sm">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h2 id="status-modal-title" class="modal-title fs-5"><i class="bx bx-transfer me-2 text-primary" aria-hidden="true"></i>Cambiar estado</h2>
@@ -196,6 +225,7 @@
                         <select id="edit-order-status" wire:model="editStatus" class="form-select">
                             <option value="pendiente">Pendiente</option>
                             <option value="en_preparacion">En preparación</option>
+                            <option value="lista">Listo</option>
                             <option value="pagada">Pagada</option>
                         </select>
                     </div>
@@ -212,10 +242,10 @@
     @endif
 
     @if($showCancelModal)
-        <div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showCancelModal',false)"></div>
-        <div class="modal app-modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog"
+        <div class="modal-backdrop app-modal-backdrop fade show" wire:click="$set('showCancelModal',false)"></div>
+        <div class="modal app-modal app-modal-layer fade show d-block" tabindex="-1" role="dialog"
             aria-modal="true" aria-labelledby="cancel-modal-title">
-            <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+            <div class="modal-dialog modal-dialog-centered app-modal-md">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h2 id="cancel-modal-title" class="modal-title fs-5"><i class="bx bx-x-circle me-2 text-danger" aria-hidden="true"></i>Cancelar orden</h2>

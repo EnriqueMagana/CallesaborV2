@@ -147,6 +147,7 @@ class MesaOrden extends Component
         $this->itemQty             = 1;
         $this->showCustomize       = true;
         unset($this->customizingProductModel);
+        $this->preselectRequiredSingletons();
     }
 
     public function editCartItem(string $cartId): void
@@ -199,19 +200,89 @@ class MesaOrden extends Component
     public function toggleAddon(int $addonId): void
     {
         if (isset($this->selectedAddons[$addonId])) {
+            $product = $this->customizingProductModel;
+            $group = $product?->addonGroups->first(fn ($candidate) => $candidate->addons->contains('id', $addonId));
+            if ($group) {
+                $minimum = $this->effectiveGroupMinimum($group);
+                $selected = collect($group->addons)->filter(fn ($addon) => isset($this->selectedAddons[$addon->id]))->count();
+                if ($selected <= $minimum) {
+                    $this->addError('addons_'.$group->id, "Debes mantener al menos {$minimum} opcion(es).");
+                    return;
+                }
+            }
             unset($this->selectedAddons[$addonId]);
-        } else {
-            $this->selectedAddons[$addonId] = true;
+            return;
+        }
+
+        $product = $this->customizingProductModel;
+        $group = $product?->addonGroups->first(fn ($candidate) => $candidate->addons->contains('id', $addonId));
+        if (! $group) return;
+
+        $minimum = $this->effectiveGroupMinimum($group);
+        $configuredMax = (int) $group->max_selections;
+        $maximum = $configuredMax > 0 ? max($minimum, min($configuredMax, $group->addons->count())) : $group->addons->count();
+        $selected = collect($group->addons)->filter(fn ($addon) => isset($this->selectedAddons[$addon->id]))->count();
+        $productMaxAddons = (int) ($product->max_addons ?? 0);
+        $totalSelectedAddons = collect($this->selectedAddons)->filter(fn ($selected) => $selected)->count();
+        if ($productMaxAddons > 0 && ($totalSelectedAddons - $selected) >= $productMaxAddons) {
+            $this->addError('addons_'.$group->id, "Este producto permite máximo {$productMaxAddons} complemento(s).");
+            return;
+        }
+        if ($maximum === 1) {
+            foreach ($group->addons as $addon) unset($this->selectedAddons[$addon->id]);
+        } elseif ($selected >= $maximum) {
+            $this->addError('addons_'.$group->id, "Maximo {$maximum} opcion(es) permitido.");
+            return;
+        }
+
+        $this->selectedAddons[$addonId] = true;
+        $this->resetErrorBag('addons_'.$group->id);
+    }
+
+    private function effectiveGroupMinimum($group): int
+    {
+        return $group->is_required ? max(1, (int) $group->min_selections) : (int) $group->min_selections;
+    }
+
+    private function preselectRequiredSingletons(): void
+    {
+        $product = $this->customizingProductModel;
+        if (! $product) return;
+
+        foreach ($product->addonGroups as $group) {
+            if ($this->effectiveGroupMinimum($group) > 0 && $group->addons->count() === 1) {
+                $this->selectedAddons[$group->addons->first()->id] = true;
+            }
+        }
+
+        $maxAddons = (int) ($product->max_addons ?? 0);
+        $totalAddons = collect($this->selectedAddons)->filter(fn ($selected) => $selected)->count();
+        if ($maxAddons > 0 && $totalAddons > $maxAddons) {
+            $this->addError('addons_general', "Este producto permite máximo {$maxAddons} complemento(s).");
+            return;
         }
     }
 
     public function setIngredientQty(int $ingredientId, int $qty): void
     {
+        $product = $this->customizingProductModel;
+        if (! $product || ! $product->ingredients->contains('id', $ingredientId)) return;
+
+        $current = (int) ($this->selectedIngredients[$ingredientId] ?? 0);
         if ($qty <= 0) {
             unset($this->selectedIngredients[$ingredientId]);
-        } else {
-            $this->selectedIngredients[$ingredientId] = $qty;
+            return;
         }
+
+        $max = (int) ($product->max_ingredients ?? 0);
+        $totalWithoutCurrent = array_sum($this->selectedIngredients) - $current;
+        if ($max > 0 && $totalWithoutCurrent + $qty > $max) {
+            $this->addError('ingredients', "Maximo {$max} ingrediente(s) permitido.");
+            return;
+        }
+
+        $this->selectedIngredients[$ingredientId] = $qty;
+        $this->resetErrorBag('ingredients');
     }
 
     public function confirmCustomize(): void
@@ -224,10 +295,34 @@ class MesaOrden extends Component
             $selected = collect($group->addons)
                 ->filter(fn($a) => isset($this->selectedAddons[$a->id]))
                 ->count();
-            if ($group->is_required && $selected < $group->min_selections) {
-                $this->addError('addons_'.$group->id, "«{$group->name}» requiere al menos {$group->min_selections} opción(es).");
+            $minimum = $this->effectiveGroupMinimum($group);
+            $configuredMax = (int) $group->max_selections;
+            $maximum = $configuredMax > 0 ? max($minimum, min($configuredMax, $group->addons->count())) : $group->addons->count();
+            if ($selected < $minimum) {
+                $this->addError('addons_'.$group->id, "Selecciona al menos {$minimum} opcion(es) en {$group->name}.");
                 return;
             }
+            if ($maximum !== null && $selected > $maximum) {
+                $this->addError('addons_'.$group->id, "Selecciona maximo {$maximum} opcion(es) en {$group->name}.");
+                return;
+            }
+        }
+
+        $totalIngredients = array_sum($this->selectedIngredients);
+        $minimumIngredients = (int) ($product->min_ingredients ?? 0);
+        $maximumIngredients = (int) ($product->max_ingredients ?? 0);
+        if ($totalIngredients < $minimumIngredients) {
+            $this->addError('ingredients', "Selecciona al menos {$minimumIngredients} ingrediente(s).");
+            return;
+        }
+        if ($maximumIngredients > 0 && $totalIngredients > $maximumIngredients) {
+            $this->addError('ingredients', "Selecciona maximo {$maximumIngredients} ingrediente(s).");
+            return;
+        }
+
+        if ($this->itemQty < 1 || $this->itemQty > 99) {
+            $this->addError('itemQty', 'La cantidad debe estar entre 1 y 99.');
+            return;
         }
 
         $addons = [];

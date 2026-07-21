@@ -43,6 +43,14 @@ class LoginForm extends Form
             ]);
         }
 
+        if ($user->isBanned()) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'form.email' => 'Tu cuenta está bloqueada. Contacta al administrador del negocio.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
 
         if (Hash::needsRehash($user->getAuthPassword())) {

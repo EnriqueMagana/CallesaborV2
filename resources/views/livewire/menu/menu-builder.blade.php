@@ -52,11 +52,11 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <div class="input-group input-group-sm" style="width:220px;">
+            <div class="input-group input-group-sm menu-filter-search" >
                 <span class="input-group-text"><i class="bx bx-search"></i></span>
                 <input wire:model.live.debounce.400ms="productSearch" type="text" class="form-control" placeholder="Buscar producto…">
             </div>
-            <select wire:model.live="productCategoryFilter" class="form-select form-select-sm" style="width:160px;">
+            <select wire:model.live="productCategoryFilter" class="form-select form-select-sm menu-filter-select" >
                 <option value="">Todas las categorías</option>
                 @foreach($this->allCategories as $cat)
                     <option value="{{ $cat->id }}">{{ $cat->name }}</option>
@@ -71,7 +71,7 @@
     <div class="card-body p-0">
         @if($this->products->isEmpty())
             <div class="text-center py-5 text-muted">
-                <i class="bx bx-dish" style="font-size:3rem;"></i>
+                <i class="bx bx-dish menu-empty-icon" ></i>
                 <p class="mt-2">No hay productos aún.</p>
             </div>
         @else
@@ -79,7 +79,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th style="width:56px;"></th>
+                        <th  class="menu-image-column"></th>
                         <th>Producto</th>
                         <th>Categoría</th>
                         <th>Precio</th>
@@ -93,26 +93,26 @@
                     <td>
                         @if($product->image)
                             <img src="{{ asset('storage/'.$product->image) }}"
-                                 class="rounded" width="40" height="40" style="object-fit:cover;"
-                                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                            <div style="width:40px;height:40px;background:#eaecf0;border-radius:.375rem;display:none;align-items:center;justify-content:center;flex-shrink:0;">
-                                <i class="bx bx-image" style="font-size:1.2rem;color:#8592a3;display:block;line-height:1;"></i>
+                                 class="rounded menu-object-cover" width="40" height="40"
+                                 onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                            <div  class="menu-media-placeholder menu-media-40 menu-fallback-hidden" hidden>
+                                <i class="bx bx-image menu-placeholder-icon menu-icon-12" ></i>
                             </div>
                         @else
-                            <div style="width:40px;height:40px;background:#eaecf0;border-radius:.375rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                <i class="bx bx-image" style="font-size:1.2rem;color:#8592a3;display:block;line-height:1;"></i>
+                            <div  class="menu-media-placeholder menu-media-40">
+                                <i class="bx bx-image menu-placeholder-icon menu-icon-12" ></i>
                             </div>
                         @endif
                     </td>
                     <td>
                         <div class="fw-semibold">{{ $product->name }}</div>
                         @if($product->is_customizable)
-                            <span class="badge bg-label-info" style="font-size:.7rem;">Personalizable</span>
+                            <span class="badge bg-label-info menu-text-xxs" >Personalizable</span>
                         @endif
                     </td>
                     <td>
                         @if($product->category)
-                            <span class="badge rounded-pill" style="background:{{ $product->category->color }}20;color:{{ $product->category->color }};">
+                            <span class="badge rounded-pill menu-dynamic-badge" >
                                 {{ $product->category->name }}
                             </span>
                         @else
@@ -153,7 +153,7 @@
 @if($tab === 'categories')
 <div class="card shadow-sm">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="input-group input-group-sm" style="width:220px;">
+        <div class="input-group input-group-sm menu-filter-search" >
             <span class="input-group-text"><i class="bx bx-search"></i></span>
             <input wire:model.live.debounce.400ms="categorySearch" type="text" class="form-control" placeholder="Buscar categoría…">
         </div>
@@ -164,17 +164,17 @@
     <div class="card-body">
         @if($this->categories->isEmpty())
             <div class="text-center py-5 text-muted">
-                <i class="bx bx-category" style="font-size:3rem;"></i>
+                <i class="bx bx-category menu-empty-icon" ></i>
                 <p class="mt-2">No hay categorías aún.</p>
             </div>
         @else
         <div class="row g-3">
         @foreach($this->categories as $cat)
         <div class="col-sm-6 col-xl-4">
-            <div class="card border-0 h-100" style="border-left:4px solid {{ $cat->color }} !important;">
+            <div class="card border-0 h-100 menu-accent-card" >
                 <div class="card-body d-flex align-items-center gap-3">
-                    <div class="flex-shrink-0 rounded d-flex align-items-center justify-content-center" style="width:42px;height:42px;background:{{ $cat->color }}20;">
-                        <i class="bx {{ $cat->icon }}" style="font-size:1.5rem;color:{{ $cat->color }};line-height:1;"></i>
+                    <div class="flex-shrink-0 rounded d-flex align-items-center justify-content-center menu-color-icon" >
+                        <i class="bx {{ $cat->icon }} menu-color-icon-glyph"></i>
                     </div>
                     <div class="flex-grow-1 min-w-0">
                         <div class="fw-semibold text-truncate">{{ $cat->name }}</div>
@@ -213,7 +213,7 @@
     <div class="card-body">
         @if($this->addonGroups->isEmpty())
             <div class="text-center py-5 text-muted">
-                <i class="bx bx-plus-circle" style="font-size:3rem;"></i>
+                <i class="bx bx-plus-circle menu-empty-icon" ></i>
                 <p class="mt-2">No hay grupos de complementos aún.</p>
             </div>
         @else
@@ -264,34 +264,34 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Catálogo de ingredientes</h6>
-        <button class="btn btn-primary btn-sm" wire:click="openIngredientModal()">
-            <i class="bx bx-plus me-1"></i> Nuevo ingrediente
+        <button type="button" class="btn btn-primary btn-sm" wire:click="openIngredientModal()">
+            <i class="bx bx-plus me-1" aria-hidden="true"></i> Nuevo ingrediente
         </button>
     </div>
     <div class="card-body">
         @if($this->ingredients->isEmpty())
             <div class="text-center py-5 text-muted">
-                <i class="bx bx-spa" style="font-size:3rem;"></i>
+                <i class="bx bx-spa menu-empty-icon" aria-hidden="true"></i>
                 <p class="mt-2">No hay ingredientes en el catálogo aún.</p>
             </div>
         @else
         <div class="row g-3">
         @foreach($this->ingredients as $ingredient)
         <div class="col-sm-6 col-xl-4">
-            <div class="card border h-100">
+            <div class="card border-0 h-100 menu-accent-card">
                 <div class="card-body d-flex align-items-center gap-3">
-                    {{-- Image --}}
                     @if($ingredient->image)
                         <img src="{{ asset('storage/'.$ingredient->image) }}"
-                             class="rounded flex-shrink-0 shadow-sm"
-                             style="width:52px;height:52px;object-fit:cover;"
-                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                        <div style="width:52px;height:52px;background:#eaecf0;border-radius:.375rem;display:none;align-items:center;justify-content:center;flex-shrink:0;">
-                            <i class="bx bx-spa" style="font-size:1.4rem;color:#8592a3;"></i>
+                             alt="Imagen de {{ $ingredient->name }}"
+                             class="rounded flex-shrink-0 menu-media menu-media-52"
+                             width="52" height="52" loading="lazy"
+                             onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                        <div class="menu-media-placeholder menu-media-52" hidden>
+                            <i class="bx bx-spa menu-placeholder-icon menu-icon-14" aria-hidden="true"></i>
                         </div>
                     @else
-                        <div style="width:52px;height:52px;background:#eaecf0;border-radius:.375rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                            <i class="bx bx-spa" style="font-size:1.4rem;color:#8592a3;"></i>
+                        <div class="menu-media-placeholder menu-media-52">
+                            <i class="bx bx-spa menu-placeholder-icon menu-icon-14" aria-hidden="true"></i>
                         </div>
                     @endif
                     <div class="flex-grow-1 min-w-0">
@@ -309,11 +309,11 @@
                         @endif
                     </div>
                     <div class="d-flex gap-1 flex-shrink-0">
-                        <button class="btn btn-sm btn-icon btn-outline-primary" wire:click="openIngredientModal({{ $ingredient->id }})">
-                            <i class="bx bx-edit-alt"></i>
+                        <button type="button" class="btn btn-sm btn-icon btn-outline-primary" title="Editar {{ $ingredient->name }}" aria-label="Editar {{ $ingredient->name }}" wire:click="openIngredientModal({{ $ingredient->id }})">
+                            <i class="bx bx-edit-alt" aria-hidden="true"></i>
                         </button>
-                        <button class="btn btn-sm btn-icon btn-outline-danger" wire:click="confirmDeleteIngredient({{ $ingredient->id }})">
-                            <i class="bx bx-trash"></i>
+                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger" title="Eliminar {{ $ingredient->name }}" aria-label="Eliminar {{ $ingredient->name }}" wire:click="confirmDeleteIngredient({{ $ingredient->id }})">
+                            <i class="bx bx-trash" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
@@ -338,17 +338,17 @@
     <div class="card-body">
         @if($this->printAreas->isEmpty())
             <div class="text-center py-5 text-muted">
-                <i class="bx bx-printer" style="font-size:3rem;"></i>
+                <i class="bx bx-printer menu-empty-icon" ></i>
                 <p class="mt-2">No hay áreas de impresión aún.</p>
             </div>
         @else
         <div class="row g-3">
         @foreach($this->printAreas as $area)
         <div class="col-sm-6 col-xl-4">
-            <div class="card border-0 h-100" style="border-left:4px solid {{ $area->color }} !important;">
+            <div class="card border-0 h-100 menu-accent-card" >
                 <div class="card-body d-flex align-items-center gap-3">
-                    <div class="flex-shrink-0 rounded d-flex align-items-center justify-content-center" style="width:42px;height:42px;background:{{ $area->color }}20;">
-                        <i class="bx bx-printer" style="font-size:1.5rem;color:{{ $area->color }};line-height:1;"></i>
+                    <div class="flex-shrink-0 rounded d-flex align-items-center justify-content-center menu-color-icon" >
+                        <i class="bx bx-printer menu-color-icon-glyph" ></i>
                     </div>
                     <div class="flex-grow-1 min-w-0">
                         <div class="fw-semibold text-truncate">{{ $area->name }}</div>
@@ -377,12 +377,12 @@
 
 {{-- ══════════════════════════════════ MODAL: Product Form ══════════════════════ --}}
 @if($showProductModal)
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showProductModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showProductModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="product-form-title">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
+                <h5 class="modal-title" id="product-form-title">
                     <i class="bx {{ $editProductId ? 'bx-edit-alt' : 'bx-plus-circle' }} me-2 text-primary"></i>
                     {{ $editProductId ? 'Editar producto' : 'Nuevo producto' }}
                 </h5>
@@ -432,8 +432,7 @@
                                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando…
                                     </div>
                                     <div wire:loading.remove wire:target="pImage">
-                                        <img src="{{ $pImage->temporaryUrl() }}" class="rounded shadow-sm"
-                                             style="width:120px;height:90px;object-fit:cover;">
+                                        <img src="{{ $pImage->temporaryUrl() }}" class="rounded shadow-sm menu-preview-image">
                                         <div class="small text-muted mt-1">
                                             Se guardará como <strong>.webp</strong>
                                         </div>
@@ -441,8 +440,7 @@
                                 </div>
                             @elseif($pCurrentImage)
                                 <div class="mt-2 d-flex align-items-center gap-3">
-                                    <img src="{{ asset('storage/'.$pCurrentImage) }}" class="rounded shadow-sm"
-                                         style="width:120px;height:90px;object-fit:cover;">
+                                    <img src="{{ asset('storage/'.$pCurrentImage) }}" class="rounded shadow-sm menu-preview-image" >
                                     <div class="small text-muted">Imagen actual</div>
                                 </div>
                             @endif
@@ -466,7 +464,7 @@
                     {{-- Right column: addon groups --}}
                     <div class="col-md-5">
                         <label class="form-label">Grupos de complementos</label>
-                        <div class="border rounded p-3" style="max-height:380px;overflow-y:auto;">
+                        <div class="border rounded p-3 menu-scroll-lg" >
                             @foreach($this->allAddonGroups as $group)
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox"
@@ -477,7 +475,7 @@
                                     <span class="fw-semibold">{{ $group->name }}</span>
                                     <span class="text-muted small ms-1">({{ $group->addons()->count() }})</span>
                                     @if($group->is_required)
-                                        <span class="badge bg-label-danger ms-1" style="font-size:.65rem;">Obligatorio</span>
+                                        <span class="badge bg-label-danger ms-1 menu-text-micro" >Obligatorio</span>
                                     @endif
                                 </label>
                             </div>
@@ -495,7 +493,7 @@
                     <span wire:loading.remove wire:target="saveProduct">
                         <i class="bx bx-check me-1"></i> {{ $editProductId ? 'Actualizar' : 'Crear producto' }}
                     </span>
-                    <span wire:loading wire:target="saveProduct" style="gap:.4rem;">
+                    <span wire:loading wire:target="saveProduct"  class="menu-loading">
                         <span class="spinner-border spinner-border-sm" role="status"></span> Guardando…
                     </span>
                 </button>
@@ -519,9 +517,9 @@ $iconList = [
     'bx-recycle','bx-spa','bx-water','bx-sun','bx-moon','bx-cut','bx-bell','bx-time',
 ];
 @endphp
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showCategoryModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:540px;">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showCategoryModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered menu-modal-540" >
         <div class="modal-content" x-data="{ customIcon: false }">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -546,8 +544,8 @@ $iconList = [
                     <label class="form-label">Ícono</label>
                     {{-- Preview + toggle --}}
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="rounded d-flex align-items-center justify-content-center" style="width:42px;height:42px;background:{{ $cColor }}20;flex-shrink:0;">
-                            <i class="bx {{ $cIcon }}" style="font-size:1.5rem;color:{{ $cColor }};line-height:1;"></i>
+                        <div class="rounded d-flex align-items-center justify-content-center menu-color-icon" >
+                            <i class="bx {{ $cIcon }} menu-color-icon-glyph" ></i>
                         </div>
                         <span class="text-muted small">{{ $cIcon }}</span>
                         <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" x-on:click="customIcon = !customIcon">
@@ -561,15 +559,11 @@ $iconList = [
                         <div class="form-text">Clase de <a href="https://boxicons.com" target="_blank">Boxicons</a> sin el prefijo "bx ".</div>
                     </div>
                     {{-- Icon grid --}}
-                    <div class="border rounded p-2" style="max-height:200px;overflow-y:auto;">
+                    <div class="border rounded p-2 menu-scroll-sm" >
                         <div class="d-flex flex-wrap gap-1">
                             @foreach($iconList as $ic)
-                            <button type="button"
-                                wire:click="$set('cIcon','{{ $ic }}')"
-                                title="{{ $ic }}"
-                                class="btn btn-sm p-0 d-flex align-items-center justify-content-center rounded {{ $cIcon === $ic ? 'btn-primary' : 'btn-outline-secondary' }}"
-                                style="width:38px;height:38px;flex-shrink:0;">
-                                <i class="bx {{ $ic }}" style="font-size:1.2rem;line-height:1;"></i>
+                            <button type="button" wire:click="$set('cIcon','{{ $ic }}')" title="{{ $ic }}" class="btn btn-sm p-0 d-flex align-items-center justify-content-center rounded {{ $cIcon === $ic ? 'btn-primary' : 'btn-outline-secondary' }} menu-icon-choice" >
+                                <i class="bx {{ $ic }} menu-icon-12" ></i>
                             </button>
                             @endforeach
                         </div>
@@ -580,7 +574,7 @@ $iconList = [
                     <label class="form-label">Color</label>
                     <div class="input-group">
                         <span class="input-group-text p-1">
-                            <input wire:model.live="cColor" type="color" class="form-control form-control-color border-0" style="width:30px;height:30px;padding:0;" title="Color">
+                            <input wire:model.live="cColor" type="color" class="form-control form-control-color border-0 menu-color-input" title="Color">
                         </span>
                         <input wire:model.live="cColor" type="text" class="form-control" placeholder="#696cff">
                     </div>
@@ -603,7 +597,7 @@ $iconList = [
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showCategoryModal',false)">Cancelar</button>
                 <button type="button" class="btn btn-primary" wire:click="saveCategory">
                     <span wire:loading.remove wire:target="saveCategory"><i class="bx bx-check me-1"></i> {{ $editCategoryId ? 'Actualizar' : 'Crear' }}</span>
-                    <span wire:loading wire:target="saveCategory" style="gap:.4rem;"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
+                    <span wire:loading wire:target="saveCategory"  class="menu-loading"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
                 </button>
             </div>
         </div>
@@ -613,9 +607,9 @@ $iconList = [
 
 {{-- ══════════════════════════════════ MODAL: Addon Group Form ═════════════════ --}}
 @if($showGroupModal)
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showGroupModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showGroupModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered menu-modal-480" >
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -638,11 +632,13 @@ $iconList = [
                     <div class="col-6">
                         <label class="form-label">Mín. selecciones</label>
                         <input wire:model="gMinSelections" type="number" min="0" max="20" class="form-control @error('gMinSelections') is-invalid @enderror">
+                        <div class="form-text">Si es obligatorio, el mínimo efectivo será 1.</div>
                         @error('gMinSelections') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-6">
                         <label class="form-label">Máx. selecciones</label>
                         <input wire:model="gMaxSelections" type="number" min="1" max="20" class="form-control @error('gMaxSelections') is-invalid @enderror">
+                        <div class="form-text">Usa 1 para selección única.</div>
                         @error('gMaxSelections') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                 </div>
@@ -661,7 +657,7 @@ $iconList = [
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showGroupModal',false)">Cancelar</button>
                 <button type="button" class="btn btn-primary" wire:click="saveGroup">
                     <span wire:loading.remove wire:target="saveGroup"><i class="bx bx-check me-1"></i> {{ $editGroupId ? 'Actualizar' : 'Crear' }}</span>
-                    <span wire:loading wire:target="saveGroup" style="gap:.4rem;"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
+                    <span wire:loading wire:target="saveGroup"  class="menu-loading"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
                 </button>
             </div>
         </div>
@@ -671,8 +667,8 @@ $iconList = [
 
 {{-- ══════════════════════════════════ MODAL: Addons list + form ═══════════════ --}}
 @if($showAddonsModal && $this->activeGroup)
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showAddonsModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showAddonsModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
@@ -685,7 +681,7 @@ $iconList = [
             <div class="modal-body">
                 {{-- Addon Form --}}
                 @if($showAddonForm)
-                <div class="card border-primary border-opacity-25 mb-3" style="background:#f8f9ff;">
+                <div class="card border-primary border-opacity-25 mb-3 menu-soft-panel" >
                     <div class="card-body">
                         <h6 class="mb-3 text-primary">
                             <i class="bx {{ $editAddonId ? 'bx-edit-alt' : 'bx-plus-circle' }} me-1"></i>
@@ -713,24 +709,20 @@ $iconList = [
                                 <label class="form-label">Imagen</label>
                                 <div class="d-flex align-items-start gap-3 flex-wrap">
                                     {{-- Preview box --}}
-                                    <div style="width:80px;height:80px;flex-shrink:0;position:relative;">
+                                    <div  class="menu-upload-frame">
                                         @if($aImage)
-                                            <div wire:loading wire:target="aImage"
-                                                 style="width:80px;height:80px;border-radius:.375rem;border:1px solid #dee2e6;background:#f8f9fa;align-items:center;justify-content:center;">
+                                            <div wire:loading wire:target="aImage"  class="menu-upload-trigger">
                                                 <span class="spinner-border spinner-border-sm text-primary"></span>
                                             </div>
                                             <span wire:loading.remove wire:target="aImage">
                                                 <img src="{{ $aImage->temporaryUrl() }}"
-                                                     class="rounded shadow-sm"
-                                                     style="width:80px;height:80px;object-fit:cover;display:block;">
+                                                     class="rounded shadow-sm menu-media menu-media-80">
                                             </span>
                                         @elseif($aCurrentImage)
-                                            <img src="{{ asset('storage/'.$aCurrentImage) }}"
-                                                 class="rounded shadow-sm"
-                                                 style="width:80px;height:80px;object-fit:cover;display:block;">
+                                            <img src="{{ asset('storage/'.$aCurrentImage) }}" class="rounded shadow-sm menu-media menu-media-80" >
                                         @else
-                                            <div style="width:80px;height:80px;background:#eaecf0;border-radius:.375rem;display:flex;align-items:center;justify-content:center;">
-                                                <i class="bx bx-image" style="font-size:2rem;color:#8592a3;display:block;line-height:1;"></i>
+                                            <div  class="menu-media-placeholder menu-media-80">
+                                                <i class="bx bx-image menu-placeholder-icon menu-icon-20" ></i>
                                             </div>
                                         @endif
                                     </div>
@@ -764,7 +756,7 @@ $iconList = [
                                 <span wire:loading.remove wire:target="saveAddon">
                                     <i class="bx bx-check me-1"></i> {{ $editAddonId ? 'Actualizar' : 'Agregar complemento' }}
                                 </span>
-                                <span wire:loading wire:target="saveAddon" style="gap:.4rem;">
+                                <span wire:loading wire:target="saveAddon"  class="menu-loading">
                                     <span class="spinner-border spinner-border-sm"></span> Guardando…
                                 </span>
                             </button>
@@ -780,7 +772,7 @@ $iconList = [
                 {{-- Addons list --}}
                 @if($this->activeGroup->addons->isEmpty())
                     <div class="text-center py-4 text-muted">
-                        <i class="bx bx-plus-circle" style="font-size:2.5rem;"></i>
+                        <i class="bx bx-plus-circle menu-icon-25" ></i>
                         <p class="mt-1 small">No hay complementos en este grupo.</p>
                     </div>
                 @else
@@ -791,15 +783,14 @@ $iconList = [
                             {{-- Image thumbnail --}}
                             @if($addon->image)
                                 <img src="{{ asset('storage/'.$addon->image) }}"
-                                     class="rounded flex-shrink-0 shadow-sm"
-                                     style="width:64px;height:64px;object-fit:cover;"
-                                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                                <div style="width:64px;height:64px;background:#eaecf0;border-radius:.375rem;display:none;align-items:center;justify-content:center;flex-shrink:0;">
-                                    <i class="bx bx-food-tag" style="font-size:1.6rem;color:#8592a3;display:block;line-height:1;"></i>
+                                     class="rounded flex-shrink-0 shadow-sm menu-media menu-media-64"
+                                     onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div  class="menu-media-placeholder menu-media-64 menu-fallback-hidden" hidden>
+                                    <i class="bx bx-food-tag menu-placeholder-icon menu-icon-16" ></i>
                                 </div>
                             @else
-                                <div style="width:64px;height:64px;background:#eaecf0;border-radius:.375rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                    <i class="bx bx-food-tag" style="font-size:1.6rem;color:#8592a3;display:block;line-height:1;"></i>
+                                <div  class="menu-media-placeholder menu-media-64">
+                                    <i class="bx bx-food-tag menu-placeholder-icon menu-icon-16" ></i>
                                 </div>
                             @endif
                             <div class="flex-grow-1 min-w-0">
@@ -815,7 +806,7 @@ $iconList = [
                             </div>
                             <div class="d-flex flex-column align-items-end gap-1">
                                 @if(!$addon->is_active)
-                                    <span class="badge bg-label-secondary" style="font-size:.65rem;">Inactivo</span>
+                                    <span class="badge bg-label-secondary menu-text-micro" >Inactivo</span>
                                 @endif
                                 <div class="d-flex gap-1">
                                     <button class="btn btn-sm btn-icon btn-outline-primary"
@@ -846,16 +837,16 @@ $iconList = [
 
 {{-- ══════════════════════════════════ MODAL: Ingredient Form ══════════════════ --}}
 @if($showIngredientModal)
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showIngredientModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:500px;">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showIngredientModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="ingredient-form-title">
+    <div class="modal-dialog modal-dialog-centered menu-modal-500" >
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
+                <h5 class="modal-title" id="ingredient-form-title">
                     <i class="bx {{ $editIngredientId ? 'bx-edit-alt' : 'bx-plus-circle' }} me-2 text-primary"></i>
                     {{ $editIngredientId ? 'Editar ingrediente' : 'Nuevo ingrediente' }}
                 </h5>
-                <button type="button" class="btn-close" wire:click="$set('showIngredientModal',false)"></button>
+                <button type="button" class="btn-close" aria-label="Cerrar formulario de ingrediente" wire:click="$set('showIngredientModal',false)"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
@@ -871,44 +862,41 @@ $iconList = [
                     <label class="form-label">Costo adicional</label>
                     <div class="input-group">
                         <span class="input-group-text">$</span>
-                        <input wire:model="ingExtraPrice" type="number" min="0" step="0.01" class="form-control @error('ingExtraPrice') is-invalid @enderror">
+                        <input wire:model="ingExtraPrice" type="number" min="0" step="0.01" class="form-control @error('ingExtraPrice') is-invalid @enderror" placeholder="0.00">
                     </div>
-                    <div class="form-text">Escribe 0 si no tiene costo adicional.</div>
+                    <div class="form-text">Usa 0 cuando esté incluido.</div>
                     @error('ingExtraPrice') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Imagen</label>
-                    <div class="d-flex align-items-start gap-3 flex-wrap">
-                        <div style="width:80px;height:80px;flex-shrink:0;">
+                <div class="menu-ingredient-upload">
+                    <div class="menu-ingredient-upload__preview" wire:loading.class="is-loading" wire:target="ingImage">
+                        <span class="menu-ingredient-upload__label">Vista previa</span>
+                        <div class="menu-ingredient-upload__media">
                             @if($ingImage)
-                                <div wire:loading wire:target="ingImage"
-                                     style="width:80px;height:80px;border-radius:.375rem;border:1px solid #dee2e6;background:#f8f9fa;align-items:center;justify-content:center;">
-                                    <span class="spinner-border spinner-border-sm text-primary"></span>
-                                </div>
-                                <span wire:loading.remove wire:target="ingImage">
-                                    <img src="{{ $ingImage->temporaryUrl() }}" class="rounded shadow-sm"
-                                         style="width:80px;height:80px;object-fit:cover;display:block;">
-                                </span>
-                            @elseif($ingCurrentImage)
-                                <img src="{{ asset('storage/'.$ingCurrentImage) }}" class="rounded shadow-sm"
-                                     style="width:80px;height:80px;object-fit:cover;display:block;">
+                                <img src="{{ $ingImage->temporaryUrl() }}" alt="Nueva imagen para {{ $ingName ?: 'el ingrediente' }}" width="320" height="200">
+                            @elseif($ingCurrentImage && !$ingRemoveImage)
+                                <img src="{{ asset('storage/'.$ingCurrentImage) }}" alt="Imagen actual de {{ $ingName }}" width="320" height="200" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="menu-ingredient-upload__fallback" hidden><i class="bx bx-image-alt" aria-hidden="true"></i><span>No se pudo cargar la imagen actual</span></div>
                             @else
-                                <div style="width:80px;height:80px;background:#eaecf0;border-radius:.375rem;display:flex;align-items:center;justify-content:center;">
-                                    <i class="bx bx-spa" style="font-size:2rem;color:#8592a3;display:block;line-height:1;"></i>
-                                </div>
+                                <div class="menu-ingredient-upload__fallback"><i class="bx bx-image-add" aria-hidden="true"></i><span>Selecciona una imagen</span></div>
                             @endif
+                            <div class="menu-ingredient-upload__loading" wire:loading.flex wire:target="ingImage" aria-label="Procesando imagen">
+                                <span class="spinner-border text-primary" aria-hidden="true"></span><strong>Preparando vista previa…</strong>
+                            </div>
                         </div>
-                        <div class="flex-grow-1">
-                            <input wire:model="ingImage" type="file"
-                                   class="form-control @error('ingImage') is-invalid @enderror"
-                                   accept="image/*">
-                            @error('ingImage') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                            @if($ingImage)
-                                <div class="small text-muted mt-1">
-                                    <i class="bx bx-check-circle text-success me-1"></i> Se guardará como <strong>.webp</strong>
-                                </div>
-                            @endif
-                        </div>
+                    </div>
+                    <div class="menu-ingredient-upload__controls">
+                        <label class="form-label" for="ingImage">Imagen del ingrediente</label>
+                        <input id="ingImage" wire:model="ingImage" type="file" class="form-control @error('ingImage') is-invalid @enderror" accept="image/jpeg,image/png,image/gif,image/webp">
+                        @error('ingImage') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <p class="form-text">JPG, PNG, GIF o WebP de hasta 1 MB. Se optimiza automáticamente a WebP.</p>
+                        @if($ingImage)
+                            <div class="menu-upload-success" role="status"><i class="bx bx-check-circle" aria-hidden="true"></i><span>Nueva imagen lista para guardar.</span></div>
+                        @elseif($ingCurrentImage)
+                            <div class="form-check menu-remove-image">
+                                <input wire:model.live="ingRemoveImage" class="form-check-input" type="checkbox" id="ingRemoveImage">
+                                <label class="form-check-label" for="ingRemoveImage">Quitar la imagen actual al guardar</label>
+                            </div>
+                        @endif
                     </div>
                 </div>
                 <div class="form-check form-switch">
@@ -920,7 +908,7 @@ $iconList = [
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showIngredientModal',false)">Cancelar</button>
                 <button type="button" class="btn btn-primary" wire:click="saveIngredient">
                     <span wire:loading.remove wire:target="saveIngredient"><i class="bx bx-check me-1"></i> {{ $editIngredientId ? 'Actualizar' : 'Crear' }}</span>
-                    <span wire:loading wire:target="saveIngredient" style="gap:.4rem;"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
+                    <span wire:loading wire:target="saveIngredient"  class="menu-loading"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
                 </button>
             </div>
         </div>
@@ -930,20 +918,20 @@ $iconList = [
 
 {{-- ════════════════════════════ MODAL: Product Ingredients Assignment ═════════ --}}
 @if($showProductIngredientsModal && $this->piProduct)
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showProductIngredientsModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showProductIngredientsModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="product-ingredients-title">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
+                <h5 class="modal-title" id="product-ingredients-title">
                     <i class="bx bx-spa me-2 text-success"></i>
                     Ingredientes: <span class="text-success">{{ $this->piProduct->name }}</span>
                 </h5>
-                <button type="button" class="btn-close" wire:click="$set('showProductIngredientsModal',false)"></button>
+                <button type="button" class="btn-close" aria-label="Cerrar configuración de ingredientes" wire:click="$set('showProductIngredientsModal',false)"></button>
             </div>
             <div class="modal-body">
                 {{-- Limits --}}
-                <div class="row g-3 mb-4 pb-3" style="border-bottom:1px solid #eaecf0;">
+                <div class="row g-3 mb-4 pb-3 menu-section-divider">
                     <div class="col-6">
                         <label class="form-label">Mín. ingredientes requeridos</label>
                         <input wire:model="piMinIngredients" type="number" min="0" max="50"
@@ -963,15 +951,14 @@ $iconList = [
                 <label class="form-label fw-semibold mb-2">Ingredientes disponibles para este producto</label>
                 @if($this->allIngredients->isEmpty())
                     <div class="text-center py-4 text-muted">
-                        <i class="bx bx-spa" style="font-size:2rem;"></i>
+                        <i class="bx bx-spa menu-icon-20" ></i>
                         <p class="small mt-1">No hay ingredientes en el catálogo. Créalos en la pestaña <strong>Ingredientes</strong>.</p>
                     </div>
                 @else
-                <div class="row g-2" style="max-height:380px;overflow-y:auto;">
+                <div class="row g-2 menu-scroll-lg">
                     @foreach($this->allIngredients as $ing)
                     <div class="col-sm-6">
-                        <label class="d-flex align-items-center gap-3 p-2 rounded border cursor-pointer {{ in_array((string)$ing->id, $piIngredientIds) ? 'border-success bg-success bg-opacity-10' : '' }}"
-                               style="cursor:pointer;">
+                        <label class="d-flex align-items-center gap-3 p-2 rounded border cursor-pointer menu-clickable {{ in_array((string)$ing->id, $piIngredientIds) ? 'border-success bg-success bg-opacity-10' : '' }}" for="pi_{{ $ing->id }}">
                             <input class="form-check-input flex-shrink-0 mt-0"
                                    type="checkbox"
                                    wire:model="piIngredientIds"
@@ -979,23 +966,19 @@ $iconList = [
                                    id="pi_{{ $ing->id }}">
                             @if($ing->image)
                                 <img src="{{ asset('storage/'.$ing->image) }}"
-                                     class="rounded flex-shrink-0"
-                                     style="width:40px;height:40px;object-fit:cover;"
-                                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                                <div style="width:40px;height:40px;background:#eaecf0;border-radius:.375rem;display:none;align-items:center;justify-content:center;flex-shrink:0;">
-                                    <i class="bx bx-spa" style="font-size:1.1rem;color:#8592a3;"></i>
-                                </div>
+                                     class="rounded flex-shrink-0 menu-media menu-media-40"
+                                     alt="Imagen de {{ $ing->name }}" width="40" height="40" loading="lazy"
+                                     onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="menu-media-placeholder menu-media-40" hidden><i class="bx bx-spa menu-placeholder-icon menu-icon-11" aria-hidden="true"></i></div>
                             @else
-                                <div style="width:40px;height:40px;background:#eaecf0;border-radius:.375rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                                    <i class="bx bx-spa" style="font-size:1.1rem;color:#8592a3;"></i>
-                                </div>
+                                <div class="menu-media-placeholder menu-media-40"><i class="bx bx-spa menu-placeholder-icon menu-icon-11" aria-hidden="true"></i></div>
                             @endif
                             <div class="flex-grow-1 min-w-0">
                                 <div class="fw-semibold small text-truncate">{{ $ing->name }}</div>
                                 @if($ing->extra_price > 0)
-                                    <div class="text-success" style="font-size:.75rem;">+${{ number_format($ing->extra_price, 2) }}</div>
+                                    <div class="text-success app-text-xs">+${{ number_format($ing->extra_price, 2) }}</div>
                                 @else
-                                    <div class="text-muted" style="font-size:.75rem;">Sin costo extra</div>
+                                    <div class="text-muted app-text-xs">Sin costo extra</div>
                                 @endif
                             </div>
                         </label>
@@ -1012,7 +995,7 @@ $iconList = [
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showProductIngredientsModal',false)">Cancelar</button>
                 <button type="button" class="btn btn-success" wire:click="saveProductIngredients">
                     <span wire:loading.remove wire:target="saveProductIngredients"><i class="bx bx-check me-1"></i> Guardar ingredientes</span>
-                    <span wire:loading wire:target="saveProductIngredients" style="gap:.4rem;"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
+                    <span wire:loading wire:target="saveProductIngredients"  class="menu-loading"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
                 </button>
             </div>
         </div>
@@ -1022,9 +1005,9 @@ $iconList = [
 
 {{-- ══════════════════════════════════ MODAL: Print Area Form ══════════════════ --}}
 @if($showAreaModal)
-<div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showAreaModal',false)"></div>
-<div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+<div class="modal-backdrop fade show app-modal-backdrop" wire:click="$set('showAreaModal',false)"></div>
+<div class="modal fade show d-block app-modal-layer" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-dialog-centered menu-modal-440" >
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -1047,7 +1030,7 @@ $iconList = [
                     <label class="form-label">Color identificador</label>
                     <div class="input-group">
                         <span class="input-group-text p-1">
-                            <input wire:model.live="areaColor" type="color" class="form-control form-control-color border-0" style="width:30px;height:30px;padding:0;">
+                            <input wire:model.live="areaColor" type="color" class="form-control form-control-color border-0 menu-color-input" >
                         </span>
                         <input wire:model.live="areaColor" type="text" class="form-control" placeholder="#696cff">
                     </div>
@@ -1061,7 +1044,7 @@ $iconList = [
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showAreaModal',false)">Cancelar</button>
                 <button type="button" class="btn btn-primary" wire:click="saveArea">
                     <span wire:loading.remove wire:target="saveArea"><i class="bx bx-check me-1"></i> {{ $editAreaId ? 'Actualizar' : 'Crear' }}</span>
-                    <span wire:loading wire:target="saveArea" style="gap:.4rem;"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
+                    <span wire:loading wire:target="saveArea"  class="menu-loading"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
                 </button>
             </div>
         </div>
@@ -1070,7 +1053,7 @@ $iconList = [
 @endif
 
 {{-- ══════════════════════════════════════════════════════════════════ Toasts --}}
-<div style="position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;min-width:260px;">
+<div  class="app-toast-stack">
     <template x-for="toast in toasts" :key="toast.id">
         <div x-show="true"
              x-transition:enter="transition ease-out duration-200"

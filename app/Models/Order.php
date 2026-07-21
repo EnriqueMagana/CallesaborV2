@@ -5,27 +5,48 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
     protected $fillable = [
-        'cash_register_id', 'customer_id', 'mesa_id',
+        'cash_register_id', 'kiosk_terminal_id', 'public_token', 'customer_id', 'mesa_id',
+        'folio',
         'customer_name', 'customer_phone', 'customer_address', 'customer_references',
-        'served_by', 'type', 'table_identifier', 'delivery_method',
+        'served_by', 'type', 'source', 'fulfillment', 'table_identifier', 'delivery_method',
         'status', 'subtotal', 'total', 'notes',
         'cancelled_by', 'cancellation_reason', 'cancelled_at', 'paid_at',
     ];
 
     protected $casts = [
-        'subtotal'      => 'decimal:2',
-        'total'         => 'decimal:2',
-        'cancelled_at'  => 'datetime',
-        'paid_at'       => 'datetime',
+        'folio' => 'integer',
+        'subtotal' => 'decimal:2',
+        'total' => 'decimal:2',
+        'cancelled_at' => 'datetime',
+        'paid_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Order $order): void {
+            if ($order->folio || ! $order->cash_register_id) {
+                return;
+            }
+
+            $order->folio = ((int) static::query()
+                ->where('cash_register_id', $order->cash_register_id)
+                ->max('folio')) + 1;
+        });
+    }
 
     public function cashRegister(): BelongsTo
     {
         return $this->belongsTo(CashRegister::class);
+    }
+
+    public function kioskTerminal(): BelongsTo
+    {
+        return $this->belongsTo(KioskTerminal::class);
     }
 
     public function mesa(): BelongsTo
@@ -58,6 +79,11 @@ class Order extends Model
         return $this->hasMany(OrderPayment::class);
     }
 
+    public function deliveryAssignment(): HasOne
+    {
+        return $this->hasOne(DeliveryAssignment::class);
+    }
+
     public function getDisplayNameAttribute(): string
     {
         return $this->customer_name
@@ -65,47 +91,58 @@ class Order extends Model
             ?? 'Cliente general';
     }
 
+    public function getDisplayFolioAttribute(): string
+    {
+        return (string) ($this->folio ?: $this->id);
+    }
+
     public function getStatusColorAttribute(): string
     {
         return match ($this->status) {
-            'pendiente'      => 'warning',
+            'pendiente' => 'warning',
             'en_preparacion' => 'info',
-            'pagada'         => 'success',
-            'cancelada'      => 'danger',
-            default          => 'secondary',
+            'lista' => 'success',
+            'en_reparto' => 'primary',
+            'entregada' => 'success',
+            'pagada' => 'success',
+            'cancelada' => 'danger',
+            default => 'secondary',
         };
     }
 
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            'pendiente'      => 'Pendiente',
+            'pendiente' => 'Pendiente',
             'en_preparacion' => 'En preparación',
-            'pagada'         => 'Pagada',
-            'cancelada'      => 'Cancelada',
-            default          => $this->status,
+            'lista' => 'Listo',
+            'en_reparto' => 'Delivery asignado',
+            'entregada' => 'Entregado',
+            'pagada' => 'Pagada',
+            'cancelada' => 'Cancelada',
+            default => $this->status,
         };
     }
 
     public function getTypeLabelAttribute(): string
     {
         return match ($this->type) {
-            'mesa'       => 'Mesa',
+            'mesa' => 'Mesa',
             'ventanilla' => 'Ventanilla',
-            'delivery'   => 'Delivery',
-            'pick_up'    => 'Pick-up',
-            default      => $this->type,
+            'delivery' => 'Delivery',
+            'pick_up' => 'Pick-up',
+            default => $this->type,
         };
     }
 
     public function getTypeIconAttribute(): string
     {
         return match ($this->type) {
-            'mesa'       => 'bx-table',
+            'mesa' => 'bx-table',
             'ventanilla' => 'bx-store',
-            'delivery'   => 'bx-cycling',
-            'pick_up'    => 'bx-package',
-            default      => 'bx-receipt',
+            'delivery' => 'bx-cycling',
+            'pick_up' => 'bx-package',
+            default => 'bx-receipt',
         };
     }
 
@@ -113,9 +150,9 @@ class Order extends Model
     {
         return match ($this->delivery_method) {
             'contra_entrega' => 'Contra entrega',
-            'tarjeta'        => 'Tarjeta',
-            'transferencia'  => 'Transferencia',
-            default          => '—',
+            'tarjeta' => 'Tarjeta',
+            'transferencia' => 'Transferencia',
+            default => '—',
         };
     }
 }

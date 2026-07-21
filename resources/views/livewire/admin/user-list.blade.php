@@ -1,646 +1,242 @@
-﻿<div x-data="{ toasts: [] }"
-     x-on:notify.window="toasts.push($event.detail); setTimeout(() => toasts.shift(), 3500)">
-    {{-- Toasts --}}
-    <div class="position-fixed top-0 end-0 p-3" style="z-index:9999;pointer-events:none">
-        <template x-for="(t, i) in toasts" :key="i">
-            <div class="toast show align-items-center border-0 mb-2" style="pointer-events:all"
-                 :class="{'text-bg-success':t.type==='success','text-bg-danger':t.type==='error','text-bg-info':t.type==='info'}">
-                <div class="d-flex">
-                    <div class="toast-body fw-medium" x-text="t.message"></div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="toasts.splice(i,1)"></button>
-                </div>
+<div class="app-page users-page" x-data="{ toasts: [] }"
+     x-on:notify.window="toasts.push($event.detail); setTimeout(() => toasts.shift(), 3800)">
+    <div class="app-toast-stack" aria-live="polite" aria-atomic="true">
+        <template x-for="(toast, index) in toasts" :key="index">
+            <div class="users-toast" :class="'is-' + (toast.type || 'info')">
+                <i class="bx" :class="toast.type === 'success' ? 'bx-check-circle' : (toast.type === 'error' ? 'bx-error-circle' : 'bx-info-circle')"></i>
+                <span x-text="toast.message"></span>
+                <button type="button" @click="toasts.splice(index, 1)" aria-label="Cerrar aviso"><i class="bx bx-x"></i></button>
             </div>
         </template>
     </div>
 
-    {{-- Cabecera --}}
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h4 class="fw-bold mb-1"><span class="text-muted fw-light">Admin /</span> Usuarios</h4>
-            <small class="text-muted">Crea, edita, asigna roles y gestiona usuarios del restaurante</small>
+    <header class="app-page-header users-hero">
+        <div class="app-page-heading">
+            <span class="app-page-icon" aria-hidden="true"><i class="bx bx-group"></i></span>
+            <div>
+                <div class="app-eyebrow">Administración · Equipo</div>
+                <h1 class="app-page-title">Usuarios</h1>
+                <p class="app-page-subtitle">Administra el acceso, rol y estado de cada integrante del restaurante.</p>
+            </div>
         </div>
-        <button class="btn btn-primary" wire:click="openCreatePanel">
-            <i class="bx bx-user-plus me-1"></i> Nuevo usuario
-        </button>
-    </div>
+        @can('crear usuarios')
+            <button type="button" class="users-primary-button" wire:click="openCreatePanel">
+                <i class="bx bx-user-plus" aria-hidden="true"></i><span>Nuevo usuario</span>
+            </button>
+        @endcan
+    </header>
 
-    {{-- EstadÃ­sticas --}}
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-2">
-            <div class="card text-center border-0 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <div class="avatar mx-auto mb-2">
-                        <span class="avatar-initial rounded-circle bg-label-primary"><i class="bx bx-group"></i></span>
-                    </div>
-                    <h4 class="fw-bold mb-0">{{ $counts['active'] }}</h4>
-                    <small class="text-muted">Activos</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-2">
-            <div class="card text-center border-0 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <div class="avatar mx-auto mb-2">
-                        <span class="avatar-initial rounded-circle bg-label-danger"><i class="bx bx-trash"></i></span>
-                    </div>
-                    <h4 class="fw-bold mb-0">{{ $counts['trashed'] }}</h4>
-                    <small class="text-muted">Papelera</small>
-                </div>
-            </div>
-        </div>
-        @foreach($this->roles->take(4) as $role)
-        @php
-            $rc = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
-            $ri = ['super-admin'=>'bx-crown','admin'=>'bx-shield','gerente'=>'bx-briefcase','cajero'=>'bx-money','mesero'=>'bx-dish','cocinero'=>'bx-restaurant'];
-            $c  = $rc[$role->name] ?? 'secondary';
-            $ic = $ri[$role->name] ?? 'bx-user';
-        @endphp
-        <div class="col-6 col-md-2">
-            <div class="card text-center border-0 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <div class="avatar mx-auto mb-2">
-                        <span class="avatar-initial rounded-circle bg-label-{{ $c }}"><i class="bx {{ $ic }}"></i></span>
-                    </div>
-                    <h4 class="fw-bold mb-0">{{ \App\Models\User::role($role->name)->count() }}</h4>
-                    <small class="text-muted">{{ ucfirst($role->name) }}</small>
-                </div>
-            </div>
-        </div>
+    <section class="users-stats" aria-label="Resumen de usuarios">
+        @foreach([
+            ['key' => 'active', 'label' => 'Activos', 'hint' => 'Con acceso disponible', 'icon' => 'bx-user-check', 'tone' => 'success'],
+            ['key' => 'banned', 'label' => 'Bloqueados', 'hint' => 'Acceso suspendido', 'icon' => 'bx-block', 'tone' => 'warning'],
+            ['key' => 'trashed', 'label' => 'Papelera', 'hint' => 'Eliminación reversible', 'icon' => 'bx-trash', 'tone' => 'danger'],
+            ['key' => 'total', 'label' => 'Registros', 'hint' => 'Histórico del equipo', 'icon' => 'bx-id-card', 'tone' => 'primary'],
+        ] as $stat)
+            <article class="users-stat-card is-{{ $stat['tone'] }}">
+                <span class="users-stat-icon"><i class="bx {{ $stat['icon'] }}"></i></span>
+                <div><small>{{ $stat['label'] }}</small><strong>{{ $counts[$stat['key']] }}</strong><span>{{ $stat['hint'] }}</span></div>
+            </article>
         @endforeach
-    </div>
+    </section>
 
-    {{-- Filtros --}}
-    <div class="card mb-4 border-0 shadow-sm">
-        <div class="card-body">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-4">
-                    <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0">
-                            <i class="bx bx-search text-muted"></i>
-                        </span>
-                        <input wire:model.live.debounce.300ms="search" type="text"
-                               class="form-control border-start-0 ps-0"
-                               placeholder="Buscar por nombre o correo" />
-                        @if($search)
-                        <button wire:click="$set('search','')" class="btn btn-outline-secondary">
-                            <i class="bx bx-x"></i>
-                        </button>
-                        @endif
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <select wire:model.live="filterRole" class="form-select">
-                        <option value="">Todos los roles</option>
-                        @foreach($this->roles as $role)
-                            <option value="{{ $role->name }}">{{ ucfirst($role->name) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <div class="btn-group w-100">
-                        <button wire:click="$set('filterStatus','active')"
-                                class="btn btn-sm {{ $filterStatus==='active' ? 'btn-primary' : 'btn-outline-primary' }}">
-                            Activos
-                        </button>
-                        <button wire:click="$set('filterStatus','trashed')"
-                                class="btn btn-sm {{ $filterStatus==='trashed' ? 'btn-danger' : 'btn-outline-danger' }}">
-                            Papelera
-                        </button>
-                        <button wire:click="$set('filterStatus','all')"
-                                class="btn btn-sm {{ $filterStatus==='all' ? 'btn-secondary' : 'btn-outline-secondary' }}">
-                            Todos
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-1">
-                    <button wire:click="$set('filterRole',''); $set('search',''); $set('filterStatus','active')"
-                            class="btn btn-outline-secondary w-100" title="Limpiar">
-                        <i class="bx bx-reset"></i>
+    <section class="users-directory" aria-labelledby="users-directory-title">
+        <header class="users-directory-header">
+            <div><span class="app-eyebrow">Directorio</span><h2 id="users-directory-title">Equipo registrado</h2><p>Busca, filtra y administra cuentas sin perder su historial.</p></div>
+            <span class="users-result-count"><strong>{{ $users->total() }}</strong> {{ $users->total() === 1 ? 'resultado' : 'resultados' }}</span>
+        </header>
+
+        <div class="users-filters">
+            <label class="users-search" for="users-search">
+                <i class="bx bx-search" aria-hidden="true"></i>
+                <input id="users-search" type="search" wire:model.live.debounce.300ms="search" placeholder="Buscar nombre, correo o teléfono" autocomplete="off">
+                @if($search)<button type="button" wire:click="$set('search', '')" aria-label="Limpiar búsqueda"><i class="bx bx-x"></i></button>@endif
+            </label>
+            <label class="users-select" for="users-role-filter">
+                <span>Rol</span>
+                <select id="users-role-filter" wire:model.live="filterRole">
+                    <option value="">Todos los roles</option>
+                    @foreach($this->roles as $role)<option value="{{ $role->name }}">{{ str($role->name)->replace('-', ' ')->title() }}</option>@endforeach
+                </select>
+            </label>
+            <div class="users-status-tabs" role="group" aria-label="Filtrar por estado">
+                @foreach([
+                    'active' => ['Activos', 'bx-user-check', $counts['active']],
+                    'banned' => ['Bloqueados', 'bx-block', $counts['banned']],
+                    'trashed' => ['Papelera', 'bx-trash', $counts['trashed']],
+                    'all' => ['Todos', 'bx-list-ul', $counts['total']],
+                ] as $value => $tab)
+                    <button type="button" wire:click="$set('filterStatus', '{{ $value }}')" class="{{ $filterStatus === $value ? 'is-active' : '' }}" aria-pressed="{{ $filterStatus === $value ? 'true' : 'false' }}">
+                        <i class="bx {{ $tab[1] }}"></i><span>{{ $tab[0] }}</span><b>{{ $tab[2] }}</b>
                     </button>
-                </div>
+                @endforeach
             </div>
+            <button type="button" class="users-reset-button" wire:click="clearFilters" aria-label="Restablecer filtros" title="Restablecer filtros"><i class="bx bx-reset"></i></button>
         </div>
-    </div>
 
-    {{-- Tabla --}}
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            <div wire:loading.class="opacity-50" wire:target="search,filterRole,filterStatus"
-                 class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-4" style="width:38%">Usuario</th>
-                            <th>Rol(es)</th>
-                            <th>Email</th>
-                            <th>Registrado</th>
-                            <th class="text-center pe-4">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        <div class="users-table-wrap" wire:loading.class="is-loading" wire:target="search,filterRole,filterStatus,clearFilters">
+            <div class="users-table-skeleton" wire:loading.flex wire:target="search,filterRole,filterStatus,clearFilters" aria-label="Cargando usuarios">
+                @for($i = 0; $i < 5; $i++)<span></span>@endfor
+            </div>
+            <table class="users-table">
+                <thead><tr><th>Usuario</th><th>Rol y contacto</th><th>Estado de acceso</th><th>Registro</th><th><span class="visually-hidden">Acciones</span></th></tr></thead>
+                <tbody>
                     @forelse($users as $user)
-                    <tr class="{{ $panelUserId===$user->id ? 'table-active' : '' }}"
-                        wire:key="user-{{ $user->id }}"
-                        style="cursor:pointer"
-                        wire:click="openPanel({{ $user->id }})">
-                        <td class="ps-4">
-                            <div class="d-flex align-items-center gap-3">
-                                @if($user->avatar && !$user->trashed())
-                                    <img src="{{ Storage::url($user->avatar) }}" class="rounded-circle"
-                                         style="width:38px;height:38px;object-fit:cover;" />
-                                @else
-                                    <div class="rounded-circle bg-label-{{ $user->trashed() ? 'danger' : 'primary' }}
-                                                d-flex align-items-center justify-content-center fw-bold"
-                                         style="width:38px;height:38px;font-size:1rem;">
-                                        {{ strtoupper(substr($user->name, 0, 1)) }}
-                                    </div>
-                                @endif
-                                <div>
-                                    <div class="fw-semibold d-flex align-items-center gap-1 flex-wrap">
-                                        {{ $user->name }}
-                                        @if($user->id===auth()->id())
-                                            <span class="badge bg-label-warning">Tu</span>
-                                        @endif
-                                        @if($user->trashed())
-                                            <span class="badge bg-label-danger">Eliminado</span>
-                                        @endif
-                                    </div>
-                                    <small class="text-muted">{{ $user->email }}</small>
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            @forelse($user->roles as $role)
-                                @php
-                                    $map = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
-                                    $c = $map[$role->name] ?? 'secondary';
-                                @endphp
-                                <span class="badge bg-label-{{ $c }} me-1">{{ ucfirst($role->name) }}</span>
-                            @empty
-                                <span class="text-muted small fst-italic">Sin rol</span>
-                            @endforelse
-                        </td>
-                        <td>
-                            @if($user->email_verified_at)
-                                <span class="badge bg-label-success">
-                                    <i class="bx bx-check me-1"></i>Verificado
-                                </span>
-                            @else
-                                <span class="badge bg-label-warning">Pendiente</span>
-                            @endif
-                        </td>
-                        <td>
-                            <small class="text-muted">{{ $user->created_at->format('d M Y') }}</small>
-                        </td>
-                        <td class="text-center pe-4" wire:click.stop>
-                            @if($user->trashed())
-                                <div class="d-flex gap-1 justify-content-center">
-                                    <button class="btn btn-icon btn-sm btn-outline-success"
-                                            wire:click="restore({{ $user->id }})" title="Restaurar">
-                                        <i class="bx bx-refresh"></i>
-                                    </button>
-                                    <button class="btn btn-icon btn-sm btn-danger"
-                                            wire:click="confirmForceDelete({{ $user->id }})"
-                                            title="Eliminar permanente">
-                                        <i class="bx bx-skull"></i>
-                                    </button>
-                                </div>
-                            @else
-                                <div class="d-flex gap-1 justify-content-center">
-                                    <button class="btn btn-icon btn-sm btn-outline-primary"
-                                            wire:click="openPanel({{ $user->id }})" title="Editar">
-                                        <i class="bx bx-edit"></i>
-                                    </button>
-                                    <button class="btn btn-icon btn-sm btn-outline-danger"
-                                            wire:click="confirmSoftDelete({{ $user->id }})"
-                                            @if($user->id===auth()->id()) disabled @endif
-                                            title="Mover a papelera">
-                                        <i class="bx bx-trash"></i>
-                                    </button>
-                                </div>
-                            @endif
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="5" class="text-center py-5 text-muted">
-                            <i class="bx bx-user-x d-block mb-2" style="font-size:3rem;opacity:.3"></i>
-                            No se encontraron usuarios
-                        </td>
-                    </tr>
-                    @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            @if($users->hasPages())
-            <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top">
-                <small class="text-muted">
-                    {{ $users->firstItem() }}-{{ $users->lastItem() }} de {{ $users->total() }}
-                </small>
-                {{ $users->links('vendor.pagination.bootstrap-5') }}
-            </div>
-            @endif
-        </div>
-    </div>
-
-
-    {{-- =====================================================
-         MODAL 1 â€” Editar usuario
-    ====================================================== --}}
-    @if($panelUserId && $panelUser)
-    {{-- Backdrop --}}
-    <div class="modal-backdrop fade show" style="z-index:1110;" wire:click="{{ $showRolePanel ? '' : 'closePanel' }}"></div>
-
-    <div class="modal fade show d-block" tabindex="-1" role="dialog"
-         style="z-index:1115;">
-        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-            <div class="modal-content border-0 shadow-lg">
-
-                {{-- Header --}}
-                <div class="modal-header border-bottom pb-3">
-                    <div class="d-flex align-items-center gap-3">
-                        @if($panelUser->avatar)
-                            <img src="{{ Storage::url($panelUser->avatar) }}" class="rounded-circle"
-                                 style="width:50px;height:50px;object-fit:cover;" />
-                        @else
-                            <div class="rounded-circle bg-label-primary d-flex align-items-center
-                                        justify-content-center fw-bold"
-                                 style="width:50px;height:50px;font-size:1.4rem;">
-                                {{ strtoupper(substr($panelUser->name, 0, 1)) }}
-                            </div>
-                        @endif
-                        <div>
-                            <h5 class="modal-title fw-bold mb-0">{{ $panelUser->name }}</h5>
-                            <small class="text-muted">{{ $panelUser->email }}</small>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close" wire:click="closePanel"></button>
-                </div>
-
-                {{-- Body --}}
-                <div class="modal-body py-4">
-                    <div class="row g-4">
-
-                        {{-- Left: form fields --}}
-                        <div class="col-lg-7">
-                            <p class="text-uppercase small fw-semibold text-muted mb-3">
-                                <i class="bx bx-edit-alt me-1"></i>Informacion del usuario
-                            </p>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">Nombre</label>
-                                <input wire:model="editName" type="text"
-                                       class="form-control @error('editName') is-invalid @enderror" />
-                                @error('editName')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">Correo</label>
-                                <input wire:model="editEmail" type="email"
-                                       class="form-control @error('editEmail') is-invalid @enderror" />
-                                @error('editEmail')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">Telefono</label>
-                                <input wire:model="editPhone" type="text"
-                                       class="form-control @error('editPhone') is-invalid @enderror"
-                                       placeholder="+1 (555) 000-0000" />
-                                @error('editPhone')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                        </div>
-
-                        {{-- Right: roles + permissions --}}
-                        <div class="col-lg-5">
-                            {{-- Roles section --}}
-                            <div class="mb-4">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <p class="text-uppercase small fw-semibold text-muted mb-0">
-                                        <i class="bx bx-shield me-1"></i>Roles asignados
-                                    </p>
-                                    <button class="btn btn-sm btn-outline-primary" wire:click="openRolePanel">
-                                        <i class="bx bx-edit me-1"></i>Cambiar roles
-                                    </button>
-                                </div>
-                                <div class="d-flex flex-wrap gap-2">
-                                    @forelse($panelUser->roles as $role)
-                                        @php
-                                            $map = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
-                                            $c = $map[$role->name] ?? 'secondary';
-                                        @endphp
-                                        <span class="badge bg-{{ $c }} px-3 py-2" style="font-size:.82rem;">
-                                            <i class="bx bx-shield me-1"></i>{{ ucfirst($role->name) }}
-                                        </span>
-                                    @empty
-                                        <em class="text-muted small">Sin roles asignados</em>
-                                    @endforelse
-                                </div>
-                            </div>
-
-                            {{-- Effective permissions accordion --}}
-                            <div>
-                                <p class="text-uppercase small fw-semibold text-muted mb-2">
-                                    <i class="bx bx-key me-1"></i>Permisos efectivos
-                                    <span class="badge bg-label-primary ms-1">
-                                        {{ $panelUser->getAllPermissions()->count() }}
-                                    </span>
-                                </p>
-                                @php $grouped = $panelUser->getAllPermissions()->groupBy('group'); @endphp
-                                @forelse($grouped as $grp => $perms)
-                                <div class="accordion accordion-flush mb-2">
-                                    <div class="accordion-item border rounded">
-                                        <h2 class="accordion-header">
-                                            <button class="accordion-button collapsed py-2 px-3 small"
-                                                    type="button"
-                                                    data-bs-toggle="collapse"
-                                                    data-bs-target="#ep{{ Str::slug($grp . $panelUser->id) }}">
-                                                <i class="bx bx-folder-open me-2 text-primary"></i>
-                                                <span class="text-capitalize fw-semibold">{{ $grp }}</span>
-                                                <span class="badge bg-label-primary ms-auto me-2">
-                                                    {{ $perms->count() }}
-                                                </span>
-                                            </button>
-                                        </h2>
-                                        <div id="ep{{ Str::slug($grp . $panelUser->id) }}"
-                                             class="accordion-collapse collapse">
-                                            <div class="accordion-body py-2 px-3">
-                                                <div class="d-flex flex-wrap gap-1">
-                                                    @foreach($perms as $p)
-                                                        <span class="badge bg-label-success"
-                                                              style="font-size:.75rem;">{{ $p->name }}</span>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                @empty
-                                    <em class="text-muted small">Sin permisos</em>
-                                @endforelse
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                {{-- Footer --}}
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-secondary" wire:click="closePanel">
-                            <i class="bx bx-x me-1"></i>Cerrar
-                        </button>
-                        @if($panelUser->trashed())
-                            <button class="btn btn-success" wire:click="restore({{ $panelUser->id }})">
-                                <i class="bx bx-refresh me-1"></i>Restaurar
-                            </button>
-                            <button class="btn btn-danger" wire:click="confirmForceDelete({{ $panelUser->id }})">
-                                <i class="bx bx-skull me-1"></i>Eliminar permanente
-                            </button>
-                        @else
-                            <button class="btn btn-outline-danger"
-                                    wire:click="confirmSoftDelete({{ $panelUser->id }})"
-                                    @if($panelUser->id===auth()->id()) disabled @endif>
-                                <i class="bx bx-trash me-1"></i>Mover a papelera
-                            </button>
-                        @endif
-                    </div>
-                    <button class="btn btn-primary" wire:click="saveUserInfo">
-                        <span wire:loading.remove wire:target="saveUserInfo">
-                            <i class="bx bx-save me-1"></i>Guardar cambios
-                        </span>
-                        <span wire:loading wire:target="saveUserInfo"
-                              style="gap:.4rem;">
-                            <span class="spinner-border spinner-border-sm"
-                                  style="width:.85rem;height:.85rem;border-width:2px;"></span>
-                            Guardando...
-                        </span>
-                    </button>
-                </div>
-
-            </div>
-        </div>
-    </div>
-    @endif
-
-
-    {{-- =====================================================
-         MODAL 2 â€” Asignar Roles (stacks on top of modal 1)
-    ====================================================== --}}
-    @if($panelUser && $showRolePanel)
-    {{-- Backdrop for role modal --}}
-    <div class="modal-backdrop fade show" style="z-index:1120;"></div>
-
-    <div class="modal fade show d-block" tabindex="-1" role="dialog"
-         style="z-index:1125;">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content border-0 shadow-lg">
-
-                {{-- Header --}}
-                <div class="modal-header border-bottom" style="background:rgba(105,108,255,.06)">
-                    <div>
-                        <h5 class="modal-title fw-bold mb-0">
-                            <i class="bx bx-shield-quarter me-2 text-primary"></i>Asignar Roles
-                        </h5>
-                        <small class="text-muted">{{ $panelUser->name }}</small>
-                    </div>
-                    <button type="button" class="btn-close" wire:click="closeRolePanel"></button>
-                </div>
-
-                {{-- Body --}}
-                <div class="modal-body py-4">
-                    <p class="text-muted small mb-4">
-                        Selecciona los roles para este usuario. Cada rol otorga permisos predefinidos.
-                    </p>
-
-                    <div class="d-flex flex-column gap-3">
-                        @foreach($this->roles as $role)
                         @php
-                            $rc = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info',
-                                   'cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
-                            $ri = ['super-admin'=>'bx-crown','admin'=>'bx-shield','gerente'=>'bx-briefcase',
-                                   'cajero'=>'bx-money','mesero'=>'bx-dish','cocinero'=>'bx-restaurant'];
-                            $c  = $rc[$role->name] ?? 'secondary';
-                            $ic = $ri[$role->name] ?? 'bx-user';
-                            $isChecked = in_array($role->name, $selectedRoles);
+                            $status = $user->trashed() ? 'deleted' : ($user->isBanned() ? 'banned' : 'active');
+                            $statusData = match($status) {
+                                'deleted' => ['Eliminado', 'En papelera', 'bx-trash', 'danger'],
+                                'banned' => ['Bloqueado', 'Sin acceso', 'bx-block', 'warning'],
+                                default => ['Activo', 'Puede ingresar', 'bx-check-circle', 'success'],
+                            };
                         @endphp
-                        <label class="d-flex align-items-start gap-3 p-3 rounded-2 border"
-                               style="cursor:pointer;{{ $isChecked ? 'border-color:#696cff;background:rgba(105,108,255,.04);' : '' }}">
-                            <input type="checkbox"
-                                   wire:model.live="selectedRoles"
-                                   value="{{ $role->name }}"
-                                   class="form-check-input mt-1 flex-shrink-0" />
-                            <div class="flex-grow-1">
-                                <div class="d-flex align-items-center gap-2 mb-1">
-                                    <i class="bx {{ $ic }} text-{{ $c }} fs-5"></i>
-                                    <span class="fw-semibold">{{ ucfirst($role->name) }}</span>
-                                    <span class="badge bg-label-{{ $c }} ms-auto">
-                                        {{ $role->permissions->count() }} permisos
+                        <tr wire:key="user-row-{{ $user->id }}" class="is-{{ $status }} {{ $panelUserId === $user->id ? 'is-selected' : '' }}">
+                            <td data-label="Usuario">
+                                <div class="users-identity">
+                                    <span class="users-avatar">
+                                        @if($user->avatar && !$user->trashed())<img src="{{ Storage::url($user->avatar) }}" alt="Avatar de {{ $user->name }}">@else{{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}@endif
                                     </span>
+                                    <div><strong>{{ $user->name }}</strong><small>{{ $user->email }}</small>@if($user->id === auth()->id())<span class="users-self-chip">Tu cuenta</span>@endif</div>
                                 </div>
-                                @if($role->permissions->count())
-                                <div class="d-flex flex-wrap gap-1 mt-1">
-                                    @foreach($role->permissions->take(4) as $p)
-                                        <span class="badge bg-label-secondary"
-                                              style="font-size:.7rem;">{{ $p->name }}</span>
-                                    @endforeach
-                                    @if($role->permissions->count() > 4)
-                                        <span class="badge bg-label-secondary" style="font-size:.7rem;">
-                                            +{{ $role->permissions->count() - 4 }} mas
-                                        </span>
-                                    @endif
-                                </div>
+                            </td>
+                            <td data-label="Rol y contacto">
+                                <div class="users-roles">@forelse($user->roles as $role)<span>{{ str($role->name)->replace('-', ' ')->title() }}</span>@empty<em>Sin rol</em>@endforelse</div>
+                                <small class="users-phone"><i class="bx bx-phone"></i>{{ $user->phone ?: 'Sin teléfono' }}</small>
+                            </td>
+                            <td data-label="Estado">
+                                <span class="users-status is-{{ $statusData[3] }}"><i class="bx {{ $statusData[2] }}"></i><span><strong>{{ $statusData[0] }}</strong><small>{{ $statusData[1] }}</small></span></span>
+                            </td>
+                            <td data-label="Registro"><time datetime="{{ $user->created_at->toDateString() }}">{{ $user->created_at->translatedFormat('d M Y') }}</time><small>{{ $user->created_at->diffForHumans() }}</small></td>
+                            <td class="users-row-actions">
+                                <button type="button" wire:click="openPanel({{ $user->id }})" aria-label="Ver detalles de {{ $user->name }}" title="Ver detalles"><i class="bx bx-show"></i></button>
+                                @if($user->trashed())
+                                    @can('eliminar usuarios')<button type="button" class="is-success" wire:click="confirmRestore({{ $user->id }})" aria-label="Restaurar a {{ $user->name }}" title="Restaurar"><i class="bx bx-revision"></i></button>@endcan
+                                @else
+                                    @can('bloquear usuarios')
+                                        @if($user->isBanned())<button type="button" class="is-success" wire:click="confirmUnban({{ $user->id }})" aria-label="Desbloquear a {{ $user->name }}" title="Desbloquear"><i class="bx bx-lock-open-alt"></i></button>
+                                        @else<button type="button" class="is-warning" wire:click="openBanPanel({{ $user->id }})" @disabled($user->id === auth()->id()) aria-label="Bloquear a {{ $user->name }}" title="Bloquear"><i class="bx bx-block"></i></button>@endif
+                                    @endcan
+                                    @can('eliminar usuarios')<button type="button" class="is-danger" wire:click="confirmSoftDelete({{ $user->id }})" @disabled($user->id === auth()->id()) aria-label="Eliminar a {{ $user->name }}" title="Mover a papelera"><i class="bx bx-trash"></i></button>@endcan
                                 @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5"><div class="users-empty"><span><i class="bx bx-user-x"></i></span><h3>No encontramos usuarios</h3><p>Modifica los filtros o limpia la búsqueda para consultar el directorio.</p><button type="button" wire:click="clearFilters"><i class="bx bx-reset"></i>Restablecer filtros</button></div></td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if($users->hasPages())<footer class="users-pagination">{{ $users->links() }}</footer>@endif
+    </section>
+
+    @if($panelUser)
+        <div class="app-modal-backdrop" wire:click="closePanel"></div>
+        <div class="app-modal-layer users-modal-layer" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
+            <section class="users-modal users-detail-modal">
+                <header class="users-modal-header">
+                    <div class="users-modal-identity"><span class="users-avatar is-large">{{ mb_strtoupper(mb_substr($panelUser->name, 0, 1)) }}</span><div><span class="app-eyebrow">Expediente del usuario</span><h2 id="user-detail-title">{{ $panelUser->name }}</h2><p>{{ $panelUser->email }}</p></div></div>
+                    <button type="button" class="users-modal-close" wire:click="closePanel" aria-label="Cerrar"><i class="bx bx-x"></i></button>
+                </header>
+
+                <div class="users-modal-body">
+                    <div class="users-detail-status-row">
+                        @if($panelUser->trashed())<span class="users-status is-danger"><i class="bx bx-trash"></i><span><strong>En papelera</strong><small>Eliminación reversible</small></span></span>
+                        @elseif($panelUser->isBanned())<span class="users-status is-warning"><i class="bx bx-block"></i><span><strong>Cuenta bloqueada</strong><small>Inicio de sesión suspendido</small></span></span>
+                        @else<span class="users-status is-success"><i class="bx bx-check-circle"></i><span><strong>Cuenta activa</strong><small>Acceso disponible</small></span></span>@endif
+                        <span class="users-created-chip"><i class="bx bx-calendar"></i>Desde {{ $panelUser->created_at->translatedFormat('d M Y') }}</span>
+                    </div>
+
+                    @if($panelUser->isBanned())
+                        <aside class="users-ban-audit"><i class="bx bx-shield-x"></i><div><strong>Motivo del bloqueo</strong><p>{{ $panelUser->ban_reason }}</p><small>Aplicado {{ $panelUser->banned_at?->diffForHumans() }} por {{ $panelUser->bannedBy?->name ?? 'Administrador' }}.</small></div></aside>
+                    @endif
+
+                    <div class="users-detail-grid">
+                        <section class="users-form-section">
+                            <header><span><i class="bx bx-id-card"></i></span><div><h3>Datos personales</h3><p>Información para identificar y contactar al integrante.</p></div></header>
+                            <div class="users-form-grid">
+                                <label><span>Nombre completo</span><input type="text" wire:model="editName" @disabled($panelUser->trashed() || !auth()->user()->can('editar usuarios'))>@error('editName')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                                <label><span>Correo electrónico</span><input type="email" wire:model="editEmail" @disabled($panelUser->trashed() || !auth()->user()->can('editar usuarios'))>@error('editEmail')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                                <label class="is-full"><span>Teléfono</span><input type="tel" wire:model="editPhone" placeholder="Ej. 5512345678" @disabled($panelUser->trashed() || !auth()->user()->can('editar usuarios'))>@error('editPhone')<small class="users-field-error">{{ $message }}</small>@enderror</label>
                             </div>
+                        </section>
+
+                        <section class="users-form-section">
+                            <header><span><i class="bx bx-shield-quarter"></i></span><div><h3>Roles y permisos</h3><p>Define qué módulos y acciones puede utilizar.</p></div></header>
+                            <div class="users-assigned-roles">@forelse($panelUser->roles as $role)<span><i class="bx bx-badge-check"></i>{{ str($role->name)->replace('-', ' ')->title() }}<b>{{ $role->permissions->count() }} permisos</b></span>@empty<em>Sin rol asignado</em>@endforelse</div>
+                            @can('gestionar roles')@unless($panelUser->trashed())<button type="button" class="users-secondary-button" wire:click="openRolePanel"><i class="bx bx-edit-alt"></i>Administrar roles</button>@endunless@endcan
+                        </section>
+                    </div>
+                </div>
+
+                <footer class="users-modal-footer">
+                    <div class="users-danger-actions">
+                        @if($panelUser->trashed())
+                            @can('eliminar usuarios')<button type="button" class="is-success" wire:click="confirmRestore({{ $panelUser->id }})"><i class="bx bx-revision"></i>Restaurar</button>@endcan
+                        @else
+                            @can('bloquear usuarios')
+                                @if($panelUser->isBanned())<button type="button" class="is-success" wire:click="confirmUnban({{ $panelUser->id }})"><i class="bx bx-lock-open-alt"></i>Desbloquear</button>
+                                @else<button type="button" class="is-warning" wire:click="openBanPanel({{ $panelUser->id }})" @disabled($panelUser->id === auth()->id())><i class="bx bx-block"></i>Bloquear</button>@endif
+                            @endcan
+                            @can('eliminar usuarios')<button type="button" class="is-danger" wire:click="confirmSoftDelete({{ $panelUser->id }})" @disabled($panelUser->id === auth()->id())><i class="bx bx-trash"></i>Eliminar</button>@endcan
+                        @endif
+                    </div>
+                    <div><button type="button" class="users-secondary-button" wire:click="closePanel">Cerrar</button>@can('editar usuarios')@unless($panelUser->trashed())<button type="button" class="users-primary-button" wire:click="saveUserInfo" wire:loading.attr="disabled" wire:target="saveUserInfo"><span wire:loading.remove wire:target="saveUserInfo"><i class="bx bx-save"></i>Guardar cambios</span><span wire:loading wire:target="saveUserInfo"><i class="bx bx-loader-alt bx-spin"></i>Guardando</span></button>@endunless@endcan</div>
+                </footer>
+            </section>
+        </div>
+    @endif
+
+    @if($showRolePanel && $panelUser)
+        <div class="app-modal-backdrop users-stacked-backdrop"></div>
+        <div class="app-modal-layer users-modal-layer is-stacked" role="dialog" aria-modal="true" aria-labelledby="roles-modal-title">
+            <section class="users-modal users-roles-modal">
+                <header class="users-modal-header"><div><span class="app-eyebrow">Control de acceso</span><h2 id="roles-modal-title">Roles de {{ $panelUser->name }}</h2><p>Debe conservar al menos un rol.</p></div><button type="button" class="users-modal-close" wire:click="closeRolePanel" aria-label="Cerrar"><i class="bx bx-x"></i></button></header>
+                <div class="users-modal-body"><div class="users-role-options">
+                    @foreach($this->roles as $role)
+                        <label class="users-role-option {{ in_array($role->name, $selectedRoles) ? 'is-selected' : '' }}">
+                            <input type="checkbox" wire:model.live="selectedRoles" value="{{ $role->name }}">
+                            <span class="users-role-option-icon"><i class="bx bx-shield-quarter"></i></span>
+                            <span><strong>{{ str($role->name)->replace('-', ' ')->title() }}</strong><small>{{ $role->permissions->count() }} permisos configurados</small></span>
+                            <i class="bx bx-check-circle users-role-check"></i>
                         </label>
-                        @endforeach
-                    </div>
-                </div>
-
-                {{-- Footer --}}
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button class="btn btn-outline-secondary" wire:click="closeRolePanel">
-                        <i class="bx bx-arrow-back me-1"></i>Volver
-                    </button>
-                    <button class="btn btn-primary" wire:click="saveRoles">
-                        <span wire:loading.remove wire:target="saveRoles">
-                            <i class="bx bx-save me-1"></i>Guardar roles
-                        </span>
-                        <span wire:loading wire:target="saveRoles"
-                              style="gap:.4rem;">
-                            <span class="spinner-border spinner-border-sm"
-                                  style="width:.85rem;height:.85rem;border-width:2px;"></span>
-                            Guardando...
-                        </span>
-                    </button>
-                </div>
-
-            </div>
+                    @endforeach
+                </div>@error('selectedRoles')<p class="users-form-alert">{{ $message }}</p>@enderror</div>
+                <footer class="users-modal-footer"><button type="button" class="users-secondary-button" wire:click="closeRolePanel"><i class="bx bx-arrow-back"></i>Volver</button><button type="button" class="users-primary-button" wire:click="saveRoles" wire:loading.attr="disabled" wire:target="saveRoles"><span wire:loading.remove wire:target="saveRoles"><i class="bx bx-save"></i>Guardar roles</span><span wire:loading wire:target="saveRoles"><i class="bx bx-loader-alt bx-spin"></i>Guardando</span></button></footer>
+            </section>
         </div>
-    </div>
     @endif
 
-
-    {{-- =====================================================
-         MODAL 3 â€” Nuevo usuario
-    ====================================================== --}}
     @if($showCreatePanel)
-    {{-- Backdrop --}}
-    <div class="modal-backdrop fade show" style="z-index:1110;" wire:click="closeCreatePanel"></div>
-
-    <div class="modal fade show d-block" tabindex="-1" role="dialog"
-         style="z-index:1115;">
-        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-            <div class="modal-content border-0 shadow-lg">
-
-                {{-- Header --}}
-                <div class="modal-header border-bottom">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="rounded-circle bg-label-primary d-flex align-items-center
-                                    justify-content-center" style="width:46px;height:46px;">
-                            <i class="bx bx-user-plus fs-5 text-primary"></i>
-                        </div>
-                        <div>
-                            <h5 class="modal-title fw-bold mb-0">Nuevo usuario</h5>
-                            <small class="text-muted">Completa los datos para crear la cuenta</small>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close" wire:click="closeCreatePanel"></button>
+        <div class="app-modal-backdrop" wire:click="closeCreatePanel"></div>
+        <div class="app-modal-layer users-modal-layer" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
+            <section class="users-modal users-create-modal">
+                <header class="users-modal-header"><div class="users-modal-heading"><span><i class="bx bx-user-plus"></i></span><div><span class="app-eyebrow">Nueva cuenta</span><h2 id="create-user-title">Crear usuario</h2><p>El rol inicial es obligatorio para habilitar su área de trabajo.</p></div></div><button type="button" class="users-modal-close" wire:click="closeCreatePanel" aria-label="Cerrar"><i class="bx bx-x"></i></button></header>
+                <div class="users-modal-body">
+                    <div class="users-form-section"><header><span><i class="bx bx-id-card"></i></span><div><h3>Información personal</h3><p>Datos visibles dentro del equipo.</p></div></header><div class="users-form-grid">
+                        <label><span>Nombre completo <b>*</b></span><input type="text" wire:model="createName" placeholder="Ej. Adriana López" autocomplete="name" autofocus>@error('createName')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                        <label><span>Correo electrónico <b>*</b></span><input type="email" wire:model="createEmail" placeholder="adriana@restaurante.com" autocomplete="email">@error('createEmail')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                        <label class="is-full"><span>Teléfono</span><input type="tel" wire:model="createPhone" placeholder="Ej. 5512345678" autocomplete="tel">@error('createPhone')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                    </div></div>
+                    <div class="users-form-section"><header><span><i class="bx bx-lock-alt"></i></span><div><h3>Acceso y rol</h3><p>Credenciales iniciales y nivel de acceso.</p></div></header><div class="users-form-grid">
+                        <label><span>Contraseña <b>*</b></span><input type="password" wire:model="createPassword" placeholder="Mínimo 8 caracteres" autocomplete="new-password">@error('createPassword')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                        <label><span>Confirmar contraseña <b>*</b></span><input type="password" wire:model="createPasswordCon" placeholder="Repite la contraseña" autocomplete="new-password">@error('createPasswordCon')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                        <label class="is-full"><span>Rol inicial <b>*</b></span><select wire:model="createRole"><option value="">Selecciona el área de trabajo</option>@foreach($this->roles as $role)<option value="{{ $role->name }}">{{ str($role->name)->replace('-', ' ')->title() }} · {{ $role->permissions->count() }} permisos</option>@endforeach</select><small class="users-field-help">El usuario podrá iniciar con los permisos incluidos en este rol.</small>@error('createRole')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                    </div></div>
                 </div>
-
-                {{-- Body --}}
-                <div class="modal-body py-4">
-                    <div class="row g-4">
-
-                        {{-- Left column: name, email, phone --}}
-                        <div class="col-lg-6">
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">
-                                    Nombre completo <span class="text-danger">*</span>
-                                </label>
-                                <input wire:model="createName" type="text"
-                                       class="form-control @error('createName') is-invalid @enderror"
-                                       placeholder="Ej: Juan PÃ©rez" autofocus />
-                                @error('createName')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">
-                                    Correo electrÃ³nico <span class="text-danger">*</span>
-                                </label>
-                                <input wire:model="createEmail" type="email"
-                                       class="form-control @error('createEmail') is-invalid @enderror"
-                                       placeholder="correo@ejemplo.com" />
-                                @error('createEmail')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">TelÃ©fono</label>
-                                <input wire:model="createPhone" type="text"
-                                       class="form-control @error('createPhone') is-invalid @enderror"
-                                       placeholder="+1 (555) 000-0000" />
-                                @error('createPhone')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                        </div>
-
-                        {{-- Right column: password, confirm, role --}}
-                        <div class="col-lg-6">
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">
-                                    ContraseÃ±a <span class="text-danger">*</span>
-                                </label>
-                                <input wire:model="createPassword" type="password"
-                                       class="form-control @error('createPassword') is-invalid @enderror"
-                                       placeholder="MÃ­nimo 8 caracteres" />
-                                @error('createPassword')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">
-                                    Confirmar contraseÃ±a <span class="text-danger">*</span>
-                                </label>
-                                <input wire:model="createPasswordCon" type="password"
-                                       class="form-control @error('createPasswordCon') is-invalid @enderror"
-                                       placeholder="Repite la contraseÃ±a" />
-                                @error('createPasswordCon')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small fw-medium">Rol inicial</label>
-                                <select wire:model="createRole"
-                                        class="form-select @error('createRole') is-invalid @enderror">
-                                    <option value="">Sin rol asignado</option>
-                                    @foreach($this->roles as $role)
-                                        @php
-                                            $rc = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info',
-                                                   'cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
-                                            $c  = $rc[$role->name] ?? 'secondary';
-                                        @endphp
-                                        <option value="{{ $role->name }}">{{ ucfirst($role->name) }}</option>
-                                    @endforeach
-                                </select>
-                                @error('createRole')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                {{-- Footer --}}
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button class="btn btn-outline-secondary" wire:click="closeCreatePanel">
-                        <i class="bx bx-x me-1"></i>Cancelar
-                    </button>
-                    <button class="btn btn-primary" wire:click="createUser">
-                        <span wire:loading.remove wire:target="createUser">
-                            <i class="bx bx-user-plus me-1"></i>Crear usuario
-                        </span>
-                        <span wire:loading wire:target="createUser"
-                              style="gap:.4rem;">
-                            <span class="spinner-border spinner-border-sm"
-                                  style="width:.85rem;height:.85rem;border-width:2px;"></span>
-                            Creando...
-                        </span>
-                    </button>
-                </div>
-
-            </div>
+                <footer class="users-modal-footer"><button type="button" class="users-secondary-button" wire:click="closeCreatePanel">Cancelar</button><button type="button" class="users-primary-button" wire:click="createUser" wire:loading.attr="disabled" wire:target="createUser"><span wire:loading.remove wire:target="createUser"><i class="bx bx-user-plus"></i>Crear usuario</span><span wire:loading wire:target="createUser"><i class="bx bx-loader-alt bx-spin"></i>Creando cuenta</span></button></footer>
+            </section>
         </div>
-    </div>
     @endif
 
+    @if($showBanPanel && $banUserId)
+        @php $banTarget = $this->banTarget; @endphp
+        <div class="app-modal-backdrop users-stacked-backdrop" wire:click="closeBanPanel"></div>
+        <div class="app-modal-layer users-modal-layer is-stacked" role="dialog" aria-modal="true" aria-labelledby="ban-user-title">
+            <section class="users-modal users-ban-modal">
+                <header class="users-modal-header is-warning"><div class="users-modal-heading"><span><i class="bx bx-block"></i></span><div><span class="app-eyebrow">Suspender acceso</span><h2 id="ban-user-title">Bloquear a {{ $banTarget?->name }}</h2><p>La cuenta podrá desbloquearse posteriormente.</p></div></div><button type="button" class="users-modal-close" wire:click="closeBanPanel" aria-label="Cerrar"><i class="bx bx-x"></i></button></header>
+                <div class="users-modal-body"><aside class="users-ban-notice"><i class="bx bx-info-circle"></i><div><strong>Efecto inmediato</strong><p>Se cerrarán sus sesiones abiertas y no podrá volver a ingresar hasta que un administrador desbloquee la cuenta.</p></div></aside><label class="users-ban-reason"><span>Motivo administrativo <b>*</b></span><textarea wire:model.live="banReason" rows="4" maxlength="500" placeholder="Ej. Suspensión temporal solicitada por gerencia"></textarea><small>{{ mb_strlen($banReason) }}/500 caracteres</small>@error('banReason')<span class="users-field-error">{{ $message }}</span>@enderror</label></div>
+                <footer class="users-modal-footer"><button type="button" class="users-secondary-button" wire:click="closeBanPanel">Cancelar</button><button type="button" class="users-warning-button" wire:click="banUser" wire:loading.attr="disabled" wire:target="banUser"><span wire:loading.remove wire:target="banUser"><i class="bx bx-block"></i>Bloquear acceso</span><span wire:loading wire:target="banUser"><i class="bx bx-loader-alt bx-spin"></i>Bloqueando</span></button></footer>
+            </section>
+        </div>
+    @endif
 </div>
-

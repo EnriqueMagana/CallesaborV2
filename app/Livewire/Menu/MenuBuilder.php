@@ -9,6 +9,7 @@ use App\Models\Ingredient;
 use App\Models\PrintArea;
 use App\Models\Product;
 use App\Traits\ConvertsToWebp;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -16,86 +17,138 @@ use Livewire\WithFileUploads;
 
 class MenuBuilder extends Component
 {
-    use WithFileUploads, ConvertsToWebp;
+    use ConvertsToWebp, WithFileUploads;
 
     // ─── Active tab ────────────────────────────────────────────────────────────
     public string $tab = 'products';
 
     // ─── Products ──────────────────────────────────────────────────────────────
     public string $productSearch = '';
-    public ?int   $productCategoryFilter = null;
 
-    public bool   $showProductModal = false;
-    public ?int   $editProductId    = null;
-    public string $pName            = '';
-    public string $pDescription     = '';
-    public ?int   $pCategoryId      = null;
-    public string $pPrice           = '0.00';
-    public bool   $pIsCustomizable  = false;
-    public string $pMaxAddons       = '';
-    public bool   $pIsActive        = true;
-    public $pImage                  = null;
-    public ?string $pCurrentImage   = null;
-    public array  $pAddonGroupIds   = [];
+    public ?int $productCategoryFilter = null;
+
+    public bool $showProductModal = false;
+
+    public ?int $editProductId = null;
+
+    public string $pName = '';
+
+    public string $pDescription = '';
+
+    public ?int $pCategoryId = null;
+
+    public string $pPrice = '0.00';
+
+    public bool $pIsCustomizable = false;
+
+    public string $pMaxAddons = '';
+
+    public bool $pIsActive = true;
+
+    public $pImage = null;
+
+    public ?string $pCurrentImage = null;
+
+    public array $pAddonGroupIds = [];
 
     // ─── Categories ────────────────────────────────────────────────────────────
     public string $categorySearch = '';
 
-    public bool   $showCategoryModal = false;
-    public ?int   $editCategoryId    = null;
-    public string $cName             = '';
-    public string $cDescription      = '';
-    public string $cIcon             = 'bx-food-menu';
-    public string $cColor            = '#696cff';
-    public ?int   $cPrintAreaId      = null;
-    public bool   $cIsActive         = true;
+    public bool $showCategoryModal = false;
+
+    public ?int $editCategoryId = null;
+
+    public string $cName = '';
+
+    public string $cDescription = '';
+
+    public string $cIcon = 'bx-food-menu';
+
+    public string $cColor = '#696cff';
+
+    public ?int $cPrintAreaId = null;
+
+    public bool $cIsActive = true;
 
     // ─── Addon Groups ──────────────────────────────────────────────────────────
-    public bool   $showGroupModal  = false;
-    public ?int   $editGroupId     = null;
-    public string $gName           = '';
-    public string $gDescription    = '';
-    public bool   $gIsRequired     = false;
-    public string $gMinSelections  = '0';
-    public string $gMaxSelections  = '1';
-    public bool   $gIsActive       = true;
+    public bool $showGroupModal = false;
 
-    public bool   $showAddonsModal = false;
-    public ?int   $activeGroupId   = null;
+    public ?int $editGroupId = null;
 
-    public bool   $showAddonForm   = false;
-    public ?int   $editAddonId     = null;
-    public string $aName           = '';
-    public string $aDescription    = '';
-    public string $aExtraPrice     = '0.00';
-    public bool   $aIsActive       = true;
-    public $aImage                  = null;
-    public ?string $aCurrentImage  = null;
+    public string $gName = '';
+
+    public string $gDescription = '';
+
+    public bool $gIsRequired = false;
+
+    public string $gMinSelections = '0';
+
+    public string $gMaxSelections = '1';
+
+    public bool $gIsActive = true;
+
+    public bool $showAddonsModal = false;
+
+    public ?int $activeGroupId = null;
+
+    public bool $showAddonForm = false;
+
+    public ?int $editAddonId = null;
+
+    public string $aName = '';
+
+    public string $aDescription = '';
+
+    public string $aExtraPrice = '0.00';
+
+    public bool $aIsActive = true;
+
+    public $aImage = null;
+
+    public ?string $aCurrentImage = null;
 
     // ─── Ingredients ───────────────────────────────────────────────────────────
-    public bool   $showIngredientModal = false;
-    public ?int   $editIngredientId    = null;
-    public string $ingName             = '';
-    public string $ingDescription      = '';
-    public string $ingExtraPrice       = '0.00';
-    public bool   $ingIsActive         = true;
-    public $ingImage                   = null;
-    public ?string $ingCurrentImage    = null;
+    public bool $showIngredientModal = false;
+
+    public ?int $editIngredientId = null;
+
+    public string $ingName = '';
+
+    public string $ingDescription = '';
+
+    public string $ingExtraPrice = '0.00';
+
+    public bool $ingIsActive = true;
+
+    public $ingImage = null;
+
+    public ?string $ingCurrentImage = null;
+
+    public bool $ingRemoveImage = false;
 
     // ─── Product ↔ Ingredients assignment ─────────────────────────────────────
-    public bool   $showProductIngredientsModal = false;
-    public ?int   $piProductId                 = null;
-    public array  $piIngredientIds             = [];
-    public string $piMinIngredients            = '0';
-    public string $piMaxIngredients            = '6';
+    public bool $showProductIngredientsModal = false;
+
+    public ?int $piProductId = null;
+
+    public array $piIngredientIds = [];
+
+    public string $piMinIngredients = '0';
+
+    public string $piMaxIngredients = '6';
 
     // ─── Print Areas ───────────────────────────────────────────────────────────
-    public bool   $showAreaModal = false;
-    public ?int   $editAreaId    = null;
-    public string $areaName      = '';
-    public string $areaDesc      = '';
-    public string $areaColor     = '#696cff';
-    public bool   $areaIsActive  = true;
+    public bool $showAreaModal = false;
+
+    public ?int $editAreaId = null;
+
+    public string $areaName = '';
+
+    public string $areaDesc = '';
+
+    public string $areaColor = '#696cff';
+
+    public bool $areaIsActive = true;
 
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -103,8 +156,8 @@ class MenuBuilder extends Component
     public function products()
     {
         return Product::with('category')
-            ->when($this->productSearch, fn($q) => $q->where('name', 'like', "%{$this->productSearch}%"))
-            ->when($this->productCategoryFilter, fn($q) => $q->where('category_id', $this->productCategoryFilter))
+            ->when($this->productSearch, fn ($q) => $q->where('name', 'like', "%{$this->productSearch}%"))
+            ->when($this->productCategoryFilter, fn ($q) => $q->where('category_id', $this->productCategoryFilter))
             ->orderBy('sort_order')->orderBy('name')
             ->paginate(12);
     }
@@ -113,7 +166,7 @@ class MenuBuilder extends Component
     public function categories()
     {
         return Category::with('printArea')
-            ->when($this->categorySearch, fn($q) => $q->where('name', 'like', "%{$this->categorySearch}%"))
+            ->when($this->categorySearch, fn ($q) => $q->where('name', 'like', "%{$this->categorySearch}%"))
             ->orderBy('sort_order')->orderBy('name')
             ->get();
     }
@@ -163,10 +216,11 @@ class MenuBuilder extends Component
     #[Computed]
     public function activeGroup(): ?AddonGroup
     {
-        if (!$this->activeGroupId) {
+        if (! $this->activeGroupId) {
             return null;
         }
-        return AddonGroup::with(['addons' => fn($q) => $q->orderBy('sort_order')])->find($this->activeGroupId);
+
+        return AddonGroup::with(['addons' => fn ($q) => $q->orderBy('sort_order')])->find($this->activeGroupId);
     }
 
     #[Computed]
@@ -182,16 +236,16 @@ class MenuBuilder extends Component
         $this->resetProductForm();
         if ($id) {
             $product = Product::with('addonGroups')->findOrFail($id);
-            $this->editProductId    = $product->id;
-            $this->pName            = $product->name;
-            $this->pDescription     = $product->description ?? '';
-            $this->pCategoryId      = $product->category_id;
-            $this->pPrice           = $product->price;
-            $this->pIsCustomizable  = $product->is_customizable;
-            $this->pMaxAddons       = $product->max_addons ?? '';
-            $this->pIsActive        = $product->is_active;
-            $this->pCurrentImage    = $product->image;
-            $this->pAddonGroupIds   = $product->addonGroups->pluck('id')->map(fn($v) => (string) $v)->toArray();
+            $this->editProductId = $product->id;
+            $this->pName = $product->name;
+            $this->pDescription = $product->description ?? '';
+            $this->pCategoryId = $product->category_id;
+            $this->pPrice = $product->price;
+            $this->pIsCustomizable = $product->is_customizable;
+            $this->pMaxAddons = $product->max_addons ?? '';
+            $this->pIsActive = $product->is_active;
+            $this->pCurrentImage = $product->image;
+            $this->pAddonGroupIds = $product->addonGroups->pluck('id')->map(fn ($v) => (string) $v)->toArray();
         }
         $this->showProductModal = true;
     }
@@ -199,21 +253,21 @@ class MenuBuilder extends Component
     public function saveProduct(): void
     {
         $this->validate([
-            'pName'        => 'required|string|max:120',
-            'pPrice'       => 'required|numeric|min:0',
-            'pCategoryId'  => 'nullable|exists:categories,id',
-            'pImage'       => 'nullable|image|max:2048',
-            'pMaxAddons'   => 'nullable|integer|min:1',
+            'pName' => 'required|string|max:120',
+            'pPrice' => 'required|numeric|min:0',
+            'pCategoryId' => 'nullable|exists:categories,id',
+            'pImage' => 'nullable|image|max:2048',
+            'pMaxAddons' => 'nullable|integer|min:1',
         ]);
 
         $data = [
-            'name'            => $this->pName,
-            'description'     => $this->pDescription ?: null,
-            'category_id'     => $this->pCategoryId,
-            'price'           => $this->pPrice,
+            'name' => $this->pName,
+            'description' => $this->pDescription ?: null,
+            'category_id' => $this->pCategoryId,
+            'price' => $this->pPrice,
             'is_customizable' => $this->pIsCustomizable,
-            'max_addons'      => $this->pIsCustomizable && $this->pMaxAddons !== '' ? (int) $this->pMaxAddons : null,
-            'is_active'       => $this->pIsActive,
+            'max_addons' => $this->pIsCustomizable && $this->pMaxAddons !== '' ? (int) $this->pMaxAddons : null,
+            'is_active' => $this->pIsActive,
         ];
 
         if ($this->pImage) {
@@ -255,15 +309,15 @@ class MenuBuilder extends Component
     public function handleModalConfirmed(string $action, array $params = []): void
     {
         match ($action) {
-            'deleteProduct'      => $this->deleteProduct($params['id']),
-            'restoreProduct'     => $this->restoreProduct($params['id']),
-            'forceProduct'       => $this->forceDeleteProduct($params['id']),
-            'deleteCategory'     => $this->deleteCategory($params['id']),
-            'deleteGroup'        => $this->deleteGroup($params['id']),
-            'deleteAddon'        => $this->deleteAddon($params['id']),
-            'deleteArea'         => $this->deleteArea($params['id']),
-            'deleteIngredient'   => $this->deleteIngredient($params['id']),
-            default              => null,
+            'deleteProduct' => $this->deleteProduct($params['id']),
+            'restoreProduct' => $this->restoreProduct($params['id']),
+            'forceProduct' => $this->forceDeleteProduct($params['id']),
+            'deleteCategory' => $this->deleteCategory($params['id']),
+            'deleteGroup' => $this->deleteGroup($params['id']),
+            'deleteAddon' => $this->deleteAddon($params['id']),
+            'deleteArea' => $this->deleteArea($params['id']),
+            'deleteIngredient' => $this->deleteIngredient($params['id']),
+            default => null,
         };
     }
 
@@ -293,17 +347,17 @@ class MenuBuilder extends Component
 
     private function resetProductForm(): void
     {
-        $this->editProductId   = null;
-        $this->pName           = '';
-        $this->pDescription    = '';
-        $this->pCategoryId     = null;
-        $this->pPrice          = '0.00';
+        $this->editProductId = null;
+        $this->pName = '';
+        $this->pDescription = '';
+        $this->pCategoryId = null;
+        $this->pPrice = '0.00';
         $this->pIsCustomizable = false;
-        $this->pMaxAddons      = '';
-        $this->pIsActive       = true;
-        $this->pImage          = null;
-        $this->pCurrentImage   = null;
-        $this->pAddonGroupIds  = [];
+        $this->pMaxAddons = '';
+        $this->pIsActive = true;
+        $this->pImage = null;
+        $this->pCurrentImage = null;
+        $this->pAddonGroupIds = [];
     }
 
     // ─── Category CRUD ─────────────────────────────────────────────────────────
@@ -314,12 +368,12 @@ class MenuBuilder extends Component
         if ($id) {
             $cat = Category::findOrFail($id);
             $this->editCategoryId = $cat->id;
-            $this->cName          = $cat->name;
-            $this->cDescription   = $cat->description ?? '';
-            $this->cIcon          = $cat->icon;
-            $this->cColor         = $cat->color;
-            $this->cPrintAreaId   = $cat->print_area_id;
-            $this->cIsActive      = $cat->is_active;
+            $this->cName = $cat->name;
+            $this->cDescription = $cat->description ?? '';
+            $this->cIcon = $cat->icon;
+            $this->cColor = $cat->color;
+            $this->cPrintAreaId = $cat->print_area_id;
+            $this->cIsActive = $cat->is_active;
         }
         $this->showCategoryModal = true;
     }
@@ -327,19 +381,19 @@ class MenuBuilder extends Component
     public function saveCategory(): void
     {
         $this->validate([
-            'cName'        => 'required|string|max:80',
-            'cIcon'        => 'required|string|max:60',
-            'cColor'       => 'required|string|max:20',
+            'cName' => 'required|string|max:80',
+            'cIcon' => 'required|string|max:60',
+            'cColor' => 'required|string|max:20',
             'cPrintAreaId' => 'nullable|exists:print_areas,id',
         ]);
 
         $data = [
-            'name'          => $this->cName,
-            'description'   => $this->cDescription ?: null,
-            'icon'          => $this->cIcon,
-            'color'         => $this->cColor,
+            'name' => $this->cName,
+            'description' => $this->cDescription ?: null,
+            'icon' => $this->cIcon,
+            'color' => $this->cColor,
             'print_area_id' => $this->cPrintAreaId,
-            'is_active'     => $this->cIsActive,
+            'is_active' => $this->cIsActive,
         ];
 
         if ($this->editCategoryId) {
@@ -376,12 +430,12 @@ class MenuBuilder extends Component
     private function resetCategoryForm(): void
     {
         $this->editCategoryId = null;
-        $this->cName          = '';
-        $this->cDescription   = '';
-        $this->cIcon          = 'bx-food-menu';
-        $this->cColor         = '#696cff';
-        $this->cPrintAreaId   = null;
-        $this->cIsActive      = true;
+        $this->cName = '';
+        $this->cDescription = '';
+        $this->cIcon = 'bx-food-menu';
+        $this->cColor = '#696cff';
+        $this->cPrintAreaId = null;
+        $this->cIsActive = true;
     }
 
     // ─── Addon Groups CRUD ─────────────────────────────────────────────────────
@@ -391,13 +445,13 @@ class MenuBuilder extends Component
         $this->resetGroupForm();
         if ($id) {
             $group = AddonGroup::findOrFail($id);
-            $this->editGroupId    = $group->id;
-            $this->gName          = $group->name;
-            $this->gDescription   = $group->description ?? '';
-            $this->gIsRequired    = $group->is_required;
+            $this->editGroupId = $group->id;
+            $this->gName = $group->name;
+            $this->gDescription = $group->description ?? '';
+            $this->gIsRequired = $group->is_required;
             $this->gMinSelections = (string) $group->min_selections;
             $this->gMaxSelections = (string) $group->max_selections;
-            $this->gIsActive      = $group->is_active;
+            $this->gIsActive = $group->is_active;
         }
         $this->showGroupModal = true;
     }
@@ -405,18 +459,29 @@ class MenuBuilder extends Component
     public function saveGroup(): void
     {
         $this->validate([
-            'gName'          => 'required|string|max:80',
+            'gName' => 'required|string|max:80',
             'gMinSelections' => 'required|integer|min:0|max:20',
             'gMaxSelections' => 'required|integer|min:1|max:20',
         ]);
 
+        $minimum = $this->gIsRequired
+            ? max(1, (int) $this->gMinSelections)
+            : (int) $this->gMinSelections;
+        $maximum = (int) $this->gMaxSelections;
+
+        if ($maximum < $minimum) {
+            $this->addError('gMaxSelections', 'El máximo debe ser igual o mayor que el mínimo.');
+
+            return;
+        }
+
         $data = [
-            'name'           => $this->gName,
-            'description'    => $this->gDescription ?: null,
-            'is_required'    => $this->gIsRequired,
-            'min_selections' => (int) $this->gMinSelections,
-            'max_selections' => (int) $this->gMaxSelections,
-            'is_active'      => $this->gIsActive,
+            'name' => $this->gName,
+            'description' => $this->gDescription ?: null,
+            'is_required' => $this->gIsRequired,
+            'min_selections' => $minimum,
+            'max_selections' => $maximum,
+            'is_active' => $this->gIsActive,
         ];
 
         if ($this->editGroupId) {
@@ -452,22 +517,22 @@ class MenuBuilder extends Component
 
     private function resetGroupForm(): void
     {
-        $this->editGroupId    = null;
-        $this->gName          = '';
-        $this->gDescription   = '';
-        $this->gIsRequired    = false;
+        $this->editGroupId = null;
+        $this->gName = '';
+        $this->gDescription = '';
+        $this->gIsRequired = false;
         $this->gMinSelections = '0';
         $this->gMaxSelections = '1';
-        $this->gIsActive      = true;
+        $this->gIsActive = true;
     }
 
     // ─── Addons CRUD ───────────────────────────────────────────────────────────
 
     public function openAddonsModal(int $groupId): void
     {
-        $this->activeGroupId   = $groupId;
+        $this->activeGroupId = $groupId;
         $this->showAddonsModal = true;
-        $this->showAddonForm   = false;
+        $this->showAddonForm = false;
         $this->resetAddonForm();
         unset($this->activeGroup);
     }
@@ -477,12 +542,12 @@ class MenuBuilder extends Component
         $this->resetAddonForm();
         if ($id) {
             $addon = Addon::findOrFail($id);
-            $this->editAddonId    = $addon->id;
-            $this->aName          = $addon->name;
-            $this->aDescription   = $addon->description ?? '';
-            $this->aExtraPrice    = $addon->extra_price;
-            $this->aIsActive      = $addon->is_active;
-            $this->aCurrentImage  = $addon->image;
+            $this->editAddonId = $addon->id;
+            $this->aName = $addon->name;
+            $this->aDescription = $addon->description ?? '';
+            $this->aExtraPrice = $addon->extra_price;
+            $this->aIsActive = $addon->is_active;
+            $this->aCurrentImage = $addon->image;
         }
         $this->showAddonForm = true;
     }
@@ -490,17 +555,17 @@ class MenuBuilder extends Component
     public function saveAddon(): void
     {
         $this->validate([
-            'aName'       => 'required|string|max:80',
+            'aName' => 'required|string|max:80',
             'aExtraPrice' => 'required|numeric|min:0',
-            'aImage'      => 'nullable|image|max:1024',
+            'aImage' => 'nullable|image|max:1024',
         ]);
 
         $data = [
             'addon_group_id' => $this->activeGroupId,
-            'name'           => $this->aName,
-            'description'    => $this->aDescription ?: null,
-            'extra_price'    => $this->aExtraPrice,
-            'is_active'      => $this->aIsActive,
+            'name' => $this->aName,
+            'description' => $this->aDescription ?: null,
+            'extra_price' => $this->aExtraPrice,
+            'is_active' => $this->aIsActive,
         ];
 
         if ($this->aImage) {
@@ -540,12 +605,12 @@ class MenuBuilder extends Component
 
     private function resetAddonForm(): void
     {
-        $this->editAddonId   = null;
-        $this->aName         = '';
-        $this->aDescription  = '';
-        $this->aExtraPrice   = '0.00';
-        $this->aIsActive     = true;
-        $this->aImage        = null;
+        $this->editAddonId = null;
+        $this->aName = '';
+        $this->aDescription = '';
+        $this->aExtraPrice = '0.00';
+        $this->aIsActive = true;
+        $this->aImage = null;
         $this->aCurrentImage = null;
     }
 
@@ -557,11 +622,11 @@ class MenuBuilder extends Component
         if ($id) {
             $ingredient = Ingredient::findOrFail($id);
             $this->editIngredientId = $ingredient->id;
-            $this->ingName          = $ingredient->name;
-            $this->ingDescription   = $ingredient->description ?? '';
-            $this->ingExtraPrice    = $ingredient->extra_price;
-            $this->ingIsActive      = $ingredient->is_active;
-            $this->ingCurrentImage  = $ingredient->image;
+            $this->ingName = $ingredient->name;
+            $this->ingDescription = $ingredient->description ?? '';
+            $this->ingExtraPrice = $ingredient->extra_price;
+            $this->ingIsActive = $ingredient->is_active;
+            $this->ingCurrentImage = $ingredient->image;
         }
         $this->showIngredientModal = true;
     }
@@ -569,24 +634,34 @@ class MenuBuilder extends Component
     public function saveIngredient(): void
     {
         $this->validate([
-            'ingName'       => 'required|string|max:100',
+            'ingName' => 'required|string|max:100',
             'ingExtraPrice' => 'required|numeric|min:0',
-            'ingImage'      => 'nullable|image|max:1024',
+            'ingImage' => 'nullable|image|max:1024',
         ]);
 
         $data = [
-            'name'        => $this->ingName,
+            'name' => $this->ingName,
             'description' => $this->ingDescription ?: null,
             'extra_price' => $this->ingExtraPrice,
-            'is_active'   => $this->ingIsActive,
+            'is_active' => $this->ingIsActive,
         ];
+
+        $ingredient = $this->editIngredientId
+            ? Ingredient::findOrFail($this->editIngredientId)
+            : null;
 
         if ($this->ingImage) {
             $data['image'] = $this->storeAsWebp($this->ingImage, 'ingredients', 82, 600);
+            if ($ingredient?->image) {
+                Storage::disk('public')->delete($ingredient->image);
+            }
+        } elseif ($this->ingRemoveImage && $ingredient?->image) {
+            Storage::disk('public')->delete($ingredient->image);
+            $data['image'] = null;
         }
 
-        if ($this->editIngredientId) {
-            Ingredient::findOrFail($this->editIngredientId)->update($data);
+        if ($ingredient) {
+            $ingredient->update($data);
         } else {
             Ingredient::create($data);
         }
@@ -619,12 +694,13 @@ class MenuBuilder extends Component
     private function resetIngredientForm(): void
     {
         $this->editIngredientId = null;
-        $this->ingName          = '';
-        $this->ingDescription   = '';
-        $this->ingExtraPrice    = '0.00';
-        $this->ingIsActive      = true;
-        $this->ingImage         = null;
-        $this->ingCurrentImage  = null;
+        $this->ingName = '';
+        $this->ingDescription = '';
+        $this->ingExtraPrice = '0.00';
+        $this->ingIsActive = true;
+        $this->ingImage = null;
+        $this->ingCurrentImage = null;
+        $this->ingRemoveImage = false;
     }
 
     // ─── Product ↔ Ingredients assignment ─────────────────────────────────────
@@ -633,7 +709,7 @@ class MenuBuilder extends Component
     {
         $this->piProductId = $productId;
         $product = Product::with('ingredients')->findOrFail($productId);
-        $this->piIngredientIds  = $product->ingredients->pluck('id')->map(fn($v) => (string) $v)->toArray();
+        $this->piIngredientIds = $product->ingredients->pluck('id')->map(fn ($v) => (string) $v)->toArray();
         $this->piMinIngredients = (string) ($product->min_ingredients ?? 0);
         $this->piMaxIngredients = (string) ($product->max_ingredients ?? 6);
         $this->showProductIngredientsModal = true;
@@ -672,10 +748,10 @@ class MenuBuilder extends Component
         $this->resetAreaForm();
         if ($id) {
             $area = PrintArea::findOrFail($id);
-            $this->editAreaId   = $area->id;
-            $this->areaName     = $area->name;
-            $this->areaDesc     = $area->description ?? '';
-            $this->areaColor    = $area->color;
+            $this->editAreaId = $area->id;
+            $this->areaName = $area->name;
+            $this->areaDesc = $area->description ?? '';
+            $this->areaColor = $area->color;
             $this->areaIsActive = $area->is_active;
         }
         $this->showAreaModal = true;
@@ -684,15 +760,15 @@ class MenuBuilder extends Component
     public function saveArea(): void
     {
         $this->validate([
-            'areaName'  => 'required|string|max:80',
+            'areaName' => 'required|string|max:80',
             'areaColor' => 'required|string|max:20',
         ]);
 
         $data = [
-            'name'        => $this->areaName,
+            'name' => $this->areaName,
             'description' => $this->areaDesc ?: null,
-            'color'       => $this->areaColor,
-            'is_active'   => $this->areaIsActive,
+            'color' => $this->areaColor,
+            'is_active' => $this->areaIsActive,
         ];
 
         if ($this->editAreaId) {
@@ -728,10 +804,10 @@ class MenuBuilder extends Component
 
     private function resetAreaForm(): void
     {
-        $this->editAreaId   = null;
-        $this->areaName     = '';
-        $this->areaDesc     = '';
-        $this->areaColor    = '#696cff';
+        $this->editAreaId = null;
+        $this->areaName = '';
+        $this->areaDesc = '';
+        $this->areaColor = '#696cff';
         $this->areaIsActive = true;
     }
 

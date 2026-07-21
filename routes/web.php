@@ -2,11 +2,14 @@
 
 use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Admin\UserList;
+use App\Livewire\Admin\KioskSettings;
+use App\Livewire\Admin\BusinessSettingsManager;
 use App\Livewire\Caja\CorteDetalle;
 use App\Livewire\Caja\CorteHistorial;
 use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\Dashboard as CajaDashboard;
 use App\Livewire\Dashboard;
+use App\Livewire\Delivery\DeliveryBoard;
 use App\Livewire\Menu\MenuBuilder;
 use App\Livewire\Mesas\GestionMesas;
 use App\Livewire\Mesas\MesaOrden;
@@ -14,32 +17,46 @@ use App\Livewire\Mesas\MesaOrdenes;
 use App\Livewire\Mesas\SplitCuenta;
 use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
+use App\Livewire\Orders\SalesHistory;
 use App\Livewire\Pos\PointOfSale;
+use App\Livewire\Kiosk\OrderTracking;
+use App\Livewire\Kiosk\OrderWizard;
 use App\Livewire\Reservas\CalendarioReservas;
 use App\Models\Order;
 use App\Models\Reservation;
+use App\Services\ThermalTicketRenderer;
+use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\PreventBackHistory;
+use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
 
+Route::get('/kiosco/{token}', OrderWizard::class)->name('kiosk.order');
+Route::get('/pedido/{publicToken}', OrderTracking::class)->name('kiosk.track');
+
 // Admin panel - requires auth
-Route::middleware(['auth', 'verified'])->prefix('app')->name('app.')->group(function () {
+Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class, RequireOpenCashRegisterForConfiguredModules::class, 'verified'])->prefix('app')->name('app.')->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/usuarios', UserList::class)->name('usuarios');
+    Route::get('/usuarios', UserList::class)->middleware('can:ver usuarios')->name('usuarios');
     Route::get('/roles-permisos', RolePermissionManager::class)->name('roles-permisos');
+    Route::get('/kioscos', KioskSettings::class)->middleware('can:gestionar kioscos')->name('kioscos');
+    Route::get('/configuracion-negocio', BusinessSettingsManager::class)->name('configuracion-negocio');
+    Route::get('/configuracion-negocio/menu-items', BusinessSettingsManager::class)->name('configuracion-negocio.menu');
     Route::get('/constructor-menu', MenuBuilder::class)->name('constructor-menu');
     Route::get('/ordenes', OrderList::class)->name('ordenes');
+    Route::get('/historial-ventas', SalesHistory::class)->name('historial-ventas');
     Route::get('/ordenes/{order}', OrderDetail::class)->name('ordenes.show');
     Route::get('/pos', PointOfSale::class)->name('pos');
+    Route::get('/delivery', DeliveryBoard::class)->middleware('can:ver delivery')->name('delivery');
     Route::get('/caja', CajaDashboard::class)->name('caja');
     Route::get('/caja/corte', CorteDeCaja::class)->name('caja.corte');
     Route::get('/caja/{id}/corte', CorteDeCaja::class)->name('caja.corte.id');
     Route::get('/caja/cortes', CorteHistorial::class)->name('caja.cortes');
     Route::get('/caja/cortes/{cut}', CorteDetalle::class)->name('caja.corte.detalle');
-    Route::get('/caja/cut/{cut}/print', function (\App\Models\CashRegisterCut $cut) {
-        $cut->load('cashRegister', 'generator');
-        return view('print.ticket-corte', compact('cut'));
+    Route::get('/caja/cut/{cut}/print', function (\App\Models\CashRegisterCut $cut, ThermalTicketRenderer $renderer) {
+        return response($renderer->renderCashCut($cut))->header('Content-Type', 'text/html; charset=UTF-8');
     })->name('caja.corte.print');
 
     // Mesas
@@ -63,35 +80,32 @@ Route::middleware(['auth', 'verified'])->prefix('app')->name('app.')->group(func
 });
 
 // Print ticket routes (auth required, open in new window)
-Route::middleware(['auth'])->prefix('print')->name('print.')->group(function () {
-    Route::get('/cocina/{order}', function (Order $order, \Illuminate\Http\Request $request) {
-        $order->load(['items.addons', 'items.ingredients']);
-        return view('print.ticket-cocina', ['order' => $order, 'printArea' => $request->query('area')]);
+Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class])->prefix('print')->name('print.')->group(function () {
+    Route::get('/cocina/{order}', function (Order $order, Request $request, ThermalTicketRenderer $renderer) {
+        return response($renderer->renderOrder($order, 'kitchen_area', $request->query('area')))
+            ->header('Content-Type', 'text/html; charset=UTF-8');
     })->name('cocina');
 
-    Route::get('/ventanilla/{order}', function (Order $order) {
-        $order->load(['items.addons', 'items.ingredients', 'seller', 'payments']);
-        return view('print.ticket-ventanilla', compact('order'));
+    Route::get('/ventanilla/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
+        return response($renderer->renderOrder($order, 'counter'))->header('Content-Type', 'text/html; charset=UTF-8');
     })->name('ventanilla');
 
-    Route::get('/delivery/{order}', function (Order $order) {
-        $order->load(['items.addons', 'items.ingredients', 'customer']);
-        return view('print.ticket-delivery', compact('order'));
+    Route::get('/delivery/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
+        return response($renderer->renderOrder($order, 'delivery'))->header('Content-Type', 'text/html; charset=UTF-8');
     })->name('delivery');
 
-    Route::get('/cliente/{order}', function (Order $order) {
-        $order->load(['items.addons', 'items.ingredients']);
-        return view('print.ticket-cliente', compact('order'));
+    Route::get('/cliente/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
+        return response($renderer->renderOrder($order, 'customer'))->header('Content-Type', 'text/html; charset=UTF-8');
     })->name('cliente');
 });
 
 // Legacy dashboard route redirects to /app
 Route::get('dashboard', function () {
     return redirect()->route('app.dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class, 'verified'])->name('dashboard');
 
 Route::view('profile', 'profile')
-    ->middleware(['auth'])
+    ->middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class])
     ->name('profile');
 
 require __DIR__.'/auth.php';

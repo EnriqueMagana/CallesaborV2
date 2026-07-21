@@ -3,7 +3,10 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Models\BusinessSetting;
+use App\Livewire\Layout\AdminNavbar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
 
@@ -13,11 +16,20 @@ class AuthenticationTest extends TestCase
 
     public function test_login_screen_can_be_rendered(): void
     {
+        BusinessSetting::current()->update([
+            'business_name' => 'Restaurante Prueba',
+            'platform_name' => 'Panel Prueba',
+            'phone' => '5551234567',
+        ]);
+
         $response = $this->get('/login');
 
         $response
             ->assertOk()
-            ->assertSeeVolt('pages.auth.login');
+            ->assertSeeVolt('pages.auth.login')
+            ->assertSee('Panel Prueba')
+            ->assertSee('Restaurante Prueba')
+            ->assertSee('5551234567');
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void
@@ -82,5 +94,33 @@ class AuthenticationTest extends TestCase
             ->assertRedirect('/');
 
         $this->assertGuest();
+    }
+
+    public function test_admin_logout_uses_one_livewire_action_and_redirects_to_login(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(AdminNavbar::class)
+            ->call('logout')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('login'));
+
+        $this->assertGuest();
+    }
+
+    public function test_private_pages_are_not_cached_and_cannot_be_reopened_after_logout(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('app.dashboard'));
+
+        $response->assertOk();
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        Livewire::actingAs($user)->test(AdminNavbar::class)->call('logout');
+
+        $this->get(route('app.dashboard'))
+            ->assertRedirect(route('login'));
     }
 }

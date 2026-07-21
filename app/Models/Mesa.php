@@ -43,7 +43,8 @@ class Mesa extends Model
 
     public function activeOrders(): HasMany
     {
-        return $this->hasMany(Order::class)->whereIn('status', ['pendiente', 'en_preparacion']);
+        return $this->hasMany(Order::class)
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']);
     }
 
     public function splits(): HasMany
@@ -62,11 +63,11 @@ class Mesa extends Model
     {
         return match ($this->status) {
             'disponible' => '#22c55e',
-            'ocupada'    => '#3b82f6',
-            'reservada'  => '#8b5cf6',
-            'en_cuenta'  => '#f59e0b',
-            'bloqueada'  => '#6b7280',
-            default      => '#9ca3af',
+            'ocupada' => '#3b82f6',
+            'reservada' => '#8b5cf6',
+            'en_cuenta' => '#f59e0b',
+            'bloqueada' => '#6b7280',
+            default => '#9ca3af',
         };
     }
 
@@ -74,11 +75,11 @@ class Mesa extends Model
     {
         return match ($this->status) {
             'disponible' => 'Disponible',
-            'ocupada'    => 'Ocupada',
-            'reservada'  => 'Reservada',
-            'en_cuenta'  => 'En cuenta',
-            'bloqueada'  => 'Bloqueada',
-            default      => ucfirst($this->status),
+            'ocupada' => 'Ocupada',
+            'reservada' => 'Reservada',
+            'en_cuenta' => 'En cuenta',
+            'bloqueada' => 'Bloqueada',
+            default => ucfirst($this->status),
         };
     }
 
@@ -86,11 +87,11 @@ class Mesa extends Model
     {
         return match ($this->status) {
             'disponible' => 'bx-check-circle',
-            'ocupada'    => 'bx-user-check',
-            'reservada'  => 'bx-calendar',
-            'en_cuenta'  => 'bx-receipt',
-            'bloqueada'  => 'bx-lock',
-            default      => 'bx-circle',
+            'ocupada' => 'bx-user-check',
+            'reservada' => 'bx-calendar',
+            'en_cuenta' => 'bx-receipt',
+            'bloqueada' => 'bx-lock',
+            default => 'bx-circle',
         };
     }
 

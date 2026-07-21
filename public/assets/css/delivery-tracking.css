@@ -1,0 +1,96 @@
+.kiosk-tracking-hero.is-delivery:not(.is-cancelled) {
+    background: linear-gradient(145deg, #fff8f3, #ffffff 68%);
+    border-color: #efd9ce;
+}
+
+.kiosk-status-timeline.is-delivery {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.kiosk-status-timeline.is-delivery .kiosk-status-step strong {
+    font-size: clamp(.67rem, 1.8vw, .82rem);
+}
+
+.kiosk-tracking-delivery-card {
+    margin-bottom: 16px;
+    padding: 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    border: 1px solid #efd9ce;
+    border-radius: 18px;
+    background: #fff8f3;
+    color: #3b2a24;
+}
+
+.kiosk-tracking-delivery-card > span {
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    color: #a94327;
+    background: #ffe4d5;
+    font-size: 1.35rem;
+}
+
+.kiosk-tracking-delivery-card > div {
+    min-width: 0;
+    display: grid;
+}
+
+.kiosk-tracking-delivery-card small {
+    color: #80675d;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.kiosk-tracking-delivery-card strong {
+    margin-top: 3px;
+    font-size: 1rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.kiosk-tracking-delivery-card p {
+    margin: 5px 0 0;
+    color: #765f55;
+    font-size: .82rem;
+    line-height: 1.45;
+}
+
+@media (max-width: 680px) {
+    .kiosk-status-timeline.is-delivery {
+        padding: 14px 7px;
+        gap: 2px;
+    }
+
+    .kiosk-status-timeline.is-delivery .kiosk-status-step span {
+        width: 34px;
+        height: 34px;
+        font-size: .95rem;
+    }
+
+    .kiosk-status-timeline.is-delivery .kiosk-status-step strong {
+        font-size: .62rem;
+        line-height: 1.12;
+    }
+
+    .kiosk-tracking-delivery-card {
+        padding: 14px;
+    }
+}
+
+@media (max-width: 390px) {
+    .kiosk-status-timeline.is-delivery .kiosk-status-step span {
+        width: 30px;
+        height: 30px;
+    }
+
+    .kiosk-status-timeline.is-delivery .kiosk-status-step strong {
+        font-size: .56rem;
+    }
+}

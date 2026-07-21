@@ -5,6 +5,8 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -27,6 +29,9 @@ class User extends Authenticatable
         'password',
         'avatar',
         'phone',
+        'banned_at',
+        'banned_by',
+        'ban_reason',
     ];
 
     /**
@@ -52,6 +57,22 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'banned_at' => 'datetime',
         ];
+    }
+
+    public function bannedBy(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'banned_by')->withTrashed();
+    }
+
+    public function isBanned(): bool
+    {
+        return $this->banned_at !== null;
+    }
+
+    public function deliveryAssignments(): HasMany
+    {
+        return $this->hasMany(DeliveryAssignment::class, 'driver_id');
     }
 }

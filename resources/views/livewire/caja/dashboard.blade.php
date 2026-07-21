@@ -1,11 +1,27 @@
-<div class="container-xxl flex-grow-1 container-p-y">
+<div class="app-page cash-page">
 
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <div>
-            <h4 class="fw-bold mb-0">Caja</h4>
-            <small class="text-muted">Gestión de turno y apertura de caja</small>
+    @if(session('cash_register_required'))
+        <div class="cash-access-notice" role="alert">
+            <span><i class="bx bx-lock-alt" aria-hidden="true"></i></span>
+            <div><strong>Este acceso requiere una caja abierta</strong><p>{{ session('cash_register_required') }} Abre el turno para continuar.</p></div>
         </div>
-    </div>
+    @endif
+
+    <header class="app-page-header">
+        <div class="app-page-heading">
+            <span class="app-page-icon" aria-hidden="true"><i class="bx bx-wallet"></i></span>
+            <div>
+                <div class="app-eyebrow">Operación · Efectivo</div>
+                <h1 class="app-page-title">Caja</h1>
+                <p class="app-page-subtitle">Controla la apertura del turno, el efectivo disponible y el cierre de caja.</p>
+            </div>
+        </div>
+        @if($this->activeRegister)
+            <span class="app-status app-status--success"><i class="bx bx-check-circle" aria-hidden="true"></i>Turno activo</span>
+        @else
+            <span class="app-status app-status--warning"><i class="bx bx-lock" aria-hidden="true"></i>Caja cerrada</span>
+        @endif
+    </header>
 
     @if ($this->activeRegister)
         {{-- Caja activa --}}
@@ -23,25 +39,25 @@
 
         <div class="row g-4 mb-4">
             <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
+                <div class="card app-card cash-summary-card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center gap-3 mb-3">
                             <span class="badge bg-label-success p-2"><i class="bx bx-dollar-circle fs-5"></i></span>
                             <div>
-                                <p class="mb-0 text-muted" style="font-size:.75rem">CAJA ACTIVA</p>
+                                <p class="mb-0 text-muted" data-ui="xui-1l0qd0m">CAJA ACTIVA</p>
                                 <h6 class="mb-0 fw-bold">{{ $reg->name }}</h6>
                             </div>
                             <span class="badge bg-success ms-auto">Abierta</span>
                         </div>
-                        <div class="d-flex justify-content-between text-muted" style="font-size:.8rem">
+                        <div class="d-flex justify-content-between text-muted" data-ui="xui-19cyg9q">
                             <span>Apertura</span>
                             <span class="fw-semibold text-dark">{{ $reg->opened_at->format('d/m/Y g:i A') }}</span>
                         </div>
-                        <div class="d-flex justify-content-between text-muted mt-1" style="font-size:.8rem">
+                        <div class="d-flex justify-content-between text-muted mt-1" data-ui="xui-19cyg9q">
                             <span>Fondo inicial</span>
                             <span class="fw-semibold text-dark">${{ number_format($reg->initial_amount, 2) }}</span>
                         </div>
-                        <div class="d-flex justify-content-between text-muted mt-1" style="font-size:.8rem">
+                        <div class="d-flex justify-content-between text-muted mt-1" data-ui="xui-19cyg9q">
                             <span>Abierta por</span>
                             <span class="fw-semibold text-dark">{{ $reg->opener->name }}</span>
                         </div>
@@ -50,22 +66,22 @@
             </div>
 
             <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
+                <div class="card app-card cash-summary-card h-100">
                     <div class="card-body text-center">
-                        <p class="text-muted mb-1" style="font-size:.75rem">PEDIDOS COBRADOS</p>
-                        <h2 class="fw-bold mb-0" style="color:var(--bs-primary)">{{ $ordersCount }}</h2>
-                        <p class="text-muted mt-1" style="font-size:.78rem">en este turno</p>
+                        <p class="text-muted mb-1" data-ui="xui-1l0qd0m">PEDIDOS COBRADOS</p>
+                        <h2 class="fw-bold mb-0" data-ui="xui-1x4f9ki">{{ $ordersCount }}</h2>
+                        <p class="text-muted mt-1" data-ui="xui-op3n57">en este turno</p>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-4">
-                <div class="card border-0 shadow-sm h-100">
+                <div class="card app-card cash-summary-card h-100">
                     <div class="card-body text-center">
-                        <p class="text-muted mb-1" style="font-size:.75rem">EFECTIVO ESTIMADO EN CAJA</p>
+                        <p class="text-muted mb-1" data-ui="xui-1l0qd0m">EFECTIVO ESTIMADO EN CAJA</p>
                         <h2 class="fw-bold mb-0 text-success">${{ number_format($reg->initial_amount + $cashIn, 2) }}
                         </h2>
-                        <p class="text-muted mt-1" style="font-size:.78rem">fondo + ventas en efectivo</p>
+                        <p class="text-muted mt-1" data-ui="xui-op3n57">fondo + ventas en efectivo</p>
                     </div>
                 </div>
             </div>
@@ -83,14 +99,14 @@
         {{-- Sin caja activa — formulario de apertura --}}
         <div class="row justify-content-center">
             <div class="col-md-5">
-                <div class="card shadow-sm border-0">
+                <div class="card app-card cash-open-card">
                     <div class="card-body p-4">
                         <div class="text-center mb-4">
-                            <span class="badge bg-label-warning p-3 mb-2" style="border-radius:50%">
-                                <i class="bx bx-lock-open-alt" style="font-size:1.6rem"></i>
+                            <span class="badge bg-label-warning p-3 mb-2" data-ui="xui-18kfxku">
+                                <i class="bx bx-lock-open-alt" data-ui="xui-4xrukp"></i>
                             </span>
                             <h5 class="fw-bold mb-1">Apertura de caja</h5>
-                            <p class="text-muted" style="font-size:.82rem">No hay ninguna caja activa. Registra el turno
+                            <p class="text-muted" data-ui="xui-1fzausk">No hay ninguna caja activa. Registra el turno
                                 para comenzar.</p>
                         </div>
 

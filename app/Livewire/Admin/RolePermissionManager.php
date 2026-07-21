@@ -30,7 +30,7 @@ class RolePermissionManager extends Component
 
     // ── Módulos / grupos disponibles ──────────────────────────────────
     public array $groups = [
-        'usuarios', 'menu', 'ordenes', 'mesas', 'caja', 'reportes', 'configuracion',
+        'usuarios', 'menu', 'ordenes', 'mesas', 'caja', 'reportes', 'configuracion', 'kiosco',
     ];
 
     // ── Computed ──────────────────────────────────────────────────────
@@ -85,6 +85,8 @@ class RolePermissionManager extends Component
         ]);
 
         if ($this->rolePanel) {
+            abort_if(in_array($this->selectedRole->name, ['owner', 'super-admin'], true)
+                && $this->roleName !== $this->selectedRole->name, 403);
             // Editar
             $this->selectedRole->update(['name' => $this->roleName]);
             $this->selectedRole->syncPermissions($this->rolePermissions);
@@ -103,6 +105,7 @@ class RolePermissionManager extends Component
     public function confirmDeleteRole(int $id): void
     {
         $role = Role::find($id);
+        abort_if($role && in_array($role->name, ['owner', 'super-admin', 'admin'], true), 403);
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar rol',
@@ -115,7 +118,9 @@ class RolePermissionManager extends Component
 
     public function deleteRole(int $id): void
     {
-        Role::find($id)?->delete();
+        $role = Role::find($id);
+        abort_if($role && in_array($role->name, ['owner', 'super-admin', 'admin'], true), 403);
+        $role?->delete();
         $this->closeRolePanel();
         $this->dispatch('notify', type: 'success', message: 'Rol eliminado.');
     }

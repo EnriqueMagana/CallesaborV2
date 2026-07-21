@@ -1,12 +1,12 @@
 <div class="pos-header">
     <div class="pos-header-left">
         <div class="pos-logo">
-            <img src="{{ asset('assets/img/favicon/favicon.ico') }}" alt=""
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-            <i class="bx bx-restaurant" style="display:none;font-size:1.2rem"></i>
+            <img class="pos-logo-img" src="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}" alt="Logo de {{ $businessSettings?->business_name ?? config('app.name') }}"
+                 onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+            <i class="bx bx-restaurant" data-ui="xui-1v6ktfg" hidden></i>
         </div>
         <div class="pos-header-info">
-            <span class="brand-name">{{ config('app.name') }}</span>
+            <span class="brand-name">{{ $businessSettings?->platform_name ?? config('app.name') }}</span>
             <span class="brand-sub">Punto de Venta</span>
         </div>
     </div>
@@ -19,7 +19,11 @@
             <i class="bx bx-calculator"></i>
             <span>Caja</span>
         </a>
-        <div style="display:flex;align-items:center;gap:6px;background:rgba(113,221,55,.1);border:1px solid rgba(113,221,55,.3);border-radius:8px;padding:5px 10px;font-size:.78rem;font-weight:700;color:#2d9a1e">
+        <button type="button" class="btn-header-action btn-header-expense" wire:click="openExpenseModal" aria-label="Registrar un gasto">
+            <i class="bx bx-wallet"></i>
+            <span>Registrar gasto</span>
+        </button>
+        <div data-ui="xui-h2y0md">
             <i class="bx bx-lock-open-alt"></i>
             <span>{{ $this->activeCashRegister->name }}</span>
         </div>

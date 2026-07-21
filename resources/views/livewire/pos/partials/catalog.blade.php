@@ -4,7 +4,7 @@
         <div class="search-wrap">
             <i class="bx bx-search si-icon"></i>
             <input type="text" wire:model.live.debounce.250ms="productSearch"
-                   class="pos-input" placeholder="Buscar platillo…" style="padding-left:32px">
+                   class="pos-input" placeholder="Buscar platillo…" data-ui="xui-zoq5gj">
         </div>
     </div>
 
@@ -75,9 +75,9 @@
         @endforeach
 
         @if($this->categoriesWithProducts->isEmpty() && $this->productsWithoutCategory->isEmpty())
-            <div style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--pos-muted)">
-                <i class="bx bx-food-menu" style="font-size:3rem;display:block;margin-bottom:8px;opacity:.3"></i>
-                <div style="font-size:.85rem">No hay productos disponibles</div>
+            <div data-ui="xui-12u9f6v">
+                <i class="bx bx-food-menu" data-ui="xui-u3h3fd"></i>
+                <div data-ui="xui-1ml6c8v">No hay productos disponibles</div>
             </div>
         @endif
     </div>

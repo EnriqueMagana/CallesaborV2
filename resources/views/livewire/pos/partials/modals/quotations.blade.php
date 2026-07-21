@@ -2,38 +2,38 @@
 <div class="pos-modal-wrap show" wire:click.self="$set('showQuotationsModal',false)">
     <div class="pos-modal" @click.stop>
         <div class="modal-header-pos">
-            <i class="bx bx-bookmark" style="font-size:1.2rem;color:var(--pos-accent)"></i>
-            <h4>Cotizaciones guardadas</h4>
-            <button wire:click="$set('showQuotationsModal',false)" class="pos-btn pos-btn-secondary" style="padding:4px 8px"><i class="bx bx-x"></i></button>
+            <i class="bx bx-bookmark" data-ui="xui-zbum5m"></i>
+            <h4>Pedidos guardados</h4>
+            <button wire:click="$set('showQuotationsModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
         </div>
         <div class="modal-body-pos">
             @forelse($this->quotations as $q)
-                <div style="background:var(--pos-bg);border:1px solid var(--pos-border);border-radius:var(--pos-radius);padding:12px 14px;margin-bottom:8px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-                        <span style="font-size:.85rem;font-weight:700;color:var(--pos-text)">{{ $q->display_name }}</span>
-                        <span style="font-size:.9rem;font-weight:800;color:var(--pos-accent)">${{ number_format($q->total,2) }}</span>
+                <div data-ui="xui-qgnhtb">
+                    <div data-ui="xui-kfq101">
+                        <span data-ui="xui-pt1n3">{{ $q->display_name }}</span>
+                        <span data-ui="xui-18m4gf1">${{ number_format($q->total,2) }}</span>
                     </div>
-                    @if($q->customer_name)<div style="font-size:.75rem;color:var(--pos-muted)"><i class="bx bx-user me-1"></i>{{ $q->customer_name }}</div>@endif
-                    <div style="font-size:.72rem;color:var(--pos-muted);margin-top:2px">{{ $q->created_at->diffForHumans() }}</div>
-                    <div style="display:flex;gap:6px;margin-top:8px">
-                        <button wire:click="loadQuotation({{ $q->id }})" class="pos-btn pos-btn-primary" style="flex:1;justify-content:center;font-size:.78rem;padding:6px">
+                    @if($q->customer_name)<div data-ui="xui-y4gxmi"><i class="bx bx-user me-1"></i>{{ $q->customer_name }}</div>@endif
+                    <div data-ui="xui-14yui1o">{{ $q->created_at->diffForHumans() }}</div>
+                    <div data-ui="xui-6889c4">
+                        <button wire:click="loadQuotation({{ $q->id }})" class="pos-btn pos-btn-primary" data-ui="xui-1lde97g">
                             <i class="bx bx-upload"></i> Cargar
                         </button>
-                        <button wire:click="deleteQuotation({{ $q->id }})" onclick="return confirm('¿Eliminar cotización?')"
-                                class="pos-btn pos-btn-secondary" style="padding:6px 10px;font-size:.78rem">
+                        <button wire:click="deleteQuotation({{ $q->id }})" onclick="return confirm('¿Eliminar pedido guardado?')"
+                                class="pos-btn pos-btn-secondary" data-ui="xui-8475pq">
                             <i class="bx bx-trash"></i>
                         </button>
                     </div>
                 </div>
             @empty
-                <div style="text-align:center;padding:40px 20px;color:var(--pos-muted)">
-                    <i class="bx bx-bookmark" style="font-size:2.5rem;display:block;margin-bottom:8px;opacity:.3"></i>
-                    <span style="font-size:.82rem">No hay cotizaciones guardadas</span>
+                <div data-ui="xui-ggsjjx">
+                    <i class="bx bx-bookmark" data-ui="xui-qcmw2v"></i>
+                    <span data-ui="xui-1fzausk">No hay pedidos guardados</span>
                 </div>
             @endforelse
         </div>
         <div class="modal-footer-pos">
-            <button wire:click="$set('showQuotationsModal',false)" class="pos-btn pos-btn-secondary" style="width:100%;justify-content:center">Cerrar</button>
+            <button wire:click="$set('showQuotationsModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-12o4wxl">Cerrar</button>
         </div>
     </div>
 </div>
@@ -43,13 +43,13 @@
 <div class="pos-modal-wrap show" wire:click.self="$set('showSaveQuotationModal',false)">
     <div class="pos-modal" @click.stop>
         <div class="modal-header-pos">
-            <i class="bx bx-save" style="font-size:1.2rem;color:var(--pos-accent)"></i>
-            <h4>Guardar cotización</h4>
-            <button wire:click="$set('showSaveQuotationModal',false)" class="pos-btn pos-btn-secondary" style="padding:4px 8px"><i class="bx bx-x"></i></button>
+            <i class="bx bx-save" data-ui="xui-zbum5m"></i>
+            <h4>Guardar pedido</h4>
+            <button wire:click="$set('showSaveQuotationModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
         </div>
         <div class="modal-body-pos">
-            <div style="margin-bottom:12px">
-                <label class="co-label">Nombre de la cotización</label>
+            <div data-ui="xui-n3c866">
+                <label class="co-label">Nombre o referencia</label>
                 <input type="text" wire:model="quotationName" class="co-input" placeholder="Ej: Cumpleaños Carlos">
             </div>
             <div>

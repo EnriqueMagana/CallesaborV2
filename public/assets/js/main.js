@@ -12,6 +12,48 @@
 window._sneatMenu = window._sneatMenu || null;
 window._sneatAnimate = window._sneatAnimate || false;
 
+// Parent modules are controlled through delegation so they keep working after
+// Livewire replaces the sidebar DOM during wire:navigate transitions.
+if (!window._sidebarParentToggleBound) {
+  window._sidebarParentToggleBound = true;
+  document.addEventListener('click', function (event) {
+    const toggle = event.target.closest('#layout-menu .sidebar-parent-toggle');
+    if (!toggle) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const item = toggle.closest('.menu-item');
+    if (!item || !item.querySelector(':scope > .menu-sub')) return;
+
+    const willOpen = !item.classList.contains('open');
+    const siblings = item.parentElement
+      ? item.parentElement.querySelectorAll(':scope > .menu-item.open')
+      : [];
+
+    if (willOpen) {
+      siblings.forEach(function (sibling) {
+        if (sibling === item) return;
+        sibling.classList.remove('open', 'menu-item-animating', 'menu-item-closing');
+        sibling.style.removeProperty('height');
+        sibling.style.removeProperty('overflow');
+        const siblingToggle = sibling.querySelector(':scope > .sidebar-parent-toggle');
+        if (siblingToggle) siblingToggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    item.classList.remove('menu-item-animating', 'menu-item-closing');
+    item.classList.toggle('open', willOpen);
+    item.style.removeProperty('height');
+    item.style.removeProperty('overflow');
+    toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+
+    if (window._sneatMenu && typeof window._sneatMenu.update === 'function') {
+      window._sneatMenu.update();
+    }
+  }, true);
+}
+
 (function () {
   // Initialize menu
   //-----------------

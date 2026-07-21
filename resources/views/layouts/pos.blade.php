@@ -5,11 +5,11 @@
       data-template="vertical-menu-template-free">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>POS — {{ config('app.name') }}</title>
+<title>POS — {{ $businessSettings?->platform_name ?? config('app.name') }}</title>
 
-<link rel="icon" type="image/x-icon" href="{{ asset('assets/img/favicon/favicon.ico') }}"/>
+<link rel="icon" href="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}"/>
 
 <!-- Fonts (misma que el tema) -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -23,7 +23,10 @@
 <link rel="stylesheet" href="{{ asset('assets/vendor/css/core.css') }}" class="template-customizer-core-css"/>
 <link rel="stylesheet" href="{{ asset('assets/vendor/css/theme-default.css') }}" class="template-customizer-theme-css"/>
 <link rel="stylesheet" href="{{ asset('assets/css/demo.css') }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/pos.css') }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/pos.css') }}?v={{ filemtime(public_path('assets/css/pos.css')) }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/pos-modern.css') }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}"/>
 
 <!-- Helpers -->
 <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
@@ -31,30 +34,7 @@
 
 @livewireStyles
 
-<style>
-html, body { height: 100%; overflow: hidden; margin: 0; }
 
-#pos-loading-screen {
-    position: fixed; inset: 0; z-index: 99999;
-    background: #fff;
-    display: flex; align-items: center; justify-content: center;
-    flex-direction: column; gap: 14px;
-    transition: opacity .3s ease;
-}
-#pos-loading-screen.fade-out { opacity: 0; pointer-events: none; }
-#pos-loading-spinner {
-    width: 40px; height: 40px;
-    border: 3px solid rgba(105,108,255,.2);
-    border-top-color: #696cff;
-    border-radius: 50%;
-    animation: pos-spin .7s linear infinite;
-}
-#pos-loading-screen span {
-    font-family: 'Public Sans', sans-serif;
-    font-size: .82rem; color: #9395a5; font-weight: 500;
-}
-@keyframes pos-spin { to { transform: rotate(360deg); } }
-</style>
 </head>
 <body>
 <div id="pos-loading-screen">
@@ -69,7 +49,6 @@ html, body { height: 100%; overflow: hidden; margin: 0; }
 <script src="{{ asset('assets/vendor/libs/jquery/jquery.js') }}"></script>
 <script src="{{ asset('assets/vendor/libs/popper/popper.js') }}"></script>
 <script src="{{ asset('assets/vendor/js/bootstrap.js') }}"></script>
-<script src="{{ asset('assets/vendor/js/menu.js') }}"></script>
 <script src="{{ asset('assets/js/main.js') }}"></script>
 
 @livewireScripts

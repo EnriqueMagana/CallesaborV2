@@ -5,7 +5,7 @@
 
     {{-- Flash --}}
     @if(session('success'))
-        <div class="mesas-toast" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)">
+        <div class="mesas-toast" role="status" aria-live="polite" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 4000)">
             <i class="bx bx-check-circle"></i> {{ session('success') }}
         </div>
     @endif
@@ -13,7 +13,7 @@
     {{-- ══════════════════ HEADER ══════════════════ --}}
     <div class="mesas-page-header">
         <div class="mesas-page-title">
-            <a href="{{ route('app.mesas') }}" class="btn btn-icon btn-outline-secondary me-2" wire:navigate>
+            <a href="{{ route('app.mesas') }}" class="btn btn-icon btn-outline-secondary me-2" wire:navigate aria-label="Volver a mesas">
                 <i class="bx bx-arrow-back"></i>
             </a>
             <i class="bx bx-split mesas-page-icon" style="color:#696cff"></i>
@@ -36,13 +36,12 @@
             <div class="split-confirmed-header">
                 <i class="bx bx-check-circle text-success" style="font-size:2rem"></i>
                 <div>
-                    <h5 class="mb-0">Split confirmado · Mesa {{ $this->mesa->number }}</h5>
-                    <small class="text-muted">Marca cada cuenta como cobrada al recibir el pago.</small>
+                    <h5 class="mb-0">Split enviado a caja · Mesa {{ $this->mesa->number }}</h5>
+                    <small class="text-muted">Cada subcuenta se cobrará por separado en POS → Cobrar mesas. La mesa se libera al pagar la última.</small>
                 </div>
                 @php $anyPaid = collect($accounts)->contains(fn($a) => $a['paid']); @endphp
                 @if(!$anyPaid)
-                <button class="btn btn-outline-secondary btn-sm ms-auto" wire:click="cancelConfirm"
-                        wire:confirm="¿Cancelar el split y volver a editar?">
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" wire:click="requestCancelConfirm">
                     <i class="bx bx-edit me-1"></i> Editar split
                 </button>
                 @endif
@@ -66,7 +65,7 @@
                     @foreach($assignedItems as $item)
                         <div class="detail-item">
                             <span class="detail-item-qty">{{ $item->quantity }}×</span>
-                            <span class="detail-item-name">{{ $item->name }}</span>
+                            <span class="detail-item-name">{{ $item->product_name }}</span>
                             <span class="detail-item-price">${{ number_format($item->subtotal, 2) }}</span>
                         </div>
                     @endforeach
@@ -80,17 +79,7 @@
                 </div>
                 @endif
 
-                @if(!$account['paid'])
-                    @can('cobrar mesas')
-                    <button class="btn btn-success btn-sm mt-2 w-100" wire:click="markPaid({{ $idx }})">
-                        <i class="bx bx-check me-1"></i> Marcar como cobrada
-                    </button>
-                    @endcan
-                @else
-                    <div class="text-center text-success small mt-2 fw-semibold">
-                        <i class="bx bx-check-circle me-1"></i> Cobrada
-                    </div>
-                @endif
+                <div class="split-pay-waiting"><i class="bx bx-lock-alt"></i><span>Pendiente de cobro en POS</span></div>
             </div>
             @endforeach
         </div>
@@ -159,7 +148,7 @@
                                 <div class="split-item-row is-unassigned">
                                     <div class="split-item-info">
                                         <span class="split-item-qty">{{ $item->quantity }}×</span>
-                                        <span class="split-item-name">{{ $item->name }}</span>
+                                        <span class="split-item-name">{{ $item->product_name }}</span>
                                         <span class="split-item-price">${{ number_format($item->subtotal, 2) }}</span>
                                     </div>
                                     <div class="split-item-assign-btns">
@@ -182,7 +171,7 @@
                                     <div class="split-item-badge">{{ $idx + 1 }}</div>
                                     <div class="split-item-info">
                                         <span class="split-item-qty">{{ $item->quantity }}×</span>
-                                        <span class="split-item-name">{{ $item->name }}</span>
+                                        <span class="split-item-name">{{ $item->product_name }}</span>
                                         <span class="split-item-price">${{ number_format($item->subtotal, 2) }}</span>
                                     </div>
                                     <button class="split-unassign-btn" wire:click="unassignItem({{ $item->id }})"
@@ -200,7 +189,7 @@
                             <div class="split-item-row">
                                 <div class="split-item-info">
                                     <span class="split-item-qty">{{ $item->quantity }}×</span>
-                                    <span class="split-item-name">{{ $item->name }}</span>
+                                    <span class="split-item-name">{{ $item->product_name }}</span>
                                     <span class="split-item-price">${{ number_format($item->subtotal, 2) }}</span>
                                 </div>
                             </div>
@@ -227,8 +216,8 @@
                         <div class="split-acc-header">
                             <div class="split-acc-badge">{{ $idx + 1 }}</div>
                             <input type="text" class="split-acc-label-input"
-                                   value="{{ $account['label'] }}"
-                                   wire:change="updateAccountLabel({{ $idx }}, $event.target.value)">
+                                   wire:model.blur="accounts.{{ $idx }}.label"
+                                   aria-label="Nombre de la cuenta {{ $idx + 1 }}">
                             @if(count($accounts) > 2)
                                 <button class="split-acc-remove" wire:click="removeAccount({{ $idx }})" title="Eliminar cuenta">
                                     <i class="bx bx-x"></i>
@@ -244,7 +233,7 @@
                                 @else
                                     @foreach($accItems as $item)
                                         <div class="split-acc-item">
-                                            <span>{{ $item->quantity }}× {{ $item->name }}</span>
+                                            <span>{{ $item->quantity }}× {{ $item->product_name }}</span>
                                             <span>${{ number_format($item->subtotal, 2) }}</span>
                                         </div>
                                     @endforeach
@@ -290,7 +279,7 @@
 
                 <button class="btn btn-primary w-100 mt-3" wire:click="confirm" wire:loading.attr="disabled">
                     <span wire:loading wire:target="confirm" class="spinner-border spinner-border-sm me-1"></span>
-                    <i class="bx bx-check-circle me-1"></i> Confirmar y cobrar
+                    <i class="bx bx-send me-1"></i> Confirmar y enviar a caja
                 </button>
                 <a href="{{ route('app.mesas') }}" class="btn btn-outline-secondary w-100 mt-2" wire:navigate>
                     Cancelar
@@ -300,4 +289,17 @@
         </div>
     @endif
 
+    @if($showCancelConfirm)
+        <div class="mesas-modal-backdrop split-cancel-backdrop" wire:click.self="closeCancelConfirm">
+            <section class="mesas-modal mesas-modal--sm split-cancel-modal" role="dialog" aria-modal="true" aria-labelledby="split-cancel-title" wire:click.stop>
+                <div class="split-cancel-modal__icon"><i class="bx bx-edit-alt"></i></div>
+                <h5 id="split-cancel-title">¿Cancelar el split?</h5>
+                <p>Se eliminará la división actual y podrás volver a asignar los productos de la mesa.</p>
+                <div class="split-cancel-modal__actions">
+                    <button type="button" class="btn btn-outline-secondary" wire:click="closeCancelConfirm">Seguir con el split</button>
+                    <button type="button" class="btn btn-primary" wire:click="cancelConfirm" wire:loading.attr="disabled" wire:target="cancelConfirm"><i class="bx bx-edit me-1"></i>Volver a editar</button>
+                </div>
+            </section>
+        </div>
+    @endif
 </div>

@@ -1543,6 +1543,11 @@
         width: 36px; height: 36px;
         border-radius: 8px;
     }
+
+    .pos-logo-img {
+        width: 36px;
+        height: 36px;
+    }
     
     .pos-logo i {
         font-size: 1.2rem;
@@ -1991,3 +1996,28 @@
         grid-template-columns: 1fr;
     }
 }
+.btn-header-expense { color: #8b4d16; border-color: #f2d4a0; background: #fff8e8; }
+.btn-header-expense:hover { color: #74400e; border-color: #e8b861; background: #ffefc7; }
+/* Layout y pantalla de carga extraídos de layouts/pos.blade.php */
+html, body { height: 100%; overflow: hidden; margin: 0; }
+
+#pos-loading-screen {
+    position: fixed; inset: 0; z-index: 99999;
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px;
+    transition: opacity .3s ease;
+}
+#pos-loading-screen.fade-out { opacity: 0; pointer-events: none; }
+#pos-loading-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(105,108,255,.2);
+    border-top-color: #696cff;
+    border-radius: 50%;
+    animation: pos-spin .7s linear infinite;
+}
+#pos-loading-screen span {
+    font-family: 'Public Sans', sans-serif;
+    font-size: .82rem; color: #9395a5; font-weight: 500;
+}
+@keyframes pos-spin { to { transform: rotate(360deg); } }

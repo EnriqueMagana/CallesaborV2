@@ -9,9 +9,6 @@ new #[Layout('layouts.guest')] class extends Component
 {
     public LoginForm $form;
 
-    /**
-     * Handle an incoming authentication request.
-     */
     public function login(): void
     {
         $this->validate();
@@ -22,7 +19,6 @@ new #[Layout('layouts.guest')] class extends Component
 
         if ($requiresTwoFactor) {
             $this->redirectRoute('two-factor.login', navigate: true);
-
             return;
         }
 
@@ -30,48 +26,61 @@ new #[Layout('layouts.guest')] class extends Component
     }
 }; ?>
 
-<div>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+<div class="auth-login" x-data="{ showPassword: false }">
+    <header class="auth-login__header">
+        <span class="auth-login__eyebrow">Panel administrativo</span>
+        <h2>Bienvenido de nuevo</h2>
+        <p>Ingresa tus credenciales para continuar con tu turno.</p>
+    </header>
 
-    <form wire:submit="login">
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input wire:model="form.email" id="email" class="block mt-1 w-full" type="email" name="email" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('form.email')" class="mt-2" />
+    @if(session('status'))
+        <div class="auth-notice auth-notice--success" role="status">
+            <i class="bx bx-check-circle" aria-hidden="true"></i><span>{{ session('status') }}</span>
+        </div>
+    @endif
+
+    <form wire:submit="login" class="auth-form" novalidate>
+        <div class="auth-field {{ $errors->has('form.email') ? 'has-error' : '' }}">
+            <label for="email">Correo electrónico</label>
+            <div class="auth-input-wrap">
+                <i class="bx bx-envelope" aria-hidden="true"></i>
+                <input wire:model.blur="form.email" id="email" type="email" name="email" required autofocus autocomplete="username" placeholder="nombre@negocio.com" aria-describedby="email-help email-error">
+            </div>
+            <small id="email-help" class="auth-field__help">Usa el correo asignado por el administrador.</small>
+            @error('form.email')<p id="email-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
         </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input wire:model="form.password" id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('form.password')" class="mt-2" />
+        <div class="auth-field {{ $errors->has('form.password') ? 'has-error' : '' }}">
+            <div class="auth-field__label-row">
+                <label for="password">Contraseña</label>
+                @if(Route::has('password.request'))
+                    <a href="{{ route('password.request') }}" wire:navigate>¿Olvidaste tu contraseña?</a>
+                @endif
+            </div>
+            <div class="auth-input-wrap">
+                <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                <input wire:model="form.password" id="password" x-bind:type="showPassword ? 'text' : 'password'" name="password" required autocomplete="current-password" placeholder="Ingresa tu contraseña" aria-describedby="password-error">
+                <button type="button" class="auth-password-toggle" x-on:click="showPassword = !showPassword" x-bind:aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" x-bind:aria-pressed="showPassword">
+                    <i class="bx" x-bind:class="showPassword ? 'bx-hide' : 'bx-show'" aria-hidden="true"></i>
+                </button>
+            </div>
+            @error('form.password')<p id="password-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
         </div>
 
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember" class="inline-flex items-center">
-                <input wire:model="form.remember" id="remember" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-            </label>
-        </div>
+        <label class="auth-remember" for="remember">
+            <input wire:model="form.remember" id="remember" type="checkbox" name="remember">
+            <span aria-hidden="true"><i class="bx bx-check"></i></span>
+            <span>Mantener mi sesión iniciada en este dispositivo</span>
+        </label>
 
-        <div class="flex items-center justify-end mt-4">
-            @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}" wire:navigate>
-                    {{ __('Forgot your password?') }}
-                </a>
-            @endif
-
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
-        </div>
+        <button type="submit" class="auth-submit" wire:loading.attr="disabled" wire:target="login">
+            <span wire:loading.remove wire:target="login">Iniciar sesión <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
+            <span wire:loading.flex wire:target="login"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Verificando acceso…</span>
+        </button>
     </form>
+
+    <div class="auth-security-note">
+        <i class="bx bx-info-circle" aria-hidden="true"></i>
+        <p><strong>Acceso exclusivo para personal autorizado.</strong><span>Por seguridad, cierra sesión cuando termines tu turno.</span></p>
+    </div>
 </div>

@@ -1,35 +1,27 @@
-<div class="pos-toolbar-bottom">
-    <button class="tb-btn" @click="panels.mesas = true; $wire.$refresh()" title="Cobrar mesa">
-        <i class="bx bx-table"></i>
-        <span>Mesas</span>
-        @if($this->mesasPendientes->count() > 0)
-            <span class="badge-dot" style="background:#ef4444;width:auto;height:18px;min-width:18px;border-radius:9px;font-size:.65rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;top:4px;right:4px">
-                {{ $this->mesasPendientes->count() }}
-            </span>
-        @endif
+<nav class="pos-toolbar-bottom" aria-label="Áreas del punto de venta">
+    <button type="button" class="tb-btn tb-btn--window" :class="panels.pickup ? 'is-active' : ''"
+        @click="panels.pickup = true; $wire.$refresh()" aria-label="Abrir pedidos no pagados">
+        <span class="tb-btn__icon"><i class="bx bx-receipt"></i></span>
+        <span class="tb-btn__copy"><strong>Pedidos no pagados</strong><small>Ventanilla y recoger</small></span>
+        @if ($this->pickupOrders->count() > 0)<span class="tb-btn__badge">{{ $this->pickupOrders->count() }}</span>@endif
     </button>
-    <button class="tb-btn" @click="panels.pickup = true" wire:click="$refresh">
-        <i class="bx bx-store-alt"></i>
-        <span>Para recoger</span>
-        @if($this->pickupOrders->count() > 0)
-            <span class="badge-dot" style="background:#f59e0b"></span>
-        @endif
+
+    <button type="button" class="tb-btn tb-btn--tables" :class="panels.mesas ? 'is-active' : ''"
+        @click="panels.mesas = true; $wire.$refresh()" aria-label="Abrir cobro de mesas">
+        <span class="tb-btn__icon"><i class="bx bx-table"></i></span>
+        <span class="tb-btn__copy"><strong>Cobrar mesas</strong><small>Cuentas cerradas</small></span>
+        @if ($this->mesasPendientes->count() > 0)<span class="tb-btn__badge">{{ $this->mesasPendientes->count() }}</span>@endif
     </button>
-    <button class="tb-btn" wire:click="openExpenseModal">
-        <i class="bx bx-wallet"></i>
-        <span>Gastos</span>
+
+    <button type="button" class="tb-btn tb-btn--saved" :class="showSaved ? 'is-active' : ''"
+        @click="showSaved = true; $wire.$set('showQuotationsModal', true)" aria-label="Abrir pedidos guardados">
+        <span class="tb-btn__icon"><i class="bx bx-bookmark"></i></span>
+        <span class="tb-btn__copy"><strong>Pedidos guardados</strong><small>Carritos y notas</small></span>
     </button>
-    <button class="tb-btn" @click="panels.kitchen = true; $wire.$refresh()" title="Cocina" wire:poll.10s="$refresh">
-        <i class="bx bx-restaurant"></i>
-        <span>Cocina</span>
-        @if($this->kitchenPendingCount > 0)
-            <span class="badge-dot" style="background:#f59e0b;width:auto;height:18px;min-width:18px;border-radius:9px;font-size:.65rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;top:4px;right:4px">
-                {{ $this->kitchenPendingCount }}
-            </span>
-        @endif
+
+    <button type="button" class="tb-btn tb-btn--reprint" :class="panels.reprint ? 'is-active' : ''"
+        @click="panels.reprint = true; $wire.$refresh()" aria-label="Abrir reimpresión de tickets">
+        <span class="tb-btn__icon"><i class="bx bx-printer"></i></span>
+        <span class="tb-btn__copy"><strong>Reimpresión</strong><small>Cocina y cliente</small></span>
     </button>
-    <button class="tb-btn" @click="panels.reprint = true" wire:click="$refresh">
-        <i class="bx bx-printer"></i>
-        <span>Reimprimir</span>
-    </button>
-</div>
+</nav>
