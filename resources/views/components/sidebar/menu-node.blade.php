@@ -17,6 +17,11 @@
         </ul>
     </li>
 @elseif($item->type === 'link')
+    @php
+        // El POS usa un layout y una hoja de estilos propios. Debe entrar con
+        // carga completa para evitar que Livewire conserve el menú del admin.
+        $usesStandaloneLayout = $item->route_name === 'app.pos';
+    @endphp
     <li class="menu-item {{ $item->is_current ? 'active' : '' }} {{ $item->register_locked ? 'is-register-locked' : '' }}">
         @if($item->register_locked)
             <button type="button" class="menu-link sidebar-register-locked" disabled aria-label="{{ $item->label }}: requiere una caja abierta" title="Requiere una caja abierta">
@@ -24,7 +29,7 @@
                 <div>{{ $item->label }}</div><i class="bx bx-lock-alt sidebar-register-lock-icon" aria-hidden="true"></i>
             </button>
         @else
-            <a href="{{ $item->resolved_url }}" class="menu-link" @if($item->route_name) wire:navigate @endif>
+            <a href="{{ $item->resolved_url }}" class="menu-link" @if($item->route_name && ! $usesStandaloneLayout) wire:navigate @endif>
                 @if($item->icon)<i class="menu-icon tf-icons bx {{ $item->icon }}"></i>@endif
                 <div>{{ $item->label }}</div>
             </a>

@@ -3,7 +3,7 @@
     <div class="catalog-search-bar">
         <div class="search-wrap">
             <i class="bx bx-search si-icon"></i>
-            <input type="text" wire:model.live.debounce.250ms="productSearch"
+            <input type="text" wire:model.live.debounce.250ms="productSearch" aria-label="Buscar platillo"
                    class="pos-input" placeholder="Buscar platillo…" data-ui="xui-zoq5gj">
         </div>
     </div>
@@ -31,11 +31,12 @@
                     $cartQty   = $cartProductIds[$product->id] ?? 0;
                     $hasAddons = $product->addonGroups->count() > 0 || $product->ingredients->count() > 0;
                 @endphp
-                <div wire:click="openCustomizeModal({{ $product->id }})"
-                     class="prod-card {{ $inCart ? 'in-cart' : '' }}">
+                <button type="button" wire:click="openCustomizeModal({{ $product->id }})"
+                     class="prod-card {{ $inCart ? 'in-cart' : '' }}"
+                     aria-label="Agregar {{ $product->name }} por ${{ number_format($product->price, 2) }}">
                     <div class="prod-img">
                         @if($product->image)
-                            <img src="{{ asset('storage/'.$product->image) }}" alt="">
+                            <img src="{{ asset('storage/'.$product->image) }}" alt="{{ $product->name }}" loading="lazy">
                         @else
                             <i class="bx bx-dish no-img"></i>
                         @endif
@@ -46,7 +47,7 @@
                         <div class="prod-name">{{ $product->name }}</div>
                         <div class="prod-price">${{ number_format($product->price, 2) }}</div>
                     </div>
-                </div>
+                </button>
             @endforeach
         @endforeach
 
@@ -56,11 +57,12 @@
                 $cartQty   = $cartProductIds[$product->id] ?? 0;
                 $hasAddons = $product->addonGroups->count() > 0 || $product->ingredients->count() > 0;
             @endphp
-            <div wire:click="openCustomizeModal({{ $product->id }})"
-                 class="prod-card {{ $inCart ? 'in-cart' : '' }}">
+            <button type="button" wire:click="openCustomizeModal({{ $product->id }})"
+                 class="prod-card {{ $inCart ? 'in-cart' : '' }}"
+                 aria-label="Agregar {{ $product->name }} por ${{ number_format($product->price, 2) }}">
                 <div class="prod-img">
                     @if($product->image)
-                        <img src="{{ asset('storage/'.$product->image) }}" alt="">
+                        <img src="{{ asset('storage/'.$product->image) }}" alt="{{ $product->name }}" loading="lazy">
                     @else
                         <i class="bx bx-dish no-img"></i>
                     @endif
@@ -71,7 +73,7 @@
                     <div class="prod-name">{{ $product->name }}</div>
                     <div class="prod-price">${{ number_format($product->price, 2) }}</div>
                 </div>
-            </div>
+            </button>
         @endforeach
 
         @if($this->categoriesWithProducts->isEmpty() && $this->productsWithoutCategory->isEmpty())

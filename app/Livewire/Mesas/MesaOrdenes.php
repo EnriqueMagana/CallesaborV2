@@ -16,6 +16,8 @@ class MesaOrdenes extends Component
         $user = auth()->user();
         $assignment = $mesa->currentAssignment;
 
+        abort_unless($user?->can('ver mesas'), 403);
+
         if (!$user->hasAnyRole(['admin', 'super-admin', 'gerente', 'cajero'])) {
             if (!$assignment || $assignment->user_id !== $user->id) {
                 $this->redirect(route('app.mesas'));

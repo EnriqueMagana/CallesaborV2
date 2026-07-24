@@ -53,9 +53,12 @@
                     @if(!empty($res[$key]))
                         <div class="gs-group-label">{{ $group['label'] }}</div>
                         @foreach($res[$key] as $item)
+                            @php
+                                $usesStandaloneLayout = rtrim($item['url'], '/') === rtrim(route('app.pos'), '/');
+                            @endphp
                             <a href="{{ $item['url'] }}"
                                class="gs-item"
-                               wire:navigate
+                               @unless($usesStandaloneLayout) wire:navigate @endunless
                                @click="open = false; $wire.clear()">
                                 <span class="gs-item-icon" style="background:{{ $group['color'] }}1a;color:{{ $group['color'] }}">
                                     <i class="bx {{ $item['icon'] }}"></i>

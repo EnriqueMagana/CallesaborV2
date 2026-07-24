@@ -39,6 +39,11 @@ class OrderList extends Component
 
     public string $editStatus = '';
 
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->can('ver ordenes'), 403);
+    }
+
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -121,6 +126,36 @@ class OrderList extends Component
         ];
     }
 
+    #[Computed]
+    public function statusCounts(): array
+    {
+        $registerId = $this->activeCashRegister?->id;
+
+        if (! $registerId) {
+            return [
+                'pending' => 0,
+                'preparing' => 0,
+                'ready' => 0,
+                'completed' => 0,
+            ];
+        }
+
+        $counts = Order::query()
+            ->where('cash_register_id', $registerId)
+            ->selectRaw("SUM(CASE WHEN status = 'pendiente' THEN 1 ELSE 0 END) as pending")
+            ->selectRaw("SUM(CASE WHEN status = 'en_preparacion' THEN 1 ELSE 0 END) as preparing")
+            ->selectRaw("SUM(CASE WHEN status = 'lista' THEN 1 ELSE 0 END) as ready")
+            ->selectRaw("SUM(CASE WHEN status IN ('pagada', 'entregada') THEN 1 ELSE 0 END) as completed")
+            ->first();
+
+        return [
+            'pending' => (int) ($counts?->pending ?? 0),
+            'preparing' => (int) ($counts?->preparing ?? 0),
+            'ready' => (int) ($counts?->ready ?? 0),
+            'completed' => (int) ($counts?->completed ?? 0),
+        ];
+    }
+
     public function filterByChannel(string $channel): void
     {
         abort_unless(in_array($channel, ['', 'ventanilla', 'mesa', 'delivery', 'kiosk'], true), 422);
@@ -146,6 +181,7 @@ class OrderList extends Component
 
     public function openStatusModal(int $id): void
     {
+        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $order = Order::findOrFail($id);
         if ($order->status === 'cancelada') {
             $this->dispatch('notify', type: 'warning', message: 'No se puede cambiar el estado de una orden cancelada.');
@@ -159,6 +195,7 @@ class OrderList extends Component
 
     public function saveStatus(): void
     {
+        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $this->validate(['editStatus' => 'required|in:pendiente,en_preparacion,lista,pagada,cancelada']);
 
         $order = Order::findOrFail($this->editStatusOrderId);
@@ -179,6 +216,7 @@ class OrderList extends Component
 
     public function openCancelModal(int $id): void
     {
+        abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $this->cancelOrderId = $id;
         $this->cancelReason = '';
         $this->showCancelModal = true;
@@ -186,6 +224,7 @@ class OrderList extends Component
 
     public function confirmCancel(): void
     {
+        abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $this->validate(['cancelReason' => 'required|string|min:5|max:255']);
 
         Order::findOrFail($this->cancelOrderId)->update([
@@ -215,6 +254,7 @@ class OrderList extends Component
 
     public function confirmDeleteOrder(int $id): void
     {
+        abort_unless(auth()->user()?->can('eliminar ordenes'), 403);
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar orden',
@@ -226,6 +266,7 @@ class OrderList extends Component
 
     private function deleteOrder(int $id): void
     {
+        abort_unless(auth()->user()?->can('eliminar ordenes'), 403);
         Order::findOrFail($id)->delete();
         unset($this->orders);
         $this->dispatch('notify', type: 'danger', message: 'Orden eliminada permanentemente.');

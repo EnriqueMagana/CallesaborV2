@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Livewire\Menu\MenuBuilder;
 use App\Models\Ingredient;
+use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -12,6 +14,16 @@ use Tests\TestCase;
 class MenuIngredientConfigurationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $user = User::factory()->create();
+        $user->givePermissionTo(['ver menu', 'gestionar complementos']);
+        $this->actingAs($user);
+    }
 
     public function test_ingredient_catalog_keeps_compact_cards_and_renders_the_image(): void
     {

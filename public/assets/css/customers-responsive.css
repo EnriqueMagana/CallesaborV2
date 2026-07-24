@@ -1,0 +1,73 @@
+@media (max-width: 991.98px) {
+    .customers-table-scroll {
+        overflow: visible;
+    }
+
+    .customers-table {
+        display: block;
+        min-width: 0;
+    }
+
+    .customers-table thead {
+        display: none;
+    }
+
+    .customers-table tbody {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .customers-table tr {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding: 11px;
+        border: 1px solid var(--app-border);
+        border-radius: 14px;
+        background: #fff;
+    }
+
+    .customers-table td {
+        display: grid;
+        grid-template-columns: 105px minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 7px 4px;
+        border: 0;
+    }
+
+    .customers-table td::before {
+        content: attr(data-label);
+        color: var(--app-muted);
+        font-size: .62rem;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .customers-table td:first-child {
+        display: block;
+        padding-top: 2px;
+    }
+
+    .customers-table td:first-child::before,
+    .customers-table td:last-child::before {
+        display: none;
+    }
+
+    .customer-address {
+        max-width: none;
+    }
+
+    .customer-row-actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .customers-table tbody {
+        grid-template-columns: 1fr;
+    }
+}

@@ -40,11 +40,13 @@
                     <small class="text-muted">Cada subcuenta se cobrará por separado en POS → Cobrar mesas. La mesa se libera al pagar la última.</small>
                 </div>
                 @php $anyPaid = collect($accounts)->contains(fn($a) => $a['paid']); @endphp
+                @canany(['cancelar divisiones mesas', 'gestionar mesas'])
                 @if(!$anyPaid)
                 <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" wire:click="requestCancelConfirm">
                     <i class="bx bx-edit me-1"></i> Editar split
                 </button>
                 @endif
+                @endcanany
             </div>
 
             @foreach($accounts as $idx => $account)

@@ -13,6 +13,11 @@ class CorteHistorial extends Component
 
     public string $search = '';
 
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->can('ver caja'), 403);
+    }
+
     public function updatingSearch(): void
     {
         $this->resetPage();

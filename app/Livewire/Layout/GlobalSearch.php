@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
+use App\Services\SidebarModuleAccess;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -20,8 +21,9 @@ class GlobalSearch extends Component
             ['label' => 'Dashboard',           'icon' => 'bx-home-circle',    'route' => 'app.dashboard',        'keywords' => 'dashboard inicio home',                        'permission' => null],
             ['label' => 'Punto de Venta',      'icon' => 'bx-store-alt',      'route' => 'app.pos',              'keywords' => 'pos venta caja cobrar pedido',                  'permission' => 'crear ordenes'],
             ['label' => 'Mesas',                'icon' => 'bx-table',          'route' => 'app.mesas',            'keywords' => 'mesas salon terraza asignar waiter mesero',     'permission' => 'ver ordenes'],
-            ['label' => 'Reservaciones',       'icon' => 'bx-calendar-check', 'route' => 'app.reservas',         'keywords' => 'reservas calendario reservacion',               'permission' => 'ver ordenes'],
+            ['label' => 'Reservaciones',       'icon' => 'bx-calendar-check', 'route' => 'app.reservas',         'keywords' => 'reservas calendario reservacion',               'permission' => 'ver reservas'],
             ['label' => 'Órdenes',             'icon' => 'bx-receipt',        'route' => 'app.ordenes',          'keywords' => 'ordenes pedidos historial',                     'permission' => 'ver ordenes'],
+            ['label' => 'Mis clientes',        'icon' => 'bx-user-pin',       'route' => 'app.clientes',         'keywords' => 'clientes customer directorio telefono',          'permission' => 'ver clientes'],
             ['label' => 'Caja',                'icon' => 'bx-calculator',     'route' => 'app.caja',             'keywords' => 'caja apertura turno fondo',                     'permission' => 'ver caja'],
             ['label' => 'Cortes de caja',      'icon' => 'bx-history',        'route' => 'app.caja.cortes',      'keywords' => 'corte cierre historial caja',                   'permission' => 'cerrar caja'],
             ['label' => 'Constructor de Menú', 'icon' => 'bx-restaurant',     'route' => 'app.constructor-menu', 'keywords' => 'menu productos categorias ingredientes platos',  'permission' => 'ver menu'],
@@ -58,6 +60,9 @@ class GlobalSearch extends Component
             ->filter(function ($m) use ($lower, $user) {
                 // Primero verifica permiso
                 if ($m['permission'] !== null && !$this->can($m['permission'])) {
+                    return false;
+                }
+                if (! app(SidebarModuleAccess::class)->allows($user, $m['route'])) {
                     return false;
                 }
                 // Luego filtra por texto
@@ -97,9 +102,10 @@ class GlobalSearch extends Component
 
         // ── Clientes (requiere 'ver ordenes') ──
         $customers = [];
-        if ($this->can('ver ordenes')) {
+        if ($this->can('ver clientes') && app(SidebarModuleAccess::class)->allows($user, 'app.clientes')) {
             $customers = Customer::where('name', 'like', "%{$q}%")
                 ->orWhere('phone', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%")
                 ->take(3)
                 ->get()
                 ->map(fn($c) => [
@@ -107,14 +113,14 @@ class GlobalSearch extends Component
                     'label'       => $c->name,
                     'icon'        => 'bx-user-circle',
                     'description' => $c->phone ? 'Tel: '.$c->phone : 'Cliente',
-                    'url'         => route('app.ordenes').'?customer='.$c->id,
+                    'url'         => route('app.clientes'),
                 ])
                 ->toArray();
         }
 
-        // ── Reservaciones (requiere 'ver ordenes') ──
+        // ── Reservaciones ──
         $reservations = [];
-        if ($this->can('ver ordenes')) {
+        if ($this->can('ver reservas')) {
             $reservations = Reservation::where('customer_name', 'like', "%{$q}%")
                 ->orWhere('customer_phone', 'like', "%{$q}%")
                 ->latest('reserved_at')

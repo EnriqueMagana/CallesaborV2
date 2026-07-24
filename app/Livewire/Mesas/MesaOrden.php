@@ -38,6 +38,8 @@ class MesaOrden extends Component
         $assignment = $mesa->currentAssignment;
         $user       = auth()->user();
 
+        abort_unless($user?->can('ordenar mesas'), 403);
+
         if (!$user->hasAnyRole(['admin', 'super-admin', 'gerente', 'cajero'])) {
             if (!$assignment || $assignment->user_id !== $user->id) {
                 session()->flash('error', 'No tienes acceso a esta mesa.');
@@ -421,6 +423,8 @@ class MesaOrden extends Component
 
     public function placeOrder(): void
     {
+        $this->requirePermission('ordenar mesas');
+
         if (empty($this->cart)) {
             $this->addError('cart', 'Agrega al menos un producto.');
             return;
@@ -488,6 +492,8 @@ class MesaOrden extends Component
 
     public function closeMesa(): void
     {
+        $this->requirePermission('cerrar mesas');
+
         $mesa = Mesa::find($this->mesaId);
         if (!$mesa || $mesa->status !== 'ocupada') return;
 
@@ -499,6 +505,11 @@ class MesaOrden extends Component
     public function goBack(): void
     {
         $this->redirect(route('app.mesas'));
+    }
+
+    private function requirePermission(string $permission): void
+    {
+        abort_unless(auth()->user()?->can($permission), 403);
     }
 
     public function render()

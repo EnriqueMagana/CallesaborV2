@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\BusinessSettingsManager;
 use App\Models\BusinessSetting;
+use App\Models\CashRegister;
+use App\Models\CashRegisterCut;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\ThermalTicketRenderer;
@@ -122,6 +124,60 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringContainsString('Caja principal', $html);
         $this->assertStringContainsString('Diferencia', $html);
         $this->assertStringNotContainsString('<style', $html);
+    }
+
+    public function test_saved_cash_cut_template_controls_the_real_printed_document(): void
+    {
+        $user = User::factory()->create();
+        $register = CashRegister::create([
+            'name' => 'Caja Ticket Maker',
+            'opened_by' => $user->id,
+            'initial_amount' => 500,
+            'opened_at' => now()->subHours(8),
+            'closed_at' => now(),
+            'is_open' => false,
+            'closing_notes' => 'Cierre validado',
+        ]);
+        $cut = CashRegisterCut::create([
+            'cash_register_id' => $register->id,
+            'generated_by' => $user->id,
+            'folio' => 'COR-PRUEBA',
+            'v_efectivo' => 750,
+            'initial_amount' => 500,
+            'total_cash_in' => 750,
+            'expected_cash' => 1250,
+            'declared_cash' => 1240,
+            'difference' => -10,
+            'generated_at' => now(),
+        ]);
+
+        $template = TicketTemplate::current('cash_cut');
+        $template->update([
+            'paper_width_mm' => 58,
+            'font_size' => 15,
+            'margin_mm' => 2,
+            'footer_text' => 'CORTE CONFIGURADO EN TICKET MAKER',
+            'blocks' => [
+                ['key' => 'footer', 'label' => 'Pie del ticket', 'enabled' => true],
+                ['key' => 'cut_reconciliation', 'label' => 'Conciliación y diferencia', 'enabled' => true],
+                ['key' => 'header', 'label' => 'Encabezado y logo', 'enabled' => true],
+                ['key' => 'cut_sales_channels', 'label' => 'Ventas por canal', 'enabled' => false],
+            ],
+        ]);
+
+        $html = app(ThermalTicketRenderer::class)->renderCashCut($cut);
+
+        $this->assertStringContainsString('ticket-paper-58 ticket-font-15 ticket-margin-2', $html);
+        $this->assertStringNotContainsString('VENTAS POR CANAL', $html);
+        $this->assertStringContainsString('window.print()', $html);
+        $this->assertLessThan(
+            strpos($html, 'Diferencia'),
+            strpos($html, 'CORTE CONFIGURADO EN TICKET MAKER'),
+        );
+        $this->assertLessThan(
+            strpos($html, 'class="ticket-header"'),
+            strpos($html, 'class="ticket-cut-reconciliation"'),
+        );
     }
 
     public function test_public_kiosk_inherits_the_restaurant_name_and_logo(): void

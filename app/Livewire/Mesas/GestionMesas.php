@@ -12,6 +12,11 @@ use Livewire\Component;
 
 class GestionMesas extends Component
 {
+    public function mount(): void
+    {
+        $this->requirePermission('ver mesas');
+    }
+
     // ── UI State ──
     public string $tab = 'disponibles'; // disponibles | mis_mesas | kiosko | todas
 
@@ -20,6 +25,18 @@ class GestionMesas extends Component
     public ?int $areaFilter = null;
 
     public string $statusFilter = '';
+
+    public function applySearch(): void
+    {
+        $this->search = trim($this->search);
+        unset($this->mesas);
+    }
+
+    public function clearSearch(): void
+    {
+        $this->search = '';
+        unset($this->mesas);
+    }
 
     // ── Assign modal ──
     public bool $showAssignModal = false;
@@ -329,6 +346,7 @@ class GestionMesas extends Component
 
     public function openReassign(int $mesaId): void
     {
+        $this->requirePermission('reasignar mesas');
         $this->reassignMesaId = $mesaId;
         $this->reassignUserId = null;
         $this->reassignReason = '';
@@ -338,6 +356,7 @@ class GestionMesas extends Component
 
     public function confirmReassign(): void
     {
+        $this->requirePermission('reasignar mesas');
         $this->validate([
             'reassignUserId' => 'required|exists:users,id',
             'reassignReason' => 'nullable|string|max:255',
@@ -382,6 +401,7 @@ class GestionMesas extends Component
 
     public function openRelease(int $mesaId): void
     {
+        $this->requirePermission('liberar mesas');
         $this->releaseMesaId = $mesaId;
         $this->releaseReason = '';
         $this->showReleaseModal = true;
@@ -389,6 +409,7 @@ class GestionMesas extends Component
 
     public function confirmRelease(): void
     {
+        $this->requirePermission('liberar mesas');
         $mesa = Mesa::find($this->releaseMesaId);
         if (! $mesa) {
             return;
@@ -415,6 +436,7 @@ class GestionMesas extends Component
 
     public function closeMesa(int $mesaId): void
     {
+        $this->requirePermission('cerrar mesas');
         $mesa = Mesa::find($mesaId);
         if (! $mesa || $mesa->status !== 'ocupada') {
             return;
@@ -450,6 +472,7 @@ class GestionMesas extends Component
 
     public function goToOrden(int $mesaId): void
     {
+        $this->requirePermission('ordenar mesas');
         $this->redirect(route('app.mesas.ordenar', $mesaId));
     }
 
@@ -457,6 +480,8 @@ class GestionMesas extends Component
 
     public function openStatusChange(int $mesaId, string $status): void
     {
+        $this->requirePermission('cambiar estado mesas', 'gestionar mesas');
+        abort_unless(in_array($status, ['disponible', 'ocupada', 'reservada', 'en_cuenta', 'bloqueada'], true), 422);
         $this->statusMesaId = $mesaId;
         $this->newStatus = $status;
         $this->showStatusModal = true;
@@ -464,6 +489,8 @@ class GestionMesas extends Component
 
     public function confirmStatusChange(): void
     {
+        $this->requirePermission('cambiar estado mesas', 'gestionar mesas');
+        abort_unless(in_array($this->newStatus, ['disponible', 'ocupada', 'reservada', 'en_cuenta', 'bloqueada'], true), 422);
         $mesa = Mesa::find($this->statusMesaId);
         if (! $mesa) {
             return;
@@ -493,6 +520,7 @@ class GestionMesas extends Component
 
     public function openDetail(int $mesaId): void
     {
+        $this->requirePermission('ver mesas');
         $this->detailMesaId = $mesaId;
         $this->showDetailModal = true;
         unset($this->detailMesa);
@@ -502,6 +530,7 @@ class GestionMesas extends Component
 
     public function openGroupModal(?int $areaId = null): void
     {
+        $this->requirePermission('gestionar grupos');
         $this->groupSelection = [];
         $this->groupName = '';
         $this->groupAreaId = $areaId;
@@ -510,6 +539,7 @@ class GestionMesas extends Component
 
     public function toggleGroupSelection(int $mesaId): void
     {
+        $this->requirePermission('gestionar grupos');
         if (in_array($mesaId, $this->groupSelection)) {
             $this->groupSelection = array_values(array_filter(
                 $this->groupSelection, fn ($id) => $id !== $mesaId
@@ -521,6 +551,7 @@ class GestionMesas extends Component
 
     public function confirmGroup(): void
     {
+        $this->requirePermission('gestionar grupos');
         $this->validate([
             'groupName' => 'required|string|max:80',
             'groupSelection' => 'required|array|min:2',
@@ -551,12 +582,14 @@ class GestionMesas extends Component
 
     public function openUngroup(int $mesaId): void
     {
+        $this->requirePermission('gestionar grupos');
         $this->ungroupMesaId = $mesaId;
         $this->showUngroupModal = true;
     }
 
     public function confirmUngroup(): void
     {
+        $this->requirePermission('gestionar grupos');
         $mesa = Mesa::find($this->ungroupMesaId);
         if (! $mesa || ! $mesa->mesa_group_id) {
             return;
@@ -584,6 +617,10 @@ class GestionMesas extends Component
 
     public function openAreaModal(?int $areaId = null): void
     {
+        $this->requirePermission(
+            $areaId ? 'editar areas de mesas' : 'crear areas de mesas',
+            'gestionar mesas'
+        );
         $this->editAreaId = $areaId;
         if ($areaId) {
             $area = Area::find($areaId);
@@ -602,6 +639,10 @@ class GestionMesas extends Component
 
     public function saveArea(): void
     {
+        $this->requirePermission(
+            $this->editAreaId ? 'editar areas de mesas' : 'crear areas de mesas',
+            'gestionar mesas'
+        );
         $this->validate([
             'areaName' => 'required|string|max:80',
             'areaColor' => 'required|string|max:20',
@@ -626,6 +667,7 @@ class GestionMesas extends Component
 
     public function deleteArea(int $id): void
     {
+        $this->requirePermission('eliminar areas de mesas', 'gestionar mesas');
         Area::destroy($id);
         unset($this->areas, $this->mesas);
         session()->flash('success', 'Área eliminada.');
@@ -635,6 +677,10 @@ class GestionMesas extends Component
 
     public function openMesaModal(?int $mesaId = null): void
     {
+        $this->requirePermission(
+            $mesaId ? 'editar mesas' : 'crear mesas',
+            'gestionar mesas'
+        );
         $this->editMesaId = $mesaId;
         if ($mesaId) {
             $mesa = Mesa::find($mesaId);
@@ -653,6 +699,10 @@ class GestionMesas extends Component
 
     public function saveMesa(): void
     {
+        $this->requirePermission(
+            $this->editMesaId ? 'editar mesas' : 'crear mesas',
+            'gestionar mesas'
+        );
         $this->validate([
             'mesaNumber' => 'required|integer|min:1|max:999',
             'mesaCapacity' => 'required|integer|min:1|max:50',
@@ -679,12 +729,14 @@ class GestionMesas extends Component
 
     public function openDeleteMesa(int $mesaId): void
     {
+        $this->requirePermission('eliminar mesas', 'gestionar mesas');
         $this->deleteMesaId = $mesaId;
         $this->showDeleteMesaModal = true;
     }
 
     public function confirmDeleteMesa(): void
     {
+        $this->requirePermission('eliminar mesas', 'gestionar mesas');
         Mesa::destroy($this->deleteMesaId);
         $this->showDeleteMesaModal = false;
         $this->deleteMesaId = null;
@@ -696,7 +748,18 @@ class GestionMesas extends Component
 
     public function goToSplit(int $mesaId): void
     {
+        $this->requirePermission('dividir mesas');
         $this->redirect(route('app.mesas.split', $mesaId));
+    }
+
+    private function requirePermission(string $permission, ?string $fallback = null): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user && ($user->can($permission) || ($fallback && $user->can($fallback))),
+            403
+        );
     }
 
     public function render()

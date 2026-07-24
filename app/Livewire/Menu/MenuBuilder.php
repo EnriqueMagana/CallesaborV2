@@ -19,6 +19,11 @@ class MenuBuilder extends Component
 {
     use ConvertsToWebp, WithFileUploads;
 
+    public function mount(): void
+    {
+        $this->authorizePermission('ver menu');
+    }
+
     // ─── Active tab ────────────────────────────────────────────────────────────
     public string $tab = 'products';
 
@@ -233,6 +238,7 @@ class MenuBuilder extends Component
 
     public function openProductModal(?int $id = null): void
     {
+        $this->authorizePermission($id ? 'editar platos' : 'crear platos');
         $this->resetProductForm();
         if ($id) {
             $product = Product::with('addonGroups')->findOrFail($id);
@@ -252,6 +258,7 @@ class MenuBuilder extends Component
 
     public function saveProduct(): void
     {
+        $this->authorizePermission($this->editProductId ? 'editar platos' : 'crear platos');
         $this->validate([
             'pName' => 'required|string|max:120',
             'pPrice' => 'required|numeric|min:0',
@@ -296,6 +303,7 @@ class MenuBuilder extends Component
 
     public function confirmDeleteProduct(int $id): void
     {
+        $this->authorizePermission('eliminar platos');
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar producto',
@@ -323,6 +331,7 @@ class MenuBuilder extends Component
 
     private function deleteProduct(int $id): void
     {
+        $this->authorizePermission('eliminar platos');
         Product::findOrFail($id)->delete();
         unset($this->products);
         $this->dispatch('notify', type: 'warning', message: 'Producto eliminado (papelera).');
@@ -330,6 +339,7 @@ class MenuBuilder extends Component
 
     private function restoreProduct(int $id): void
     {
+        $this->authorizePermission('eliminar platos');
         Product::withTrashed()->findOrFail($id)->restore();
         unset($this->products);
         $this->dispatch('notify', type: 'success', message: 'Producto restaurado.');
@@ -337,6 +347,7 @@ class MenuBuilder extends Component
 
     private function forceDeleteProduct(int $id): void
     {
+        $this->authorizePermission('eliminar platos');
         $p = Product::withTrashed()->findOrFail($id);
         $p->addonGroups()->detach();
         $p->ingredients()->detach();
@@ -364,6 +375,7 @@ class MenuBuilder extends Component
 
     public function openCategoryModal(?int $id = null): void
     {
+        $this->authorizePermission('gestionar categorias');
         $this->resetCategoryForm();
         if ($id) {
             $cat = Category::findOrFail($id);
@@ -380,6 +392,7 @@ class MenuBuilder extends Component
 
     public function saveCategory(): void
     {
+        $this->authorizePermission('gestionar categorias');
         $this->validate([
             'cName' => 'required|string|max:80',
             'cIcon' => 'required|string|max:60',
@@ -411,6 +424,7 @@ class MenuBuilder extends Component
 
     public function confirmDeleteCategory(int $id): void
     {
+        $this->authorizePermission('gestionar categorias');
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar categoría',
@@ -422,6 +436,7 @@ class MenuBuilder extends Component
 
     private function deleteCategory(int $id): void
     {
+        $this->authorizePermission('gestionar categorias');
         Category::findOrFail($id)->delete();
         unset($this->categories, $this->allCategories);
         $this->dispatch('notify', type: 'warning', message: 'Categoría eliminada.');
@@ -442,6 +457,7 @@ class MenuBuilder extends Component
 
     public function openGroupModal(?int $id = null): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->resetGroupForm();
         if ($id) {
             $group = AddonGroup::findOrFail($id);
@@ -458,6 +474,7 @@ class MenuBuilder extends Component
 
     public function saveGroup(): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->validate([
             'gName' => 'required|string|max:80',
             'gMinSelections' => 'required|integer|min:0|max:20',
@@ -499,6 +516,7 @@ class MenuBuilder extends Component
 
     public function confirmDeleteGroup(int $id): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar grupo de complementos',
@@ -510,6 +528,7 @@ class MenuBuilder extends Component
 
     private function deleteGroup(int $id): void
     {
+        $this->authorizePermission('gestionar complementos');
         AddonGroup::findOrFail($id)->delete();
         unset($this->addonGroups, $this->allAddonGroups);
         $this->dispatch('notify', type: 'warning', message: 'Grupo eliminado.');
@@ -530,6 +549,7 @@ class MenuBuilder extends Component
 
     public function openAddonsModal(int $groupId): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->activeGroupId = $groupId;
         $this->showAddonsModal = true;
         $this->showAddonForm = false;
@@ -539,6 +559,7 @@ class MenuBuilder extends Component
 
     public function openAddonForm(?int $id = null): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->resetAddonForm();
         if ($id) {
             $addon = Addon::findOrFail($id);
@@ -554,6 +575,7 @@ class MenuBuilder extends Component
 
     public function saveAddon(): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->validate([
             'aName' => 'required|string|max:80',
             'aExtraPrice' => 'required|numeric|min:0',
@@ -587,6 +609,7 @@ class MenuBuilder extends Component
 
     public function confirmDeleteAddon(int $id): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar complemento',
@@ -598,6 +621,7 @@ class MenuBuilder extends Component
 
     private function deleteAddon(int $id): void
     {
+        $this->authorizePermission('gestionar complementos');
         Addon::findOrFail($id)->delete();
         unset($this->activeGroup, $this->addonGroups);
         $this->dispatch('notify', type: 'warning', message: 'Complemento eliminado.');
@@ -618,6 +642,7 @@ class MenuBuilder extends Component
 
     public function openIngredientModal(?int $id = null): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->resetIngredientForm();
         if ($id) {
             $ingredient = Ingredient::findOrFail($id);
@@ -633,6 +658,7 @@ class MenuBuilder extends Component
 
     public function saveIngredient(): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->validate([
             'ingName' => 'required|string|max:100',
             'ingExtraPrice' => 'required|numeric|min:0',
@@ -675,6 +701,7 @@ class MenuBuilder extends Component
 
     public function confirmDeleteIngredient(int $id): void
     {
+        $this->authorizePermission('gestionar complementos');
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar ingrediente',
@@ -686,6 +713,7 @@ class MenuBuilder extends Component
 
     private function deleteIngredient(int $id): void
     {
+        $this->authorizePermission('gestionar complementos');
         Ingredient::findOrFail($id)->delete();
         unset($this->ingredients, $this->allIngredients);
         $this->dispatch('notify', type: 'warning', message: 'Ingrediente eliminado.');
@@ -707,6 +735,7 @@ class MenuBuilder extends Component
 
     public function openProductIngredientsModal(int $productId): void
     {
+        $this->authorizePermission('editar platos');
         $this->piProductId = $productId;
         $product = Product::with('ingredients')->findOrFail($productId);
         $this->piIngredientIds = $product->ingredients->pluck('id')->map(fn ($v) => (string) $v)->toArray();
@@ -718,6 +747,7 @@ class MenuBuilder extends Component
 
     public function saveProductIngredients(): void
     {
+        $this->authorizePermission('editar platos');
         $this->validate([
             'piMinIngredients' => 'required|integer|min:0|max:50',
             'piMaxIngredients' => 'required|integer|min:1|max:50',
@@ -745,6 +775,7 @@ class MenuBuilder extends Component
 
     public function openAreaModal(?int $id = null): void
     {
+        $this->authorizePermission('gestionar areas impresion');
         $this->resetAreaForm();
         if ($id) {
             $area = PrintArea::findOrFail($id);
@@ -759,6 +790,7 @@ class MenuBuilder extends Component
 
     public function saveArea(): void
     {
+        $this->authorizePermission('gestionar areas impresion');
         $this->validate([
             'areaName' => 'required|string|max:80',
             'areaColor' => 'required|string|max:20',
@@ -786,6 +818,7 @@ class MenuBuilder extends Component
 
     public function confirmDeleteArea(int $id): void
     {
+        $this->authorizePermission('gestionar areas impresion');
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar área de impresión',
@@ -797,6 +830,7 @@ class MenuBuilder extends Component
 
     private function deleteArea(int $id): void
     {
+        $this->authorizePermission('gestionar areas impresion');
         PrintArea::findOrFail($id)->delete();
         unset($this->printAreas, $this->allPrintAreas);
         $this->dispatch('notify', type: 'warning', message: 'Área eliminada.');
@@ -817,5 +851,10 @@ class MenuBuilder extends Component
     {
         return view('livewire.menu.menu-builder')
             ->layout('layouts.app');
+    }
+
+    private function authorizePermission(string $permission): void
+    {
+        abort_unless(auth()->user()?->can($permission), 403);
     }
 }

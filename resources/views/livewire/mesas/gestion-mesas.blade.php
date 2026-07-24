@@ -1,4 +1,27 @@
-<div class="app-page mesas-page">
+<div class="app-page mesas-page"
+     x-data="{ booting: true }"
+     x-init="requestAnimationFrame(() => requestAnimationFrame(() => booting = false))">
+
+    <div class="mesas-initial-skeleton" x-show="booting" role="status" aria-label="Cargando gestión de mesas">
+        <header><span></span><div><b></b><i></i></div><strong></strong></header>
+        <nav>@for($i = 0; $i < 4; $i++)<span></span>@endfor<i></i></nav>
+        <section class="mesas-skeleton-filters">@for($i = 0; $i < 5; $i++)<span></span>@endfor</section>
+        <section class="mesas-skeleton-grid">@for($i = 0; $i < 6; $i++)<article><header><span></span><i></i></header><b></b><i></i><footer><span></span><strong></strong></footer></article>@endfor</section>
+    </div>
+
+    <div x-show="!booting" x-cloak>
+    @php
+        $mesaUser = auth()->user();
+        $canLegacyManageMesas = $mesaUser?->can('gestionar mesas');
+        $canCreateAreas = $canLegacyManageMesas || $mesaUser?->can('crear areas de mesas');
+        $canEditAreas = $canLegacyManageMesas || $mesaUser?->can('editar areas de mesas');
+        $canDeleteAreas = $canLegacyManageMesas || $mesaUser?->can('eliminar areas de mesas');
+        $canCreateMesas = $canLegacyManageMesas || $mesaUser?->can('crear mesas');
+        $canEditMesas = $canLegacyManageMesas || $mesaUser?->can('editar mesas');
+        $canDeleteMesas = $canLegacyManageMesas || $mesaUser?->can('eliminar mesas');
+        $canChangeMesaStatus = $canLegacyManageMesas || $mesaUser?->can('cambiar estado mesas');
+        $canManageGroups = $canLegacyManageMesas || $mesaUser?->can('gestionar grupos');
+    @endphp
 
     {{-- Flash --}}
     @if(session('success'))
@@ -21,14 +44,16 @@
             </div>
         </div>
         <div class="mesas-page-actions">
-            @can('gestionar mesas')
-                <button class="btn btn-outline-secondary btn-sm" wire:click="openAreaModal()">
-                    <i class="bx bx-map-pin me-1"></i> Áreas
+            @if($canCreateAreas || $canEditAreas || $canDeleteAreas)
+                <button class="btn btn-outline-secondary btn-sm mesas-action-loader" wire:click="openAreaModal()" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="openAreaModal">
+                    <span><i class="bx bx-map-pin me-1"></i> Áreas</span><b></b>
                 </button>
-                <button class="btn btn-primary btn-sm" wire:click="openMesaModal()">
-                    <i class="bx bx-plus me-1"></i> Nueva Mesa
+            @endif
+            @if($canCreateMesas)
+                <button class="btn btn-primary btn-sm mesas-action-loader" wire:click="openMesaModal()" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="openMesaModal">
+                    <span><i class="bx bx-plus me-1"></i> Nueva Mesa</span><b></b>
                 </button>
-            @endcan
+            @endif
         </div>
     </div>
 
@@ -36,45 +61,48 @@
     <div class="mesas-tabs-bar">
         <div class="mesas-tabs">
             <button class="mesas-tab {{ $tab === 'disponibles' ? 'active' : '' }}"
-                    wire:click="setTab('disponibles')">
+                    wire:click="setTab('disponibles')" wire:loading.attr="disabled" wire:target="setTab">
                 <i class="bx bx-check-circle"></i>
                 <span>Disponibles</span>
                 <span class="mesas-tab-badge badge-green">{{ $this->availableCount }}</span>
             </button>
             <button class="mesas-tab {{ $tab === 'mis_mesas' ? 'active' : '' }}"
-                    wire:click="setTab('mis_mesas')">
+                    wire:click="setTab('mis_mesas')" wire:loading.attr="disabled" wire:target="setTab">
                 <i class="bx bx-user-check"></i>
                 <span>Mis Mesas</span>
                 <span class="mesas-tab-badge badge-blue">{{ $this->myActiveMesaCount }}</span>
             </button>
             <button class="mesas-tab mesas-tab--kiosk {{ $tab === 'kiosko' ? 'active' : '' }}"
-                    wire:click="setTab('kiosko')">
+                    wire:click="setTab('kiosko')" wire:loading.attr="disabled" wire:target="setTab">
                 <i class="bx bx-desktop"></i>
                 <span>Kiosko</span>
                 <span class="mesas-tab-badge badge-purple">{{ $this->kioskCount }}</span>
             </button>
-            @can('gestionar mesas')
             <button class="mesas-tab {{ $tab === 'todas' ? 'active' : '' }}"
-                    wire:click="setTab('todas')">
+                    wire:click="setTab('todas')" wire:loading.attr="disabled" wire:target="setTab">
                 <i class="bx bx-grid-alt"></i>
                 <span>Todas las Mesas</span>
             </button>
-            @endcan
         </div>
 
         {{-- Search bar --}}
-        <div class="mesas-search-wrap">
+        <form class="mesas-search-wrap" wire:submit="applySearch">
             <i class="bx bx-search mesas-search-icon"></i>
-            <input type="text"
+            <input type="search"
                    class="mesas-search-input"
-                   wire:model.live.debounce.300ms="search"
-                   placeholder="Buscar por número o nombre…">
+                   wire:model="search"
+                   aria-label="Buscar mesa por número o nombre"
+                   placeholder="Buscar por número o nombre…"
+                   autocomplete="off">
             @if($search)
-                <button class="mesas-search-clear" wire:click="$set('search', '')">
+                <button type="button" class="mesas-search-clear" wire:click="clearSearch" wire:loading.attr="disabled" wire:target="clearSearch" aria-label="Limpiar búsqueda">
                     <i class="bx bx-x"></i>
                 </button>
             @endif
-        </div>
+            <button type="submit" class="mesas-search-submit mesas-action-loader" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="applySearch">
+                <span>Buscar</span><b></b>
+            </button>
+        </form>
     </div>
 
     {{-- ══════════════════ FILTER BAR ══════════════════ --}}
@@ -83,10 +111,10 @@
         <div class="mesas-filter-group">
             <span class="mesas-filter-label">Área:</span>
             <button class="mesas-filter-pill {{ $areaFilter === null ? 'active' : '' }}"
-                    wire:click="$set('areaFilter', null)">Todas</button>
+                    wire:click="$set('areaFilter', null)" wire:loading.attr="disabled" wire:target="areaFilter">Todas</button>
             @foreach($this->areas as $area)
                 <button class="mesas-filter-pill {{ $areaFilter === $area->id ? 'active' : '' }}"
-                        wire:click="$set('areaFilter', {{ $area->id }})">
+                        wire:click="$set('areaFilter', {{ $area->id }})" wire:loading.attr="disabled" wire:target="areaFilter">
                     <i class="bx {{ $area->icon }}"></i> {{ $area->name }}
                 </button>
             @endforeach
@@ -98,36 +126,36 @@
             <span class="mesas-filter-label">Ver:</span>
             {{-- "Todas activas" = sin filtro específico → muestra ocupada + en_cuenta --}}
             <button class="mesas-filter-pill mesas-filter-pill--primary {{ $statusFilter === '' ? 'active' : '' }}"
-                    wire:click="$set('statusFilter', '')">
+                    wire:click="$set('statusFilter', '')" wire:loading.attr="disabled" wire:target="statusFilter">
                 <i class="bx bx-grid-alt me-1"></i> Todas activas
             </button>
             <button class="mesas-filter-pill mesas-filter-pill--info {{ $statusFilter === 'ocupada' ? 'active' : '' }}"
-                    wire:click="$set('statusFilter', '{{ $statusFilter === 'ocupada' ? '' : 'ocupada' }}')">
+                    wire:click="$set('statusFilter', '{{ $statusFilter === 'ocupada' ? '' : 'ocupada' }}')" wire:loading.attr="disabled" wire:target="statusFilter">
                 <i class="bx bx-user-check me-1"></i> Ocupadas
             </button>
             <button class="mesas-filter-pill mesas-filter-pill--warning {{ $statusFilter === 'en_cuenta' ? 'active' : '' }}"
-                    wire:click="$set('statusFilter', '{{ $statusFilter === 'en_cuenta' ? '' : 'en_cuenta' }}')">
+                    wire:click="$set('statusFilter', '{{ $statusFilter === 'en_cuenta' ? '' : 'en_cuenta' }}')" wire:loading.attr="disabled" wire:target="statusFilter">
                 <i class="bx bx-receipt me-1"></i> En cuenta
             </button>
         </div>
         @endif
 
         {{-- Group action --}}
-        @can('gestionar mesas')
+        @if($canManageGroups)
         <div class="ms-auto">
             <button class="btn btn-outline-secondary btn-sm" wire:click="openGroupModal({{ $areaFilter }})">
                 <i class="bx bx-merge me-1"></i> Agrupar mesas
             </button>
         </div>
-        @endcan
+        @endif
     </div>
 
     {{-- ══════════════════ MESA GRID ══════════════════ --}}
-    <div wire:loading.class="mesas-grid-loading" class="mesas-grid-wrap">
+    <div wire:loading.class="mesas-grid-loading" wire:target="setTab,applySearch,clearSearch,areaFilter,statusFilter" class="mesas-grid-wrap">
 
-        <div wire:loading class="mesas-loading-overlay">
+        <div wire:loading.flex wire:target="setTab,applySearch,clearSearch,areaFilter,statusFilter" class="mesas-loading-overlay">
             <div class="mesas-loading-spinner">
-                <div class="spinner-border text-primary" role="status"></div>
+                <i class="bx bx-loader-alt"></i><span>Actualizando mesas…</span>
             </div>
         </div>
 
@@ -257,7 +285,7 @@
 
                             <div class="mesa-card-footer">
                                 @if($firstMesa->currentAssignment)
-                                    @if($tab === 'mis_mesas' && $firstMesa->status === 'ocupada')
+                                    @if($tab === 'mis_mesas' && $firstMesa->status === 'ocupada' && $mesaUser?->can('ordenar mesas'))
                                         <button class="btn-asignarme" data-ui="xui-18yv2pi"
                                                 wire:click="goToOrden({{ $firstMesa->id }})">
                                             <i class="bx bx-receipt"></i> Ordenar
@@ -275,11 +303,11 @@
                                             <span class="mesa-waiter-name">{{ $waiter?->name }}</span>
                                         </div>
                                     @endif
-                                @elseif($firstMesa->status === 'disponible')
+                                @elseif($firstMesa->status === 'disponible' && $mesaUser?->can('asignar mesas'))
                                     <button class="btn-asignarme" wire:click="openAssign({{ $firstMesa->id }})">
                                         <i class="bx bx-user-plus"></i> Asignarme
                                     </button>
-                                @elseif($firstMesa->status === 'ocupada' && $groupMesas->flatMap->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
+                                @elseif($firstMesa->status === 'ocupada' && $mesaUser?->can('asignar mesas') && $groupMesas->flatMap->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
                                     <button class="btn-asignarme btn-asignarme--kiosk" wire:click="openAssign({{ $firstMesa->id }})">
                                         <i class="bx bx-desktop"></i> Tomar mesa de kiosco
                                     </button>
@@ -298,18 +326,23 @@
                                             <i class="bx bx-info-circle"></i> Detalle
                                         </button>
                                         @if($firstMesa->status === 'ocupada')
+                                            @can('ordenar mesas')
                                             <button wire:click="goToOrden({{ $firstMesa->id }})" @click="open=false">
                                                 <i class="bx bx-receipt"></i> Ordenar
                                             </button>
+                                            @endcan
+                                            @can('cerrar mesas')
                                             <button type="button" wire:click="closeMesa({{ $firstMesa->id }})" wire:loading.attr="disabled" wire:target="closeMesa" @click="open=false" aria-label="Cerrar mesa y dividir la cuenta">
                                                 <i class="bx bx-split"></i> Cerrar y dividir cuenta
                                             </button>
+                                            @endcan
                                         @endif
                                         @if(in_array($firstMesa->status, ['ocupada', 'en_cuenta']))
                                             <a href="{{ route('app.mesas.ordenes', $firstMesa->id) }}" wire:navigate @click="open=false" class="mesa-action-link">
                                                 <i class="bx bx-list-ul"></i> Ver órdenes
                                             </a>
                                         @endif
+                                        @can('dividir mesas')
                                         @if($activeSplit)
                                             <button wire:click="goToSplit({{ $firstMesa->id }})" @click="open=false">
                                                 <i class="bx bx-check-circle"></i> Ver cuenta dividida
@@ -319,6 +352,7 @@
                                                 <i class="bx bx-split"></i> Dividir cuenta
                                             </button>
                                         @endif
+                                        @endcan
                                         @can('reasignar mesas')
                                         @if($firstMesa->currentAssignment && $firstMesa->status !== 'en_cuenta')
                                             <button wire:click="openReassign({{ $firstMesa->id }})" @click="open=false">
@@ -333,12 +367,12 @@
                                             </button>
                                         @endif
                                         @endcan
-                                        @can('gestionar mesas')
+                                        @if($canManageGroups)
                                             <div class="mesa-action-divider"></div>
                                             <button wire:click="openUngroup({{ $firstMesa->id }})" @click="open=false">
                                                 <i class="bx bx-unlink"></i> Desagrupar
                                             </button>
-                                        @endcan
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -389,7 +423,7 @@
 
                             <div class="mesa-card-footer">
                                 @if($mesa->currentAssignment)
-                                    @if($tab === 'mis_mesas' && $mesa->status === 'ocupada')
+                                    @if($tab === 'mis_mesas' && $mesa->status === 'ocupada' && $mesaUser?->can('ordenar mesas'))
                                         <button class="btn-asignarme" data-ui="xui-18yv2pi"
                                                 wire:click="goToOrden({{ $mesa->id }})">
                                             <i class="bx bx-receipt"></i> Ordenar
@@ -407,11 +441,11 @@
                                             <span class="mesa-waiter-name">{{ $waiter?->name }}</span>
                                         </div>
                                     @endif
-                                @elseif($mesa->status === 'disponible')
+                                @elseif($mesa->status === 'disponible' && $mesaUser?->can('asignar mesas'))
                                     <button class="btn-asignarme" wire:click="openAssign({{ $mesa->id }})">
                                         <i class="bx bx-user-plus"></i> Asignarme
                                     </button>
-                                @elseif($mesa->status === 'ocupada' && $mesa->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
+                                @elseif($mesa->status === 'ocupada' && $mesaUser?->can('asignar mesas') && $mesa->activeOrders->contains(fn($order) => $order->source === 'kiosk'))
                                     <button class="btn-asignarme btn-asignarme--kiosk" wire:click="openAssign({{ $mesa->id }})">
                                         <i class="bx bx-desktop"></i> Tomar mesa de kiosco
                                     </button>
@@ -435,18 +469,23 @@
                                             <i class="bx bx-info-circle"></i> Ver detalle
                                         </button>
                                         @if($mesa->status === 'ocupada')
+                                            @can('ordenar mesas')
                                             <button wire:click="goToOrden({{ $mesa->id }})" @click="open=false">
                                                 <i class="bx bx-receipt"></i> Ordenar
                                             </button>
+                                            @endcan
+                                            @can('cerrar mesas')
                                             <button type="button" wire:click="closeMesa({{ $mesa->id }})" wire:loading.attr="disabled" wire:target="closeMesa" @click="open=false" aria-label="Cerrar mesa y dividir la cuenta">
                                                 <i class="bx bx-split"></i> Cerrar y dividir cuenta
                                             </button>
+                                            @endcan
                                         @endif
                                         @if(in_array($mesa->status, ['ocupada', 'en_cuenta']))
                                             <a href="{{ route('app.mesas.ordenes', $mesa->id) }}" wire:navigate @click="open=false" class="mesa-action-link">
                                                 <i class="bx bx-list-ul"></i> Ver órdenes
                                             </a>
                                         @endif
+                                        @can('dividir mesas')
                                         @if($activeSplit)
                                             <button wire:click="goToSplit({{ $mesa->id }})" @click="open=false">
                                                 <i class="bx bx-check-circle"></i> Ver cuenta dividida
@@ -456,6 +495,7 @@
                                                 <i class="bx bx-split"></i> Dividir cuenta
                                             </button>
                                         @endif
+                                        @endcan
                                         @can('reasignar mesas')
                                         @if($mesa->currentAssignment && $mesa->status !== 'en_cuenta')
                                             <button wire:click="openReassign({{ $mesa->id }})" @click="open=false">
@@ -470,8 +510,9 @@
                                             </button>
                                         @endif
                                         @endcan
-                                        @can('gestionar mesas')
+                                        @if($canChangeMesaStatus || $canEditMesas || $canDeleteMesas)
                                             <div class="mesa-action-divider"></div>
+                                            @if($canChangeMesaStatus)
                                             @foreach(['disponible','ocupada','reservada','en_cuenta','bloqueada'] as $st)
                                                 @if($st !== $mesa->status)
                                                     <button wire:click="openStatusChange({{ $mesa->id }}, '{{ $st }}')" @click="open=false">
@@ -480,14 +521,21 @@
                                                     </button>
                                                 @endif
                                             @endforeach
+                                            @endif
+                                            @if($canEditMesas || $canDeleteMesas)
                                             <div class="mesa-action-divider"></div>
+                                            @endif
+                                            @if($canEditMesas)
                                             <button wire:click="openMesaModal({{ $mesa->id }})" @click="open=false">
                                                 <i class="bx bx-edit"></i> Editar
                                             </button>
+                                            @endif
+                                            @if($canDeleteMesas)
                                             <button wire:click="openDeleteMesa({{ $mesa->id }})" @click="open=false" class="danger">
                                                 <i class="bx bx-trash"></i> Eliminar
                                             </button>
-                                        @endcan
+                                            @endif
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -504,7 +552,7 @@
     <div class="mesas-bottom-nav">
         <div class="mesas-bottom-nav-inner">
             <button class="mbn-item {{ $tab === 'disponibles' ? 'active' : '' }}"
-                    wire:click="setTab('disponibles')">
+                    wire:click="setTab('disponibles')" wire:loading.attr="disabled" wire:target="setTab">
                 @if($this->availableCount > 0)
                     <span class="mbn-badge">{{ $this->availableCount }}</span>
                 @endif
@@ -512,7 +560,7 @@
                 Libres
             </button>
             <button class="mbn-item {{ $tab === 'mis_mesas' ? 'active' : '' }}"
-                    wire:click="setTab('mis_mesas')">
+                    wire:click="setTab('mis_mesas')" wire:loading.attr="disabled" wire:target="setTab">
                 @if($this->myActiveMesaCount > 0)
                     <span class="mbn-badge">{{ $this->myActiveMesaCount }}</span>
                 @endif
@@ -520,18 +568,16 @@
                 Mis Mesas
             </button>
             <button class="mbn-item {{ $tab === 'kiosko' ? 'active' : '' }}"
-                    wire:click="setTab('kiosko')">
+                    wire:click="setTab('kiosko')" wire:loading.attr="disabled" wire:target="setTab">
                 @if($this->kioskCount > 0)<span class="mbn-badge">{{ $this->kioskCount }}</span>@endif
                 <i class="bx bx-desktop"></i>
                 Kiosko
             </button>
-            @can('gestionar mesas')
             <button class="mbn-item {{ $tab === 'todas' ? 'active' : '' }}"
-                    wire:click="setTab('todas')">
+                    wire:click="setTab('todas')" wire:loading.attr="disabled" wire:target="setTab">
                 <i class="bx bx-grid-alt"></i>
                 Todas
             </button>
-            @endcan
         </div>
     </div>
 
@@ -797,10 +843,12 @@
                                 </span>
                             </div>
                             <div class="d-flex gap-1">
+                                @if($canEditAreas)
                                 <button class="btn btn-icon btn-sm btn-outline-secondary" wire:click="openAreaModal({{ $a->id }})">
                                     <i class="bx bx-edit"></i>
                                 </button>
-                                @if($a->mesas_count == 0)
+                                @endif
+                                @if($canDeleteAreas && $a->mesas_count == 0)
                                     <button class="btn btn-icon btn-sm btn-outline-danger" wire:click="deleteArea({{ $a->id }})">
                                         <i class="bx bx-trash"></i>
                                     </button>
@@ -1095,13 +1143,18 @@
             <div class="mesas-modal-actions">
                 <button class="btn btn-outline-secondary" wire:click="$set('showDetailModal', false)">Cerrar</button>
                 @if($dm->status === 'ocupada')
+                    @can('cerrar mesas')
                     <button type="button" class="btn btn-outline-warning" wire:click="closeMesa({{ $dm->id }})" wire:loading.attr="disabled" wire:target="closeMesa" aria-label="Cerrar mesa y dividir la cuenta">
                         <i class="bx bx-split me-1"></i> Cerrar y dividir cuenta
                     </button>
+                    @endcan
+                    @can('ordenar mesas')
                     <button class="btn btn-primary" wire:click="goToOrden({{ $dm->id }})">
                         <i class="bx bx-receipt me-1"></i> Ordenar
                     </button>
+                    @endcan
                 @endif
+                @can('dividir mesas')
                 @if($dm->splits->isNotEmpty())
                     <button class="btn btn-primary" wire:click="goToSplit({{ $dm->id }})">
                         <i class="bx bx-check-circle me-1"></i> Ver cuenta dividida
@@ -1111,9 +1164,11 @@
                         <i class="bx bx-split me-1"></i> Dividir cuenta
                     </button>
                 @endif
+                @endcan
             </div>
         </div>
     </div>
     @endif
 
+    </div>
 </div>

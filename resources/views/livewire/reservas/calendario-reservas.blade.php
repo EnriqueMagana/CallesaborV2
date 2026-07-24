@@ -11,9 +11,11 @@
             </div>
         </div>
         <div class="app-page-actions">
+            @can('crear reservas')
             <button type="button" wire:click="openNew('{{ now()->format('Y-m-d') }}')" class="btn btn-primary">
                 <i class="bx bx-plus me-1" aria-hidden="true"></i>Nueva reserva
             </button>
+            @endcan
         </div>
     </header>
 
@@ -231,6 +233,7 @@
                     @endif
 
                     {{-- Form cancelación inline --}}
+                    @can('cancelar reservas')
                     @if($showCancelForm)
                         <div class="mt-3 p-3 bg-light rounded border reservation-cancel-form">
                             <label class="form-label fw-semibold mb-1">Motivo (opcional)</label>
@@ -245,10 +248,12 @@
                             </div>
                         </div>
                     @endif
+                    @endcan
                 </div>
 
                 @if($r->status !== 'cancelada' && $r->status !== 'completada' && !$showCancelForm)
                 <div class="modal-footer border-0 pt-0 flex-wrap gap-2">
+                    @can('cambiar estado reservas')
                     @if($r->status === 'pendiente')
                         <button wire:click="changeStatus('confirmada')" class="btn btn-success btn-sm">
                             <i class="bx bx-check me-1"></i> Confirmar
@@ -259,13 +264,18 @@
                             <i class="bx bx-check-double me-1"></i> Completada
                         </button>
                     @endif
+                    @endcan
+                    @can('editar reservas')
                     <button wire:click="startEdit" class="btn btn-outline-warning btn-sm">
                         <i class="bx bx-edit me-1"></i> Editar
                     </button>
+                    @endcan
+                    @can('cancelar reservas')
                     <button wire:click="$set('showCancelForm', true)"
                             class="btn btn-outline-danger btn-sm">
                         <i class="bx bx-x-circle me-1"></i> Cancelar
                     </button>
+                    @endcan
                 </div>
                 @endif
 
@@ -346,8 +356,10 @@
                         .catch(failureCallback);
                 },
                 dateClick: function(info) {
+                    @can('crear reservas')
                     const cmp = getComponent();
                     if (cmp) cmp.call('openNew', info.dateStr);
+                    @endcan
                 },
                 eventClick: function(info) {
                     const cmp = getComponent();

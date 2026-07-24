@@ -9,7 +9,11 @@
 
     <section class="sales-history-summary" aria-label="Resumen histórico">
         <article><span><i class="bx bx-receipt"></i></span><div><small>Pedidos encontrados</small><strong>{{ number_format($this->summary['orders']) }}</strong></div></article>
-        <article class="is-success"><span><i class="bx bx-money"></i></span><div><small>Ventas cobradas</small><strong>${{ number_format($this->summary['sales'], 2) }}</strong></div></article>
+        @if($this->canViewFinancials)
+            <article class="is-success"><span><i class="bx bx-money"></i></span><div><small>Ventas cobradas</small><strong>${{ number_format($this->summary['sales'], 2) }}</strong></div></article>
+        @else
+            <article><span><i class="bx bx-lock-alt"></i></span><div><small>Importes financieros</small><strong>Restringidos</strong></div></article>
+        @endif
         <article class="is-warning"><span><i class="bx bx-time-five"></i></span><div><small>Pendientes</small><strong>{{ number_format($this->summary['open']) }}</strong></div></article>
         <article class="is-danger"><span><i class="bx bx-x-circle"></i></span><div><small>Canceladas</small><strong>{{ number_format($this->summary['cancelled']) }}</strong></div></article>
     </section>
@@ -36,7 +40,11 @@
                     <span class="sales-history-row__identity"><strong>{{ $order->display_name }}</strong><small>{{ $order->type_label }} · {{ $order->created_at->format('d/m/Y H:i') }}</small></span>
                     <span class="sales-history-row__cell"><small>Caja</small><strong>{{ $order->cashRegister?->name ?? '—' }}</strong></span>
                     <span class="sales-history-row__cell"><small>Atendió</small><strong>{{ $order->seller?->name ?? '—' }}</strong></span>
-                    <span class="sales-history-row__amount"><small>Total</small><strong>${{ number_format($order->total, 2) }}</strong></span>
+                    @if($this->canViewFinancials)
+                        <span class="sales-history-row__amount"><small>Total</small><strong>${{ number_format($order->total, 2) }}</strong></span>
+                    @else
+                        <span class="sales-history-row__amount"><small>Importe</small><strong>Restringido</strong></span>
+                    @endif
                     <span class="app-status app-status--{{ $statusClass }}">{{ $order->status_label }}</span><i class="bx {{ $expandedOrderId === $order->id ? 'bx-chevron-up' : 'bx-chevron-down' }} sales-history-row__chevron"></i>
                 </button>
                 @if($expandedOrderId === $order->id)
@@ -44,10 +52,14 @@
                         <div><small>Creada</small><strong>{{ $order->created_at->format('d/m/Y H:i:s') }}</strong></div>
                         <div><small>Cobro registrado</small><strong>{{ $order->paid_at?->format('d/m/Y H:i:s') ?? 'Sin cobro' }}</strong></div>
                         <div><small>Teléfono</small><strong>{{ $order->customer_phone ?: '—' }}</strong></div>
-                        <div><small>Métodos de pago</small><strong>{{ $order->payments->map(fn($payment) => ucfirst($payment->method).' $'.number_format($payment->amount, 2))->join(' · ') ?: 'Sin pagos' }}</strong></div>
+                        @if($this->canViewFinancials)
+                            <div><small>Métodos de pago</small><strong>{{ $order->payments->map(fn($payment) => ucfirst($payment->method).' $'.number_format($payment->amount, 2))->join(' · ') ?: 'Sin pagos' }}</strong></div>
+                        @endif
                         @if($order->status === 'cancelada')<div class="is-danger"><small>Canceló</small><strong>{{ $order->cancelledBy?->name ?? 'Usuario no disponible' }}</strong><small>{{ $order->cancelled_at?->format('d/m/Y H:i:s') }} · {{ $order->cancellation_reason ?: 'Sin motivo registrado' }}</small></div>@endif
                         @if($order->notes)<div class="sales-history-row__note"><small>Notas</small><strong>{{ $order->notes }}</strong></div>@endif
-                        <a href="{{ route('app.ordenes.show', $order) }}" class="btn btn-sm btn-outline-primary"><i class="bx bx-show"></i> Ver orden completa</a>
+                        @can('ver ordenes')
+                            <a href="{{ route('app.ordenes.show', $order) }}" class="btn btn-sm btn-outline-primary"><i class="bx bx-show"></i> Ver orden completa</a>
+                        @endcan
                     </div>
                 @endif
             </article>

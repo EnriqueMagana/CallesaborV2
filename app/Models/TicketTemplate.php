@@ -22,6 +22,7 @@ class TicketTemplate extends Model
         'delivery' => ['name' => 'Delivery', 'icon' => 'bx-cycling'],
         'cash_cut' => ['name' => 'Corte de caja', 'icon' => 'bx-calculator'],
         'kitchen_area' => ['name' => 'Áreas / Cocina', 'icon' => 'bx-dish'],
+        'inventory_purchase' => ['name' => 'Compra de inventario', 'icon' => 'bx-package'],
     ];
 
     public static function defaultsFor(string $key): array
@@ -38,6 +39,30 @@ class TicketTemplate extends Model
                 'qr_label' => null,
                 'footer_text' => 'Documento de control interno',
                 'blocks' => self::cashCutBlocks(),
+                'options' => ['show_rfc' => true, 'show_phone' => true, 'show_address' => true],
+                'is_active' => true,
+            ];
+        }
+
+        if ($key === 'inventory_purchase') {
+            return [
+                'key' => $key,
+                'name' => self::TYPES[$key]['name'],
+                'paper_width_mm' => 80,
+                'font_size' => 11,
+                'margin_mm' => 4,
+                'show_logo' => false,
+                'show_qr' => false,
+                'qr_label' => null,
+                'footer_text' => 'Conserva este folio para recepcionar los insumos.',
+                'blocks' => [
+                    ['key' => 'header', 'label' => 'Encabezado y logo', 'enabled' => true],
+                    ['key' => 'business', 'label' => 'Información del negocio', 'enabled' => true],
+                    ['key' => 'inventory_purchase_meta', 'label' => 'Folio y responsable', 'enabled' => true],
+                    ['key' => 'inventory_purchase_items', 'label' => 'Insumos solicitados', 'enabled' => true],
+                    ['key' => 'inventory_purchase_notes', 'label' => 'Indicaciones de compra', 'enabled' => true],
+                    ['key' => 'footer', 'label' => 'Pie del ticket', 'enabled' => true],
+                ],
                 'options' => ['show_rfc' => true, 'show_phone' => true, 'show_address' => true],
                 'is_active' => true,
             ];

@@ -21,6 +21,7 @@ class SplitCuenta extends Component
 
     public function mount(Mesa $mesa): void
     {
+        $this->requirePermission('dividir mesas');
         $this->mesaId = $mesa->id;
 
         // Si la mesa ya tiene una división pendiente (por ejemplo, al volver
@@ -238,6 +239,8 @@ class SplitCuenta extends Component
 
     public function confirm(): void
     {
+        $this->requirePermission('dividir mesas');
+
         // Validation: in manual mode, all items must be assigned
         if ($this->mode === 'manual') {
             $unassigned = $this->unassignedItems->count();
@@ -298,6 +301,8 @@ class SplitCuenta extends Component
 
     public function cancelConfirm(): void
     {
+        $this->requirePermission('cancelar divisiones mesas', 'gestionar mesas');
+
         if (!$this->confirmed) return;
         // Delete the MesaSplit record and reset status back to ocupada
         MesaSplit::destroy($this->confirmed);
@@ -309,6 +314,8 @@ class SplitCuenta extends Component
 
     public function requestCancelConfirm(): void
     {
+        $this->requirePermission('cancelar divisiones mesas', 'gestionar mesas');
+
         if (! $this->confirmed) return;
         $this->showCancelConfirm = true;
     }
@@ -316,6 +323,16 @@ class SplitCuenta extends Component
     public function closeCancelConfirm(): void
     {
         $this->showCancelConfirm = false;
+    }
+
+    private function requirePermission(string $permission, ?string $fallback = null): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user && ($user->can($permission) || ($fallback && $user->can($fallback))),
+            403
+        );
     }
 
     public function render()

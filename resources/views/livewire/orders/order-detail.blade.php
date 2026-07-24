@@ -242,14 +242,14 @@
                             <div class="small text-muted">${{ number_format($item->product_price, 2) }} c/u</div>
                             @if(!$item->is_cancelled && $order->status !== 'cancelada')
                                 <div class="d-flex gap-1 mt-1 justify-content-end">
-                                    @can('eliminar items de ordenes')
+                                    @can('cancelar ordenes')
                                     <button class="btn btn-sm btn-icon btn-outline-danger"
                                             title="Cancelar ítem"
                                             wire:click="openCancelItemModal({{ $item->id }})">
                                         <i class="bx bx-x"></i>
                                     </button>
                                     @endcan
-                                    @can('eliminar ordenes')
+                                    @can('eliminar items de ordenes')
                                     <button class="btn btn-sm btn-icon btn-outline-danger"
                                             title="Eliminar ítem"
                                             wire:click="confirmDeleteItem({{ $item->id }})">

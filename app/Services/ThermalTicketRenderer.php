@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\BusinessSetting;
 use App\Models\CashRegisterCut;
+use App\Models\InventoryItem;
+use App\Models\InventoryPurchase;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\Order;
@@ -15,7 +17,12 @@ use BaconQrCode\Writer;
 
 class ThermalTicketRenderer
 {
-    public function renderOrder(Order $order, string $type, ?string $printArea = null): string
+    public function renderOrder(
+        Order $order,
+        string $type,
+        ?string $printArea = null,
+        bool $autoPrint = true,
+    ): string
     {
         $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'customer', 'mesa.area']);
 
@@ -25,8 +32,11 @@ class ThermalTicketRenderer
             $areas = $items->groupBy(fn ($item) => (string) ($item->product?->category?->printArea?->name ?? 'General'));
             if ($areas->count() > 1) {
                 return $this->renderBatch('kitchen_area', $areas->map(
-                    fn ($areaItems, $areaName) => $this->orderPayload($order, $type, (string) $areaName, $areaItems)
-                )->values()->all());
+                    fn ($areaItems, $areaName) => array_merge(
+                        $this->orderPayload($order, $type, (string) $areaName, $areaItems),
+                        ['auto_print' => $autoPrint],
+                    )
+                )->values()->all(), $autoPrint);
             }
         }
 
@@ -36,7 +46,10 @@ class ThermalTicketRenderer
             );
         }
 
-        return $this->render($type, $this->orderPayload($order, $type, $printArea, $items));
+        return $this->render($type, array_merge(
+            $this->orderPayload($order, $type, $printArea, $items),
+            ['auto_print' => $autoPrint],
+        ));
     }
 
     private function orderPayload(Order $order, string $type, ?string $printArea, $items): array
@@ -95,6 +108,31 @@ class ThermalTicketRenderer
         ]);
     }
 
+    public function renderInventoryPurchase(InventoryPurchase $purchase, bool $autoPrint = false): string
+    {
+        $purchase->loadMissing(['items.inventoryItem', 'requester', 'receiver']);
+
+        return $this->render('inventory_purchase', [
+            'title' => 'LISTA DE COMPRA DE INSUMOS',
+            'folio' => $purchase->folio,
+            'date' => $purchase->issued_at?->format('d/m/Y H:i'),
+            'requested_by' => $purchase->requester?->name ?: 'Sin asignar',
+            'received_by' => $purchase->receiver?->name,
+            'received_at' => $purchase->received_at?->format('d/m/Y H:i'),
+            'status' => $purchase->status,
+            'notes' => $purchase->notes,
+            'items' => $purchase->items->map(fn ($line) => [
+                'name' => $line->item_name,
+                'quantity' => (float) $line->requested_quantity,
+                'unit' => InventoryItem::UNITS[$line->unit]['short'] ?? $line->unit,
+                'notes' => $line->notes,
+                'received_quantity' => $line->received_quantity,
+            ])->all(),
+            'tracking_url' => null,
+            'auto_print' => $autoPrint,
+        ]);
+    }
+
     public function renderMesaAccount(
         Mesa $mesa,
         string $accountLabel,
@@ -143,6 +181,24 @@ class ThermalTicketRenderer
                 'total' => 3245.50,
                 'tracking_url' => null,
                 'preview' => true,
+            ], $template, $business);
+        }
+
+        if ($type === 'inventory_purchase') {
+            return $this->render($type, [
+                'title' => 'LISTA DE COMPRA DE INSUMOS',
+                'folio' => 'CMP-2607-000018',
+                'date' => now()->format('d/m/Y H:i'),
+                'requested_by' => 'Usuario de almacén',
+                'status' => 'pending',
+                'notes' => 'Comprar con el proveedor habitual.',
+                'items' => [
+                    ['name' => 'Harina de trigo', 'quantity' => 10, 'unit' => 'kg', 'notes' => 'Costal cerrado'],
+                    ['name' => 'Aceite vegetal', 'quantity' => 6, 'unit' => 'L', 'notes' => null],
+                ],
+                'tracking_url' => null,
+                'preview' => true,
+                'auto_print' => false,
             ], $template, $business);
         }
 
@@ -237,12 +293,12 @@ class ThermalTicketRenderer
         return view('print.ticket-document', compact('business', 'template', 'payload', 'qrDataUri'))->render();
     }
 
-    private function renderBatch(string $type, array $payloads): string
+    private function renderBatch(string $type, array $payloads, bool $autoPrint = true): string
     {
         $business = BusinessSetting::current();
         $template = TicketTemplate::current($type);
 
-        return view('print.ticket-batch', compact('business', 'template', 'payloads'))->render();
+        return view('print.ticket-batch', compact('business', 'template', 'payloads', 'autoPrint'))->render();
     }
 
     private function qrDataUri(string $value): string

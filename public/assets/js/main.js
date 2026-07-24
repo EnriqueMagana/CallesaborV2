@@ -55,10 +55,39 @@ if (!window._sidebarParentToggleBound) {
 }
 
 (function () {
+  const hasLayoutMenuInner = Boolean(document.querySelector('#layout-menu .menu-inner'));
+
+  const menuConstructor = window.Menu || (typeof Menu !== 'undefined' ? Menu : null);
+
+  if (menuConstructor && menuConstructor.prototype && !menuConstructor._safeManageScrollPatched) {
+    const originalManageScroll = menuConstructor.prototype.manageScroll;
+    menuConstructor.prototype.manageScroll = function () {
+      const menuInner = document.querySelector('.menu-inner');
+      if (!menuInner) {
+        if (this._scrollbar) {
+          try { this._scrollbar.destroy(); } catch (e) {}
+          this._scrollbar = null;
+        }
+        return;
+      }
+
+      return originalManageScroll.apply(this, arguments);
+    };
+    menuConstructor._safeManageScrollPatched = true;
+  }
+
+  if (!hasLayoutMenuInner && window._sneatMenu && typeof window._sneatMenu.destroy === 'function') {
+    try { window._sneatMenu.destroy(); } catch (e) {}
+    window._sneatMenu = null;
+    if (window.Helpers) window.Helpers.mainMenu = null;
+  }
+
   // Initialize menu
   //-----------------
   let layoutMenuEl = document.querySelectorAll('#layout-menu');
   layoutMenuEl.forEach(function (element) {
+    if (!element.querySelector('.menu-inner')) return;
+
     window._sneatMenu = new Menu(element, {
       orientation: 'vertical',
       closeChildren: false
@@ -138,6 +167,10 @@ if (!window._sidebarParentToggleBound) {
   window.Helpers.initPasswordToggle();
   window.Helpers.initSpeechToText();
 
+  if (!hasLayoutMenuInner) {
+    return;
+  }
+
   if (window.Helpers.isSmallScreen()) {
     return;
   }
@@ -150,28 +183,59 @@ if (!window._sidebarParentToggleBound) {
 // deletes the .ps__rail-y / .ps__thumb-y nodes that PS injected. Without them
 // the sidebar loses its scrollbar on every navigation. We destroy the stale
 // instance and create a fresh one each time navigation completes.
+window._clearNavigationUiLocks = function () {
+  document.documentElement.classList.remove('overflow-y-hidden');
+  document.body.classList.remove('overflow-y-hidden', 'modal-open');
+  document.documentElement.style.removeProperty('overflow');
+  document.body.style.removeProperty('overflow');
+  document.body.style.removeProperty('padding-right');
+
+  document.querySelectorAll('.modal-backdrop, .offcanvas-backdrop').forEach(function (backdrop) {
+    backdrop.remove();
+  });
+};
+
+window._destroySneatMenu = function () {
+  if (window._sneatMenu && typeof window._sneatMenu.destroy === 'function') {
+    try { window._sneatMenu.destroy(); } catch (e) {}
+  }
+
+  window._sneatMenu = null;
+  if (window.Helpers) {
+    window.Helpers.mainMenu = null;
+    window.Helpers.menuPsScroll = null;
+  }
+};
+
+window._initializeSneatMenu = function () {
+  const menuElement = document.getElementById('layout-menu');
+  const menuInner = menuElement ? menuElement.querySelector('.menu-inner') : null;
+  const menuConstructor = window.Menu || (typeof Menu !== 'undefined' ? Menu : null);
+
+  if (!menuElement || !menuInner || !menuConstructor) return;
+
+  window._destroySneatMenu();
+  window._sneatMenu = new menuConstructor(menuElement, {
+    orientation: 'vertical',
+    closeChildren: false
+  });
+
+  if (window.Helpers) {
+    window.Helpers.mainMenu = window._sneatMenu;
+    window.Helpers.scrollToActive(false);
+  }
+};
+
 if (!window._sneatNavBound) {
   window._sneatNavBound = true;
 
+  document.addEventListener('livewire:navigating', function () {
+    window._clearNavigationUiLocks();
+    window._destroySneatMenu();
+  });
+
   document.addEventListener('livewire:navigated', function () {
-    const menuInner = document.querySelector('#layout-menu .menu-inner');
-    if (!menuInner || !window.PerfectScrollbar) return;
-
-    // Destroy stale PS instance (removes its DOM nodes and event listeners)
-    if (window._sneatMenu && window._sneatMenu._scrollbar) {
-      try { window._sneatMenu._scrollbar.destroy(); } catch (e) {}
-      window._sneatMenu._scrollbar = null;
-    }
-
-    // Re-create PS on the (now clean) menu-inner element
-    window._sneatMenu._scrollbar = new PerfectScrollbar(menuInner, {
-      suppressScrollX: true,
-      wheelPropagation: false
-    });
-
-    // Scroll sidebar to show the newly active menu item
-    if (window.Helpers) {
-      window.Helpers.scrollToActive(false);
-    }
+    window._clearNavigationUiLocks();
+    window._initializeSneatMenu();
   });
 }

@@ -12,6 +12,11 @@ class Dashboard extends Component
     public string $registerName  = '';
     public string $initialAmount = '';
 
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->can('ver caja'), 403);
+    }
+
     #[Computed]
     public function activeRegister(): ?CashRegister
     {
@@ -20,6 +25,7 @@ class Dashboard extends Component
 
     public function openRegister(): void
     {
+        abort_unless(auth()->user()?->can('abrir caja'), 403);
         $this->validate([
             'registerName'  => 'required|string|max:60',
             'initialAmount' => 'required|numeric|min:0',

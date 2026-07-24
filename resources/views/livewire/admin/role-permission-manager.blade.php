@@ -29,6 +29,7 @@
 
     {{-- Tabs --}}
     <ul class="nav nav-pills app-tabs mb-4 gap-2" role="tablist" aria-label="Gestión de acceso">
+        @can('gestionar roles')
         <li class="nav-item">
             <button wire:click="$set('activeTab','roles')"
                     class="nav-link {{ $activeTab==='roles' ? 'active' : '' }}">
@@ -38,6 +39,8 @@
                 </span>
             </button>
         </li>
+        @endcan
+        @can('gestionar permisos')
         <li class="nav-item">
             <button wire:click="$set('activeTab','permissions')"
                     class="nav-link {{ $activeTab==='permissions' ? 'active' : '' }}">
@@ -47,12 +50,14 @@
                 </span>
             </button>
         </li>
+        @endcan
     </ul>
 
 
     {{-- ================================================================
          TAB: ROLES
     ================================================================= --}}
+    @can('gestionar roles')
     @if($activeTab === 'roles')
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h6 class="fw-semibold mb-0 text-muted">
@@ -114,11 +119,13 @@
         </div>
     </div>
     @endif
+    @endcan
 
 
     {{-- ================================================================
          TAB: PERMISOS
     ================================================================= --}}
+    @can('gestionar permisos')
     @if($activeTab === 'permissions')
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h6 class="fw-semibold mb-0 text-muted">
@@ -132,8 +139,8 @@
     <div class="row g-4">
         @foreach($this->permissionsByGroup as $grp => $perms)
         @php
-            $gc = ['usuarios'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
-            $gi = ['usuarios'=>'bx-group','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
+            $gc = ['usuarios'=>'primary','clientes'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
+            $gi = ['usuarios'=>'bx-group','clientes'=>'bx-user-pin','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
             $gc_val = $gc[$grp] ?? 'secondary';
             $gi_val = $gi[$grp] ?? 'bx-key';
         @endphp
@@ -168,6 +175,7 @@
         @endforeach
     </div>
     @endif
+    @endcan
 
 
     {{-- ================================================================
@@ -302,8 +310,8 @@
                             <div class="row g-3">
                                 @foreach($this->permissionsByGroup as $grp => $perms)
                                 @php
-                                    $gc3 = ['usuarios'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
-                                    $gi3 = ['usuarios'=>'bx-group','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
+                                    $gc3 = ['usuarios'=>'primary','clientes'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
+                                    $gi3 = ['usuarios'=>'bx-group','clientes'=>'bx-user-pin','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
                                     $gc3v = $gc3[$grp] ?? 'secondary';
                                     $gi3v = $gi3[$grp] ?? 'bx-folder';
                                     $allSelected = collect($perms)->every(fn($p) => in_array($p->name, $rolePermissions));

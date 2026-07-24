@@ -2,6 +2,7 @@
     <div class="pos-header-left">
         <div class="pos-logo">
             <img class="pos-logo-img" src="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}" alt="Logo de {{ $businessSettings?->business_name ?? config('app.name') }}"
+                 width="42" height="42"
                  onerror="this.hidden=true;this.nextElementSibling.hidden=false">
             <i class="bx bx-restaurant" data-ui="xui-1v6ktfg" hidden></i>
         </div>
@@ -19,15 +20,18 @@
             <i class="bx bx-calculator"></i>
             <span>Caja</span>
         </a>
-        <button type="button" class="btn-header-action btn-header-expense" wire:click="openExpenseModal" aria-label="Registrar un gasto">
-            <i class="bx bx-wallet"></i>
-            <span>Registrar gasto</span>
-        </button>
+        @can('registrar gastos')
+            <button type="button" class="btn-header-action btn-header-expense" wire:click="openExpenseModal" aria-label="Registrar un gasto">
+                <i class="bx bx-wallet"></i>
+                <span>Registrar gasto</span>
+            </button>
+        @endcan
         <div data-ui="xui-h2y0md">
             <i class="bx bx-lock-open-alt"></i>
             <span>{{ $this->activeCashRegister->name }}</span>
         </div>
-        <button class="btn-cart-toggle" @click="showCart = !showCart" :class="showCart ? 'active' : ''">
+        <button type="button" class="btn-cart-toggle" @click="showCart = !showCart" :class="showCart ? 'active' : ''"
+                aria-label="Abrir carrito" :aria-expanded="showCart.toString()">
             <i class="bx bx-cart"></i>
             @if(!empty($cart))
                 <span class="cart-count">{{ $this->cartCount }}</span>

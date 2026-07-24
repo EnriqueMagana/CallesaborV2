@@ -1,10 +1,10 @@
 @if ($showCheckoutModal)
-    <div class="pos-modal-wrap show" wire:click.self="$set('showCheckoutModal',false)">
+    <div class="pos-modal-wrap show" wire:click.self="$set('showCheckoutModal',false)" role="dialog" aria-modal="true" aria-labelledby="checkout-modal-title">
         <div class="pos-modal" @click.stop>
             <div class="modal-header-pos">
                 <i class="bx bx-receipt" data-ui="xui-szn55b"></i>
-                <h4>Confirmar pedido</h4>
-                <button wire:click="$set('showCheckoutModal',false)" class="pos-btn pos-btn-ghost pos-btn-sm"><i
+                <h4 id="checkout-modal-title">Confirmar pedido</h4>
+                <button type="button" wire:click="$set('showCheckoutModal',false)" class="pos-btn pos-btn-ghost pos-btn-sm" aria-label="Cerrar"><i
                         class="bx bx-x" data-ui="xui-miwya2"></i></button>
             </div>
             <div class="modal-body-pos">

@@ -4,18 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $payload['title'] ?? $template->name }}</title>
-    <link rel="stylesheet" href="{{ asset('assets/css/ticket-print.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/ticket-print.css') }}?v={{ filemtime(public_path('assets/css/ticket-print.css')) }}">
 </head>
 <body class="ticket-document ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }}">
     <main class="ticket-sheet">
         @foreach($template->blocks as $block)
-            @if(($block['enabled'] ?? false) && in_array($block['key'] ?? '', ['header','business','order_meta','delivery','items','cut_summary','cut_meta','cut_sales_channels','cut_payment_methods','cut_cash_movements','cut_reconciliation','cut_notes','totals','payments','qr','footer'], true))
+            @if(($block['enabled'] ?? false) && in_array($block['key'] ?? '', ['header','business','order_meta','delivery','items','cut_summary','cut_meta','cut_sales_channels','cut_payment_methods','cut_cash_movements','cut_reconciliation','cut_notes','totals','payments','qr','footer','inventory_purchase_meta','inventory_purchase_items','inventory_purchase_notes'], true))
                 @include('print.blocks.'.$block['key'])
             @endif
         @endforeach
     </main>
-    @unless($payload['preview'] ?? false)
+    @if(!($payload['preview'] ?? false) && ($payload['auto_print'] ?? true))
         <script>window.addEventListener('load', () => window.print())</script>
-    @endunless
+    @endif
 </body>
 </html>

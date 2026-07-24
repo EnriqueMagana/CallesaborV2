@@ -11,6 +11,19 @@
 
 <link rel="icon" href="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}"/>
 
+{{-- Reserva la geometría esencial antes de cargar las hojas completas. --}}
+<style>
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f6f5f8}
+#pos-loading-screen{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:#f6f5f8;color:#6f6b80;font:600 13px/1.4 "Public Sans","Segoe UI",sans-serif;transition:opacity .2s ease}
+#pos-loading-screen.fade-out{opacity:0;pointer-events:none}
+#pos-loading-spinner{width:42px;height:42px;border:3px solid rgba(105,86,232,.16);border-top-color:#6956e8;border-radius:50%;animation:pos-critical-spin .7s linear infinite}
+.pos-root{position:fixed;inset:0;display:flex;overflow:hidden;flex-direction:column;background:#f6f5f8}
+.pos-logo,.pos-logo-img{width:42px;height:42px;max-width:42px;max-height:42px}
+.pos-logo-img{display:block;object-fit:contain}
+@keyframes pos-critical-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#pos-loading-spinner{animation-duration:1.5s}}
+</style>
+
 <!-- Fonts (misma que el tema) -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -24,8 +37,8 @@
 <link rel="stylesheet" href="{{ asset('assets/vendor/css/theme-default.css') }}" class="template-customizer-theme-css"/>
 <link rel="stylesheet" href="{{ asset('assets/css/demo.css') }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/pos.css') }}?v={{ filemtime(public_path('assets/css/pos.css')) }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/pos-modern.css') }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}?v={{ filemtime(public_path('assets/css/extracted-ui.css')) }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/pos-modern.css') }}?v={{ filemtime(public_path('assets/css/pos-modern.css')) }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}"/>
 
 <!-- Helpers -->
@@ -49,7 +62,6 @@
 <script src="{{ asset('assets/vendor/libs/jquery/jquery.js') }}"></script>
 <script src="{{ asset('assets/vendor/libs/popper/popper.js') }}"></script>
 <script src="{{ asset('assets/vendor/js/bootstrap.js') }}"></script>
-<script src="{{ asset('assets/js/main.js') }}"></script>
 
 @livewireScripts
 @stack('scripts')
@@ -60,11 +72,17 @@
         var el = document.getElementById('pos-loading-screen');
         if (!el) return;
         el.classList.add('fade-out');
-        setTimeout(function () { el.remove(); }, 350);
+        setTimeout(function () { el.remove(); }, 220);
     }
-    document.addEventListener('livewire:initialized', hidePosLoader);
-    // Fallback: remove after 3s even if Livewire hook doesn't fire
-    setTimeout(hidePosLoader, 3000);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', hidePosLoader, { once: true });
+    } else {
+        requestAnimationFrame(hidePosLoader);
+    }
+
+    document.addEventListener('livewire:navigated', hidePosLoader);
+    setTimeout(hidePosLoader, 900);
 })();
 </script>
 </body>

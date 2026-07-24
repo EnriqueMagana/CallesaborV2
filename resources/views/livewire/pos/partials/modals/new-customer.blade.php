@@ -1,10 +1,10 @@
 @if($showAddCustomerModal)
-<div class="pos-modal-wrap show" wire:click.self="$set('showAddCustomerModal',false)" data-ui="xui-5zthtb">
+<div class="pos-modal-wrap show" wire:click.self="$set('showAddCustomerModal',false)" role="dialog" aria-modal="true" aria-labelledby="customer-modal-title" data-ui="xui-5zthtb">
     <div class="pos-modal" @click.stop>
         <div class="modal-header-pos">
             <i class="bx bx-user-plus" data-ui="xui-zbum5m"></i>
-            <h4>Registrar nuevo cliente</h4>
-            <button wire:click="$set('showAddCustomerModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
+            <h4 id="customer-modal-title">Registrar nuevo cliente</h4>
+            <button type="button" wire:click="$set('showAddCustomerModal',false)" class="pos-btn pos-btn-secondary" aria-label="Cerrar" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
         </div>
         <div class="modal-body-pos">
             <div data-ui="xui-n3c866">
@@ -31,8 +31,8 @@
             </div>
         </div>
         <div class="modal-footer-pos">
-            <button wire:click="$set('showAddCustomerModal',false)" class="pos-btn pos-btn-secondary">Cancelar</button>
-            <button wire:click="saveNewCustomer" wire:loading.attr="disabled" wire:target="saveNewCustomer" class="pos-btn pos-btn-primary">
+            <button type="button" wire:click="$set('showAddCustomerModal',false)" class="pos-btn pos-btn-secondary">Cancelar</button>
+            <button type="button" wire:click="saveNewCustomer" wire:loading.attr="disabled" wire:target="saveNewCustomer" class="pos-btn pos-btn-primary">
                 <span wire:loading wire:target="saveNewCustomer" class="spinner-border spinner-border-sm" data-ui="xui-a2bbzz"></span>
                 <i wire:loading.remove wire:target="saveNewCustomer" class="bx bx-save"></i>
                 Guardar y usar

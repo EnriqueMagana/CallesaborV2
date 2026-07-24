@@ -15,8 +15,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $permissions = [
             'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos'],
+            'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion'],
-            'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'eliminar items de ordenes', 'eliminar ordenes', 'cerrar ordenes'],
+            'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'eliminar items de ordenes', 'eliminar ordenes', 'cerrar ordenes', 'reimprimir tickets'],
             'mesas' => [
                 'ver mesas',
                 'asignar mesas',       // asignarse a una mesa disponible
@@ -28,8 +29,16 @@ class RolesAndPermissionsSeeder extends Seeder
                 'dividir mesas',       // dividir cuenta en partes
                 'gestionar mesas',     // crear/editar/eliminar mesas y áreas (admin)
                 'gestionar grupos',    // agrupar/desagrupar mesas
+                'crear areas de mesas',
+                'editar areas de mesas',
+                'eliminar areas de mesas',
+                'crear mesas',
+                'editar mesas',
+                'eliminar mesas',
+                'cambiar estado mesas',
+                'cancelar divisiones mesas',
             ],
-            'caja' => ['ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'anular pagos'],
+            'caja' => ['ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'anular pagos', 'registrar gastos'],
             'reportes' => ['ver reportes', 'exportar reportes', 'ver reportes financieros'],
             'configuracion' => [
                 'ver configuracion', 'editar configuracion', 'gestionar configuracion negocio',
@@ -38,6 +47,16 @@ class RolesAndPermissionsSeeder extends Seeder
             ],
             'kiosco' => ['gestionar kioscos'],
             'delivery' => ['ver delivery', 'tomar delivery', 'entregar delivery', 'gestionar delivery'],
+            'reservas' => ['ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas'],
+            'inventario' => [
+                'ver inventario',
+                'gestionar insumos',
+                'ajustar inventario',
+                'generar compras inventario',
+                'editar compras inventario',
+                'eliminar compras inventario',
+                'recepcionar compras inventario',
+            ],
         ];
 
         foreach ($permissions as $group => $perms) {
@@ -71,23 +90,34 @@ class RolesAndPermissionsSeeder extends Seeder
         $gerente = Role::firstOrCreate(['name' => 'gerente', 'guard_name' => 'web']);
         $gerente->syncPermissions([
             'ver usuarios',
+            'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias',
-            'ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'cerrar ordenes',
+            'ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'gestionar mesas', 'gestionar grupos',
-            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos',
+            'crear areas de mesas', 'editar areas de mesas', 'eliminar areas de mesas',
+            'crear mesas', 'editar mesas', 'eliminar mesas', 'cambiar estado mesas',
+            'cancelar divisiones mesas',
+            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos',
             'ver reportes', 'exportar reportes',
             'ver delivery', 'gestionar delivery',
+            'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
+            'ver inventario', 'gestionar insumos', 'ajustar inventario',
+            'generar compras inventario', 'recepcionar compras inventario',
+            'editar compras inventario', 'eliminar compras inventario',
         ]);
 
         // Cajero
         $cajero = Role::firstOrCreate(['name' => 'cajero', 'guard_name' => 'web']);
         $cajero->syncPermissions([
-            'ver ordenes', 'crear ordenes', 'cerrar ordenes',
+            'ver clientes', 'crear clientes', 'editar clientes',
+            'ver ordenes', 'crear ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
-            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos',
+            'cancelar divisiones mesas',
+            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos',
+            'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
         ]);
 
         // Mesero
@@ -99,7 +129,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Cocinero
         $cocinero = Role::firstOrCreate(['name' => 'cocinero', 'guard_name' => 'web']);
-        $cocinero->syncPermissions(['ver ordenes', 'editar ordenes', 'ver menu']);
+        $cocinero->syncPermissions(['ver ordenes', 'editar ordenes', 'reimprimir tickets', 'ver menu']);
 
         // Repartidor — acceso operativo únicamente a sus entregas.
         $repartidor = Role::firstOrCreate(['name' => 'repartidor', 'guard_name' => 'web']);

@@ -28,39 +28,161 @@
     </header>
 
     @if ($step === 1)
-        <section class="kiosk-welcome">
+        @php $featuredPromotions = $this->promotions->values(); @endphp
+        <section class="kiosk-welcome kiosk-welcome--fullscreen">
             <div class="kiosk-welcome-copy">
                 <span class="kiosk-eyebrow">Kiosco de autoservicio</span>
                 <h1>{{ $this->terminal->welcome_title }}</h1>
                 <p>{{ $this->terminal->welcome_message }}</p>
-                <div class="kiosk-trust-row">
-                    <span><i class="bx bx-star"></i> 100% personalizado</span>
-                    <span><i class="bx bx-qr-scan"></i> Seguimiento por QR</span>
-                </div>
+
+                @if($featuredPromotions->isNotEmpty())
+                    <section
+                        class="kiosk-promo-spotlight"
+                        x-data="{
+                            active: 0,
+                            direction: 1,
+                            total: {{ $featuredPromotions->count() }},
+                            selected: @js($featuredProductIntent),
+                            timer: null,
+                            touchStart: null,
+                            init() { this.start() },
+                            destroy() { this.stop() },
+                            start() {
+                                if (this.total < 2 || this.timer || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                                this.timer = setInterval(() => this.next(), 5000);
+                            },
+                            stop() {
+                                clearInterval(this.timer);
+                                this.timer = null;
+                            },
+                            next() {
+                                this.direction = 1;
+                                this.active = (this.active + 1) % this.total;
+                            },
+                            previous() {
+                                this.direction = -1;
+                                this.active = (this.active - 1 + this.total) % this.total;
+                            },
+                            go(index) {
+                                if (index === this.active) return;
+                                this.direction = index > this.active ? 1 : -1;
+                                this.active = index;
+                            },
+                            finishSwipe(position) {
+                                if (this.touchStart === null) return;
+                                const distance = position - this.touchStart;
+                                if (Math.abs(distance) > 40) distance < 0 ? this.next() : this.previous();
+                                this.touchStart = null;
+                                this.start();
+                            }
+                        }"
+                        :class="{ 'is-moving-backward': direction < 0 }"
+                        @mouseenter="stop()"
+                        @mouseleave="start()"
+                        @focusin="stop()"
+                        @focusout="start()"
+                        @touchstart.passive="touchStart = $event.touches[0].clientX; stop()"
+                        @touchend.passive="finishSwipe($event.changedTouches[0].clientX)"
+                        aria-label="Productos recomendados"
+                    >
+                        <div class="kiosk-promo-spotlight-stage">
+                            @if($featuredPromotions->count() > 1)
+                                <button type="button" class="kiosk-carousel-control is-previous" @click="previous()" aria-label="Recomendación anterior"><i class="bx bx-chevron-left"></i></button>
+                                <button type="button" class="kiosk-carousel-control is-next" @click="next()" aria-label="Recomendación siguiente"><i class="bx bx-chevron-right"></i></button>
+                            @endif
+
+                            @foreach($featuredPromotions as $promotion)
+                                @php
+                                    $product = $promotion->product;
+                                    $hasDiscount = $promotion->promotional_price !== null && (float) $promotion->promotional_price < (float) $product->price;
+                                @endphp
+                                <article
+                                    class="kiosk-promo-slide"
+                                    :class="{ 'is-selected': selected === {{ $product->id }} }"
+                                    x-cloak
+                                    x-show="active === {{ $loop->index }}"
+                                    x-transition:enter="kiosk-carousel-enter"
+                                    x-transition:enter-start="kiosk-carousel-enter-start"
+                                    x-transition:enter-end="kiosk-carousel-enter-end"
+                                    x-transition:leave="kiosk-carousel-leave"
+                                    x-transition:leave-start="kiosk-carousel-leave-start"
+                                    x-transition:leave-end="kiosk-carousel-leave-end"
+                                    wire:key="home-promotion-{{ $promotion->id }}"
+                                >
+                                    <span class="kiosk-promo-slide-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
+                                        @if($product->image)
+                                            <img x-ref="image" src="{{ route('kiosk.media', ['path' => $product->image]) }}" alt="{{ $product->name }}" width="176" height="172" loading="eager" decoding="async" fetchpriority="{{ $loop->first ? 'high' : 'low' }}">
+                                        @else
+                                            <i class="bx bx-food-menu"></i>
+                                        @endif
+                                    </span>
+                                    <span class="kiosk-promo-slide-copy">
+                                        <strong>{{ $product->name }}</strong>
+                                        <span>
+                                            @if($hasDiscount)<del>${{ number_format($product->price, 2) }}</del>@endif
+                                            <b>${{ number_format($hasDiscount ? $promotion->promotional_price : $product->price, 2) }}</b>
+                                        </span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        @click="selected = selected === {{ $product->id }} ? null : {{ $product->id }}; $wire.set('featuredProductIntent', selected, false)"
+                                        :aria-pressed="selected === {{ $product->id }} ? 'true' : 'false'"
+                                        :aria-label="selected === {{ $product->id }} ? @js('Quitar '.$product->name) : @js('Elegir '.$product->name)"
+                                    >
+                                        <i class="bx" :class="selected === {{ $product->id }} ? 'bx-check' : 'bx-plus'"></i>
+                                        <span x-text="selected === {{ $product->id }} ? 'Elegido' : 'Quiero este'"></span>
+                                    </button>
+                                </article>
+                            @endforeach
+                        </div>
+
+                        @if($featuredPromotions->count() > 1)
+                            <div class="kiosk-carousel-dots" role="group" aria-label="Elegir recomendación">
+                                @foreach($featuredPromotions as $promotion)
+                                    <button
+                                        type="button"
+                                        @click="go({{ $loop->index }})"
+                                        :class="{ 'is-active': active === {{ $loop->index }} }"
+                                        :aria-current="active === {{ $loop->index }} ? 'true' : 'false'"
+                                        aria-label="Ver {{ $promotion->product->name }}"
+                                    ></button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </section>
+                @else
+                    <div class="kiosk-trust-row">
+                        <span><i class="bx bx-star"></i> 100% personalizado</span>
+                        <span><i class="bx bx-qr-scan"></i> Seguimiento por QR</span>
+                    </div>
+                @endif
             </div>
-            <div class="kiosk-fulfillment-grid">
-                @if ($this->terminal->allow_dine_in)
-                    <button class="kiosk-choice-card" type="button" wire:click="chooseFulfillment('dine_in')">
-                        <span class="kiosk-choice-icon"><i class="bx bx-restaurant"></i></span>
-                        <span><strong>Comer aquí</strong><small>Disfruta tu orden en el restaurante</small></span>
-                        <i class="bx bx-right-arrow-alt"></i>
-                    </button>
-                @endif
-                @if ($this->terminal->allow_takeaway)
-                    <button class="kiosk-choice-card" type="button" wire:click="chooseFulfillment('takeaway')">
-                        <span class="kiosk-choice-icon"><i class="bx bx-shopping-bag"></i></span>
-                        <span><strong>Para llevar</strong><small>Preparamos todo para que continúes</small></span>
-                        <i class="bx bx-right-arrow-alt"></i>
-                    </button>
-                @endif
-                @if ($this->terminal->allow_delivery)
-                    <button class="kiosk-choice-card kiosk-choice-card-delivery" type="button"
-                        wire:click="chooseFulfillment('delivery')">
-                        <span class="kiosk-choice-icon"><i class="bx bx-cycling"></i></span>
-                        <span><strong>Para domicilio</strong><small>Lo llevamos a la dirección que nos indiques</small></span>
-                        <i class="bx bx-right-arrow-alt"></i>
-                    </button>
-                @endif
+
+            <div class="kiosk-fulfillment-panel">
+                <div class="kiosk-fulfillment-grid">
+                    @if ($this->terminal->allow_dine_in)
+                        <button class="kiosk-choice-card kiosk-loadable-card" type="button" wire:click="chooseFulfillment('dine_in')" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="chooseFulfillment('dine_in')">
+                            <span class="kiosk-choice-icon"><i class="bx bx-restaurant"></i></span>
+                            <span><strong>Comer aquí</strong><small>Disfruta tu orden en el restaurante</small></span>
+                            <i class="bx bx-right-arrow-alt"></i>
+                        </button>
+                    @endif
+                    @if ($this->terminal->allow_takeaway)
+                        <button class="kiosk-choice-card kiosk-loadable-card" type="button" wire:click="chooseFulfillment('takeaway')" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="chooseFulfillment('takeaway')">
+                            <span class="kiosk-choice-icon"><i class="bx bx-shopping-bag"></i></span>
+                            <span><strong>Para llevar</strong><small>Preparamos todo para que continúes</small></span>
+                            <i class="bx bx-right-arrow-alt"></i>
+                        </button>
+                    @endif
+                    @if ($this->terminal->allow_delivery)
+                        <button class="kiosk-choice-card kiosk-choice-card-delivery kiosk-loadable-card" type="button"
+                            wire:click="chooseFulfillment('delivery')" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="chooseFulfillment('delivery')">
+                            <span class="kiosk-choice-icon"><i class="bx bx-cycling"></i></span>
+                            <span><strong>Para domicilio</strong><small>Lo llevamos a la dirección que nos indiques</small></span>
+                            <i class="bx bx-right-arrow-alt"></i>
+                        </button>
+                    @endif
+                </div>
             </div>
         </section>
     @elseif($step === 2)
@@ -76,11 +198,11 @@
             <div class="kiosk-recommendation-grid">
                 @foreach ($this->categories as $category)
                     @php $coverProduct = $category->products->first(fn($product) => filled($product->image)); @endphp
-                    <button type="button" class="kiosk-recommendation-card"
-                        wire:click="chooseRecommendation({{ $category->id }})">
-                        <span class="kiosk-recommendation-media">
+                    <button type="button" class="kiosk-recommendation-card kiosk-loadable-card"
+                        wire:click="chooseRecommendation({{ $category->id }})" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="chooseRecommendation({{ $category->id }})">
+                        <span class="kiosk-recommendation-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                             @if ($coverProduct)
-                                <img src="{{ \Illuminate\Support\Facades\Storage::url($coverProduct->image) }}"
+                                <img x-ref="image" src="{{ route('kiosk.media', ['path' => $coverProduct->image]) }}"
                                     alt="Productos de {{ $category->name }}" width="360" height="220"
                                     loading="lazy">
                             @else
@@ -96,8 +218,8 @@
                         </span>
                     </button>
                 @endforeach
-                <button type="button" class="kiosk-recommendation-card kiosk-recommendation-all"
-                    wire:click="chooseRecommendation">
+                <button type="button" class="kiosk-recommendation-card kiosk-recommendation-all kiosk-loadable-card"
+                    wire:click="chooseRecommendation" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="chooseRecommendation">
                     <span class="kiosk-recommendation-media"><i class="bx bx-grid-alt"></i><b>Todos los
                             productos</b></span>
                     <span class="kiosk-recommendation-copy"><span><strong>Quiero ver todo</strong><i
@@ -121,11 +243,12 @@
                         <h1>{{ $recommendationName === 'Todo el menú' ? 'Explora todo el menú' : 'Te recomendamos ' . $recommendationName }}
                         </h1>
                     </div>
-                    <label class="kiosk-search">
+                    <form class="kiosk-search" wire:submit="applySearch">
                         <i class="bx bx-search"></i>
-                        <input type="search" wire:model.live.debounce.300ms="search" placeholder="Buscar en el menú"
+                        <input type="search" wire:model="search" placeholder="Buscar en el menú"
                             aria-label="Buscar en el menú">
-                    </label>
+                        <button type="submit" aria-label="Buscar"><i class="bx bx-right-arrow-alt"></i></button>
+                    </form>
                 </div>
 
                 <nav class="kiosk-categories" aria-label="Categorías">
@@ -142,13 +265,21 @@
                     @endforeach
                 </nav>
 
-                <div class="kiosk-products" wire:loading.class="is-loading">
+                <div class="kiosk-products-shell">
+                    <div class="kiosk-component-loader" wire:loading.flex wire:target="applySearch,categoryFilter" role="status" aria-label="Actualizando productos">
+                        <i class="bx bx-loader-alt"></i>
+                    </div>
+                    <div class="kiosk-products">
                     @forelse($this->products as $product)
-                        <button class="kiosk-product-card" type="button" wire:click="openProduct({{ $product->id }})"
-                            wire:key="kiosk-product-{{ $product->id }}">
-                            <span class="kiosk-product-media">
+                        @php
+                            $menuPromotion = $this->promotions->get($product->id);
+                            $menuHasDiscount = $menuPromotion?->promotional_price !== null && (float) $menuPromotion->promotional_price < (float) $product->price;
+                        @endphp
+                        <button class="kiosk-product-card kiosk-loadable-card" type="button" wire:click="openProduct({{ $product->id }})"
+                            wire:key="kiosk-product-{{ $product->id }}" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="openProduct({{ $product->id }})">
+                            <span class="kiosk-product-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                                 @if ($product->image)
-                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($product->image) }}"
+                                    <img x-ref="image" src="{{ route('kiosk.media', ['path' => $product->image]) }}"
                                         alt="{{ $product->name }}">
                                 @else
                                     <i class="bx bx-food-menu"></i>
@@ -156,11 +287,20 @@
                                 @if ($product->is_customizable || $product->addon_groups_count || $product->ingredients_count)
                                     <small><i class="bx bx-slider-alt"></i> Personalizable</small>
                                 @endif
+                                @if($menuPromotion)
+                                    <b class="kiosk-product-promo-label"><i class="bx bx-purchase-tag"></i>{{ $menuPromotion->label ?: 'Recomendado' }}</b>
+                                @endif
                             </span>
                             <span class="kiosk-product-info">
                                 <strong>{{ $product->name }}</strong>
                                 <small>{{ Str::limit($product->description ?: 'Preparado al momento para ti.', 72) }}</small>
-                                <span>${{ number_format($product->price, 2) }} <i class="bx bx-plus"></i></span>
+                                <span>
+                                    <span class="kiosk-menu-price">
+                                        @if($menuHasDiscount)<del>${{ number_format($product->price, 2) }}</del>@endif
+                                        <b>${{ number_format($menuHasDiscount ? $menuPromotion->promotional_price : $product->price, 2) }}</b>
+                                    </span>
+                                    <i class="bx bx-plus"></i>
+                                </span>
                             </span>
                         </button>
                     @empty
@@ -170,6 +310,7 @@
                             <p>Prueba otra categoría o cambia tu búsqueda.</p>
                         </div>
                     @endforelse
+                    </div>
                 </div>
             </div>
 
@@ -223,9 +364,13 @@
                     class="bx bx-left-arrow-alt"></i> Volver al menú</button>
             <div class="kiosk-customizer-grid">
                 <aside class="kiosk-customizer-summary">
-                    <div class="kiosk-customizer-media">
+                    @php
+                        $customizerPromotion = $this->promotions->get($this->product->id);
+                        $customizerHasDiscount = $customizerPromotion?->promotional_price !== null && (float) $customizerPromotion->promotional_price < (float) $this->product->price;
+                    @endphp
+                    <div class="kiosk-customizer-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                         @if ($this->product->image)
-                            <img src="{{ \Illuminate\Support\Facades\Storage::url($this->product->image) }}"
+                            <img x-ref="image" src="{{ route('kiosk.media', ['path' => $this->product->image]) }}"
                                 alt="{{ $this->product->name }}">
                         @else
                             <i class="bx bx-food-menu"></i>
@@ -234,7 +379,10 @@
                     <span class="kiosk-eyebrow">Paso 3 de 4</span>
                     <h1>{{ $this->product->name }}</h1>
                     <p>{{ $this->product->description ?: 'Hazlo exactamente como te gusta.' }}</p>
-                    <strong>Desde ${{ number_format($this->product->price, 2) }}</strong>
+                    <strong class="kiosk-customizer-price">
+                        @if($customizerHasDiscount)<del>${{ number_format($this->product->price, 2) }}</del>@endif
+                        Desde ${{ number_format($customizerHasDiscount ? $customizerPromotion->promotional_price : $this->product->price, 2) }}
+                    </strong>
                 </aside>
                 <div class="kiosk-options-panel">
                     <div class="kiosk-options-heading">
@@ -291,9 +439,9 @@
                                 @foreach ($group->addons as $addon)
                                     @php $addonQuantity = (int) ($addonQuantities[$addon->id] ?? 0); @endphp
                                     <article class="kiosk-option {{ $addonQuantity > 0 ? 'is-selected' : '' }}">
-                                        <div class="kiosk-option-media">
+                                        <div class="kiosk-option-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                                             @if ($addon->image)
-                                                <img src="{{ \Illuminate\Support\Facades\Storage::url($addon->image) }}"
+                                                <img x-ref="image" src="{{ route('kiosk.media', ['path' => $addon->image]) }}"
                                                     alt="Imagen de {{ $addon->name }}" width="112"
                                                     height="96" loading="lazy">
                                             @else
@@ -314,12 +462,20 @@
                                                 aria-label="Cantidad de {{ $addon->name }}">
                                                 <button type="button"
                                                     wire:click="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, -1)"
+                                                    class="kiosk-local-action"
+                                                    wire:loading.class="is-loading"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, -1)"
                                                     @disabled($addonQuantity === 0 || ($group->is_required && $group->addons->count() === 1 && $addonQuantity === 1))
                                                     aria-label="Quitar una unidad de {{ $addon->name }}"><i
                                                         class="bx bx-minus"></i><span>Quitar</span></button>
                                                 <div><small>Cantidad</small><strong>{{ $addonQuantity }}</strong></div>
                                                 <button type="button"
                                                     wire:click="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, 1)"
+                                                    class="kiosk-local-action"
+                                                    wire:loading.class="is-loading"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, 1)"
                                                     @disabled($addonQuantity >= $maximum || ($selectedCount >= $maximum && $maximum > 1))
                                                     aria-label="Agregar una unidad de {{ $addon->name }}"><i
                                                         class="bx bx-plus"></i><span>Agregar</span></button>
@@ -379,9 +535,9 @@
                                     <article
                                         class="kiosk-ingredient {{ $ingredientQuantity > 0 ? 'is-selected' : '' }}">
                                         <div class="kiosk-ingredient-copy">
-                                            <span class="kiosk-ingredient-media">
+                                            <span class="kiosk-ingredient-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                                                 @if ($ingredient->image)
-                                                    <img src="{{ \Illuminate\Support\Facades\Storage::url($ingredient->image) }}"
+                                                    <img x-ref="image" src="{{ route('kiosk.media', ['path' => $ingredient->image]) }}"
                                                         alt="Imagen de {{ $ingredient->name }}" width="56"
                                                     height="56" loading="lazy">@else<i class="bx bx-leaf"></i>
                                                 @endif
@@ -396,6 +552,10 @@
                                             aria-label="Cantidad de {{ $ingredient->name }}">
                                             <button type="button"
                                                 wire:click="changeIngredient({{ $ingredient->id }}, -1)"
+                                                class="kiosk-local-action"
+                                                wire:loading.class="is-loading"
+                                                wire:loading.attr="disabled"
+                                                wire:target="changeIngredient({{ $ingredient->id }}, -1)"
                                                 @disabled($ingredientQuantity === 0)
                                                 aria-label="Quitar una unidad de {{ $ingredient->name }}"><i
                                                     class="bx bx-minus"></i><span>Quitar</span></button>
@@ -403,6 +563,10 @@
                                             </div>
                                             <button type="button"
                                                 wire:click="changeIngredient({{ $ingredient->id }}, 1)"
+                                                class="kiosk-local-action"
+                                                wire:loading.class="is-loading"
+                                                wire:loading.attr="disabled"
+                                                wire:target="changeIngredient({{ $ingredient->id }}, 1)"
                                                 @disabled($ingredientMaximum > 0 && $ingredientTotal >= $ingredientMaximum)
                                                 aria-label="Agregar una unidad de {{ $ingredient->name }}"><i
                                                     class="bx bx-plus"></i><span>Agregar</span></button>

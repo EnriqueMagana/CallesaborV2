@@ -20,7 +20,7 @@
             <div class="kiosk-token-copy">
                 <span>Token emitido para {{ $issuedTerminalName }}</span>
                 <h2>Guarda esta URL ahora</h2>
-                <p>Por seguridad, el token no podrá consultarse nuevamente. Al rotarlo, la URL anterior deja de funcionar.</p>
+                <p>La URL queda protegida y podrás volver a abrirla desde la tarjeta. Al rotarla, la anterior deja de funcionar.</p>
                 <code>{{ $issuedUrl }}</code>
             </div>
             <div class="kiosk-token-actions">
@@ -59,6 +59,13 @@
                         <div><dt>Último acceso</dt><dd>{{ $terminal->last_used_at?->diffForHumans() ?: 'Nunca' }}</dd></div>
                     </dl>
                     <div class="kiosk-terminal-actions">
+                        <a
+                            class="btn btn-kiosk-open"
+                            href="{{ route('app.kioscos.open', $terminal) }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Abrir {{ $terminal->name }} en una pestaña nueva"
+                        ><i class="bx bx-link-external"></i> Abrir kiosco</a>
                         <button type="button" class="btn btn-primary" wire:click="editTerminal({{ $terminal->id }})"><i class="bx bx-slider-alt"></i> Ajustes</button>
                         <button type="button" class="btn btn-outline-primary" wire:click="confirmRotateToken({{ $terminal->id }})"><i class="bx bx-refresh"></i> Rotar token</button>
                         <button type="button" class="btn btn-icon {{ $terminal->is_active ? 'btn-outline-warning' : 'btn-outline-success' }}" wire:click="toggleTerminal({{ $terminal->id }})" aria-label="{{ $terminal->is_active ? 'Pausar terminal' : 'Activar terminal' }}"><i class="bx {{ $terminal->is_active ? 'bx-pause' : 'bx-play' }}"></i></button>
@@ -72,7 +79,7 @@
 
     <section class="kiosk-security-note">
         <i class="bx bx-shield-quarter"></i>
-        <div><h2>Seguridad por diseño</h2><p>Los tokens se almacenan como hash. Solo un owner, super-admin o usuario con el permiso <strong>gestionar kioscos</strong> puede modificar estos ajustes.</p></div>
+        <div><h2>Seguridad por diseño</h2><p>Los tokens se validan mediante hash y su copia recuperable se almacena cifrada. Solo un owner, super-admin o usuario con el permiso <strong>gestionar kioscos</strong> puede abrir o modificar estos kioscos.</p></div>
     </section>
 
     @if($showForm)
@@ -117,6 +124,81 @@
                         <label class="kiosk-admin-field"><span>Instrucciones de pago</span><input type="text" class="form-control" wire:model="paymentInstructions" maxlength="180"></label>
                         <label class="kiosk-admin-field"><span>Mensaje al finalizar</span><textarea class="form-control" wire:model="successMessage" maxlength="180" rows="2"></textarea></label>
                         @foreach(['welcomeTitle','welcomeMessage','paymentInstructions','successMessage','ordersPerMinute','autoResetSeconds'] as $field)@error($field)<p class="kiosk-admin-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror @endforeach
+                    </section>
+
+                    <section class="kiosk-form-section kiosk-promotion-settings">
+                        <div class="kiosk-form-section-title">
+                            <span><i class="bx bx-purchase-tag-alt"></i></span>
+                            <div><h3>Portada y productos destacados</h3><p>Elige hasta 6 productos. Destacar un producto no cambia su precio.</p></div>
+                        </div>
+
+                        <label class="kiosk-setting-switch kiosk-promotion-toggle">
+                            <input type="checkbox" wire:model.live="promotionEnabled">
+                            <span><i class="bx bx-show"></i></span>
+                            <div><strong>Mostrar productos destacados en portada</strong><small>Publica el escaparate antes de que el cliente inicie su pedido.</small></div>
+                        </label>
+
+                        <div class="kiosk-form-grid">
+                            <label class="kiosk-admin-field"><span>Etiqueta del escaparate</span><input type="text" class="form-control" wire:model="promotionBadge" maxlength="60" placeholder="Ej. Favoritos del chef"></label>
+                            <label class="kiosk-admin-field"><span>Título del escaparate</span><input type="text" class="form-control" wire:model="promotionTitle" maxlength="120" placeholder="Ej. Sabores que tienes que probar"></label>
+                        </div>
+                        <label class="kiosk-admin-field"><span>Mensaje del escaparate</span><textarea class="form-control" wire:model="promotionMessage" maxlength="240" rows="2" placeholder="Describe brevemente los productos destacados."></textarea></label>
+
+                        <div class="kiosk-product-selector-head">
+                            <div>
+                                <strong>Productos destacados</strong>
+                                <small>{{ count($featuredProductIds) }} de 6 seleccionados</small>
+                                <small class="kiosk-product-selector-help">Se muestran en la portada del kiosco. El descuento se activa por producto.</small>
+                            </div>
+                            <label class="kiosk-product-search">
+                                <i class="bx bx-search"></i>
+                                <input type="search" wire:model.live.debounce.250ms="productSearch" placeholder="Buscar producto" aria-label="Buscar productos para promocionar">
+                            </label>
+                        </div>
+
+                        @error('featuredProductIds')<p class="kiosk-admin-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
+                        @foreach(['promotionBadge','promotionTitle','promotionMessage'] as $field)@error($field)<p class="kiosk-admin-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror @endforeach
+
+                        <div class="kiosk-promotion-product-grid" wire:loading.class="is-loading" wire:target="productSearch">
+                            @forelse($this->promotionalProducts as $product)
+                                @php $isFeatured = in_array((int) $product->id, array_map('intval', $featuredProductIds), true); @endphp
+                                <article class="kiosk-promotion-product {{ $isFeatured ? 'is-selected' : '' }}" wire:key="promotion-product-{{ $product->id }}">
+                                    <button type="button" class="kiosk-promotion-product-select" wire:click="toggleFeaturedProduct({{ $product->id }})" aria-pressed="{{ $isFeatured ? 'true' : 'false' }}">
+                                        <span class="kiosk-promotion-product-media">
+                                            @if($product->image)
+                                                <img src="{{ Storage::url($product->image) }}" alt="" width="96" height="96" loading="lazy">
+                                            @else
+                                                <i class="bx bx-food-menu"></i>
+                                            @endif
+                                        </span>
+                                        <span class="kiosk-promotion-product-copy">
+                                            <small>{{ $product->category?->name ?: 'Sin categoría' }}</small>
+                                            <strong>{{ $product->name }}</strong>
+                                            <b>${{ number_format($product->price, 2) }}</b>
+                                        </span>
+                                        <span class="kiosk-promotion-check"><i class="bx {{ $isFeatured ? 'bx-check' : 'bx-plus' }}"></i></span>
+                                    </button>
+
+                                    @if($isFeatured)
+                                        <div class="kiosk-promotion-product-fields">
+                                            <label class="kiosk-product-discount-toggle">
+                                                <input type="checkbox" wire:model.live="promotionDiscounts.{{ $product->id }}">
+                                                <span><i class="bx bx-purchase-tag"></i></span>
+                                                <span><strong>Aplicar descuento</strong><small>{{ ($promotionDiscounts[$product->id] ?? false) ? 'Usará el precio especial.' : 'Conserva el precio normal.' }}</small></span>
+                                            </label>
+                                            @if($promotionDiscounts[$product->id] ?? false)
+                                                <label><span>Precio especial</span><div class="input-group"><span class="input-group-text">$</span><input type="number" class="form-control" wire:model="promotionPrices.{{ $product->id }}" min="0.01" max="{{ max(0.01, (float) $product->price - 0.01) }}" step="0.01" placeholder="{{ number_format(max(0.01, (float) $product->price - 0.01), 2, '.', '') }}"></div></label>
+                                            @endif
+                                            <label><span>Etiqueta</span><input type="text" class="form-control" wire:model="promotionLabels.{{ $product->id }}" maxlength="40" placeholder="Ej. Más vendido"></label>
+                                            @error('promotionPrices.'.$product->id)<p class="kiosk-admin-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
+                                            @error('promotionLabels.'.$product->id)<p class="kiosk-admin-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
+                                        </div>
+                                    @endif
+                                </article>
+                            @empty
+                                <div class="kiosk-promotion-empty"><i class="bx bx-search-alt"></i><strong>No encontramos productos</strong><small>Prueba con otro nombre.</small></div>
+                            @endforelse
+                        </div>
                     </section>
                 </div>
 

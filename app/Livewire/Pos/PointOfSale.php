@@ -543,6 +543,7 @@ class PointOfSale extends Component
 
     public function openCashRegister(): void
     {
+        abort_unless(auth()->user()?->can('abrir caja'), 403);
         $this->validate([
             'cashName' => 'required|string|max:60',
             'cashInitialAmount' => 'required|numeric|min:0',
@@ -932,9 +933,11 @@ class PointOfSale extends Component
 
     public function saveNewCustomer(): void
     {
+        abort_unless(auth()->user()?->can('crear ordenes'), 403);
         $this->validate([
             'newCustomerName' => 'required|string|max:120',
             'newCustomerPhone' => 'required|string|max:30',
+            'newCustomerEmail' => 'nullable|email:rfc|max:160',
         ]);
 
         $customer = Customer::create([
@@ -1033,6 +1036,7 @@ class PointOfSale extends Component
 
     public function submitOrder(): void
     {
+        abort_unless(auth()->user()?->can('crear ordenes'), 403);
         if (empty($this->cart)) {
             return;
         }
@@ -1074,11 +1078,12 @@ class PointOfSale extends Component
         }
 
         $this->showCheckoutModal = false;
-        $this->finishSale($order);
+        $this->finishSale($order, openTicket: true);
     }
 
     public function submitPickupLater(): void
     {
+        abort_unless(auth()->user()?->can('crear ordenes'), 403);
         if (empty($this->cart)) {
             return;
         }
@@ -1107,11 +1112,12 @@ class PointOfSale extends Component
             );
         }
 
-        $this->finishSale($order);
+        $this->finishSale($order, openTicket: false);
     }
 
     public function submitOrderLater(): void
     {
+        abort_unless(auth()->user()?->can('crear ordenes'), 403);
         if (empty($this->cart)) {
             return;
         }
@@ -1133,13 +1139,14 @@ class PointOfSale extends Component
             );
         }
 
-        $this->finishSale($order);
+        $this->finishSale($order, openTicket: false);
     }
 
     // ─── Quotations ────────────────────────────────────────────────────────────
 
     public function saveQuotation(): void
     {
+        abort_unless(auth()->user()?->can('crear ordenes'), 403);
         if (empty($this->cart)) {
             $this->dispatch('notify', type: 'warning', message: 'El carrito está vacío.');
 
@@ -1257,6 +1264,7 @@ class PointOfSale extends Component
 
     public function deleteQuotation(int $id): void
     {
+        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         Quotation::findOrFail($id)->delete();
         unset($this->quotations);
         $this->dispatch('notify', type: 'warning', message: 'Cotización eliminada.');
@@ -1292,6 +1300,7 @@ class PointOfSale extends Component
 
     public function openExpenseModal(): void
     {
+        abort_unless(auth()->user()?->can('registrar gastos'), 403);
         $this->expenseAmount = '';
         $this->expenseCategory = 'otro';
         $this->expenseDescription = '';
@@ -1303,6 +1312,7 @@ class PointOfSale extends Component
 
     public function saveExpense(): void
     {
+        abort_unless(auth()->user()?->can('registrar gastos'), 403);
         $this->validate([
             'expenseAmount' => 'required|numeric|min:0.01',
             'expenseDescription' => 'required|string|max:255',
@@ -1338,6 +1348,7 @@ class PointOfSale extends Component
 
     public function openConvertDeliveryModal(int $orderId): void
     {
+        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $order = Order::with('customer')
             ->where('cash_register_id', $this->activeCashRegister?->id)
             ->findOrFail($orderId);
@@ -1363,6 +1374,7 @@ class PointOfSale extends Component
 
     public function convertOrderToDelivery(): void
     {
+        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $this->validate([
             'convertDeliveryName' => 'required|string|max:120',
             'convertDeliveryPhone' => ['required', 'regex:/^[0-9]{10}$/'],
@@ -1397,6 +1409,7 @@ class PointOfSale extends Component
 
     public function openPickupPayModal(int $orderId): void
     {
+        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
         $order = Order::where('cash_register_id', $this->activeCashRegister?->id)
             ->findOrFail($orderId);
 
@@ -1438,6 +1451,7 @@ class PointOfSale extends Component
 
     public function openMesaPayModal(int $mesaId): void
     {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
         $this->mesaPayId = $mesaId;
         $this->mesaSplitId = null;
         $this->mesaSplitAccountIdx = null;
@@ -1496,6 +1510,7 @@ class PointOfSale extends Component
 
     public function openMesaSplitPayModal(int $splitId, int $accountIdx): void
     {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
         $cashRegisterId = $this->activeCashRegister?->id;
         $split = MesaSplit::whereIn('status', ['pendiente', 'parcial'])
             ->whereHas('mesa.orders', fn ($q) => $q->where('cash_register_id', $cashRegisterId)
@@ -1570,6 +1585,7 @@ class PointOfSale extends Component
 
     public function confirmMesaPayment(): void
     {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
         // Para un pago único, el cajero puede confirmar directamente. Si no
         // agregó una parcialidad manualmente, usamos el saldo pendiente con
         // el método seleccionado en el modal.
@@ -2007,6 +2023,7 @@ HTML;
 
     public function confirmPickupPayment(): void
     {
+        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
         $order = Order::with(['items'])
             ->where('cash_register_id', $this->activeCashRegister?->id)
             ->find($this->pickupPayOrderId);
@@ -2068,8 +2085,8 @@ HTML;
             : "Orden #{$order->id} cobrada.";
         $this->dispatch('notify', type: 'success', message: $message);
 
-        // Dispatch print event for the order
-        $this->openReprintModal($order->id);
+        // La primera impresión forma parte del cobro y no es una reimpresión.
+        $this->dispatchOrderTicketPreview($order);
     }
 
     // ─── Kitchen panel ────────────────────────────────────────────────────────
@@ -2136,6 +2153,7 @@ HTML;
 
     public function markKitchenReady(int $orderId): void
     {
+        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $order = Order::with([
             'items.addons',
             'items.ingredients',
@@ -2178,6 +2196,7 @@ HTML;
 
     public function reprintKitchenOrder(int $orderId): void
     {
+        abort_unless(auth()->user()?->can('reimprimir tickets'), 403);
         $order = Order::with([
             'items.addons',
             'items.ingredients',
@@ -2190,6 +2209,7 @@ HTML;
         }
 
         if ($order->status === 'pendiente') {
+            abort_unless(auth()->user()?->can('editar ordenes'), 403);
             $order->update(['status' => 'en_preparacion']);
             unset(
                 $this->kitchenOrders,
@@ -2214,6 +2234,7 @@ HTML;
 
     public function openReprintModal(int $orderId): void
     {
+        abort_unless(auth()->user()?->can('reimprimir tickets'), 403);
         $order = Order::with([
             'items.addons',
             'items.ingredients',
@@ -2222,6 +2243,11 @@ HTML;
         ])->where('cash_register_id', $this->activeCashRegister?->id)
             ->findOrFail($orderId);
 
+        $this->dispatchOrderTicketPreview($order);
+    }
+
+    private function dispatchOrderTicketPreview(Order $order): void
+    {
         $this->dispatch('pos-reprint-show',
             html_cliente: $this->buildTicketHtml($order),
             html_cocina: $this->buildKitchenTicketHtml($order),
@@ -2232,7 +2258,8 @@ HTML;
     {
         return app(ThermalTicketRenderer::class)->renderOrder(
             $order,
-            $order->type === 'delivery' ? 'delivery' : 'customer',
+            $this->ticketTemplateTypeForOrder($order),
+            autoPrint: false,
         );
 
         $appName = config('app.name');
@@ -2397,7 +2424,7 @@ HTML;
 
     private function buildKitchenTicketHtml(Order $order): string
     {
-        return app(ThermalTicketRenderer::class)->renderOrder($order, 'kitchen_area');
+        return app(ThermalTicketRenderer::class)->renderOrder($order, 'kitchen_area', autoPrint: false);
 
         $appName = config('app.name');
         $now = now()->format('d/m/Y H:i');
@@ -2524,6 +2551,19 @@ HTML;
 
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
+    private function ticketTemplateTypeForOrder(Order $order): string
+    {
+        if ($order->type === 'delivery' || $order->fulfillment === 'delivery') {
+            return 'delivery';
+        }
+
+        if (in_array($order->type, ['ventanilla', 'pick_up'], true) || $order->fulfillment === 'pickup') {
+            return 'counter';
+        }
+
+        return 'customer';
+    }
+
     private function persistOrder(string $type, string $status): Order
     {
         $cash = $this->activeCashRegister;
@@ -2580,7 +2620,7 @@ HTML;
         return $order;
     }
 
-    private function finishSale(Order $order): void
+    private function finishSale(Order $order, bool $openTicket): void
     {
         if ($this->activeQuotationId) {
             Quotation::find($this->activeQuotationId)?->delete();
@@ -2597,6 +2637,16 @@ HTML;
         $this->resetOrderForm();
         unset($this->cartTotal, $this->cartCount, $this->activeCashRegister, $this->recentOrders);
         $this->dispatch('notify', type: 'success', message: "Orden #{$order->id} creada.");
+
+        if ($openTicket) {
+            $order->loadMissing([
+                'items.addons',
+                'items.ingredients',
+                'items.product.category.printArea',
+                'payments',
+            ]);
+            $this->dispatchOrderTicketPreview($order);
+        }
     }
 
     private function resetOrderForm(): void

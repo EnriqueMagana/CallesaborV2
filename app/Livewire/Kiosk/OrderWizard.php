@@ -4,6 +4,7 @@ namespace App\Livewire\Kiosk;
 
 use App\Models\CashRegister;
 use App\Models\Category;
+use App\Models\KioskProductPromotion;
 use App\Models\KioskTerminal;
 use App\Models\Mesa;
 use App\Models\Order;
@@ -33,6 +34,8 @@ class OrderWizard extends Component
     public ?string $unavailableTerminalName = null;
 
     public ?string $recommendationName = null;
+
+    public ?int $featuredProductIntent = null;
 
     public int $step = 1;
 
@@ -135,6 +138,36 @@ class OrderWizard extends Component
     }
 
     #[Computed]
+    public function promotions()
+    {
+        if (! $this->terminal->promotion_enabled) {
+            return collect();
+        }
+
+        return KioskProductPromotion::query()
+            ->where('kiosk_terminal_id', $this->terminalId)
+            ->whereHas('product', fn ($query) => $query->where('is_active', true))
+            ->with(['product' => fn ($query) => $query
+                ->withCount(['addonGroups', 'ingredients'])
+                ->with('category:id,name')])
+            ->orderBy('sort_order')
+            ->get()
+            ->keyBy('product_id');
+    }
+
+    public function selectFeaturedProduct(int $productId): void
+    {
+        abort_unless($this->promotions->has($productId), 422);
+        $this->featuredProductIntent = $productId;
+    }
+
+    public function applySearch(): void
+    {
+        $this->search = trim($this->search);
+        unset($this->products);
+    }
+
+    #[Computed]
     public function product(): ?Product
     {
         if (! $this->customizingProduct) {
@@ -207,6 +240,14 @@ class OrderWizard extends Component
         $this->fulfillment = $fulfillment;
         $this->selectedMesaId = null;
         $this->step = 2;
+
+        if ($this->featuredProductIntent) {
+            $productId = $this->featuredProductIntent;
+            $this->featuredProductIntent = null;
+            $this->recommendationName = 'Productos destacados';
+            $this->step = 3;
+            $this->openProduct($productId);
+        }
     }
 
     public function chooseRecommendation(?int $categoryId = null): void
@@ -543,7 +584,7 @@ class OrderWizard extends Component
                         'order_id' => $order->id,
                         'product_id' => $line['product']->id,
                         'product_name' => $line['product']->name,
-                        'product_price' => $line['product']->price,
+                        'product_price' => $line['base_price'],
                         'quantity' => $line['quantity'],
                         'subtotal' => $line['subtotal'],
                         'notes' => $line['notes'] ?: null,
@@ -589,7 +630,7 @@ class OrderWizard extends Component
     public function startAgain(): void
     {
         $this->reset([
-            'fulfillment', 'selectedMesaId', 'search', 'categoryFilter', 'recommendationName', 'cart', 'customizingProduct',
+            'fulfillment', 'selectedMesaId', 'search', 'categoryFilter', 'recommendationName', 'featuredProductIntent', 'cart', 'customizingProduct',
             'selectedAddons', 'addonQuantities', 'selectedIngredients', 'itemNotes', 'customerName',
             'customerPhone', 'deliveryStreet', 'deliveryNeighborhood', 'deliveryReferences',
             'orderNotes', 'completedOrderId', 'publicToken', 'submitting',
@@ -663,7 +704,17 @@ class OrderWizard extends Component
             return ['model' => $allowedIngredients->get((int) $id), 'quantity' => $quantity];
         })->values();
 
-        $unitTotal = (float) $product->price
+        $promotion = $this->terminal->promotion_enabled
+            ? KioskProductPromotion::query()
+                ->where('kiosk_terminal_id', $this->terminalId)
+                ->where('product_id', $product->id)
+                ->first()
+            : null;
+        $basePrice = $promotion?->promotional_price !== null
+            ? (float) $promotion->promotional_price
+            : (float) $product->price;
+
+        $unitTotal = $basePrice
             + (float) $addons->sum(fn ($item) => (float) $item['model']->extra_price * $item['quantity'])
             + (float) $ingredientModels->sum(fn ($item) => (float) $item['model']->extra_price * $item['quantity']);
         $quantity = max(1, min(99, (int) ($line['quantity'] ?? 1)));
@@ -674,6 +725,7 @@ class OrderWizard extends Component
             'ingredients' => $ingredientModels,
             'quantity' => $quantity,
             'notes' => trim((string) ($line['notes'] ?? '')),
+            'base_price' => round($basePrice, 2),
             'unit_total' => round($unitTotal, 2),
             'subtotal' => round($unitTotal * $quantity, 2),
         ];

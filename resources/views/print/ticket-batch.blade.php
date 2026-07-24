@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $template->name }}</title>
-    <link rel="stylesheet" href="{{ asset('assets/css/ticket-print.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/ticket-print.css') }}?v={{ filemtime(public_path('assets/css/ticket-print.css')) }}">
 </head>
 <body class="ticket-document ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }}">
     @foreach($payloads as $payload)
@@ -17,6 +17,8 @@
             @endforeach
         </main>
     @endforeach
-    <script>window.addEventListener('load', () => window.print())</script>
+    @if($autoPrint)
+        <script>window.addEventListener('load', () => window.print())</script>
+    @endif
 </body>
 </html>

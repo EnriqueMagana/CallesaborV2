@@ -63,9 +63,11 @@
                 @endforeach
             </select>
         </div>
+        @can('crear platos')
         <button class="btn btn-primary btn-sm" wire:click="openProductModal()">
             <i class="bx bx-plus me-1"></i> Nuevo producto
         </button>
+        @endcan
     </div>
 
     <div class="card-body p-0">
@@ -128,15 +130,19 @@
                         @endif
                     </td>
                     <td class="text-end">
+                        @can('editar platos')
                         <button class="btn btn-sm btn-icon btn-outline-success" title="Ingredientes" wire:click="openProductIngredientsModal({{ $product->id }})">
                             <i class="bx bx-spa"></i>
                         </button>
                         <button class="btn btn-sm btn-icon btn-outline-primary" title="Editar" wire:click="openProductModal({{ $product->id }})">
                             <i class="bx bx-edit-alt"></i>
                         </button>
+                        @endcan
+                        @can('eliminar platos')
                         <button class="btn btn-sm btn-icon btn-outline-danger" title="Eliminar" wire:click="confirmDeleteProduct({{ $product->id }})">
                             <i class="bx bx-trash"></i>
                         </button>
+                        @endcan
                     </td>
                 </tr>
                 @endforeach
@@ -157,9 +163,11 @@
             <span class="input-group-text"><i class="bx bx-search"></i></span>
             <input wire:model.live.debounce.400ms="categorySearch" type="text" class="form-control" placeholder="Buscar categoría…">
         </div>
+        @can('gestionar categorias')
         <button class="btn btn-primary btn-sm" wire:click="openCategoryModal()">
             <i class="bx bx-plus me-1"></i> Nueva categoría
         </button>
+        @endcan
     </div>
     <div class="card-body">
         @if($this->categories->isEmpty())
@@ -183,6 +191,7 @@
                             @if(!$cat->is_active) <span class="badge bg-label-secondary ms-1">Inactiva</span> @endif
                         </div>
                     </div>
+                    @can('gestionar categorias')
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-icon btn-outline-primary" wire:click="openCategoryModal({{ $cat->id }})">
                             <i class="bx bx-edit-alt"></i>
@@ -191,6 +200,7 @@
                             <i class="bx bx-trash"></i>
                         </button>
                     </div>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -206,9 +216,11 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Grupos de complementos</h6>
+        @can('gestionar complementos')
         <button class="btn btn-primary btn-sm" wire:click="openGroupModal()">
             <i class="bx bx-plus me-1"></i> Nuevo grupo
         </button>
+        @endcan
     </div>
     <div class="card-body">
         @if($this->addonGroups->isEmpty())
@@ -238,6 +250,7 @@
                     <div class="small text-muted mb-3">
                         Sel. {{ $group->min_selections }}–{{ $group->max_selections }}
                     </div>
+                    @can('gestionar complementos')
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-outline-secondary flex-grow-1" wire:click="openAddonsModal({{ $group->id }})">
                             <i class="bx bx-list-ul me-1"></i> Complementos
@@ -249,6 +262,7 @@
                             <i class="bx bx-trash"></i>
                         </button>
                     </div>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -264,9 +278,11 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Catálogo de ingredientes</h6>
+        @can('gestionar complementos')
         <button type="button" class="btn btn-primary btn-sm" wire:click="openIngredientModal()">
             <i class="bx bx-plus me-1" aria-hidden="true"></i> Nuevo ingrediente
         </button>
+        @endcan
     </div>
     <div class="card-body">
         @if($this->ingredients->isEmpty())
@@ -308,6 +324,7 @@
                             <div class="small text-muted">Sin costo extra</div>
                         @endif
                     </div>
+                    @can('gestionar complementos')
                     <div class="d-flex gap-1 flex-shrink-0">
                         <button type="button" class="btn btn-sm btn-icon btn-outline-primary" title="Editar {{ $ingredient->name }}" aria-label="Editar {{ $ingredient->name }}" wire:click="openIngredientModal({{ $ingredient->id }})">
                             <i class="bx bx-edit-alt" aria-hidden="true"></i>
@@ -316,6 +333,7 @@
                             <i class="bx bx-trash" aria-hidden="true"></i>
                         </button>
                     </div>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -331,9 +349,11 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Áreas de impresión</h6>
+        @can('gestionar areas impresion')
         <button class="btn btn-primary btn-sm" wire:click="openAreaModal()">
             <i class="bx bx-plus me-1"></i> Nueva área
         </button>
+        @endcan
     </div>
     <div class="card-body">
         @if($this->printAreas->isEmpty())
@@ -357,6 +377,7 @@
                             @if(!$area->is_active) <span class="badge bg-label-secondary ms-1">Inactiva</span> @endif
                         </div>
                     </div>
+                    @can('gestionar areas impresion')
                     <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-icon btn-outline-primary" wire:click="openAreaModal({{ $area->id }})">
                             <i class="bx bx-edit-alt"></i>
@@ -365,6 +386,7 @@
                             <i class="bx bx-trash"></i>
                         </button>
                     </div>
+                    @endcan
                 </div>
             </div>
         </div>

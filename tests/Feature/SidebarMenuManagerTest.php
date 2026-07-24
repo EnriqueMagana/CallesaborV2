@@ -109,6 +109,9 @@ class SidebarMenuManagerTest extends TestCase
         $script = file_get_contents(public_path('assets/js/main.js'));
         $this->assertStringContainsString('_sidebarParentToggleBound', $script);
         $this->assertStringContainsString("closest('#layout-menu .sidebar-parent-toggle')", $script);
+        $this->assertStringContainsString('_clearNavigationUiLocks', $script);
+        $this->assertStringContainsString("document.addEventListener('livewire:navigating'", $script);
+        $this->assertStringContainsString("classList.remove('overflow-y-hidden', 'modal-open')", $script);
     }
 
     public function test_owner_can_require_an_open_register_for_an_internal_module(): void
@@ -128,6 +131,18 @@ class SidebarMenuManagerTest extends TestCase
             'id' => $item->id,
             'requires_open_register' => true,
         ]);
+    }
+
+    public function test_pos_sidebar_link_uses_a_full_load_because_it_has_a_standalone_layout(): void
+    {
+        $item = SidebarMenuItem::where('route_name', 'app.pos')->firstOrFail();
+        $item->setAttribute('register_locked', false);
+        $item->setRelation('children', collect());
+
+        $html = view('components.sidebar.menu-node', ['item' => $item])->render();
+
+        $this->assertStringContainsString('href="'.route('app.pos').'"', $html);
+        $this->assertStringNotContainsString('wire:navigate', $html);
     }
 
     public function test_configured_module_is_blocked_by_url_until_a_register_is_open(): void

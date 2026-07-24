@@ -1,10 +1,10 @@
 @if($showExpenseModal)
-<div class="pos-modal-wrap show" wire:click.self="$set('showExpenseModal',false)">
+<div class="pos-modal-wrap show" wire:click.self="$set('showExpenseModal',false)" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
     <div class="pos-modal" @click.stop>
         <div class="modal-header-pos">
             <i class="bx bx-wallet" data-ui="xui-1vp2017"></i>
-            <h4>Registrar gasto</h4>
-            <button wire:click="$set('showExpenseModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
+            <h4 id="expense-modal-title">Registrar gasto</h4>
+            <button type="button" wire:click="$set('showExpenseModal',false)" class="pos-btn pos-btn-secondary" aria-label="Cerrar" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
         </div>
         <div class="modal-body-pos">
             <div class="co-grid">
@@ -48,8 +48,8 @@
             </div>
         </div>
         <div class="modal-footer-pos">
-            <button wire:click="$set('showExpenseModal',false)" class="pos-btn pos-btn-secondary">Cancelar</button>
-            <button wire:click="saveExpense" wire:loading.attr="disabled" class="pos-btn pos-btn-primary">
+            <button type="button" wire:click="$set('showExpenseModal',false)" class="pos-btn pos-btn-secondary">Cancelar</button>
+            <button type="button" wire:click="saveExpense" wire:loading.attr="disabled" class="pos-btn pos-btn-primary">
                 <span wire:loading wire:target="saveExpense" class="spinner-border spinner-border-sm" data-ui="xui-a2bbzz"></span>
                 <i wire:loading.remove wire:target="saveExpense" class="bx bx-save"></i>
                 Guardar gasto

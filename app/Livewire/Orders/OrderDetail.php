@@ -21,6 +21,7 @@ class OrderDetail extends Component
 
     public function mount(Order $order): void
     {
+        abort_unless(auth()->user()?->can('ver ordenes'), 403);
         $this->order = $order->load([
             'seller',
             'cashRegister',
@@ -38,12 +39,14 @@ class OrderDetail extends Component
 
     public function openCancelItemModal(int $itemId): void
     {
+        abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $this->cancelItemId       = $itemId;
         $this->showCancelItemModal = true;
     }
 
     public function confirmCancelItem(): void
     {
+        abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $item = OrderItem::findOrFail($this->cancelItemId);
 
         $item->update([
@@ -64,12 +67,14 @@ class OrderDetail extends Component
 
     public function openCancelModal(): void
     {
+        abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $this->cancelReason   = '';
         $this->showCancelModal = true;
     }
 
     public function confirmCancel(): void
     {
+        abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $this->validate(['cancelReason' => 'required|string|min:5|max:255']);
 
         $this->order->update([
@@ -98,6 +103,7 @@ class OrderDetail extends Component
 
     public function confirmDeleteItem(int $id): void
     {
+        abort_unless(auth()->user()?->can('eliminar items de ordenes'), 403);
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar ítem',
@@ -109,6 +115,7 @@ class OrderDetail extends Component
 
     private function deleteItem(int $id): void
     {
+        abort_unless(auth()->user()?->can('eliminar items de ordenes'), 403);
         $item = OrderItem::findOrFail($id);
         $orderId = $item->order_id;
         $item->delete();

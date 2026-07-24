@@ -11,8 +11,11 @@ use App\Models\Mesa;
 use App\Models\MesaSplit;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\TicketTemplate;
 use App\Livewire\Mesas\SplitCuenta;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -21,6 +24,12 @@ use Tests\TestCase;
 class KioskPosWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RolesAndPermissionsSeeder::class);
+    }
 
     public function test_kiosk_orders_are_separated_by_operational_area_and_follow_the_status_flow(): void
     {
@@ -86,7 +95,8 @@ class KioskPosWorkflowTest extends TestCase
             'subtotal' => 120,
         ]);
 
-        Livewire::test(SplitCuenta::class, ['mesa' => $mesa])
+        Livewire::actingAs($user)
+            ->test(SplitCuenta::class, ['mesa' => $mesa])
             ->assertSee('Hamburguesa kiosko');
     }
 
@@ -162,7 +172,10 @@ class KioskPosWorkflowTest extends TestCase
         $this->actingAs($user)
             ->get(route('app.pos'))
             ->assertOk()
-            ->assertDontSee('assets/vendor/js/menu.js', false);
+            ->assertDontSee('assets/vendor/js/menu.js', false)
+            ->assertDontSee('assets/js/main.js', false)
+            ->assertSee('#pos-loading-screen', false)
+            ->assertSee('requestAnimationFrame(hidePosLoader)', false);
     }
 
     public function test_pos_header_uses_the_configured_restaurant_logo(): void
@@ -212,9 +225,87 @@ class KioskPosWorkflowTest extends TestCase
             ->assertDontSee('Mesa 99');
     }
 
+    public function test_pos_prints_counter_orders_with_the_counter_ticket_maker_template(): void
+    {
+        [$user, $register, $terminal] = $this->posContext();
+        $order = $this->kioskOrder($register->id, $user->id, $terminal->id, 'Cliente mostrador', 'takeaway', status: 'lista');
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Orden mostrador',
+            'product_price' => 100,
+            'quantity' => 1,
+            'subtotal' => 100,
+        ]);
+
+        TicketTemplate::current('counter')->update([
+            'paper_width_mm' => 58,
+            'font_size' => 15,
+            'margin_mm' => 2,
+            'footer_text' => 'VENTANILLA DESDE TICKET MAKER',
+        ]);
+        TicketTemplate::current('customer')->update(['footer_text' => 'PLANTILLA CLIENTE INCORRECTA']);
+
+        $this->actingAs($user);
+
+        Livewire::test(PointOfSale::class)
+            ->call('openPickupPayModal', $order->id)
+            ->set('pickupPayAmount', '100')
+            ->set('pickupPayReceived', '100')
+            ->call('addPickupPayment')
+            ->call('confirmPickupPayment')
+            ->assertDispatched('pos-reprint-show', fn ($event, $params) =>
+                str_contains($params['html_cliente'] ?? '', 'VENTANILLA DESDE TICKET MAKER')
+                && str_contains($params['html_cliente'] ?? '', 'ticket-paper-58 ticket-font-15 ticket-margin-2')
+                && ! str_contains($params['html_cliente'] ?? '', 'PLANTILLA CLIENTE INCORRECTA')
+                && ! str_contains($params['html_cliente'] ?? '', 'window.print()'));
+    }
+
+    public function test_finishing_a_direct_sale_opens_the_ticket_maker_document_without_double_printing_iframes(): void
+    {
+        [$user] = $this->posContext();
+        $product = Product::create([
+            'name' => 'Taco directo',
+            'price' => 100,
+            'is_active' => true,
+        ]);
+
+        TicketTemplate::current('counter')->update([
+            'footer_text' => 'TICKET FINAL DESDE MAKER',
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(PointOfSale::class)
+            ->set('orderType', 'ventanilla')
+            ->set('cart', [[
+                'cart_id' => 'direct-sale-ticket-test',
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_price' => 100,
+                'quantity' => 1,
+                'subtotal' => 100,
+                'notes' => '',
+                'addons' => [],
+                'ingredients' => [],
+            ]])
+            ->set('payments', [[
+                'method' => 'cash',
+                'amount' => 100,
+                'cash_received' => 100,
+                'cash_change' => 0,
+            ]])
+            ->call('submitOrder')
+            ->assertSet('showOrderSuccess', true)
+            ->assertDispatched('pos-reprint-show', fn ($event, $params) =>
+                str_contains($params['html_cliente'] ?? '', 'TICKET FINAL DESDE MAKER')
+                && ! str_contains($params['html_cliente'] ?? '', 'window.print()')
+                && ! str_contains($params['html_cocina'] ?? '', 'window.print()'));
+    }
+
     private function posContext(): array
     {
         $user = User::factory()->create();
+        $user->assignRole('owner');
         $register = CashRegister::create([
             'name' => 'Caja principal',
             'opened_by' => $user->id,

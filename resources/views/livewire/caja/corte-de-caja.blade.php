@@ -39,7 +39,151 @@
             $salesTotal = $t['v']['total'] + $t['m']['total'] + $t['d']['total'];
             $cardTotal = $t['v']['tarjeta'] + $t['m']['tarjeta'] + $t['d']['tarjeta'];
             $transferTotal = $t['v']['transfer'] + $t['m']['transfer'] + $t['d']['transfer'];
+            $blockers = $this->closingBlockers;
         @endphp
+
+        @if($blockers['has_blockers'])
+            <section class="cash-cut-blockers" aria-labelledby="cash-cut-blockers-title">
+                <header class="cash-cut-blockers__header">
+                    <span class="cash-cut-blockers__icon" aria-hidden="true"><i class="bx bx-error-circle"></i></span>
+                    <div>
+                        <span class="cash-cut-blockers__eyebrow">Cierre bloqueado</span>
+                        <h2 id="cash-cut-blockers-title">Hay operaciones que todavía deben resolverse</h2>
+                        <p>Cobra o cancela los pedidos y libera las mesas pendientes antes de realizar el corte.</p>
+                    </div>
+                    <button type="button" class="cash-cut-refresh" wire:click="$refresh" wire:loading.attr="disabled">
+                        <span wire:loading.remove><i class="bx bx-refresh" aria-hidden="true"></i>Actualizar revisión</span>
+                        <span wire:loading><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Revisando…</span>
+                    </button>
+                </header>
+
+                <div class="cash-cut-blocker-summary" aria-label="Resumen de pendientes">
+                    <article>
+                        <span class="is-table" aria-hidden="true"><i class="bx bx-chair"></i></span>
+                        <div><small>Mesas activas</small><strong>{{ $blockers['summary']['tables'] }}</strong></div>
+                    </article>
+                    <article>
+                        <span class="is-order" aria-hidden="true"><i class="bx bx-food-menu"></i></span>
+                        <div><small>Pedidos de mesa</small><strong>{{ $blockers['summary']['table_orders'] }}</strong></div>
+                    </article>
+                    <article>
+                        <span class="is-kiosk" aria-hidden="true"><i class="bx bx-desktop"></i></span>
+                        <div><small>Pedidos de kiosco</small><strong>{{ $blockers['summary']['kiosk'] }}</strong></div>
+                    </article>
+                    <article>
+                        <span class="is-other" aria-hidden="true"><i class="bx bx-receipt"></i></span>
+                        <div><small>Ventanilla y domicilio</small><strong>{{ $blockers['summary']['counter'] + $blockers['summary']['delivery'] }}</strong></div>
+                    </article>
+                </div>
+
+                @error('cutBlockers')
+                    <div class="cash-cut-blockers__error" role="alert"><i class="bx bx-shield-x" aria-hidden="true"></i>{{ $message }}</div>
+                @enderror
+
+                <div class="cash-cut-blocker-columns">
+                    <section aria-labelledby="cash-cut-pending-orders-title">
+                        <div class="cash-cut-blocker-section-title">
+                            <div>
+                                <h3 id="cash-cut-pending-orders-title">Pedidos sin finalizar</h3>
+                                <p>{{ $blockers['orders']->count() }} pedidos · ${{ number_format($blockers['unpaid_total'], 2) }} pendientes de conciliación</p>
+                            </div>
+                            <span>{{ $blockers['orders']->count() }}</span>
+                        </div>
+
+                        <div class="cash-cut-pending-list">
+                            @forelse($blockers['orders'] as $pendingOrder)
+                                @php
+                                    $pendingChannel = $pendingOrder->source === 'kiosk'
+                                        ? ['Kiosco', 'bx-desktop', 'kiosk']
+                                        : match($pendingOrder->type) {
+                                            'mesa' => ['Mesa', 'bx-chair', 'table'],
+                                            'delivery' => ['Domicilio', 'bx-cycling', 'delivery'],
+                                            default => ['Ventanilla', 'bx-store', 'counter'],
+                                        };
+                                @endphp
+                                <article class="cash-cut-pending-item">
+                                    <span class="cash-cut-pending-item__channel is-{{ $pendingChannel[2] }}" aria-hidden="true"><i class="bx {{ $pendingChannel[1] }}"></i></span>
+                                    <div class="cash-cut-pending-item__copy">
+                                        <div>
+                                            <strong>Orden #{{ $pendingOrder->display_folio }}</strong>
+                                            <span class="cash-cut-pending-status">{{ $pendingOrder->status_label }}</span>
+                                        </div>
+                                        <p>
+                                            {{ $pendingChannel[0] }}
+                                            @if($pendingOrder->mesa) · {{ $pendingOrder->mesa->display_name }}@endif
+                                            @if($pendingOrder->kioskTerminal) · {{ $pendingOrder->kioskTerminal->name }}@endif
+                                        </p>
+                                        <small>{{ $pendingOrder->display_name }} · {{ $pendingOrder->created_at->format('g:i A') }}</small>
+                                    </div>
+                                    <div class="cash-cut-pending-item__amount">
+                                        <strong>${{ number_format($pendingOrder->total, 2) }}</strong>
+                                        @if($pendingOrder->type === 'mesa' && $pendingOrder->mesa_id)
+                                            @can('ver mesas')
+                                                <a href="{{ route('app.mesas.ordenes', $pendingOrder->mesa_id) }}">Revisar mesa <i class="bx bx-chevron-right" aria-hidden="true"></i></a>
+                                            @endcan
+                                        @elseif(auth()->user()?->can('cerrar ordenes'))
+                                            <a href="{{ route('app.pos') }}">Resolver en POS <i class="bx bx-chevron-right" aria-hidden="true"></i></a>
+                                        @elseif(auth()->user()?->can('ver ordenes'))
+                                            <a href="{{ route('app.ordenes.show', $pendingOrder) }}">Ver pedido <i class="bx bx-chevron-right" aria-hidden="true"></i></a>
+                                        @endif
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="cash-cut-pending-empty"><i class="bx bx-check-circle" aria-hidden="true"></i>No hay pedidos sin cobrar.</div>
+                            @endforelse
+                        </div>
+                    </section>
+
+                    <section aria-labelledby="cash-cut-pending-tables-title">
+                        <div class="cash-cut-blocker-section-title">
+                            <div>
+                                <h3 id="cash-cut-pending-tables-title">Mesas pendientes de liberar</h3>
+                                <p>Una mesa ocupada o en cuenta mantiene abierto el turno.</p>
+                            </div>
+                            <span>{{ $blockers['tables']->count() }}</span>
+                        </div>
+
+                        <div class="cash-cut-pending-list">
+                            @forelse($blockers['tables'] as $pendingTable)
+                                <article class="cash-cut-pending-item cash-cut-pending-item--table">
+                                    <span class="cash-cut-pending-item__channel is-table" aria-hidden="true"><i class="bx bx-chair"></i></span>
+                                    <div class="cash-cut-pending-item__copy">
+                                        <div>
+                                            <strong>{{ $pendingTable->display_name }}</strong>
+                                            <span class="cash-cut-pending-status">{{ $pendingTable->status_label }}</span>
+                                        </div>
+                                        <p>{{ $pendingTable->area?->name ?? 'Sin área' }}</p>
+                                        <small>
+                                            {{ $pendingTable->currentAssignment?->waiter?->name ?? 'Sin mesero asignado' }}
+                                            · {{ $pendingTable->orders->count() }} {{ $pendingTable->orders->count() === 1 ? 'pedido abierto' : 'pedidos abiertos' }}
+                                            @if($pendingTable->splits->isNotEmpty()) · {{ $pendingTable->splits->count() }} cuenta(s) dividida(s)@endif
+                                        </small>
+                                    </div>
+                                    <div class="cash-cut-pending-item__amount">
+                                        <strong>${{ number_format($pendingTable->orders->sum('total'), 2) }}</strong>
+                                        @can('ver mesas')
+                                            <a href="{{ route('app.mesas.ordenes', $pendingTable) }}">Abrir mesa <i class="bx bx-chevron-right" aria-hidden="true"></i></a>
+                                        @endcan
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="cash-cut-pending-empty"><i class="bx bx-check-circle" aria-hidden="true"></i>No hay mesas ocupadas o en cuenta.</div>
+                            @endforelse
+                        </div>
+                    </section>
+                </div>
+
+                <footer class="cash-cut-blockers__footer">
+                    <span><i class="bx bx-info-circle" aria-hidden="true"></i>Después de cobrar o liberar, presiona “Actualizar revisión”.</span>
+                    <strong>{{ $blockers['count'] }} {{ $blockers['count'] === 1 ? 'pendiente bloquea' : 'pendientes bloquean' }} el cierre</strong>
+                </footer>
+            </section>
+        @else
+            <section class="cash-cut-ready" aria-live="polite">
+                <span aria-hidden="true"><i class="bx bx-check-shield"></i></span>
+                <div><strong>Operación lista para conciliar</strong><p>No hay pedidos sin pagar ni mesas pendientes en este turno.</p></div>
+            </section>
+        @endif
 
         <section class="cash-cut-kpis" aria-label="Resumen del turno">
             <article class="cash-cut-kpi cash-cut-kpi--primary">
@@ -187,8 +331,15 @@
 
                 <label class="cash-cut-field"><span>Notas de cierre <small>Opcional</small></span><textarea wire:model="closingNotes" rows="3" placeholder="Observaciones importantes del turno…"></textarea></label>
 
-                <div class="cash-cut-warning"><i class="bx bx-error-circle"></i><p><strong>Revisa antes de continuar.</strong> El cierre de caja no se puede deshacer.</p></div>
-                <button type="button" wire:click="confirmCut" wire:loading.attr="disabled" wire:target="confirmCut" class="btn btn-danger cash-cut-submit"><span wire:loading.remove wire:target="confirmCut"><i class="bx bx-lock-alt"></i> Revisar y cerrar caja</span><span wire:loading wire:target="confirmCut">Validando efectivo…</span></button>
+                @if($blockers['has_blockers'])
+                    <div class="cash-cut-warning cash-cut-warning--blocked"><i class="bx bx-lock-alt"></i><p><strong>Cierre no disponible.</strong> Resuelve los pedidos y mesas mostrados en la revisión operativa.</p></div>
+                    <button type="button" disabled aria-disabled="true" class="btn btn-danger cash-cut-submit">
+                        <span><i class="bx bx-lock-alt"></i>{{ $blockers['count'] }} {{ $blockers['count'] === 1 ? 'pendiente por resolver' : 'pendientes por resolver' }}</span>
+                    </button>
+                @else
+                    <div class="cash-cut-warning"><i class="bx bx-error-circle"></i><p><strong>Revisa antes de continuar.</strong> El cierre de caja no se puede deshacer.</p></div>
+                    <button type="button" wire:click="confirmCut" wire:loading.attr="disabled" wire:target="confirmCut" class="btn btn-danger cash-cut-submit"><span wire:loading.remove wire:target="confirmCut"><i class="bx bx-lock-alt"></i> Revisar y cerrar caja</span><span wire:loading wire:target="confirmCut">Validando efectivo…</span></button>
+                @endif
             </aside>
         </div>
 

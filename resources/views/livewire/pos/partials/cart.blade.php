@@ -4,7 +4,7 @@
         <h5>Pedido actual</h5>
         @if(!empty($cart))
             <span class="cart-badge">{{ $this->cartCount }}</span>
-            <button class="btn-remove" wire:click="confirmClearCart"
+            <button type="button" class="btn-remove" wire:click="confirmClearCart" aria-label="Vaciar pedido"
                     data-ui="xui-pspzi">
                 <i class="bx bx-trash"></i>
             </button>
@@ -15,11 +15,11 @@
         @forelse($cart as $item)
             <div class="cart-item">
                 <div class="cart-qty-controls">
-                    <button class="qty-btn" wire:click="decrementCartItem('{{ $item['cart_id'] }}')">
+                    <button type="button" class="qty-btn" wire:click="decrementCartItem('{{ $item['cart_id'] }}')" aria-label="Reducir cantidad de {{ $item['product_name'] }}">
                         <i class="bx bx-minus"></i>
                     </button>
                     <span class="qty-val">{{ $item['quantity'] }}</span>
-                    <button class="qty-btn" data-ui="xui-gv08wd"
+                    <button type="button" class="qty-btn" data-ui="xui-gv08wd" aria-label="Aumentar cantidad de {{ $item['product_name'] }}"
                             wire:click="incrementCartItem('{{ $item['cart_id'] }}')">
                         <i class="bx bx-plus"></i>
                     </button>
@@ -42,10 +42,10 @@
                 <div class="cart-item-right">
                     <span class="cart-item-price">${{ number_format($item['subtotal'],2) }}</span>
                     <div data-ui="xui-aqd7gy">
-                        <button class="btn-remove" wire:click="editCartItem('{{ $item['cart_id'] }}')" title="Editar" data-ui="xui-n83t44">
+                        <button type="button" class="btn-remove" wire:click="editCartItem('{{ $item['cart_id'] }}')" title="Editar" aria-label="Editar {{ $item['product_name'] }}" data-ui="xui-n83t44">
                             <i class="bx bx-edit" data-ui="xui-1ml6c8v"></i>
                         </button>
-                        <button class="btn-remove" wire:click="removeCartItem('{{ $item['cart_id'] }}')" title="Quitar">
+                        <button type="button" class="btn-remove" wire:click="removeCartItem('{{ $item['cart_id'] }}')" title="Quitar" aria-label="Quitar {{ $item['product_name'] }}">
                             <i class="bx bx-x"></i>
                         </button>
                     </div>

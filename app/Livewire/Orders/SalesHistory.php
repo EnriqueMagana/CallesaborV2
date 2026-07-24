@@ -21,6 +21,11 @@ class SalesHistory extends Component
     public ?int $cashRegisterId = null;
     public ?int $expandedOrderId = null;
 
+    public function mount(): void
+    {
+        abort_unless(auth()->user()?->can('ver reportes'), 403);
+    }
+
     public function updatingSearch(): void { $this->resetPage(); }
     public function updatingStatusFilter(): void { $this->resetPage(); }
     public function updatingTypeFilter(): void { $this->resetPage(); }
@@ -34,10 +39,16 @@ class SalesHistory extends Component
         return CashRegister::where('is_open', false)->latest('closed_at')->get();
     }
 
-    private function query(): Builder
+    #[Computed]
+    public function canViewFinancials(): bool
     {
-        return Order::query()
-            ->with(['cashRegister', 'seller', 'cancelledBy', 'payments'])
+        return auth()->user()?->can('ver reportes financieros') ?? false;
+    }
+
+    private function query(bool $forListing = false): Builder
+    {
+        $query = Order::query()
+            ->with(['cashRegister', 'seller', 'cancelledBy'])
             ->whereHas('cashRegister', fn ($q) => $q->where('is_open', false))
             ->when($this->cashRegisterId, fn ($q) => $q->where('cash_register_id', $this->cashRegisterId))
             ->when($this->statusFilter, fn ($q) => $q->where('status', $this->statusFilter))
@@ -55,21 +66,41 @@ class SalesHistory extends Component
                         ->orWhereHas('cashRegister', fn ($register) => $register->where('name', 'like', $term));
                 });
             });
+
+        if ($forListing && $this->canViewFinancials) {
+            $query->with('payments');
+        }
+
+        if ($forListing && ! $this->canViewFinancials) {
+            $query->select([
+                'id', 'cash_register_id', 'served_by', 'cancelled_by', 'folio',
+                'customer_name', 'customer_phone', 'type', 'status', 'notes',
+                'cancellation_reason', 'cancelled_at', 'paid_at', 'created_at',
+            ]);
+        }
+
+        return $query;
     }
 
     #[Computed]
     public function orders()
     {
-        return $this->query()->latest('created_at')->paginate(20);
+        return $this->query(true)->latest('created_at')->paginate(20);
     }
 
     #[Computed]
     public function summary(): array
     {
-        $orders = $this->query()->get(['id', 'type', 'status', 'total']);
+        $columns = $this->canViewFinancials
+            ? ['id', 'type', 'status', 'total']
+            : ['id', 'type', 'status'];
+        $orders = $this->query()->get($columns);
+
         return [
             'orders' => $orders->count(),
-            'sales' => (float) $orders->where('status', 'pagada')->sum('total'),
+            'sales' => $this->canViewFinancials
+                ? (float) $orders->where('status', 'pagada')->sum('total')
+                : null,
             'cancelled' => $orders->where('status', 'cancelada')->count(),
             'open' => $orders->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'en_reparto'])->count(),
         ];

@@ -9,6 +9,7 @@ use App\Models\AddonGroup;
 use App\Models\Area;
 use App\Models\CashRegister;
 use App\Models\Category;
+use App\Models\KioskProductPromotion;
 use App\Models\KioskTerminal;
 use App\Models\Mesa;
 use App\Models\Order;
@@ -16,6 +17,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\KioskQrCode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -51,7 +53,30 @@ class KioskOrderTest extends TestCase
         $this->get(route('kiosk.order', $token))
             ->assertOk()
             ->assertSee('Kiosco de autoservicio')
-            ->assertSee('Comer aquí');
+            ->assertSee('Comer aquí')
+            ->assertSee('kiosk-is-booting', false)
+            ->assertSee('kiosk-initial-skeleton', false);
+    }
+
+    public function test_kiosk_images_use_long_lived_cache_and_conditional_requests(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('products/cached-product.webp', 'fake-webp-content');
+
+        $url = route('kiosk.media', ['path' => 'products/cached-product.webp']);
+        $response = $this->get($url)->assertOk();
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        $etag = $response->headers->get('ETag');
+
+        $this->assertStringContainsString('public', $cacheControl);
+        $this->assertStringContainsString('max-age=31536000', $cacheControl);
+        $this->assertStringContainsString('immutable', $cacheControl);
+        $this->assertNotEmpty($etag);
+        $this->assertNotEmpty($response->headers->get('Last-Modified'));
+
+        $this->withHeaders(['If-None-Match' => $etag])
+            ->get($url)
+            ->assertNotModified();
     }
 
     public function test_delivery_only_appears_when_enabled_for_the_terminal(): void
@@ -297,19 +322,156 @@ class KioskOrderTest extends TestCase
     {
         [$token] = $this->terminal();
         $category = Category::create(['name' => 'Hamburguesas', 'description' => 'Jugosas y preparadas al momento', 'is_active' => true]);
-        Product::create(['category_id' => $category->id, 'name' => 'Hamburguesa clásica', 'price' => 100, 'is_active' => true]);
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'Hamburguesa clásica',
+            'price' => 100,
+            'image' => 'products/hamburguesa.webp',
+            'is_active' => true,
+        ]);
+        Product::create(['category_id' => $category->id, 'name' => 'Papas crujientes', 'price' => 45, 'is_active' => true]);
 
         Livewire::test(OrderWizard::class, ['token' => $token])
             ->call('chooseFulfillment', 'dine_in')
             ->assertSet('step', 2)
             ->assertSee('¿Qué quieres comer hoy?')
             ->assertSee('Hamburguesas')
+            ->assertSeeHtml('x-data="kioskImageLoader"')
+            ->assertSeeHtml('x-ref="image"')
+            ->assertSee(route('kiosk.media', ['path' => 'products/hamburguesa.webp']), false)
             ->call('chooseRecommendation', $category->id)
             ->assertSet('step', 3)
             ->assertSet('categoryFilter', $category->id)
             ->assertSet('recommendationName', 'Hamburguesas')
             ->assertSee('Te recomendamos Hamburguesas')
-            ->assertSee('Hamburguesa clásica');
+            ->assertSee('Hamburguesa clásica')
+            ->assertSee('Papas crujientes')
+            ->assertSeeHtml('wire:submit="applySearch"')
+            ->assertSeeHtml('wire:model="search"')
+            ->assertDontSeeHtml('wire:model.live')
+            ->set('search', 'Hamburguesa')
+            ->call('applySearch')
+            ->assertSee('Hamburguesa clásica')
+            ->assertDontSee('Papas crujientes');
+    }
+
+    public function test_featured_product_uses_the_promotional_price_from_homepage_to_sale(): void
+    {
+        [$token, $terminal, $user] = $this->terminal([
+            'promotion_enabled' => true,
+            'promotion_badge' => 'Solo por hoy',
+            'promotion_title' => 'El favorito de la casa',
+            'promotion_message' => 'Pídelo ahora con precio especial.',
+        ]);
+        CashRegister::create([
+            'name' => 'Caja principal',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $product = Product::create([
+            'name' => 'Taco especial',
+            'description' => 'Preparado al momento',
+            'price' => 95,
+            'image' => 'products/taco-especial.webp',
+            'is_active' => true,
+        ]);
+        KioskProductPromotion::create([
+            'kiosk_terminal_id' => $terminal->id,
+            'product_id' => $product->id,
+            'promotional_price' => 79,
+            'label' => 'Más vendido',
+        ]);
+        $secondProduct = Product::create([
+            'name' => 'Papas crujientes',
+            'description' => 'Recién hechas',
+            'price' => 45,
+            'image' => 'products/papas-crujientes.webp',
+            'is_active' => true,
+        ]);
+        KioskProductPromotion::create([
+            'kiosk_terminal_id' => $terminal->id,
+            'product_id' => $secondProduct->id,
+            'promotional_price' => null,
+            'label' => 'Para compartir',
+            'sort_order' => 1,
+        ]);
+
+        $this->get(route('kiosk.order', $token))
+            ->assertOk()
+            ->assertDontSee('Solo por hoy')
+            ->assertDontSee('El favorito de la casa')
+            ->assertDontSee('Pídelo ahora con precio especial.')
+            ->assertSee('Taco especial')
+            ->assertSee('Papas crujientes')
+            ->assertSee('$79.00')
+            ->assertSee('$95.00')
+            ->assertSee('kiosk-carousel-dots', false)
+            ->assertSee('kiosk-carousel-enter-start', false)
+            ->assertSee('fetchpriority="low"', false)
+            ->assertSee('kiosk-loadable-card', false)
+            ->assertSee('kiosk-welcome--fullscreen', false)
+            ->assertDontSee('class="kiosk-home"', false);
+
+        Livewire::test(OrderWizard::class, ['token' => $token])
+            ->call('selectFeaturedProduct', $product->id)
+            ->assertSet('featuredProductIntent', $product->id)
+            ->call('chooseFulfillment', 'takeaway')
+            ->assertSet('step', 3)
+            ->assertSet('cart.0.product_id', $product->id)
+            ->assertSet('cart.0.subtotal', 79.0)
+            ->set('customerName', 'Laura')
+            ->call('reviewOrder')
+            ->call('placeOrder')
+            ->assertHasNoErrors()
+            ->assertSet('step', 6);
+
+        $this->assertDatabaseHas('orders', [
+            'kiosk_terminal_id' => $terminal->id,
+            'total' => 79,
+        ]);
+        $this->assertDatabaseHas('order_items', [
+            'product_id' => $product->id,
+            'product_price' => 79,
+            'subtotal' => 79,
+        ]);
+    }
+
+    public function test_featured_product_without_discount_keeps_the_regular_price(): void
+    {
+        [$token, $terminal] = $this->terminal([
+            'promotion_enabled' => true,
+            'promotion_badge' => 'Recomendaciones',
+            'promotion_title' => 'Nuestros favoritos',
+            'promotion_message' => 'Productos que vale la pena probar.',
+        ]);
+        $product = Product::create([
+            'name' => 'Taco recomendado',
+            'description' => 'Preparado al momento',
+            'price' => 95,
+            'is_active' => true,
+        ]);
+        KioskProductPromotion::create([
+            'kiosk_terminal_id' => $terminal->id,
+            'product_id' => $product->id,
+            'promotional_price' => null,
+            'label' => 'Recomendado',
+        ]);
+
+        $this->get(route('kiosk.order', $token))
+            ->assertOk()
+            ->assertDontSee('Nuestros favoritos')
+            ->assertDontSee('Productos que vale la pena probar.')
+            ->assertSee('Taco recomendado')
+            ->assertSee('$95.00')
+            ->assertDontSee('<del>$95.00</del>', false);
+
+        Livewire::test(OrderWizard::class, ['token' => $token])
+            ->call('selectFeaturedProduct', $product->id)
+            ->call('chooseFulfillment', 'takeaway')
+            ->assertSet('cart.0.product_id', $product->id)
+            ->assertSet('cart.0.subtotal', 95.0);
     }
 
     private function terminal(array $overrides = []): array

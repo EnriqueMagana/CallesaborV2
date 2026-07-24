@@ -39,7 +39,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/profile.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/reservations.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/menu-builder.css') }}" />
-    <link rel="stylesheet" href="{{ asset('assets/css/mesas.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/mesas.css') }}?v={{ filemtime(public_path('assets/css/mesas.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/admin-pages.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/user-management.css') }}?v={{ filemtime(public_path('assets/css/user-management.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/kiosk-admin.css') }}" />
@@ -49,6 +49,11 @@
     <link rel="stylesheet" href="{{ asset('assets/css/sales-history.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/business-settings.css') }}?v={{ filemtime(public_path('assets/css/business-settings.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/delivery.css') }}?v={{ filemtime(public_path('assets/css/delivery.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/inventory.css') }}?v={{ filemtime(public_path('assets/css/inventory.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/dashboard.css') }}?v={{ filemtime(public_path('assets/css/dashboard.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/customers.css') }}?v={{ filemtime(public_path('assets/css/customers.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/customers-responsive.css') }}?v={{ filemtime(public_path('assets/css/customers-responsive.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/orders.css') }}?v={{ filemtime(public_path('assets/css/orders.css')) }}" />
 
     @stack('styles')
 
@@ -125,6 +130,8 @@
     <script src="{{ asset('assets/js/main.js') }}?v={{ filemtime(public_path('assets/js/main.js')) }}" data-navigate-once></script>
 
     @livewireScripts
+
+    <script src="{{ asset('assets/js/dashboard.js') }}?v={{ filemtime(public_path('assets/js/dashboard.js')) }}" data-navigate-once></script>
 
     @stack('scripts')
 </body>

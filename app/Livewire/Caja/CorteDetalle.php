@@ -14,6 +14,7 @@ class CorteDetalle extends Component
 
     public function mount(CashRegisterCut $cut): void
     {
+        abort_unless(auth()->user()?->can('ver caja'), 403);
         $this->cutId = $cut->id;
     }
 

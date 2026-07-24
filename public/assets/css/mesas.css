@@ -141,7 +141,7 @@
   display: flex;
   align-items: center;
   min-width: 220px;
-  max-width: 320px;
+  max-width: 410px;
   flex: 1;
 }
 .mesas-search-icon {
@@ -153,7 +153,8 @@
 }
 .mesas-search-input {
   width: 100%;
-  padding: 8px 32px 8px 32px;
+  min-height: 42px;
+  padding: 8px 122px 8px 32px;
   border: 1.5px solid var(--c-border);
   border-radius: var(--mesa-radius-sm);
   background: var(--c-surface);
@@ -165,7 +166,7 @@
 .mesas-search-input:focus { border-color: var(--c-primary); }
 .mesas-search-clear {
   position: absolute;
-  right: 8px;
+  right: 82px;
   background: none;
   border: none;
   color: var(--c-text-muted);
@@ -175,6 +176,22 @@
   display: flex;
 }
 .mesas-search-clear:hover { color: #ef4444; }
+.mesas-search-submit {
+  min-width: 72px;
+  min-height: 34px;
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  padding: 6px 12px;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c-primary);
+  font-size: .76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 
 /* ══════════════════════════════════════════════════════════
@@ -240,7 +257,58 @@
   justify-content: center;
   z-index: 10;
 }
-.mesas-loading-spinner { padding: 24px; background: rgba(255,255,255,.9); border-radius: 12px; }
+.mesas-loading-spinner { display: flex; align-items: center; gap: 9px; padding: 15px 18px; color: var(--c-primary); background: rgba(255,255,255,.96); border: 1px solid #dedbf0; border-radius: 14px; box-shadow: 0 12px 32px rgba(37,31,68,.12); font-size: .8rem; font-weight: 700; }
+.mesas-loading-spinner i { font-size: 1.4rem; animation: mesas-spin .7s linear infinite; }
+
+.mesas-action-loader { position: relative; }
+.mesas-action-loader > b { display: none; }
+.mesas-action-loader.is-loading > span { opacity: 0; }
+.mesas-action-loader.is-loading > b {
+  width: 18px;
+  height: 18px;
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -9px;
+  border: 2px solid rgba(255,255,255,.48);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: mesas-spin .7s linear infinite;
+}
+.btn-outline-secondary.mesas-action-loader.is-loading > b { border-color: rgba(105,108,255,.2); border-top-color: var(--c-primary); }
+
+.mesas-initial-skeleton { display: grid; gap: 14px; }
+.mesas-initial-skeleton span,
+.mesas-initial-skeleton i,
+.mesas-initial-skeleton b,
+.mesas-initial-skeleton strong {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(100deg, #e8e6ed 18%, #f8f7fa 36%, #e8e6ed 54%);
+  background-size: 220% 100%;
+  animation: mesas-shimmer 1.1s ease-in-out infinite;
+}
+.mesas-initial-skeleton > header { min-height: 112px; display: grid; grid-template-columns: 54px 1fr 220px; align-items: center; gap: 14px; padding: 22px; border: 1px solid var(--c-border); border-radius: 22px; background: #fff; }
+.mesas-initial-skeleton > header > span { width: 54px; height: 54px; border-radius: 16px; }
+.mesas-initial-skeleton > header > div { display: grid; gap: 9px; }
+.mesas-initial-skeleton > header b { width: 220px; height: 24px; }
+.mesas-initial-skeleton > header i { width: 310px; max-width: 80%; height: 12px; }
+.mesas-initial-skeleton > header > strong { width: 210px; height: 42px; }
+.mesas-initial-skeleton > nav { min-height: 60px; display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid var(--c-border); border-radius: 17px; background: #fff; }
+.mesas-initial-skeleton > nav span { width: 125px; height: 38px; }
+.mesas-initial-skeleton > nav i { width: 250px; height: 40px; margin-left: auto; }
+.mesas-skeleton-filters { min-height: 58px; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--c-border); border-radius: 16px; background: #fff; }
+.mesas-skeleton-filters span { width: 95px; height: 30px; border-radius: 18px; }
+.mesas-skeleton-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.mesas-skeleton-grid article { min-height: 210px; display: grid; gap: 13px; padding: 16px; border: 1px solid var(--c-border); border-radius: 18px; background: #fff; }
+.mesas-skeleton-grid article header, .mesas-skeleton-grid article footer { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+.mesas-skeleton-grid article header span { width: 72px; height: 23px; }
+.mesas-skeleton-grid article header i { width: 82px; height: 23px; }
+.mesas-skeleton-grid article > b { width: 80px; height: 54px; margin: 4px auto; }
+.mesas-skeleton-grid article > i { width: 70%; height: 12px; margin: auto; }
+.mesas-skeleton-grid article footer span { width: 105px; height: 34px; }
+.mesas-skeleton-grid article footer strong { width: 36px; height: 36px; }
 
 .mesas-grid {
   display: grid;
@@ -1257,6 +1325,7 @@
   .mesa-card-group { grid-column: span 2; }
   .split-layout { grid-template-columns: 1fr; }
   .split-accounts-panel { order: -1; }
+  .mesas-skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
   .mesas-tabs-bar { flex-direction: column; align-items: stretch; }
@@ -1266,6 +1335,12 @@
   .mesas-filter-bar { padding: 8px 10px; }
   .mesa-number { font-size: 2.2rem; }
   .mesas-modal--lg, .mesas-modal--xl { max-width: 100%; }
+  .mesas-initial-skeleton > header { grid-template-columns: 48px 1fr; padding: 18px; }
+  .mesas-initial-skeleton > header > span { width: 48px; height: 48px; }
+  .mesas-initial-skeleton > header > strong { grid-column: 1/-1; width: 100%; }
+  .mesas-initial-skeleton > nav span:nth-of-type(n+3) { display: none; }
+  .mesas-initial-skeleton > nav i { width: 46%; }
+  .mesas-skeleton-filters { overflow: hidden; }
 }
 @media (max-width: 480px) {
   .mesas-tabs { gap: 2px; }
@@ -1274,7 +1349,20 @@
   .mesas-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .mesas-modal-backdrop { padding: 8px; }
   .mesas-modal { border-radius: 14px; }
+  .mesas-skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mesas-skeleton-grid article { min-height: 180px; padding: 11px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .mesas-page *, .mesas-page *::before, .mesas-page *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+@keyframes mesas-spin { to { transform: rotate(360deg); } }
+@keyframes mesas-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 
 /* ── Mesa action link (styled like dropdown button) ── */
 .mesa-action-link {

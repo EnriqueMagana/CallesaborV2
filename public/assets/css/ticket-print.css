@@ -34,6 +34,18 @@ hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-cut-reconciliation .ticket-row { padding: 2px 0; }
 .ticket-cut-difference { margin-top: 4px; padding-top: 4px!important; border-top: 2px solid #000; font-size: 1.1em; }
 .ticket-cut-notes p { margin: 0; font-size: .86em; white-space: pre-wrap; }
+.ticket-purchase-folio { margin: 7px 0; padding: 6px 4px; border: 2px solid #000; text-align: center; }
+.ticket-purchase-folio span, .ticket-purchase-folio strong { display: block; }
+.ticket-purchase-folio span { font-size: .76em; }
+.ticket-purchase-folio strong { margin-top: 2px; font-size: 1.45em; letter-spacing: .04em; }
+.ticket-purchase-item { display: grid; grid-template-columns: 20px 1fr; gap: 6px; padding: 7px 0; border-bottom: 1px dashed #777; break-inside: avoid; }
+.ticket-purchase-number { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid #000; border-radius: 3px; font-weight: 700; }
+.ticket-purchase-item strong, .ticket-purchase-item b, .ticket-purchase-item small { display: block; }
+.ticket-purchase-item b { margin-top: 2px; font-size: 1.1em; }
+.ticket-purchase-item small { margin-top: 2px; }
+.ticket-purchase-check { display: flex; align-items: center; gap: 5px; margin-top: 5px; font-weight: 700; }
+.ticket-purchase-check i { width: 14px; height: 14px; display: block; border: 1px solid #000; }
+.ticket-purchase-notes p { margin: 0; white-space: pre-wrap; }
 @media print {
     @page { margin: 0; }
     html { background: #fff; }

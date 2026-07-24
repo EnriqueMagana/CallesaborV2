@@ -11,6 +11,17 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionManager extends Component
 {
+    public function mount(): void
+    {
+        abort_unless(
+            auth()->user()?->can('gestionar roles') || auth()->user()?->can('gestionar permisos'),
+            403
+        );
+
+        if (! auth()->user()?->can('gestionar roles')) {
+            $this->activeTab = 'permissions';
+        }
+    }
     // ── Vista activa: 'roles' | 'permissions' ─────────────────────────
     public string $activeTab = 'roles';
 
@@ -53,6 +64,7 @@ class RolePermissionManager extends Component
 
     public function selectRole(int $id): void
     {
+        $this->authorizePermission('gestionar roles');
         $this->selectedRole   = Role::with('permissions')->find($id);
         $this->rolePanel      = $id;
         $this->showRoleForm   = false;
@@ -66,6 +78,7 @@ class RolePermissionManager extends Component
 
     public function openCreateRole(): void
     {
+        $this->authorizePermission('gestionar roles');
         $this->closeRolePanel();
         $this->showRoleForm = true;
         $this->roleName = '';
@@ -74,12 +87,14 @@ class RolePermissionManager extends Component
 
     public function openEditRole(): void
     {
+        $this->authorizePermission('gestionar roles');
         $this->showRoleForm   = true;
         $this->roleName       = $this->selectedRole->name;
     }
 
     public function saveRole(): void
     {
+        $this->authorizePermission('gestionar roles');
         $this->validate([
             'roleName' => 'required|string|min:2|max:50',
         ]);
@@ -104,6 +119,7 @@ class RolePermissionManager extends Component
 
     public function confirmDeleteRole(int $id): void
     {
+        $this->authorizePermission('gestionar roles');
         $role = Role::find($id);
         abort_if($role && in_array($role->name, ['owner', 'super-admin', 'admin'], true), 403);
         $this->dispatch('open-confirm',
@@ -118,6 +134,7 @@ class RolePermissionManager extends Component
 
     public function deleteRole(int $id): void
     {
+        $this->authorizePermission('gestionar roles');
         $role = Role::find($id);
         abort_if($role && in_array($role->name, ['owner', 'super-admin', 'admin'], true), 403);
         $role?->delete();
@@ -129,6 +146,7 @@ class RolePermissionManager extends Component
 
     public function selectPerm(int $id): void
     {
+        $this->authorizePermission('gestionar permisos');
         $this->selectedPerm = Permission::find($id);
         $this->permPanel    = $id;
         $this->showPermForm = false;
@@ -143,6 +161,7 @@ class RolePermissionManager extends Component
 
     public function openCreatePerm(): void
     {
+        $this->authorizePermission('gestionar permisos');
         $this->closePermPanel();
         $this->showPermForm = true;
         $this->permName  = '';
@@ -151,6 +170,7 @@ class RolePermissionManager extends Component
 
     public function savePerm(): void
     {
+        $this->authorizePermission('gestionar permisos');
         $this->validate([
             'permName'  => 'required|string|min:2|max:100',
             'permGroup' => 'required|string',
@@ -177,6 +197,7 @@ class RolePermissionManager extends Component
 
     public function confirmDeletePerm(int $id): void
     {
+        $this->authorizePermission('gestionar permisos');
         $perm = Permission::find($id);
         $this->dispatch('open-confirm',
             type: 'danger',
@@ -190,6 +211,7 @@ class RolePermissionManager extends Component
 
     public function deletePerm(int $id): void
     {
+        $this->authorizePermission('gestionar permisos');
         Permission::find($id)?->delete();
         $this->closePermPanel();
         $this->dispatch('notify', type: 'success', message: 'Permiso eliminado.');
@@ -211,5 +233,10 @@ class RolePermissionManager extends Component
     {
         return view('livewire.admin.role-permission-manager')
             ->layout('layouts.app');
+    }
+
+    private function authorizePermission(string $permission): void
+    {
+        abort_unless(auth()->user()?->can($permission), 403);
     }
 }

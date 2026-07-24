@@ -27,12 +27,22 @@ class CalendarioReservas extends Component
     public string  $cancelReason   = '';
     public bool    $showCancelForm = false;
 
+    public function mount(): void
+    {
+        $this->requirePermission('ver reservas');
+    }
+
     // ── Computed ──
 
     #[Computed]
     public function customerSuggestions()
     {
         if (strlen($this->customerSearch) < 2) return collect();
+
+        abort_unless(
+            auth()->user()?->can('crear reservas') || auth()->user()?->can('editar reservas'),
+            403
+        );
 
         return Customer::where('name', 'like', '%'.$this->customerSearch.'%')
             ->orWhere('phone', 'like', '%'.$this->customerSearch.'%')
@@ -50,6 +60,7 @@ class CalendarioReservas extends Component
 
     public function openNew(string $date = ''): void
     {
+        $this->requirePermission('crear reservas');
         $this->resetForm();
         $this->reservedDate = $date ?: now()->format('Y-m-d');
         $this->panelMode    = 'new';
@@ -58,6 +69,7 @@ class CalendarioReservas extends Component
 
     public function openDetail(int $id): void
     {
+        $this->requirePermission('ver reservas');
         $this->selectedId   = $id;
         $this->panelMode    = 'detail';
         $this->showCancelForm = false;
@@ -66,6 +78,10 @@ class CalendarioReservas extends Component
 
     public function selectCustomer(int $id): void
     {
+        abort_unless(
+            auth()->user()?->can('crear reservas') || auth()->user()?->can('editar reservas'),
+            403
+        );
         $c = Customer::find($id);
         if (!$c) return;
 
@@ -84,6 +100,7 @@ class CalendarioReservas extends Component
 
     public function save(): void
     {
+        $this->requirePermission('crear reservas');
         $this->validate([
             'customerName' => 'required|string|max:100',
             'guests'       => 'required|integer|min:1|max:500',
@@ -114,6 +131,7 @@ class CalendarioReservas extends Component
 
     public function startEdit(): void
     {
+        $this->requirePermission('editar reservas');
         $r = $this->selectedReservation;
         if (!$r) return;
 
@@ -129,6 +147,7 @@ class CalendarioReservas extends Component
 
     public function update(): void
     {
+        $this->requirePermission('editar reservas');
         $this->validate([
             'customerName' => 'required|string|max:100',
             'guests'       => 'required|integer|min:1|max:500',
@@ -155,6 +174,8 @@ class CalendarioReservas extends Component
 
     public function changeStatus(string $status): void
     {
+        $this->requirePermission('cambiar estado reservas');
+        abort_unless(in_array($status, ['pendiente', 'confirmada', 'completada'], true), 422);
         $r = $this->selectedReservation;
         if (!$r) return;
 
@@ -165,6 +186,7 @@ class CalendarioReservas extends Component
 
     public function cancel(): void
     {
+        $this->requirePermission('cancelar reservas');
         $r = $this->selectedReservation;
         if (!$r) return;
 
@@ -208,6 +230,11 @@ class CalendarioReservas extends Component
         $this->reservedTime  = '19:00';
         $this->notes         = '';
         unset($this->customerSuggestions);
+    }
+
+    private function requirePermission(string $permission): void
+    {
+        abort_unless(auth()->user()?->can($permission), 403);
     }
 
     public function render()

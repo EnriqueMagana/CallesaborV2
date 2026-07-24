@@ -77,21 +77,31 @@ class SidebarMenuSeeder extends Seeder
         $this->item('operations.reservations', [
             'parent_id' => $operations->id, 'label' => 'Reservaciones', 'type' => 'link',
             'icon' => 'bx-calendar-check', 'route_name' => 'app.reservas', 'active_pattern' => 'app.reservas*',
-            'permission' => 'ver ordenes', 'sort_order' => 20,
+            'permission' => 'ver reservas', 'sort_order' => 20,
         ]);
         $this->item('operations.orders', [
             'parent_id' => $operations->id, 'label' => 'Órdenes', 'type' => 'link',
             'icon' => 'bx-receipt', 'route_name' => 'app.ordenes', 'active_pattern' => 'app.ordenes*',
             'permission' => 'ver ordenes', 'sort_order' => 30,
         ]);
+        $this->item('operations.customers', [
+            'parent_id' => $operations->id, 'label' => 'Mis clientes', 'type' => 'link',
+            'icon' => 'bx-group', 'route_name' => 'app.clientes', 'active_pattern' => 'app.clientes*',
+            'permission' => 'ver clientes', 'sort_order' => 35,
+        ]);
         $this->item('operations.sales-history', [
             'parent_id' => $operations->id, 'label' => 'Historial de ventas', 'type' => 'link',
-            'icon' => 'bx-history', 'route_name' => 'app.historial-ventas', 'permission' => 'ver ordenes', 'sort_order' => 40,
+            'icon' => 'bx-history', 'route_name' => 'app.historial-ventas', 'permission' => 'ver reportes', 'sort_order' => 40,
         ]);
         $this->item('operations.delivery', [
             'parent_id' => $operations->id, 'label' => 'Delivery', 'type' => 'link',
             'icon' => 'bx-cycling', 'route_name' => 'app.delivery', 'active_pattern' => 'app.delivery*',
             'permission' => 'ver delivery', 'sort_order' => 50,
+        ]);
+        $this->item('operations.inventory', [
+            'parent_id' => $operations->id, 'label' => 'Inventario', 'type' => 'link',
+            'icon' => 'bx-package', 'route_name' => 'app.inventario', 'active_pattern' => 'app.inventario*',
+            'permission' => 'ver inventario', 'sort_order' => 60,
         ]);
 
         $cash = $this->item('group.cash', [
@@ -116,6 +126,13 @@ class SidebarMenuSeeder extends Seeder
             'parent_id' => $account->id, 'label' => 'Mi perfil', 'type' => 'link',
             'icon' => 'bx-user', 'route_name' => 'profile', 'sort_order' => 10,
         ]);
+
+        // Estos permisos forman parte de la frontera de seguridad del módulo.
+        // Se corrigen también en instalaciones existentes donde el menú ya fue sembrado.
+        SidebarMenuItem::where('system_key', 'operations.reservations')
+            ->update(['permission' => 'ver reservas']);
+        SidebarMenuItem::where('system_key', 'operations.sales-history')
+            ->update(['permission' => 'ver reportes']);
     }
 
     private function item(string $systemKey, array $defaults): SidebarMenuItem

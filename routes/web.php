@@ -4,11 +4,15 @@ use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Admin\UserList;
 use App\Livewire\Admin\KioskSettings;
 use App\Livewire\Admin\BusinessSettingsManager;
+use App\Http\Controllers\KioskLaunchController;
+use App\Http\Controllers\KioskMediaController;
+use App\Http\Controllers\InventoryPurchaseTicketController;
 use App\Livewire\Caja\CorteDetalle;
 use App\Livewire\Caja\CorteHistorial;
 use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\Dashboard as CajaDashboard;
 use App\Livewire\Dashboard;
+use App\Livewire\Customers\CustomerManager;
 use App\Livewire\Delivery\DeliveryBoard;
 use App\Livewire\Menu\MenuBuilder;
 use App\Livewire\Mesas\GestionMesas;
@@ -21,11 +25,13 @@ use App\Livewire\Orders\SalesHistory;
 use App\Livewire\Pos\PointOfSale;
 use App\Livewire\Kiosk\OrderTracking;
 use App\Livewire\Kiosk\OrderWizard;
+use App\Livewire\Inventory\InventoryManager;
 use App\Livewire\Reservas\CalendarioReservas;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Services\ThermalTicketRenderer;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\EnforceSidebarModuleAccess;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use Illuminate\Http\Request;
@@ -33,40 +39,47 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
 
+Route::get('/kiosco-media/{path}', KioskMediaController::class)
+    ->where('path', '.*')
+    ->withoutMiddleware('web')
+    ->name('kiosk.media');
 Route::get('/kiosco/{token}', OrderWizard::class)->name('kiosk.order');
 Route::get('/pedido/{publicToken}', OrderTracking::class)->name('kiosk.track');
 
 // Admin panel - requires auth
-Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class, RequireOpenCashRegisterForConfiguredModules::class, 'verified'])->prefix('app')->name('app.')->group(function () {
+Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class, EnforceSidebarModuleAccess::class, RequireOpenCashRegisterForConfiguredModules::class, 'verified'])->prefix('app')->name('app.')->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/usuarios', UserList::class)->middleware('can:ver usuarios')->name('usuarios');
     Route::get('/roles-permisos', RolePermissionManager::class)->name('roles-permisos');
     Route::get('/kioscos', KioskSettings::class)->middleware('can:gestionar kioscos')->name('kioscos');
+    Route::get('/kioscos/{terminal}/abrir', KioskLaunchController::class)->middleware('can:gestionar kioscos')->name('kioscos.open');
     Route::get('/configuracion-negocio', BusinessSettingsManager::class)->name('configuracion-negocio');
     Route::get('/configuracion-negocio/menu-items', BusinessSettingsManager::class)->name('configuracion-negocio.menu');
-    Route::get('/constructor-menu', MenuBuilder::class)->name('constructor-menu');
-    Route::get('/ordenes', OrderList::class)->name('ordenes');
-    Route::get('/historial-ventas', SalesHistory::class)->name('historial-ventas');
-    Route::get('/ordenes/{order}', OrderDetail::class)->name('ordenes.show');
+    Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
+    Route::get('/ordenes', OrderList::class)->middleware('can:ver ordenes')->name('ordenes');
+    Route::get('/clientes', CustomerManager::class)->middleware('can:ver clientes')->name('clientes');
+    Route::get('/historial-ventas', SalesHistory::class)->middleware('can:ver reportes')->name('historial-ventas');
+    Route::get('/ordenes/{order}', OrderDetail::class)->middleware('can:ver ordenes')->name('ordenes.show');
     Route::get('/pos', PointOfSale::class)->name('pos');
     Route::get('/delivery', DeliveryBoard::class)->middleware('can:ver delivery')->name('delivery');
-    Route::get('/caja', CajaDashboard::class)->name('caja');
-    Route::get('/caja/corte', CorteDeCaja::class)->name('caja.corte');
-    Route::get('/caja/{id}/corte', CorteDeCaja::class)->name('caja.corte.id');
-    Route::get('/caja/cortes', CorteHistorial::class)->name('caja.cortes');
-    Route::get('/caja/cortes/{cut}', CorteDetalle::class)->name('caja.corte.detalle');
+    Route::get('/inventario', InventoryManager::class)->middleware('can:ver inventario')->name('inventario');
+    Route::get('/caja', CajaDashboard::class)->middleware('can:ver caja')->name('caja');
+    Route::get('/caja/corte', CorteDeCaja::class)->middleware('can:cerrar caja')->name('caja.corte');
+    Route::get('/caja/{id}/corte', CorteDeCaja::class)->middleware('can:cerrar caja')->name('caja.corte.id');
+    Route::get('/caja/cortes', CorteHistorial::class)->middleware('can:ver caja')->name('caja.cortes');
+    Route::get('/caja/cortes/{cut}', CorteDetalle::class)->middleware('can:ver caja')->name('caja.corte.detalle');
     Route::get('/caja/cut/{cut}/print', function (\App\Models\CashRegisterCut $cut, ThermalTicketRenderer $renderer) {
         return response($renderer->renderCashCut($cut))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->name('caja.corte.print');
+    })->middleware('can:reimprimir tickets')->name('caja.corte.print');
 
     // Mesas
-    Route::get('/mesas', GestionMesas::class)->name('mesas');
-    Route::get('/mesas/{mesa}/ordenar', MesaOrden::class)->name('mesas.ordenar');
-    Route::get('/mesas/{mesa}/ordenes', MesaOrdenes::class)->name('mesas.ordenes');
-    Route::get('/mesas/{mesa}/split', SplitCuenta::class)->name('mesas.split');
+    Route::get('/mesas', GestionMesas::class)->middleware('can:ver mesas')->name('mesas');
+    Route::get('/mesas/{mesa}/ordenar', MesaOrden::class)->middleware('can:ordenar mesas')->name('mesas.ordenar');
+    Route::get('/mesas/{mesa}/ordenes', MesaOrdenes::class)->middleware('can:ver mesas')->name('mesas.ordenes');
+    Route::get('/mesas/{mesa}/split', SplitCuenta::class)->middleware('can:dividir mesas')->name('mesas.split');
 
     // Reservaciones
-    Route::get('/reservas', CalendarioReservas::class)->name('reservas');
+    Route::get('/reservas', CalendarioReservas::class)->middleware('can:ver reservas')->name('reservas');
     Route::get('/reservas/events', function (Request $request) {
         $reservations = Reservation::whereBetween('reserved_at', [
             $request->query('start'),
@@ -76,27 +89,29 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
         return response()->json(
             $reservations->map(fn($r) => $r->toCalendarEvent())
         );
-    })->name('reservas.events');
+    })->middleware('can:ver reservas')->name('reservas.events');
 });
 
 // Print ticket routes (auth required, open in new window)
 Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class])->prefix('print')->name('print.')->group(function () {
+    Route::get('/inventario/compras/{purchase}', InventoryPurchaseTicketController::class)
+        ->name('inventory-purchase');
     Route::get('/cocina/{order}', function (Order $order, Request $request, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'kitchen_area', $request->query('area')))
             ->header('Content-Type', 'text/html; charset=UTF-8');
-    })->name('cocina');
+    })->middleware('can:reimprimir tickets')->name('cocina');
 
     Route::get('/ventanilla/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'counter'))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->name('ventanilla');
+    })->middleware('can:reimprimir tickets')->name('ventanilla');
 
     Route::get('/delivery/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'delivery'))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->name('delivery');
+    })->middleware('can:reimprimir tickets')->name('delivery');
 
     Route::get('/cliente/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'customer'))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->name('cliente');
+    })->middleware('can:reimprimir tickets')->name('cliente');
 });
 
 // Legacy dashboard route redirects to /app

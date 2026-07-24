@@ -79,32 +79,55 @@
 <script>
 window._posTicketTab = 'cliente';
 
-document.addEventListener('livewire:init', function () {
+window.bindPosTicketEvents = function () {
+    if (!window.Livewire || window._posTicketEventsBound) return;
+    window._posTicketEventsBound = true;
+
     Livewire.on('pos-reprint-show', ({ html_cliente, html_cocina }) => {
-        document.getElementById('iframe-cliente').srcdoc = html_cliente || '';
-        document.getElementById('iframe-cocina').srcdoc  = html_cocina  || '';
+        const clientFrame = document.getElementById('iframe-cliente');
+        const kitchenFrame = document.getElementById('iframe-cocina');
+        const modal = document.getElementById('posTicketModal');
+        if (!clientFrame || !kitchenFrame || !modal) return;
+        clientFrame.srcdoc = html_cliente || '';
+        kitchenFrame.srcdoc = html_cocina || '';
         posTicketTab('cliente');
-        document.getElementById('posTicketModal').classList.add('is-open');
+        modal.classList.add('is-open');
     });
 
     Livewire.on('pos-reprint-show-cocina', ({ html_cliente, html_cocina }) => {
-        document.getElementById('iframe-cliente').srcdoc = html_cliente || '';
-        document.getElementById('iframe-cocina').srcdoc  = html_cocina  || '';
+        const clientFrame = document.getElementById('iframe-cliente');
+        const kitchenFrame = document.getElementById('iframe-cocina');
+        const modal = document.getElementById('posTicketModal');
+        if (!clientFrame || !kitchenFrame || !modal) return;
+        clientFrame.srcdoc = html_cliente || '';
+        kitchenFrame.srcdoc = html_cocina || '';
         posTicketTab('cocina');
-        document.getElementById('posTicketModal').classList.add('is-open');
+        modal.classList.add('is-open');
     });
-});
+};
+
+if (window.Livewire) {
+    window.bindPosTicketEvents();
+} else {
+    document.addEventListener('livewire:init', window.bindPosTicketEvents, { once: true });
+}
 
 window.posTicketTab = function (tab) {
     window._posTicketTab = tab;
-    document.getElementById('pane-cliente').classList.toggle('is-hidden', tab !== 'cliente');
-    document.getElementById('pane-cocina').classList.toggle('is-hidden', tab !== 'cocina');
-    document.getElementById('tab-cliente').className = 'pos-btn pos-btn-sm ' + (tab === 'cliente' ? 'pos-btn-primary' : 'pos-btn-secondary');
-    document.getElementById('tab-cocina').className  = 'pos-btn pos-btn-sm ' + (tab === 'cocina'  ? 'pos-btn-primary' : 'pos-btn-secondary');
+    const clientPane = document.getElementById('pane-cliente');
+    const kitchenPane = document.getElementById('pane-cocina');
+    const clientTab = document.getElementById('tab-cliente');
+    const kitchenTab = document.getElementById('tab-cocina');
+    if (!clientPane || !kitchenPane || !clientTab || !kitchenTab) return;
+    clientPane.classList.toggle('is-hidden', tab !== 'cliente');
+    kitchenPane.classList.toggle('is-hidden', tab !== 'cocina');
+    clientTab.className = 'pos-btn pos-btn-sm ' + (tab === 'cliente' ? 'pos-btn-primary' : 'pos-btn-secondary');
+    kitchenTab.className = 'pos-btn pos-btn-sm ' + (tab === 'cocina' ? 'pos-btn-primary' : 'pos-btn-secondary');
 };
 
 window.posTicketClose = function () {
-    document.getElementById('posTicketModal').classList.remove('is-open');
+    const modal = document.getElementById('posTicketModal');
+    if (modal) modal.classList.remove('is-open');
 };
 
 window.posTicketPrint = function () {
