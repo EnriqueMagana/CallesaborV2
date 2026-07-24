@@ -35,9 +35,16 @@ use App\Http\Middleware\EnforceSidebarModuleAccess;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
+
+Route::get('/auth/session-status', function () {
+    return response()->json([
+        'authenticated' => Auth::check(),
+    ]);
+})->name('auth.session-status');
 
 Route::get('/kiosco-media/{path}', KioskMediaController::class)
     ->where('path', '.*')

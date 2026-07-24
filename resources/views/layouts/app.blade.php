@@ -116,6 +116,21 @@
     <!-- Global confirm modal -->
     <livewire:ui.confirm-modal />
 
+    <div id="app-session-ended-modal" class="app-session-ended-modal" role="alertdialog" aria-modal="true"
+        aria-labelledby="app-session-ended-title" aria-describedby="app-session-ended-description"
+        data-status-url="{{ route('auth.session-status') }}" data-login-url="{{ route('login') }}" hidden>
+        <div class="app-session-ended-modal__backdrop" aria-hidden="true"></div>
+        <section class="app-session-ended-dialog">
+            <span class="app-session-ended-dialog__icon" aria-hidden="true"><i class="bx bx-log-out-circle"></i></span>
+            <span class="app-session-ended-dialog__eyebrow">Sesión finalizada</span>
+            <h2 id="app-session-ended-title">Tu sesión se cerró</h2>
+            <p id="app-session-ended-description">Esta cuenta inició sesión en otro navegador. Por seguridad, este dispositivo ya no tiene acceso al sistema.</p>
+            <button type="button" id="app-session-ended-accept">
+                Aceptar e ir al login <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+            </button>
+        </section>
+    </div>
+
     <!-- Core JS -->
     <script src="{{ asset('assets/vendor/libs/jquery/jquery.js') }}"></script>
     <script src="{{ asset('assets/vendor/libs/popper/popper.js') }}"></script>

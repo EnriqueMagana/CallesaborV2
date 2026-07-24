@@ -35,6 +35,9 @@
 .auth-brand-message ul { display: grid; gap: 11px; margin: 28px 0 0; padding: 0; list-style: none; }
 .auth-brand-message li { display: flex; align-items: flex-start; gap: 10px; color: rgba(255,255,255,.88); font-size: .86rem; line-height: 1.5; }
 .auth-brand-message li i { display: grid; flex: 0 0 22px; width: 22px; height: 22px; place-items: center; margin-top: 1px; color: #4434ae; border-radius: 50%; background: #fff; font-size: 15px; }
+.auth-brand-modules { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.auth-brand-modules span { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 8px 12px; color: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.18); border-radius: 11px; background: rgba(255,255,255,.09); backdrop-filter: blur(7px); font-size: .74rem; font-weight: 700; }
+.auth-brand-modules i { color: #fff; font-size: 17px; }
 .auth-business-contact { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 0; color: rgba(255,255,255,.72); font-size: .73rem; font-style: normal; }
 .auth-business-contact span { display: inline-flex; align-items: center; gap: 6px; }
 .auth-business-contact i { color: #fff; font-size: 16px; }
@@ -43,11 +46,15 @@
 .auth-mobile-brand small { color: var(--auth-muted); }
 .auth-card { width: min(100%, 470px); padding: clamp(28px,4vw,44px); border: 1px solid var(--auth-border); border-radius: 24px; background: var(--auth-surface); box-shadow: 0 24px 70px rgba(39,32,72,.1); }
 .auth-login__header { margin-bottom: 28px; }
-.auth-login__eyebrow { display: block; margin-bottom: 8px; color: var(--auth-primary); font-size: .7rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.auth-login__topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.auth-login__eyebrow { display: block; color: var(--auth-primary); font-size: .7rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.auth-login__secure { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 5px 8px; color: #126347; border-radius: 999px; background: #eaf8f2; font-size: .62rem; font-weight: 750; white-space: nowrap; }
+.auth-login__secure i { font-size: 14px; }
 .auth-login__header h2 { margin: 0; color: var(--auth-ink); font-size: clamp(1.65rem,3vw,2rem); font-weight: 800; letter-spacing: -.035em; }
 .auth-login__header p { margin: 8px 0 0; color: var(--auth-muted); font-size: .9rem; line-height: 1.55; }
 .auth-notice { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 20px; padding: 12px 13px; border-radius: 12px; font-size: .78rem; line-height: 1.45; }
 .auth-notice--success { color: #0b5f43; border: 1px solid #bce4d5; background: #eaf8f2; }
+.auth-notice--warning { color: #874e08; border: 1px solid #efd5a6; background: #fff7e8; }
 .auth-notice i { margin-top: 1px; font-size: 18px; }
 .auth-form { display: grid; gap: 20px; }
 .auth-field label { display: block; margin-bottom: 7px; color: #393548; font-size: .78rem; font-weight: 750; }
@@ -87,6 +94,28 @@
 .auth-security-note strong,.auth-security-note span { display: block; }
 .auth-security-note strong { color: #494454; font-size: .73rem; }
 .auth-security-note span { margin-top: 3px; color: var(--auth-muted); font-size: .68rem; line-height: 1.45; }
+.auth-session-modal { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; }
+.auth-session-modal__backdrop { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: rgba(28,22,48,.62); backdrop-filter: blur(6px); cursor: default; animation: auth-session-fade .18s ease-out; }
+.auth-session-dialog { position: relative; width: min(100%,440px); padding: 30px; overflow: hidden; border: 1px solid rgba(255,255,255,.7); border-radius: 22px; background: #fff; box-shadow: 0 30px 90px rgba(24,18,53,.3); text-align: center; animation: auth-session-enter .22s cubic-bezier(.22,1,.36,1); }
+.auth-session-dialog::before { position: absolute; top: -72px; right: -66px; width: 180px; height: 180px; border: 28px solid rgba(105,86,232,.055); border-radius: 50%; content: ""; pointer-events: none; }
+.auth-session-dialog__icon { position: relative; display: grid; width: 58px; height: 58px; margin: 0 auto 14px; place-items: center; color: var(--auth-primary-dark); border-radius: 18px; background: var(--auth-primary-soft); font-size: 28px; box-shadow: 0 10px 25px rgba(105,86,232,.14); }
+.auth-session-dialog__eyebrow { position: relative; display: block; color: var(--auth-primary); font-size: .65rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.auth-session-dialog h3 { position: relative; margin: 7px 0 9px; color: var(--auth-ink); font-size: 1.25rem; line-height: 1.25; letter-spacing: -.025em; }
+.auth-session-dialog > p { position: relative; margin: 0; color: var(--auth-muted); font-size: .79rem; line-height: 1.55; }
+.auth-session-dialog__notice { position: relative; display: flex; align-items: flex-start; gap: 8px; margin-top: 18px; padding: 11px 12px; color: #6f530f; border: 1px solid #efddb4; border-radius: 11px; background: #fff9eb; text-align: left; font-size: .69rem; line-height: 1.45; }
+.auth-session-dialog__notice i { flex: 0 0 auto; margin-top: 1px; font-size: 17px; }
+.auth-session-dialog__actions { position: relative; display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; margin-top: 21px; }
+.auth-session-dialog__actions button { min-height: 46px; padding: 10px 15px; border-radius: 12px; font: inherit; font-size: .76rem; font-weight: 750; cursor: pointer; transition: border-color var(--auth-transition),background var(--auth-transition),box-shadow var(--auth-transition),transform var(--auth-transition); }
+.auth-session-dialog__actions button:disabled { cursor: wait; opacity: .68; }
+.auth-session-dialog__cancel { color: #575162; border: 1px solid var(--auth-border); background: #fff; }
+.auth-session-dialog__cancel:hover { border-color: #cbc5d5; background: #f7f5fa; }
+.auth-session-dialog__confirm { color: #fff; border: 1px solid var(--auth-primary); background: linear-gradient(135deg,var(--auth-primary),var(--auth-primary-dark)); box-shadow: 0 10px 22px rgba(105,86,232,.22); }
+.auth-session-dialog__confirm > span { align-items: center; justify-content: center; gap: 6px; }
+.auth-session-dialog__confirm > span:first-child { display: flex; }
+.auth-session-dialog__confirm:hover { box-shadow: 0 13px 27px rgba(105,86,232,.29); transform: translateY(-1px); }
+.auth-session-dialog__actions button:focus-visible { outline: 3px solid rgba(105,86,232,.25); outline-offset: 2px; }
+@keyframes auth-session-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes auth-session-enter { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
 .auth-footer { display: flex; width: min(100%,470px); align-items: center; justify-content: space-between; gap: 14px; color: #817b8e; font-size: .68rem; }
 .auth-footer span { display: inline-flex; align-items: center; gap: 5px; }
 .auth-footer i { color: var(--auth-success); font-size: 14px; }
@@ -96,6 +125,7 @@
     .auth-brand-panel__content { padding: 36px; }
     .auth-brand-message h1 { font-size: 2.35rem; }
     .auth-brand-message ul { display: none; }
+    .auth-brand-modules { margin-top: 20px; }
     .auth-business-contact span:last-child { display: none; }
     .auth-content { padding: 34px; }
 }
@@ -117,8 +147,13 @@
     .auth-content { gap: 16px; padding: 18px 14px; }
     .auth-card { padding: 25px 18px; }
     .auth-login__header { margin-bottom: 24px; }
+    .auth-login__topline { align-items: flex-start; flex-direction: column; }
     .auth-field__label-row { align-items: flex-end; }
     .auth-footer { flex-direction: column; align-items: flex-start; gap: 5px; }
+    .auth-session-modal { align-items: end; padding: 0; }
+    .auth-session-dialog { width: 100%; padding: 25px 19px 20px; border-radius: 22px 22px 0 0; }
+    .auth-session-dialog__actions { grid-template-columns: 1fr; }
+    .auth-session-dialog__confirm { grid-row: 1; }
 }
 
 @media (max-height: 700px) and (min-width: 768px) {
@@ -131,4 +166,6 @@
 
 @media (prefers-reduced-motion: reduce) {
     .auth-input-wrap input,.auth-password-toggle,.auth-remember > span[aria-hidden],.auth-submit { transition: none; }
+    .auth-session-modal__backdrop,.auth-session-dialog { animation: none; }
+    .auth-session-dialog__actions button { transition: none; }
 }

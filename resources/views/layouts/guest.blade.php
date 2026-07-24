@@ -29,12 +29,17 @@
 
                 <div class="auth-brand-message">
                     <span class="auth-brand-message__eyebrow"><i class="bx bx-shield-quarter" aria-hidden="true"></i> Acceso seguro</span>
-                    <h1>Tu operación empieza aquí.</h1>
-                    <p>Administra ventas, mesas, cocina y servicio desde un espacio diseñado para trabajar con claridad.</p>
+                    <h1>Todo listo para comenzar el turno.</h1>
+                    <p>Ventas, mesas, cocina y servicio reunidos en un espacio diseñado para operar con claridad.</p>
                     <ul>
                         <li><i class="bx bx-check" aria-hidden="true"></i><span>Información centralizada y disponible según tus permisos.</span></li>
-                        <li><i class="bx bx-check" aria-hidden="true"></i><span>Protección de cuenta y autenticación en dos pasos.</span></li>
+                        <li><i class="bx bx-check" aria-hidden="true"></i><span>Una sola sesión activa para proteger cada cuenta.</span></li>
                     </ul>
+                    <div class="auth-brand-modules" aria-label="Módulos operativos">
+                        <span><i class="bx bx-receipt" aria-hidden="true"></i>Ventas</span>
+                        <span><i class="bx bx-chair" aria-hidden="true"></i>Mesas</span>
+                        <span><i class="bx bx-bowl-hot" aria-hidden="true"></i>Cocina</span>
+                    </div>
                 </div>
 
                 @if($businessSettings?->phone || $businessSettings?->email || $businessSettings?->full_address)

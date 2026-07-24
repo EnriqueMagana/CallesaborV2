@@ -24,11 +24,45 @@ class LoginForm extends Form
     public bool $remember = false;
 
     /**
+     * Check valid credentials for an existing browser before authenticating
+     * this one, so replacing that session always requires confirmation.
+     */
+    public function hasActiveSession(): bool
+    {
+        return filled($this->validatedUser()->active_session_token_hash);
+    }
+
+    /**
      * Attempt to authenticate the request's credentials.
      *
      * @throws ValidationException
      */
     public function authenticate(): bool
+    {
+        $guard = Auth::guard('web');
+        $user = $this->validatedUser();
+
+        if (Hash::needsRehash($user->getAuthPassword())) {
+            $user->forceFill(['password' => Hash::make($this->password)])->save();
+        }
+
+        if ($user->hasEnabledTwoFactorAuthentication()) {
+            session()->put([
+                'login.id' => $user->getKey(),
+                'login.remember' => $this->remember,
+            ]);
+
+            TwoFactorAuthenticationChallenged::dispatch($user);
+
+            return true;
+        }
+
+        $guard->login($user, $this->remember);
+
+        return false;
+    }
+
+    private function validatedUser(): \App\Models\User
     {
         $this->ensureIsNotRateLimited();
 
@@ -53,24 +87,7 @@ class LoginForm extends Form
 
         RateLimiter::clear($this->throttleKey());
 
-        if (Hash::needsRehash($user->getAuthPassword())) {
-            $user->forceFill(['password' => Hash::make($this->password)])->save();
-        }
-
-        if ($user->hasEnabledTwoFactorAuthentication()) {
-            session()->put([
-                'login.id' => $user->getKey(),
-                'login.remember' => $this->remember,
-            ]);
-
-            TwoFactorAuthenticationChallenged::dispatch($user);
-
-            return true;
-        }
-
-        $guard->login($user, $this->remember);
-
-        return false;
+        return $user;
     }
 
     /**

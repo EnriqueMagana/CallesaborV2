@@ -227,6 +227,7 @@ class UserList extends Component
             'banned_by' => auth()->id(),
             'ban_reason' => trim($this->banReason),
             'remember_token' => null,
+            'active_session_token_hash' => null,
         ])->save();
         $this->revokeSessions($user);
         $this->closeBanPanel();

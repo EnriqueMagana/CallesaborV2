@@ -1,6 +1,8 @@
 <?php
 
 use App\Livewire\Forms\LoginForm;
+use App\Services\SingleSessionManager;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -9,10 +11,36 @@ new #[Layout('layouts.guest')] class extends Component
 {
     public LoginForm $form;
 
+    public bool $showSessionConfirmation = false;
+
     public function login(): void
     {
         $this->validate();
 
+        if ($this->form->hasActiveSession()) {
+            $this->showSessionConfirmation = true;
+
+            return;
+        }
+
+        $this->completeLogin();
+    }
+
+    public function confirmSessionTakeover(): void
+    {
+        $this->validate();
+        $this->showSessionConfirmation = false;
+        $this->completeLogin();
+    }
+
+    public function cancelSessionTakeover(): void
+    {
+        $this->showSessionConfirmation = false;
+        $this->form->password = '';
+    }
+
+    private function completeLogin(): void
+    {
         $requiresTwoFactor = $this->form->authenticate();
 
         Session::regenerate();
@@ -22,16 +50,32 @@ new #[Layout('layouts.guest')] class extends Component
             return;
         }
 
-        $this->redirectIntended(default: route('app.dashboard', absolute: false), navigate: true);
+        app(SingleSessionManager::class)->start(
+            Auth::guard('web')->user(),
+            Session::driver(),
+        );
+
+        // Dashboard uses a different layout and stylesheet bundle.
+        // A full navigation prevents a flash of unstyled admin content.
+        $this->redirectIntended(default: route('app.dashboard', absolute: false), navigate: false);
     }
 }; ?>
 
 <div class="auth-login" x-data="{ showPassword: false }">
     <header class="auth-login__header">
-        <span class="auth-login__eyebrow">Panel administrativo</span>
-        <h2>Bienvenido de nuevo</h2>
-        <p>Ingresa tus credenciales para continuar con tu turno.</p>
+        <div class="auth-login__topline">
+            <span class="auth-login__eyebrow">Panel administrativo</span>
+            <span class="auth-login__secure"><i class="bx bx-shield-quarter" aria-hidden="true"></i>Acceso protegido</span>
+        </div>
+        <h2>Inicia tu turno con seguridad</h2>
+        <p>Usa las credenciales asignadas a tu cuenta para entrar al espacio de trabajo.</p>
     </header>
+
+    @if(session('auth_warning'))
+        <div class="auth-notice auth-notice--warning" role="alert">
+            <i class="bx bx-log-out-circle" aria-hidden="true"></i><span>{{ session('auth_warning') }}</span>
+        </div>
+    @endif
 
     @if(session('status'))
         <div class="auth-notice auth-notice--success" role="status">
@@ -44,7 +88,9 @@ new #[Layout('layouts.guest')] class extends Component
             <label for="email">Correo electrónico</label>
             <div class="auth-input-wrap">
                 <i class="bx bx-envelope" aria-hidden="true"></i>
-                <input wire:model.blur="form.email" id="email" type="email" name="email" required autofocus autocomplete="username" placeholder="nombre@negocio.com" aria-describedby="email-help email-error">
+                <input wire:model.blur="form.email" id="email" type="email" name="email" required autofocus
+                    autocomplete="username" autocapitalize="none" spellcheck="false"
+                    placeholder="nombre@negocio.com" aria-describedby="email-help email-error">
             </div>
             <small id="email-help" class="auth-field__help">Usa el correo asignado por el administrador.</small>
             @error('form.email')<p id="email-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
@@ -80,7 +126,32 @@ new #[Layout('layouts.guest')] class extends Component
     </form>
 
     <div class="auth-security-note">
-        <i class="bx bx-info-circle" aria-hidden="true"></i>
-        <p><strong>Acceso exclusivo para personal autorizado.</strong><span>Por seguridad, cierra sesión cuando termines tu turno.</span></p>
+        <i class="bx bx-devices" aria-hidden="true"></i>
+        <p><strong>Una cuenta, un navegador activo.</strong><span>Si ingresas desde otro navegador, la sesión anterior se cerrará automáticamente.</span></p>
     </div>
+
+    @if($showSessionConfirmation)
+        <div class="auth-session-modal" role="presentation">
+            <button type="button" class="auth-session-modal__backdrop" wire:click="cancelSessionTakeover" aria-label="Cerrar confirmación"></button>
+            <section class="auth-session-dialog" role="alertdialog" aria-modal="true" aria-labelledby="active-session-title" aria-describedby="active-session-description">
+                <span class="auth-session-dialog__icon" aria-hidden="true"><i class="bx bx-devices"></i></span>
+                <span class="auth-session-dialog__eyebrow">Sesión activa detectada</span>
+                <h3 id="active-session-title">Ya tienes una sesión iniciada en otro dispositivo</h3>
+                <p id="active-session-description">Si continúas aquí, cerraremos la sesión anterior y este navegador quedará como el único acceso activo.</p>
+                <div class="auth-session-dialog__notice">
+                    <i class="bx bx-info-circle" aria-hidden="true"></i>
+                    <span>No se perderán ventas ni información guardada; solo se cerrará el acceso anterior.</span>
+                </div>
+                <div class="auth-session-dialog__actions">
+                    <button type="button" class="auth-session-dialog__cancel" wire:click="cancelSessionTakeover" wire:loading.attr="disabled" wire:target="confirmSessionTakeover,cancelSessionTakeover">
+                        Cerrar
+                    </button>
+                    <button type="button" class="auth-session-dialog__confirm" wire:click="confirmSessionTakeover" wire:loading.attr="disabled" wire:target="confirmSessionTakeover">
+                        <span wire:loading.remove wire:target="confirmSessionTakeover">Iniciar aquí <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
+                        <span wire:loading.flex wire:target="confirmSessionTakeover"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Cerrando sesión anterior…</span>
+                    </button>
+                </div>
+            </section>
+        </div>
+    @endif
 </div>

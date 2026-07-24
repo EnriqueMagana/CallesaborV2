@@ -19,6 +19,14 @@
 
 .content-wrapper { background: var(--app-canvas); }
 
+#layout-navbar {
+    position: relative;
+    z-index: 1050 !important;
+    overflow: visible;
+}
+#layout-navbar .navbar-nav,
+#layout-navbar .navbar-dropdown { overflow: visible; }
+
 .app-navbar-profile-trigger {
     display: grid !important;
     width: 48px;
@@ -73,6 +81,7 @@
     box-shadow: 0 0 0 1px rgba(22, 135, 92, .16);
 }
 .app-navbar-user-menu {
+    z-index: 1060;
     width: min(300px, calc(100vw - 24px));
     overflow: hidden;
     padding: 8px;
@@ -342,6 +351,32 @@
 .app-text-sm { font-size: 0.82rem !important; }
 
 .app-toast-stack { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 9999; display: flex; width: min(360px, calc(100vw - 2rem)); flex-direction: column; gap: 8px; }
+
+.app-session-ended-modal[hidden] { display: none; }
+.app-session-ended-modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; }
+.app-session-ended-modal__backdrop { position: absolute; inset: 0; background: rgba(26,21,43,.66); backdrop-filter: blur(6px); animation: app-session-ended-fade .18s ease-out; }
+.app-session-ended-dialog { position: relative; width: min(430px,100%); overflow: hidden; padding: 30px; border: 1px solid rgba(255,255,255,.7); border-radius: 22px; background: #fff; box-shadow: 0 30px 90px rgba(20,15,43,.34); text-align: center; animation: app-session-ended-enter .22s cubic-bezier(.22,1,.36,1); }
+.app-session-ended-dialog::before { position: absolute; top: -70px; right: -64px; width: 170px; height: 170px; border: 27px solid rgba(196,62,79,.055); border-radius: 50%; content: ""; pointer-events: none; }
+.app-session-ended-dialog__icon { position: relative; display: grid; width: 60px; height: 60px; margin: 0 auto 14px; place-items: center; color: #b32f43; border-radius: 18px; background: #fdecef; box-shadow: 0 10px 24px rgba(196,62,79,.14); font-size: 29px; }
+.app-session-ended-dialog__eyebrow { position: relative; display: block; color: #b32f43; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.app-session-ended-dialog h2 { position: relative; margin: 7px 0 8px; color: var(--app-ink); font-size: 1.35rem; letter-spacing: -.03em; }
+.app-session-ended-dialog p { position: relative; margin: 0; color: var(--app-muted); font-size: .79rem; line-height: 1.55; }
+.app-session-ended-dialog button { position: relative; display: inline-flex; width: 100%; min-height: 48px; align-items: center; justify-content: center; gap: 7px; margin-top: 22px; padding: 11px 18px; color: #fff; border: 0; border-radius: 12px; background: linear-gradient(135deg,var(--app-primary),var(--app-primary-dark)); box-shadow: 0 11px 25px rgba(105,86,232,.24); font: inherit; font-size: .78rem; font-weight: 800; cursor: pointer; transition: box-shadow var(--app-transition),transform var(--app-transition); }
+.app-session-ended-dialog button:hover { box-shadow: 0 14px 30px rgba(105,86,232,.31); transform: translateY(-1px); }
+.app-session-ended-dialog button:focus-visible { outline: 3px solid rgba(105,86,232,.28); outline-offset: 3px; }
+body.app-session-ended-open { overflow: hidden !important; }
+@keyframes app-session-ended-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes app-session-ended-enter { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 479.98px) {
+    .app-session-ended-modal { align-items: end; padding: 0; }
+    .app-session-ended-dialog { width: 100%; padding: 26px 20px 20px; border-radius: 22px 22px 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-session-ended-modal__backdrop,.app-session-ended-dialog { animation: none; }
+    .app-session-ended-dialog button { transition: none; }
+}
 .app-toast-stack .toast { border-radius: 12px; box-shadow: 0 14px 38px rgba(31, 25, 62, 0.2); }
 
 .reservations-page .fc { color: var(--app-ink); }

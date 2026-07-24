@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\SingleSessionManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Livewire\Volt\Volt;
@@ -60,6 +61,8 @@ class TwoFactorAuthenticationTest extends TestCase
 
         $response->assertRedirect('/app');
         $this->assertAuthenticatedAs($user);
+        $this->assertIsString(session(SingleSessionManager::SESSION_KEY));
+        $this->assertNotNull($user->fresh()->active_session_token_hash);
     }
 
     private function twoFactorUser(): User

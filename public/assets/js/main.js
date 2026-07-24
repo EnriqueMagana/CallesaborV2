@@ -239,3 +239,96 @@ if (!window._sneatNavBound) {
     window._initializeSneatMenu();
   });
 }
+
+window._showSessionEndedModal = function (loginUrl) {
+  const modal = document.getElementById('app-session-ended-modal');
+  const acceptButton = document.getElementById('app-session-ended-accept');
+
+  if (!modal || !acceptButton) {
+    window.location.assign(loginUrl || '/login');
+    return;
+  }
+
+  modal.dataset.loginUrl = loginUrl || '/login';
+  modal.hidden = false;
+  document.body.classList.add('app-session-ended-open');
+  acceptButton.focus();
+};
+
+if (!window._singleSessionUiBound) {
+  window._singleSessionUiBound = true;
+
+  document.addEventListener('click', function (event) {
+    const acceptButton = event.target.closest('#app-session-ended-accept');
+    if (!acceptButton) return;
+
+    const modal = document.getElementById('app-session-ended-modal');
+    window.location.assign((modal && modal.dataset.loginUrl) || '/login');
+  });
+
+  document.addEventListener('keydown', function (event) {
+    const modal = document.getElementById('app-session-ended-modal');
+    if (!modal || modal.hidden || event.key !== 'Escape') return;
+
+    event.preventDefault();
+    document.getElementById('app-session-ended-accept')?.focus();
+  });
+
+  document.addEventListener('livewire:init', function () {
+    Livewire.hook('request', function ({ fail }) {
+      fail(function ({ status, content, preventDefault }) {
+        if (status === 409 && content) {
+          let payload;
+          try {
+            payload = JSON.parse(content);
+          } catch (error) {
+            return;
+          }
+
+          if (payload.reason !== 'session_replaced') return;
+
+          preventDefault();
+          window._showSessionEndedModal(payload.login_url);
+          return;
+        }
+
+        if (status !== 419) return;
+
+        // A replaced database session used to fail CSRF before reaching the
+        // single-session middleware. Verify once, only after that failure, so
+        // the user never sees Livewire's generic page-expired dialog.
+        preventDefault();
+
+        const modal = document.getElementById('app-session-ended-modal');
+        const statusUrl = modal?.dataset.statusUrl || '/auth/session-status';
+        const loginUrl = modal?.dataset.loginUrl || '/login';
+
+        fetch(statusUrl, {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(async function (response) {
+            if (response.status === 409 || response.status === 401) {
+              window._showSessionEndedModal(loginUrl);
+              return;
+            }
+
+            const payload = await response.json();
+            if (!payload.authenticated) {
+              window._showSessionEndedModal(loginUrl);
+              return;
+            }
+
+            window.location.reload();
+          })
+          .catch(function () {
+            window._showSessionEndedModal(loginUrl);
+          });
+      });
+    });
+  }, { once: true });
+}
