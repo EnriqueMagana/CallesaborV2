@@ -132,6 +132,40 @@ class AdministrationPermissionBoundariesTest extends TestCase
         $this->assertDatabaseHas('permissions', ['name' => 'permiso temporal de prueba']);
     }
 
+    public function test_roles_page_exposes_accessible_modals_and_dark_theme_styles(): void
+    {
+        $manager = $this->employee(['gestionar roles', 'gestionar permisos']);
+
+        $this->actingAs($manager)
+            ->get(route('app.roles-permisos'))
+            ->assertOk()
+            ->assertSee('assets/css/role-permissions.css', false)
+            ->assertSee('roles-tabs', false)
+            ->assertSee('roles-role-card', false);
+
+        Livewire::actingAs($manager)->test(RolePermissionManager::class)
+            ->call('openCreateRole')
+            ->assertSee('roles-modal-layer', false)
+            ->assertSee('roles-modal-close', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('wire:click="closeRoleForm"', false)
+            ->assertSee('id="role-name"', false)
+            ->call('closeRoleForm')
+            ->assertSet('showRoleForm', false)
+            ->call('openCreatePerm')
+            ->assertSee('wire:click="closePermForm"', false)
+            ->assertSee('id="permission-name"', false)
+            ->call('closePermForm')
+            ->assertSet('showPermForm', false);
+
+        $styles = file_get_contents(public_path('assets/css/role-permissions.css'));
+
+        $this->assertStringContainsString('html.dark-style .roles-page', $styles);
+        $this->assertStringContainsString('.roles-modal-close', $styles);
+        $this->assertStringContainsString('top: -54px', $styles);
+        $this->assertStringContainsString('@media (max-width: 767.98px)', $styles);
+    }
+
     private function employee(array $permissions): User
     {
         $user = User::factory()->create();

@@ -233,7 +233,30 @@
             </div>
         </section>
     @elseif($step === 3)
-        <section class="kiosk-menu-layout">
+        <section class="kiosk-menu-layout"
+            x-data="{
+                query: '',
+                category: @js($categoryFilter),
+                items: @js($this->products->map(fn ($product) => [
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'categoryId' => $product->category_id,
+                ])->values()),
+                normalize(value) {
+                    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                },
+                matches(name, description, categoryId) {
+                    const categoryMatches = this.category === null || Number(this.category) === Number(categoryId);
+                    const term = this.normalize(this.query.trim());
+                    return categoryMatches && (!term || this.normalize(`${name} ${description || ''}`).includes(term));
+                },
+                hasMatches() {
+                    for (const item of this.items) {
+                        if (this.matches(item.name, item.description, item.categoryId)) return true;
+                    }
+                    return false;
+                }
+            }">
             <div class="kiosk-catalog">
                 <button class="kiosk-back-button" type="button" wire:click="$set('step', 2)"><i
                         class="bx bx-left-arrow-alt"></i> Cambiar recomendación</button>
@@ -243,20 +266,23 @@
                         <h1>{{ $recommendationName === 'Todo el menú' ? 'Explora todo el menú' : 'Te recomendamos ' . $recommendationName }}
                         </h1>
                     </div>
-                    <form class="kiosk-search" wire:submit="applySearch">
+                    <form class="kiosk-search" x-on:submit.prevent>
                         <i class="bx bx-search"></i>
-                        <input type="search" wire:model="search" placeholder="Buscar en el menú"
-                            aria-label="Buscar en el menú">
-                        <button type="submit" aria-label="Buscar"><i class="bx bx-right-arrow-alt"></i></button>
+                        <input type="search" x-model.debounce.120ms="query" placeholder="Buscar en el menú"
+                            aria-label="Buscar en el menú" autocomplete="off">
+                        <button type="button" x-show="query" x-cloak x-on:click="query = ''"
+                            aria-label="Limpiar búsqueda"><i class="bx bx-x"></i></button>
                     </form>
                 </div>
 
                 <nav class="kiosk-categories" aria-label="Categorías">
-                    <button type="button" class="{{ $categoryFilter === null ? 'is-active' : '' }}"
-                        wire:click="$set('categoryFilter', null)">Todo</button>
+                    <button type="button" x-on:click="category = null"
+                        :class="{ 'is-active': category === null }"
+                        :aria-pressed="category === null">Todo</button>
                     @foreach ($this->categories as $category)
-                        <button type="button" class="{{ $categoryFilter === $category->id ? 'is-active' : '' }}"
-                            wire:click="$set('categoryFilter', {{ $category->id }})">
+                        <button type="button" x-on:click="category = {{ $category->id }}"
+                            :class="{ 'is-active': Number(category) === {{ $category->id }} }"
+                            :aria-pressed="Number(category) === {{ $category->id }}">
                             @if ($category->icon)
                                 <i class="bx {{ $category->icon }}"></i>
                             @endif
@@ -266,21 +292,21 @@
                 </nav>
 
                 <div class="kiosk-products-shell">
-                    <div class="kiosk-component-loader" wire:loading.flex wire:target="applySearch,categoryFilter" role="status" aria-label="Actualizando productos">
-                        <i class="bx bx-loader-alt"></i>
-                    </div>
                     <div class="kiosk-products">
-                    @forelse($this->products as $product)
+                    @foreach($this->products as $product)
                         @php
                             $menuPromotion = $this->promotions->get($product->id);
                             $menuHasDiscount = $menuPromotion?->promotional_price !== null && (float) $menuPromotion->promotional_price < (float) $product->price;
                         @endphp
-                        <button class="kiosk-product-card kiosk-loadable-card" type="button" wire:click="openProduct({{ $product->id }})"
+                        <button class="kiosk-product-card kiosk-loadable-card" type="button"
+                            x-show="matches(@js($product->name), @js($product->description), @js($product->category_id))" x-cloak
+                            wire:click="openProduct({{ $product->id }})"
                             wire:key="kiosk-product-{{ $product->id }}" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="openProduct({{ $product->id }})">
                             <span class="kiosk-product-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                                 @if ($product->image)
                                     <img x-ref="image" src="{{ route('kiosk.media', ['path' => $product->image]) }}"
-                                        alt="{{ $product->name }}">
+                                        alt="{{ $product->name }}" width="320" height="216"
+                                        loading="lazy" decoding="async">
                                 @else
                                     <i class="bx bx-food-menu"></i>
                                 @endif
@@ -303,13 +329,12 @@
                                 </span>
                             </span>
                         </button>
-                    @empty
-                        <div class="kiosk-empty-state">
+                    @endforeach
+                        <div class="kiosk-empty-state" x-show="!hasMatches()" x-cloak>
                             <i class="bx bx-search-alt"></i>
                             <h2>No encontramos productos</h2>
                             <p>Prueba otra categoría o cambia tu búsqueda.</p>
                         </div>
-                    @endforelse
                     </div>
                 </div>
             </div>
@@ -359,7 +384,22 @@
             </aside>
         </section>
     @elseif($step === 4 && $this->product)
-        <section class="kiosk-customizer">
+        <section class="kiosk-customizer"
+            x-data="kioskCustomizer(@js([
+                'addonQuantities' => (object) $addonQuantities,
+                'ingredients' => (object) $selectedIngredients,
+                'qty' => $itemQuantity,
+                'notes' => $itemNotes,
+                'groups' => $this->product->addonGroups->map(fn ($group) => [
+                    'name' => $group->name,
+                    'ids' => $group->addons->pluck('id')->map(fn ($id) => (int) $id)->values(),
+                    'minimum' => $group->is_required ? max(1, (int) $group->min_selections) : (int) $group->min_selections,
+                    'maximum' => max(1, (int) $group->max_selections),
+                ])->values(),
+                'productAddonMaximum' => (int) ($this->product->max_addons ?? 0),
+                'ingredientMinimum' => (int) $this->product->min_ingredients,
+                'ingredientMaximum' => (int) ($this->product->max_ingredients ?? 0),
+            ]))">
             <button class="kiosk-back-button" type="button" wire:click="cancelCustomization"><i
                     class="bx bx-left-arrow-alt"></i> Volver al menú</button>
             <div class="kiosk-customizer-grid">
@@ -371,7 +411,8 @@
                     <div class="kiosk-customizer-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                         @if ($this->product->image)
                             <img x-ref="image" src="{{ route('kiosk.media', ['path' => $this->product->image]) }}"
-                                alt="{{ $this->product->name }}">
+                                alt="{{ $this->product->name }}" width="520" height="360"
+                                decoding="async">
                         @else
                             <i class="bx bx-food-menu"></i>
                         @endif
@@ -395,6 +436,9 @@
                         <p class="kiosk-error kiosk-error-block"><i class="bx bx-error-circle"></i>{{ $message }}
                         </p>
                     @enderror
+                    <p class="kiosk-error kiosk-error-block" x-show="clientError" x-cloak aria-live="polite">
+                        <i class="bx bx-error-circle"></i><span x-text="clientError"></span>
+                    </p>
 
                     @foreach ($this->product->addonGroups as $group)
                         @php
@@ -415,30 +459,32 @@
                                         {{ $minimum === $maximum ? $maximum : 'de ' . $minimum . ' a ' . $maximum }} en
                                         total. Usa los botones menos y más.</p>
                                 </div>
-                                <span class="{{ $selectedCount >= $minimum ? 'is-complete' : '' }}">
-                                    <i
-                                        class="bx {{ $selectedCount >= $minimum ? 'bx-check' : 'bx-error-circle' }}"></i>
-                                    {{ $selectedCount >= $minimum ? 'Listo' : 'Obligatorio' }}
+                                <span :class="{ 'is-complete': groupTotal(@js($groupAddonIds)) >= {{ $minimum }} }">
+                                    <i class="bx"
+                                        :class="groupTotal(@js($groupAddonIds)) >= {{ $minimum }} ? 'bx-check' : 'bx-error-circle'"></i>
+                                    <span x-text="groupTotal(@js($groupAddonIds)) >= {{ $minimum }} ? 'Listo' : 'Obligatorio'"></span>
                                 </span>
                             </div>
-                            <div class="kiosk-selection-counter {{ $selectedCount >= $minimum ? 'is-complete' : '' }}"
+                            <div class="kiosk-selection-counter"
+                                :class="{ 'is-complete': groupTotal(@js($groupAddonIds)) >= {{ $minimum }} }"
                                 aria-live="polite">
                                 <div>
-                                    <strong>{{ $selectedCount }} de {{ $maximum }}</strong>
-                                    <span>{{ $selectedCount === 1 ? 'complemento seleccionado' : 'complementos seleccionados' }}</span>
+                                    <strong x-text="`${groupTotal(@js($groupAddonIds))} de {{ $maximum }}`"></strong>
+                                    <span x-text="groupTotal(@js($groupAddonIds)) === 1 ? 'complemento seleccionado' : 'complementos seleccionados'"></span>
                                 </div>
-                                <div class="kiosk-selection-progress"><span
-                                        class="kiosk-selection-progress-step {{ $selectedCount >= 1 ? 'is-filled' : '' }}"></span>
+                                <div class="kiosk-selection-progress"><span class="kiosk-selection-progress-step"
+                                        :class="{ 'is-filled': groupTotal(@js($groupAddonIds)) >= 1 }"></span>
                                     @for ($selectionStep = 2; $selectionStep <= $maximum; $selectionStep++)
-                                        <span
-                                            class="kiosk-selection-progress-step {{ $selectedCount >= $selectionStep ? 'is-filled' : '' }}"></span>
+                                        <span class="kiosk-selection-progress-step"
+                                            :class="{ 'is-filled': groupTotal(@js($groupAddonIds)) >= {{ $selectionStep }} }"></span>
                                     @endfor
                                 </div>
                             </div>
                             <div class="kiosk-option-list">
                                 @foreach ($group->addons as $addon)
                                     @php $addonQuantity = (int) ($addonQuantities[$addon->id] ?? 0); @endphp
-                                    <article class="kiosk-option {{ $addonQuantity > 0 ? 'is-selected' : '' }}">
+                                    <article class="kiosk-option"
+                                        :class="{ 'is-selected': amount(addonQuantities, {{ $addon->id }}) > 0 }">
                                         <div class="kiosk-option-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                                             @if ($addon->image)
                                                 <img x-ref="image" src="{{ route('kiosk.media', ['path' => $addon->image]) }}"
@@ -447,10 +493,10 @@
                                             @else
                                                 <span><i class="bx bx-food-menu"></i><small>Sin imagen</small></span>
                                             @endif
-                                            @if ($addonQuantity > 0)
-                                                <b class="kiosk-selected-label"><i class="bx bx-check"></i>
-                                                    Seleccionado</b>
-                                            @endif
+                                            <b class="kiosk-selected-label"
+                                                x-show="amount(addonQuantities, {{ $addon->id }}) > 0" x-cloak>
+                                                <i class="bx bx-check"></i> Seleccionado
+                                            </b>
                                         </div>
                                         <div class="kiosk-option-content">
                                             <div class="kiosk-option-copy">
@@ -461,30 +507,31 @@
                                             <div class="kiosk-addon-quantity"
                                                 aria-label="Cantidad de {{ $addon->name }}">
                                                 <button type="button"
-                                                    wire:click="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, -1)"
+                                                    x-on:click="changeAddon({{ $addon->id }}, -1, @js($groupAddonIds), {{ $maximum }}, @js($group->is_required && $group->addons->count() === 1))"
                                                     class="kiosk-local-action"
-                                                    wire:loading.class="is-loading"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, -1)"
-                                                    @disabled($addonQuantity === 0 || ($group->is_required && $group->addons->count() === 1 && $addonQuantity === 1))
+                                                    :disabled="amount(addonQuantities, {{ $addon->id }}) === 0 || (@js($group->is_required && $group->addons->count() === 1) && amount(addonQuantities, {{ $addon->id }}) === 1)"
                                                     aria-label="Quitar una unidad de {{ $addon->name }}"><i
                                                         class="bx bx-minus"></i><span>Quitar</span></button>
-                                                <div><small>Cantidad</small><strong>{{ $addonQuantity }}</strong></div>
+                                                <div><small>Cantidad</small><strong
+                                                    x-text="amount(addonQuantities, {{ $addon->id }})"></strong></div>
                                                 <button type="button"
-                                                    wire:click="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, 1)"
+                                                    x-on:click="changeAddon({{ $addon->id }}, 1, @js($groupAddonIds), {{ $maximum }}, false)"
                                                     class="kiosk-local-action"
-                                                    wire:loading.class="is-loading"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="changeAddonQuantity({{ $group->id }}, {{ $addon->id }}, 1)"
-                                                    @disabled($addonQuantity >= $maximum || ($selectedCount >= $maximum && $maximum > 1))
+                                                    :disabled="(groupTotal(@js($groupAddonIds)) >= {{ $maximum }} && {{ $maximum }} > 1)
+                                                        || (productAddonMaximum > 0
+                                                            && total(addonQuantities) >= productAddonMaximum
+                                                            && amount(addonQuantities, {{ $addon->id }}) === 0)"
                                                     aria-label="Agregar una unidad de {{ $addon->name }}"><i
                                                         class="bx bx-plus"></i><span>Agregar</span></button>
                                             </div>
-                                            <p class="kiosk-option-status {{ $addonQuantity > 0 ? 'is-selected' : '' }}"
+                                            <p class="kiosk-option-status"
+                                                :class="{ 'is-selected': amount(addonQuantities, {{ $addon->id }}) > 0 }"
                                                 aria-live="polite">
-                                                <i
-                                                    class="bx {{ $addonQuantity > 0 ? 'bx-check-circle' : 'bx-circle' }}"></i>
-                                                {{ $addonQuantity > 0 ? 'Has elegido ' . $addonQuantity . ' de este complemento' : 'No seleccionado' }}
+                                                <i class="bx"
+                                                    :class="amount(addonQuantities, {{ $addon->id }}) > 0 ? 'bx-check-circle' : 'bx-circle'"></i>
+                                                <span x-text="amount(addonQuantities, {{ $addon->id }}) > 0
+                                                    ? `Has elegido ${amount(addonQuantities, {{ $addon->id }})} de este complemento`
+                                                    : 'No seleccionado'"></span>
                                             </p>
                                         </div>
                                     </article>
@@ -507,24 +554,30 @@
                                         {{ $ingredientMaximum > 0 ? 'Puedes elegir hasta ' . $ingredientMaximum . ' en total.' : 'No hay límite de cantidad.' }}
                                     </p>
                                 </div>
-                                <span
-                                    class="{{ $ingredientMinimum > 0 && $ingredientTotal >= $ingredientMinimum ? 'is-complete' : '' }}">
-                                    <i
-                                        class="bx {{ $ingredientMinimum > 0 ? ($ingredientTotal >= $ingredientMinimum ? 'bx-check' : 'bx-error-circle') : 'bx-info-circle' }}"></i>
-                                    {{ $ingredientMinimum > 0 ? ($ingredientTotal >= $ingredientMinimum ? 'Listo' : 'Obligatorio') : 'Opcional' }}
+                                <span :class="{ 'is-complete': ingredientMinimum > 0 && total(ingredients) >= ingredientMinimum }">
+                                    <i class="bx"
+                                        :class="ingredientMinimum > 0
+                                            ? (total(ingredients) >= ingredientMinimum ? 'bx-check' : 'bx-error-circle')
+                                            : 'bx-info-circle'"></i>
+                                    <span x-text="ingredientMinimum > 0
+                                        ? (total(ingredients) >= ingredientMinimum ? 'Listo' : 'Obligatorio')
+                                        : 'Opcional'"></span>
                                 </span>
                             </div>
-                            <div class="kiosk-ingredient-counter {{ $ingredientTotal > 0 ? 'has-selection' : '' }}"
+                            <div class="kiosk-ingredient-counter"
+                                :class="{ 'has-selection': total(ingredients) > 0 }"
                                 aria-live="polite">
                                 <div>
-                                    <strong>{{ $ingredientMaximum > 0 ? $ingredientTotal . ' de ' . $ingredientMaximum : $ingredientTotal }}</strong>
-                                    <span>{{ $ingredientTotal === 1 ? 'ingrediente agregado' : 'ingredientes agregados' }}</span>
+                                    <strong x-text="ingredientMaximum > 0
+                                        ? `${total(ingredients)} de ${ingredientMaximum}`
+                                        : total(ingredients)"></strong>
+                                    <span x-text="total(ingredients) === 1 ? 'ingrediente agregado' : 'ingredientes agregados'"></span>
                                 </div>
                                 @if ($ingredientMaximum > 0 && $ingredientMaximum <= 12)
                                     <div class="kiosk-selection-progress" aria-hidden="true">
                                         @for ($ingredientStep = 1; $ingredientStep <= $ingredientMaximum; $ingredientStep++)
-                                            <span
-                                                class="kiosk-selection-progress-step {{ $ingredientTotal >= $ingredientStep ? 'is-filled' : '' }}"></span>
+                                            <span class="kiosk-selection-progress-step"
+                                                :class="{ 'is-filled': total(ingredients) >= {{ $ingredientStep }} }"></span>
                                         @endfor
                                     </div>
                                 @endif
@@ -532,8 +585,8 @@
                             <div class="kiosk-ingredient-list">
                                 @foreach ($this->product->ingredients as $ingredient)
                                     @php $ingredientQuantity = (int) ($selectedIngredients[$ingredient->id] ?? 0); @endphp
-                                    <article
-                                        class="kiosk-ingredient {{ $ingredientQuantity > 0 ? 'is-selected' : '' }}">
+                                    <article class="kiosk-ingredient"
+                                        :class="{ 'is-selected': amount(ingredients, {{ $ingredient->id }}) > 0 }">
                                         <div class="kiosk-ingredient-copy">
                                             <span class="kiosk-ingredient-media kiosk-image-shell" x-data="kioskImageLoader" :class="{ 'is-image-loading': loading }">
                                                 @if ($ingredient->image)
@@ -545,29 +598,26 @@
                                             <span>
                                                 <strong>{{ $ingredient->name }}</strong>
                                                 <small>{{ $ingredient->extra_price > 0 ? '+$' . number_format($ingredient->extra_price, 2) . ' cada uno' : 'Sin costo extra' }}</small>
-                                                <b>{{ $ingredientQuantity > 0 ? 'Seleccionado · ' . $ingredientQuantity : 'No seleccionado' }}</b>
+                                                <b x-text="amount(ingredients, {{ $ingredient->id }}) > 0
+                                                    ? `Seleccionado · ${amount(ingredients, {{ $ingredient->id }})}`
+                                                    : 'No seleccionado'"></b>
                                             </span>
                                         </div>
                                         <div class="kiosk-ingredient-quantity"
                                             aria-label="Cantidad de {{ $ingredient->name }}">
                                             <button type="button"
-                                                wire:click="changeIngredient({{ $ingredient->id }}, -1)"
+                                                x-on:click="changeIngredient({{ $ingredient->id }}, -1)"
                                                 class="kiosk-local-action"
-                                                wire:loading.class="is-loading"
-                                                wire:loading.attr="disabled"
-                                                wire:target="changeIngredient({{ $ingredient->id }}, -1)"
-                                                @disabled($ingredientQuantity === 0)
+                                                :disabled="amount(ingredients, {{ $ingredient->id }}) === 0"
                                                 aria-label="Quitar una unidad de {{ $ingredient->name }}"><i
                                                     class="bx bx-minus"></i><span>Quitar</span></button>
-                                            <div><small>Cantidad</small><strong>{{ $ingredientQuantity }}</strong>
+                                            <div><small>Cantidad</small><strong
+                                                x-text="amount(ingredients, {{ $ingredient->id }})"></strong>
                                             </div>
                                             <button type="button"
-                                                wire:click="changeIngredient({{ $ingredient->id }}, 1)"
+                                                x-on:click="changeIngredient({{ $ingredient->id }}, 1)"
                                                 class="kiosk-local-action"
-                                                wire:loading.class="is-loading"
-                                                wire:loading.attr="disabled"
-                                                wire:target="changeIngredient({{ $ingredient->id }}, 1)"
-                                                @disabled($ingredientMaximum > 0 && $ingredientTotal >= $ingredientMaximum)
+                                                :disabled="ingredientMaximum > 0 && total(ingredients) >= ingredientMaximum"
                                                 aria-label="Agregar una unidad de {{ $ingredient->name }}"><i
                                                     class="bx bx-plus"></i><span>Agregar</span></button>
                                         </div>
@@ -578,20 +628,24 @@
                     @endif
 
                     <label class="kiosk-field"><span>Indicaciones especiales <small>Opcional</small></span>
-                        <textarea wire:model="itemNotes" maxlength="300" placeholder="Ej. sin cebolla, salsa aparte…"></textarea>
+                        <textarea x-model="notes" maxlength="300" placeholder="Ej. sin cebolla, salsa aparte…"></textarea>
                     </label>
                     <div class="kiosk-customizer-action">
                         <div class="kiosk-quantity kiosk-quantity-large">
-                            <button type="button"
-                                wire:click="$set('itemQuantity', {{ max(1, $itemQuantity - 1) }})"><i
+                            <button type="button" x-on:click="qty = Math.max(1, qty - 1)"
+                                :disabled="qty === 1" aria-label="Quitar una unidad"><i
                                     class="bx bx-minus"></i></button>
-                            <span>{{ $itemQuantity }}</span>
-                            <button type="button"
-                                wire:click="$set('itemQuantity', {{ min(99, $itemQuantity + 1) }})"><i
+                            <span x-text="qty"></span>
+                            <button type="button" x-on:click="qty = Math.min(99, qty + 1)"
+                                :disabled="qty >= 99" aria-label="Agregar una unidad"><i
                                     class="bx bx-plus"></i></button>
                         </div>
-                        <button class="kiosk-primary-button" type="button" wire:click="addCustomizedProduct">Agregar
-                            al pedido <i class="bx bx-plus"></i></button>
+                        <button class="kiosk-primary-button" type="button" x-on:click="submit($wire)"
+                            :disabled="submitting || !isValid()" :aria-busy="submitting">
+                            <span x-show="!submitting">Agregar al pedido</span>
+                            <span x-show="submitting" x-cloak>Agregando…</span>
+                            <i class="bx" :class="submitting ? 'bx-loader-alt bx-spin' : 'bx-plus'"></i>
+                        </button>
                     </div>
                 </div>
             </div>

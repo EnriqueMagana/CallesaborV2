@@ -90,6 +90,15 @@
     box-shadow: 0 18px 48px rgba(39, 32, 72, .14);
 }
 .app-navbar-user-menu .dropdown-item { min-height: 42px; border-radius: 10px; }
+.app-navbar-user-menu .app-theme-toggle { min-height: 44px; }
+.app-theme-toggle [data-theme-toggle-icon] {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    color: var(--app-primary);
+    font-size: 1.15rem;
+}
 .app-navbar-user-menu .dropdown-divider { margin: 6px 0; border-color: var(--app-border); }
 .app-navbar-user-summary { padding: 10px !important; }
 #layout-navbar .app-navbar-avatar--menu { flex-basis: 40px; width: 40px; height: 40px; }

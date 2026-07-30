@@ -8,6 +8,7 @@ use App\Models\InventoryItem;
 use App\Models\InventoryPurchase;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
+use App\Models\MesaService;
 use App\Models\Order;
 use App\Models\TicketTemplate;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -168,6 +169,68 @@ class ThermalTicketRenderer
                 'change' => (float) ($payment['cash_change'] ?? 0),
             ])->all(),
             'total' => $total,
+            'tracking_url' => null,
+        ]);
+    }
+
+    public function renderMesaService(MesaService $service): string
+    {
+        $service->loadMissing([
+            'mesas.area',
+            'primaryMesa.area',
+            'closer',
+            'orders.items',
+            'orders.payments',
+            'splits',
+        ]);
+
+        $areas = $service->mesas->pluck('area.name')->filter()->unique()->implode(', ');
+        $members = $service->mesas
+            ->map(fn ($mesa) => $mesa->pivot->mesa_label_snapshot ?: $mesa->display_name)
+            ->implode(', ');
+        $splitLabels = $service->splits
+            ->flatMap(fn ($split) => collect($split->split_data ?? [])
+                ->filter(fn ($account) => (bool) ($account['paid'] ?? false))
+                ->pluck('label'))
+            ->filter()
+            ->unique()
+            ->implode(', ');
+
+        return $this->render('customer', [
+            'title' => $service->status === 'pagada' ? 'HISTÓRICO DE MESA' : 'AUDITORÍA DE MESA',
+            'folio' => $service->service_label,
+            'date' => ($service->closed_at ?? $service->updated_at)->format('d/m/Y H:i'),
+            'table' => $service->service_label,
+            'area' => $areas ?: $service->primaryMesa?->area?->name,
+            'served_by' => $service->opener_name_snapshot ?: 'Sin asignar',
+            'cashier' => $service->closer?->name,
+            'items' => $service->orders->flatMap(fn ($order) => $order->items->map(fn ($item) => [
+                'name' => $item->product_name,
+                'quantity' => $item->quantity,
+                'subtotal' => (float) $item->subtotal,
+                'modifiers' => [],
+                'notes' => null,
+            ]))->all(),
+            'payments' => $service->orders->flatMap->payments
+                ->groupBy('method')
+                ->map(fn ($payments, $method) => [
+                    'label' => match ($method) {
+                        'efectivo' => 'Efectivo',
+                        'tarjeta' => 'Tarjeta',
+                        'transferencia' => 'Transferencia',
+                        'contra_entrega' => 'Contra entrega',
+                        default => ucfirst($method),
+                    },
+                    'amount' => (float) $payments->sum('amount'),
+                    'change' => (float) $payments->sum('change_amount'),
+                ])->values()->all(),
+            'total' => (float) $service->total_snapshot,
+            'notes' => collect([
+                $members ? "Mesas ocupadas: {$members}" : null,
+                $splitLabels ? "Subcuentas cobradas: {$splitLabels}" : null,
+                $service->status === 'liberada' ? "Liberada sin cobro: {$service->close_reason}" : null,
+                "Apertura: {$service->opened_at->format('d/m/Y H:i')}",
+            ])->filter()->implode(' · '),
             'tracking_url' => null,
         ]);
     }

@@ -3,10 +3,12 @@
 namespace App\Livewire\Mesas;
 
 use App\Models\Area;
+use App\Models\CashRegister;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaGroup;
 use App\Models\User;
+use App\Services\MesaServiceManager;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -317,9 +319,14 @@ class GestionMesas extends Component
         }
 
         $now = now();
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->resolveOrCreate($mesa, $register, auth()->id())
+            : null;
 
         MesaAssignment::create([
             'mesa_id' => $mesa->id,
+            'mesa_service_id' => $service?->id,
             'user_id' => auth()->id(),
             'assigned_by' => auth()->id(),
             'assigned_at' => $now,
@@ -370,6 +377,10 @@ class GestionMesas extends Component
         }
 
         $now = now();
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->findActiveForMesa($mesa, $register->id)
+            : null;
 
         // Close current assignment
         MesaAssignment::where('mesa_id', $mesa->id)
@@ -383,6 +394,7 @@ class GestionMesas extends Component
         // Create new assignment
         MesaAssignment::create([
             'mesa_id' => $mesa->id,
+            'mesa_service_id' => $service?->id,
             'user_id' => $this->reassignUserId,
             'assigned_by' => auth()->id(),
             'assigned_at' => $now,
@@ -415,7 +427,13 @@ class GestionMesas extends Component
             return;
         }
 
-        MesaAssignment::where('mesa_id', $mesa->id)
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->findActiveForMesa($mesa, $register->id)
+            : null;
+        $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
+
+        MesaAssignment::whereIn('mesa_id', $memberIds)
             ->whereNull('released_at')
             ->update([
                 'released_by' => auth()->id(),
@@ -423,7 +441,15 @@ class GestionMesas extends Component
                 'release_reason' => $this->releaseReason ?: 'Liberación manual',
             ]);
 
-        $this->releaseMesaAndUngroup($mesa);
+        if ($service) {
+            app(MesaServiceManager::class)->releaseWithoutPayment(
+                $service,
+                auth()->id(),
+                $this->releaseReason ?: 'Liberación manual'
+            );
+        }
+
+        $this->releaseMesaAndUngroup($mesa, $memberIds);
 
         $this->showReleaseModal = false;
         $this->releaseMesaId = null;
@@ -442,7 +468,12 @@ class GestionMesas extends Component
             return;
         }
 
-        $mesa->update(['status' => 'en_cuenta']);
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->markInAccount($mesa, $register->id)
+            : null;
+        $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
+        Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
         unset($this->mesas);
 
         session()->flash('success', "Mesa {$mesa->number} cerrada. Divide la cuenta antes de enviarla a caja.");
@@ -453,18 +484,18 @@ class GestionMesas extends Component
 
     // ── Shared: release + ungroup helper ──
 
-    private function releaseMesaAndUngroup(Mesa $mesa): void
+    private function releaseMesaAndUngroup(Mesa $mesa, ?array $memberIds = null): void
     {
         $groupId = $mesa->mesa_group_id;
+        $memberIds ??= $groupId
+            ? Mesa::where('mesa_group_id', $groupId)->pluck('id')->all()
+            : [$mesa->id];
 
-        $mesa->update(['status' => 'disponible', 'mesa_group_id' => null]);
+        Mesa::whereIn('id', $memberIds)
+            ->update(['status' => 'disponible', 'mesa_group_id' => null]);
 
         if ($groupId) {
-            $remaining = Mesa::where('mesa_group_id', $groupId)->count();
-            if ($remaining <= 1) {
-                Mesa::where('mesa_group_id', $groupId)->update(['mesa_group_id' => null]);
-                MesaGroup::destroy($groupId);
-            }
+            MesaGroup::destroy($groupId);
         }
     }
 

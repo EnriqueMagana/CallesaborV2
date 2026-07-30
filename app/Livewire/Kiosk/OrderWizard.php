@@ -13,6 +13,7 @@ use App\Models\OrderItemAddon;
 use App\Models\OrderItemIngredient;
 use App\Models\Product;
 use App\Services\KioskQrCode;
+use App\Services\MesaServiceManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -42,8 +43,6 @@ class OrderWizard extends Component
     public string $fulfillment = '';
 
     public ?int $selectedMesaId = null;
-
-    public string $search = '';
 
     public ?int $categoryFilter = null;
 
@@ -111,33 +110,55 @@ class OrderWizard extends Component
         return $terminal;
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 60)]
     public function categories()
     {
         return Category::query()
+            ->select(['id', 'name', 'description', 'icon', 'sort_order'])
             ->where('is_active', true)
             ->whereHas('products', fn ($query) => $query->where('is_active', true))
-            ->with(['products' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')])
+            ->with(['products' => fn ($query) => $query
+                ->where('is_active', true)
+                ->select([
+                    'id', 'category_id', 'name', 'description', 'image', 'price',
+                    'is_customizable', 'max_addons', 'min_ingredients',
+                    'max_ingredients', 'sort_order',
+                ])
+                ->withCount(['addonGroups', 'ingredients'])
+                ->orderBy('sort_order')
+                ->orderBy('name')])
             ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed(persist: true, seconds: 60)]
+    public function productsWithoutCategory()
+    {
+        return Product::query()
+            ->whereNull('category_id')
+            ->where('is_active', true)
+            ->select([
+                'id', 'category_id', 'name', 'description', 'image', 'price',
+                'is_customizable', 'max_addons', 'min_ingredients',
+                'max_ingredients', 'sort_order',
+            ])
+            ->withCount(['addonGroups', 'ingredients'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
             ->get();
     }
 
     #[Computed]
     public function products()
     {
-        return Product::query()
-            ->withCount(['addonGroups', 'ingredients'])
-            ->where('is_active', true)
-            ->when($this->categoryFilter, fn ($query) => $query->where('category_id', $this->categoryFilter))
-            ->when(trim($this->search), function ($query) {
-                $term = '%'.trim($this->search).'%';
-                $query->where(fn ($inner) => $inner->where('name', 'like', $term)->orWhere('description', 'like', $term));
-            })
-            ->orderBy('sort_order')
-            ->get();
+        return $this->categories
+            ->flatMap->products
+            ->concat($this->productsWithoutCategory)
+            ->values();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 60)]
     public function promotions()
     {
         if (! $this->terminal->promotion_enabled) {
@@ -148,6 +169,11 @@ class OrderWizard extends Component
             ->where('kiosk_terminal_id', $this->terminalId)
             ->whereHas('product', fn ($query) => $query->where('is_active', true))
             ->with(['product' => fn ($query) => $query
+                ->select([
+                    'id', 'category_id', 'name', 'description', 'image', 'price',
+                    'is_customizable', 'max_addons', 'min_ingredients',
+                    'max_ingredients',
+                ])
                 ->withCount(['addonGroups', 'ingredients'])
                 ->with('category:id,name')])
             ->orderBy('sort_order')
@@ -161,12 +187,6 @@ class OrderWizard extends Component
         $this->featuredProductIntent = $productId;
     }
 
-    public function applySearch(): void
-    {
-        $this->search = trim($this->search);
-        unset($this->products);
-    }
-
     #[Computed]
     public function product(): ?Product
     {
@@ -174,11 +194,35 @@ class OrderWizard extends Component
             return null;
         }
 
-        return Product::with([
-            'addonGroups' => fn ($query) => $query->where('is_active', true)
-                ->with(['addons' => fn ($addons) => $addons->where('is_active', true)->orderBy('sort_order')]),
-            'ingredients' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order'),
-        ])->where('is_active', true)->find($this->customizingProduct);
+        return Product::query()
+            ->select([
+                'id', 'name', 'description', 'image', 'price', 'is_customizable',
+                'max_addons', 'min_ingredients', 'max_ingredients',
+            ])
+            ->with([
+                'addonGroups' => fn ($query) => $query->where('is_active', true)
+                    ->select([
+                        'addon_groups.id', 'addon_groups.name', 'addon_groups.description',
+                        'addon_groups.is_required', 'addon_groups.min_selections',
+                        'addon_groups.max_selections', 'addon_groups.sort_order',
+                        'addon_groups.is_active',
+                    ])
+                    ->with(['addons' => fn ($addons) => $addons->where('is_active', true)
+                        ->select([
+                            'id', 'addon_group_id', 'name', 'description', 'image',
+                            'extra_price', 'sort_order', 'is_active',
+                        ])
+                        ->orderBy('sort_order')]),
+                'ingredients' => fn ($query) => $query->where('is_active', true)
+                    ->select([
+                        'ingredients.id', 'ingredients.name', 'ingredients.description',
+                        'ingredients.image', 'ingredients.extra_price', 'ingredients.sort_order',
+                        'ingredients.is_active',
+                    ])
+                    ->orderBy('ingredients.sort_order'),
+            ])
+            ->where('is_active', true)
+            ->find($this->customizingProduct);
     }
 
     #[Computed]
@@ -267,10 +311,13 @@ class OrderWizard extends Component
 
     public function openProduct(int $productId): void
     {
-        $product = Product::with(['addonGroups.addons', 'ingredients'])
-            ->where('is_active', true)->findOrFail($productId);
+        $product = Product::query()
+            ->select(['id', 'name', 'image', 'price', 'is_customizable'])
+            ->withCount(['addonGroups', 'ingredients'])
+            ->where('is_active', true)
+            ->findOrFail($productId);
 
-        if (! $product->is_customizable && $product->addonGroups->isEmpty() && $product->ingredients->isEmpty()) {
+        if (! $product->is_customizable && ! $product->addon_groups_count && ! $product->ingredients_count) {
             $this->addLine($product, [], [], '', 1);
 
             return;
@@ -283,7 +330,7 @@ class OrderWizard extends Component
         $this->itemNotes = '';
         $this->itemQuantity = 1;
 
-        foreach ($product->addonGroups as $group) {
+        foreach ($this->product?->addonGroups ?? [] as $group) {
             $active = $group->addons->where('is_active', true);
             if ($group->is_required && $active->count() === 1) {
                 $addonId = (int) $active->first()->id;
@@ -374,11 +421,36 @@ class OrderWizard extends Component
         $this->resetErrorBag('customization');
     }
 
-    public function addCustomizedProduct(): void
+    public function addCustomizedProduct(
+        ?array $addonQuantities = null,
+        ?array $ingredientQuantities = null,
+        ?int $quantity = null,
+        ?string $notes = null
+    ): void
     {
         $product = $this->product;
         if (! $product) {
             return;
+        }
+
+        if ($addonQuantities !== null) {
+            $this->addonQuantities = collect($addonQuantities)
+                ->mapWithKeys(fn ($value, $id) => [(int) $id => max(0, (int) $value)])
+                ->filter()
+                ->all();
+            $this->selectedAddons = array_map('intval', array_keys($this->addonQuantities));
+        }
+        if ($ingredientQuantities !== null) {
+            $this->selectedIngredients = collect($ingredientQuantities)
+                ->mapWithKeys(fn ($value, $id) => [(int) $id => max(0, (int) $value)])
+                ->filter()
+                ->all();
+        }
+        if ($quantity !== null) {
+            $this->itemQuantity = max(1, min(99, $quantity));
+        }
+        if ($notes !== null) {
+            $this->itemNotes = mb_substr(trim($notes), 0, 300);
         }
 
         try {
@@ -552,6 +624,15 @@ class OrderWizard extends Component
                     $mesa ? "Mesa {$mesa->number}" : null,
                     trim($this->orderNotes) ?: null,
                 ])->filter()->implode(' · ');
+                $mesaService = $mesa
+                    ? app(MesaServiceManager::class)->resolveOrCreate(
+                        $mesa,
+                        $cash,
+                        $responsibleUserId,
+                        'kiosk',
+                        $terminal
+                    )
+                    : null;
 
                 $order = Order::create([
                     'cash_register_id' => $cash->id,
@@ -564,6 +645,7 @@ class OrderWizard extends Component
                     'served_by' => $responsibleUserId,
                     'type' => $mesa ? 'mesa' : ($isDelivery ? 'delivery' : 'ventanilla'),
                     'mesa_id' => $mesa?->id,
+                    'mesa_service_id' => $mesaService?->id,
                     'delivery_method' => $isDelivery ? 'contra_entrega' : null,
                     'source' => 'kiosk',
                     'fulfillment' => $this->fulfillment,
@@ -576,7 +658,8 @@ class OrderWizard extends Component
                 if ($mesa) {
                     // El kiosco ocupa la mesa inmediatamente; el mesero puede
                     // tomarla o reasignarla desde Gestión de mesas.
-                    $mesa->update(['status' => 'ocupada']);
+                    $memberIds = $mesaService?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
+                    Mesa::whereIn('id', $memberIds)->update(['status' => 'ocupada']);
                 }
 
                 foreach ($lines as $line) {
@@ -630,7 +713,7 @@ class OrderWizard extends Component
     public function startAgain(): void
     {
         $this->reset([
-            'fulfillment', 'selectedMesaId', 'search', 'categoryFilter', 'recommendationName', 'featuredProductIntent', 'cart', 'customizingProduct',
+            'fulfillment', 'selectedMesaId', 'categoryFilter', 'recommendationName', 'featuredProductIntent', 'cart', 'customizingProduct',
             'selectedAddons', 'addonQuantities', 'selectedIngredients', 'itemNotes', 'customerName',
             'customerPhone', 'deliveryStreet', 'deliveryNeighborhood', 'deliveryReferences',
             'orderNotes', 'completedOrderId', 'publicToken', 'submitting',

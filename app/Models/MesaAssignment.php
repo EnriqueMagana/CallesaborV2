@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class MesaAssignment extends Model
 {
     protected $fillable = [
-        'mesa_id', 'user_id', 'assigned_by',
+        'mesa_id', 'mesa_service_id', 'user_id', 'assigned_by',
         'released_by', 'assigned_at', 'released_at', 'release_reason',
     ];
 
@@ -20,6 +20,11 @@ class MesaAssignment extends Model
     public function mesa(): BelongsTo
     {
         return $this->belongsTo(Mesa::class);
+    }
+
+    public function mesaService(): BelongsTo
+    {
+        return $this->belongsTo(MesaService::class);
     }
 
     public function waiter(): BelongsTo

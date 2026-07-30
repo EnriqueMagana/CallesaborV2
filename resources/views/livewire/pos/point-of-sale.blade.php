@@ -2,7 +2,7 @@
 <div x-data="{
     showCart: false,
     showSaved: false,
-    panels: { mesas: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false }
+    panels: { mesas: false, tracking: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false }
 }" class="pos-root">
 
 {{-- Toast --}}
@@ -57,6 +57,7 @@
 
 {{-- Panels laterales --}}
 @include('livewire.pos.partials.panels.mesas')
+@include('livewire.pos.partials.panels.table-tracking')
 @include('livewire.pos.partials.panels.pickup')
 @include('livewire.pos.partials.panels.kitchen')
 @include('livewire.pos.partials.panels.reprint')

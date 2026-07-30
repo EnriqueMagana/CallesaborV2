@@ -1,0 +1,237 @@
+html.dark-style {
+    color-scheme: dark;
+    --app-primary: #9b8cff;
+    --app-primary-dark: #b9afff;
+    --app-primary-soft: #2c2747;
+    --app-ink: #f2f0f7;
+    --app-muted: #b4afc1;
+    --app-border: #3b3748;
+    --app-surface: #201e29;
+    --app-canvas: #13141b;
+    --app-success: #55c896;
+    --app-warning: #f1b85a;
+    --app-danger: #ff8594;
+    --app-info: #70b7f1;
+    --app-shadow: 0 14px 38px rgba(0, 0, 0, .28);
+
+    --profile-primary: #9b8cff;
+    --profile-primary-dark: #b9afff;
+    --profile-primary-soft: #2c2747;
+    --profile-ink: #f2f0f7;
+    --profile-muted: #b4afc1;
+    --profile-border: #3b3748;
+    --profile-surface: #201e29;
+    --profile-canvas: #13141b;
+    --profile-shadow: var(--app-shadow);
+
+    --biz-primary: #9b8cff;
+    --biz-primary-soft: #2c2747;
+    --biz-text: #f2f0f7;
+    --biz-muted: #b4afc1;
+    --biz-border: #3b3748;
+    --biz-surface: #201e29;
+    --biz-bg: #13141b;
+
+    --c-surface: #201e29;
+    --c-bg: #13141b;
+    --c-border: #3b3748;
+    --c-text: #f2f0f7;
+    --c-text-muted: #b4afc1;
+}
+
+html.dark-style body,
+html.dark-style .layout-wrapper,
+html.dark-style .layout-container,
+html.dark-style .layout-page,
+html.dark-style .content-wrapper {
+    color: var(--app-ink);
+    background-color: var(--app-canvas) !important;
+}
+
+html.dark-style .layout-navbar {
+    color: var(--app-ink);
+    background-color: rgba(31, 29, 41, .94) !important;
+    border: 1px solid var(--app-border);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .24);
+}
+
+html.dark-style .bg-navbar-theme,
+html.dark-style .bg-navbar-theme .nav-link,
+html.dark-style .bg-navbar-theme .navbar-nav > .nav-item > .nav-link {
+    color: var(--app-muted);
+}
+
+html.dark-style .app-navbar-profile-trigger:hover,
+html.dark-style .app-navbar-profile-trigger[aria-expanded="true"] {
+    border-color: rgba(155, 140, 255, .34) !important;
+    background: var(--app-primary-soft) !important;
+}
+
+html.dark-style .dropdown-menu,
+html.dark-style .app-navbar-user-menu {
+    color: var(--app-ink);
+    border-color: var(--app-border);
+    background: #201e29;
+    box-shadow: 0 20px 52px rgba(0, 0, 0, .38);
+}
+
+html.dark-style .dropdown-item {
+    color: var(--app-ink);
+}
+
+html.dark-style .dropdown-item:hover,
+html.dark-style .dropdown-item:focus,
+html.dark-style .dropdown-item.show {
+    color: #fff;
+    background-color: var(--app-primary-soft);
+}
+
+html.dark-style .dropdown-divider {
+    border-color: var(--app-border);
+}
+
+html.dark-style .bg-menu-theme {
+    color: var(--app-muted);
+    background-color: #1a1922 !important;
+    box-shadow: 5px 0 24px rgba(0, 0, 0, .18);
+}
+
+html.dark-style .bg-menu-theme .menu-text,
+html.dark-style .bg-menu-theme .menu-link {
+    color: var(--app-muted);
+}
+
+html.dark-style .bg-menu-theme .menu-link:hover,
+html.dark-style .bg-menu-theme .menu-link:focus,
+html.dark-style .bg-menu-theme .menu-item.open > .menu-link {
+    color: var(--app-ink);
+    background-color: rgba(255, 255, 255, .055);
+}
+
+html.dark-style .bg-menu-theme .menu-inner > .menu-item.active > .menu-link {
+    color: #c8c0ff;
+    background-color: rgba(155, 140, 255, .18) !important;
+}
+
+html.dark-style .bg-menu-theme .menu-inner-shadow {
+    background: linear-gradient(#1a1922 41%, rgba(26, 25, 34, .12) 95%, transparent);
+}
+
+html.dark-style .sidebar-register-locked {
+    color: #aaa5b6 !important;
+    background: #25232d !important;
+}
+
+html.dark-style .bg-footer-theme {
+    color: var(--app-muted);
+    background-color: var(--app-canvas) !important;
+}
+
+html.dark-style :is(
+    .card,
+    .modal-content,
+    .offcanvas,
+    .accordion-item,
+    .list-group-item,
+    .app-page-header,
+    .app-card,
+    .dashboard-welcome,
+    .customers-hero,
+    .customers-stats article,
+    .customers-directory,
+    .customer-modal,
+    .customer-detail-grid article,
+    .customer-input,
+    .sidebar-manager,
+    .sidebar-tree,
+    .sidebar-editor,
+    .business-editor,
+    .inventory-hero,
+    .delivery-hero
+) {
+    color: var(--app-ink);
+    border-color: var(--app-border) !important;
+    background: var(--app-surface) !important;
+    box-shadow: var(--app-shadow);
+}
+
+html.dark-style :is(.card-header, .card-footer, .modal-header, .modal-footer, .customer-modal__profile, .customer-modal__form-header, .customer-modal__actions) {
+    color: var(--app-ink);
+    border-color: var(--app-border) !important;
+    background: #25232f !important;
+}
+
+html.dark-style :is(.form-control, .form-select, .input-group-text, textarea, input:not([type="checkbox"]):not([type="radio"])) {
+    color: var(--app-ink);
+    border-color: var(--app-border);
+    background-color: #181720;
+}
+
+html.dark-style :is(.form-control, .form-select, textarea, input)::placeholder {
+    color: #8f899e;
+}
+
+html.dark-style :is(.form-control, .form-select, textarea, input):focus {
+    color: #fff;
+    border-color: #8e7cf1;
+    background-color: #1c1a25;
+    box-shadow: 0 0 0 .2rem rgba(155, 140, 255, .16);
+}
+
+html.dark-style :is(.form-label, .col-form-label, label, h1, h2, h3, h4, h5, h6, strong) {
+    color: var(--app-ink);
+}
+
+html.dark-style :is(.text-muted, small, .form-text) {
+    color: var(--app-muted) !important;
+}
+
+html.dark-style .table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-color: var(--app-ink);
+    --bs-table-striped-bg: rgba(255, 255, 255, .025);
+    --bs-table-active-color: var(--app-ink);
+    --bs-table-active-bg: rgba(155, 140, 255, .12);
+    --bs-table-hover-color: #fff;
+    --bs-table-hover-bg: rgba(255, 255, 255, .045);
+    color: var(--app-ink);
+    border-color: var(--app-border);
+}
+
+html.dark-style .table > :not(:first-child),
+html.dark-style .table > :not(caption) > * > * {
+    border-color: var(--app-border);
+}
+
+html.dark-style :is(.customers-search, .customers-table th, .customer-recent-orders__heading, .customer-modal__actions) {
+    color: var(--app-ink);
+    border-color: var(--app-border) !important;
+    background: #25232f !important;
+}
+
+html.dark-style .customers-table td,
+html.dark-style .customer-recent-order {
+    border-color: var(--app-border);
+}
+
+html.dark-style .customers-table tbody tr:hover {
+    background: rgba(255, 255, 255, .035);
+}
+
+html.dark-style .app-session-ended-dialog {
+    color: var(--app-ink);
+    border-color: var(--app-border);
+    background: var(--app-surface);
+}
+
+html.dark-style .layout-overlay {
+    background-color: rgba(0, 0, 0, .72);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.dark-style *,
+    html.dark-style *::before,
+    html.dark-style *::after {
+        transition-duration: .01ms !important;
+    }
+}

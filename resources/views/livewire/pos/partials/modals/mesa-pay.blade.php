@@ -1,32 +1,17 @@
 @if($showMesaPayModal)
 @php
-    $mpMesa = \App\Models\Mesa::with([
-        'area',
-        'currentAssignment.waiter',
-        'orders' => fn($q) => $q->whereIn('status', ['pendiente','en_preparacion','lista','entregada'])->with('items'),
-    ])->find($mesaPayId);
-
-    // Split mode
-    if ($mesaSplitId !== null) {
-        $mpSplit       = \App\Models\MesaSplit::find($mesaSplitId);
-        $mpAccount     = $mpSplit ? ($mpSplit->split_data[$mesaSplitAccountIdx] ?? null) : null;
-        $mpAccountLabel = $mpAccount ? $mpAccount['label'] : '';
-        $mpTotal       = $mpAccount ? (float)$mpAccount['total'] : 0;
-        $mpItems       = collect($mpAccount['items'] ?? []);
-        $mpIsSplit     = true;
-    } else {
-        $mpAccount     = null;
-        $mpAccountLabel = $mpMesa?->display_name ?? '';
-        $mpOrders      = $mpMesa ? $mpMesa->orders : collect();
-        $mpTotal       = (float) $mpOrders->sum('total');
-        $mpItems       = collect(); // items shown per order below
-        $mpIsSplit     = false;
-    }
+    $mpContext = $this->mesaPaymentContext;
+    $mpMesa = $mpContext['mesa'];
+    $mpAccount = $mpContext['account'];
+    $mpAccountLabel = $mpContext['accountLabel'];
+    $mpOrders = $mpContext['orders'];
+    $mpTotal = $mpContext['total'];
+    $mpItems = $mpContext['items'];
+    $mpIsSplit = $mpContext['isSplit'];
 
     $mpPaid      = collect($mesaPayments)->sum('amount');
     $mpRem       = max(0, $mpTotal - $mpPaid);
-    $mpDirectAmount = empty($mesaPayments) ? (float)($mesaPayAmount ?: $mpRem) : 0;
-    $mpCanPay    = ($mpPaid + $mpDirectAmount) >= $mpTotal - 0.01;
+    $mpCanPay    = !empty($mesaPayments) && $mpPaid >= $mpTotal - 0.01;
     $assignment  = $mpMesa?->currentAssignment;
 @endphp
 <div class="pos-modal-wrap show pos-modal-shell" data-ui="xui-6jaq3m" wire:click.self="closeMesaPayModal" role="dialog" aria-modal="true" aria-labelledby="mesa-pay-title">
@@ -117,8 +102,9 @@
             @if($mpRem > 0 || empty($mesaPayments))
                 <div class="pos-payment-methods" data-ui="xui-1qqbkl9" role="group" aria-label="Forma de pago">
                     @foreach(['cash'=>'Efectivo','card'=>'Tarjeta','transfer'=>'Transferencia'] as $m => $label)
-                        <button wire:click="$set('mesaPayMethod','{{ $m }}')"
+                        <button type="button" wire:click="$set('mesaPayMethod','{{ $m }}')"
                                 class="pos-btn {{ $mesaPayMethod===$m ? 'pos-btn-primary' : 'pos-btn-secondary' }}"
+                                aria-pressed="{{ $mesaPayMethod === $m ? 'true' : 'false' }}"
                                 data-ui="xui-1hwm503">
                             {{ $label }}
                         </button>
@@ -126,25 +112,35 @@
                 </div>
 
                 @if($mesaPayMethod === 'cash')
-                    <div data-ui="xui-167pdlk">
-                        <div data-ui="xui-1x8awyf">
-                            <span data-ui="xui-1n7u11m">$</span>
-                            <input type="number" wire:model.live="mesaPayAmount" class="pos-input" data-ui="xui-78yyj2"
-                                   placeholder="{{ number_format($mpRem, 2) }}" step="0.01" min="0">
-                            <span data-ui="xui-1p3z5bq">Monto</span>
+                    <div class="pos-payment-entry-grid">
+                        <div class="pos-payment-field">
+                            <label for="mesa-pay-amount">Monto a aplicar</label>
+                            <div class="pos-payment-input">
+                                <span aria-hidden="true">$</span>
+                                <input id="mesa-pay-amount" type="text" wire:model.blur="mesaPayAmount" class="pos-input"
+                                       placeholder="0.00" inputmode="decimal" autocomplete="off"
+                                       pattern="[0-9]+([.][0-9]{1,2})?" maxlength="12">
+                            </div>
+                            <small>Saldo pendiente: ${{ number_format($mpRem, 2) }}</small>
+                            @error('mesaPayAmount')<span class="pos-payment-field-error"><i class="bx bx-error-circle"></i>{{ $message }}</span>@enderror
                         </div>
-                        <div data-ui="xui-1x8awyf">
-                            <span data-ui="xui-1n7u11m">$</span>
-                            <input type="number" wire:model.live="mesaPayReceived" class="pos-input" data-ui="xui-78yyj2"
-                                   placeholder="Recibido" step="0.01" min="0">
-                            <span data-ui="xui-1p3z5bq">Recibido</span>
+                        <div class="pos-payment-field">
+                            <label for="mesa-pay-received">Efectivo recibido</label>
+                            <div class="pos-payment-input">
+                                <span aria-hidden="true">$</span>
+                                <input id="mesa-pay-received" type="text" wire:model.blur="mesaPayReceived" class="pos-input"
+                                       placeholder="0.00" inputmode="decimal" autocomplete="off"
+                                       pattern="[0-9]+([.][0-9]{1,2})?" maxlength="12">
+                            </div>
+                            <small>Captura lo entregado por el cliente.</small>
+                            @error('mesaPayReceived')<span class="pos-payment-field-error"><i class="bx bx-error-circle"></i>{{ $message }}</span>@enderror
                         </div>
                     </div>
                     @php
-                        $mpMonto    = (float)($mesaPayAmount ?: $mpRem);
+                        $mpMonto    = (float)$mesaPayAmount;
                         $mpRecibido = (float)$mesaPayReceived;
                     @endphp
-                    @if($mpRecibido > 0)
+                    @if($mpMonto > 0 && $mpRecibido > 0)
                         <div class="pos-payment-received {{ $mpRecibido >= $mpMonto ? 'is-complete' : 'is-pending' }}">
                             @if($mpRecibido >= $mpMonto)
                                 <i class="bx bx-check-circle"></i> Cambio: <strong>${{ number_format($mpRecibido - $mpMonto, 2) }}</strong>
@@ -154,39 +150,74 @@
                         </div>
                     @endif
                 @elseif($mesaPayMethod === 'card')
-                    <div data-ui="xui-167pdlk">
-                        <div data-ui="xui-1x8awyf">
-                            <span data-ui="xui-1n7u11m">$</span>
-                            <input type="number" wire:model.live="mesaPayAmount" class="pos-input" data-ui="xui-78yyj2"
-                                   placeholder="{{ number_format($mpRem, 2) }}" step="0.01" min="0">
-                            <span data-ui="xui-1p3z5bq">Monto</span>
+                    <div class="pos-payment-entry-grid">
+                        <div class="pos-payment-field">
+                            <label for="mesa-card-amount">Monto a aplicar</label>
+                            <div class="pos-payment-input">
+                                <span aria-hidden="true">$</span>
+                                <input id="mesa-card-amount" type="text" wire:model.blur="mesaPayAmount" class="pos-input"
+                                       placeholder="0.00" inputmode="decimal" autocomplete="off"
+                                       pattern="[0-9]+([.][0-9]{1,2})?" maxlength="12">
+                            </div>
+                            <small>Saldo pendiente: ${{ number_format($mpRem, 2) }}</small>
+                            @error('mesaPayAmount')<span class="pos-payment-field-error"><i class="bx bx-error-circle"></i>{{ $message }}</span>@enderror
                         </div>
-                        <div data-ui="xui-1x8awyf">
-                            <span data-ui="xui-1n7u11m">#</span>
-                            <input type="text" wire:model="mesaPayCard" class="pos-input" data-ui="xui-78yyj2" placeholder="Últimos 4" maxlength="4">
-                            <span data-ui="xui-1p3z5bq">Tarjeta</span>
+                        <div class="pos-payment-field">
+                            <label for="mesa-card-last4">Últimos 4 dígitos</label>
+                            <div class="pos-payment-input pos-payment-input--reference">
+                                <span aria-hidden="true">#</span>
+                                <input id="mesa-card-last4" type="text" wire:model="mesaPayCard" class="pos-input"
+                                       placeholder="0000" inputmode="numeric" autocomplete="off"
+                                       pattern="[0-9]{4}" maxlength="4">
+                            </div>
+                            <small>Dato opcional para localizar el pago.</small>
                         </div>
                     </div>
                 @elseif($mesaPayMethod === 'transfer')
-                    <div data-ui="xui-167pdlk">
-                        <div data-ui="xui-1x8awyf">
-                            <span data-ui="xui-1n7u11m">$</span>
-                            <input type="number" wire:model.live="mesaPayAmount" class="pos-input" data-ui="xui-78yyj2"
-                                   placeholder="{{ number_format($mpRem, 2) }}" step="0.01" min="0">
-                            <span data-ui="xui-1p3z5bq">Monto</span>
+                    <div class="pos-payment-entry-grid">
+                        <div class="pos-payment-field">
+                            <label for="mesa-transfer-amount">Monto a aplicar</label>
+                            <div class="pos-payment-input">
+                                <span aria-hidden="true">$</span>
+                                <input id="mesa-transfer-amount" type="text" wire:model.blur="mesaPayAmount" class="pos-input"
+                                       placeholder="0.00" inputmode="decimal" autocomplete="off"
+                                       pattern="[0-9]+([.][0-9]{1,2})?" maxlength="12">
+                            </div>
+                            <small>Saldo pendiente: ${{ number_format($mpRem, 2) }}</small>
+                            @error('mesaPayAmount')<span class="pos-payment-field-error"><i class="bx bx-error-circle"></i>{{ $message }}</span>@enderror
                         </div>
-                        <div data-ui="xui-1x8awyf">
-                            <span data-ui="xui-13xqprg">#</span>
-                            <input type="text" wire:model="mesaPayRef" class="pos-input" data-ui="xui-78yyj2" placeholder="Referencia">
-                            <span data-ui="xui-1p3z5bq">Ref.</span>
+                        <div class="pos-payment-field">
+                            <label for="mesa-transfer-reference">Referencia</label>
+                            <div class="pos-payment-input pos-payment-input--reference">
+                                <span aria-hidden="true">#</span>
+                                <input id="mesa-transfer-reference" type="text" wire:model="mesaPayRef" class="pos-input"
+                                       placeholder="Folio o referencia" autocomplete="off" maxlength="80">
+                            </div>
+                            <small>Dato opcional para conciliación.</small>
                         </div>
                     </div>
                 @endif
 
-                <button wire:click="addMesaPayment" class="pos-btn pos-btn-secondary pos-add-payment" data-ui="xui-5q5jzi">
-                    <i class="bx bx-plus"></i> Agregar pago
+                <button type="button" wire:click="addMesaPayment"
+                        wire:loading.attr="disabled" wire:target="addMesaPayment"
+                        class="pos-btn pos-btn-secondary pos-add-payment" data-ui="xui-5q5jzi">
+                    <span wire:loading wire:target="addMesaPayment" class="pos-btn-spinner"></span>
+                    <i wire:loading.remove wire:target="addMesaPayment" class="bx bx-plus"></i>
+                    Agregar pago
                 </button>
             @endif
+
+            @if(empty($mesaPayments))
+                <div class="pos-payment-required" role="status">
+                    <i class="bx bx-info-circle" aria-hidden="true"></i>
+                    <span>Agrega al menos un pago para habilitar el cobro.</span>
+                </div>
+            @endif
+            @error('mesaPayments')
+                <div class="pos-inline-alert pos-inline-alert--danger" role="alert">
+                    <i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}
+                </div>
+            @enderror
         </div>
 
         <div class="modal-footer-pos pos-modal-modern__footer" data-ui="xui-c1sc8d">

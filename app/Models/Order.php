@@ -11,6 +11,7 @@ class Order extends Model
 {
     protected $fillable = [
         'cash_register_id', 'kiosk_terminal_id', 'public_token', 'customer_id', 'mesa_id',
+        'mesa_service_id',
         'folio',
         'customer_name', 'customer_phone', 'customer_address', 'customer_references',
         'served_by', 'type', 'source', 'fulfillment', 'table_identifier', 'delivery_method',
@@ -52,6 +53,11 @@ class Order extends Model
     public function mesa(): BelongsTo
     {
         return $this->belongsTo(Mesa::class);
+    }
+
+    public function mesaService(): BelongsTo
+    {
+        return $this->belongsTo(MesaService::class);
     }
 
     public function customer(): BelongsTo

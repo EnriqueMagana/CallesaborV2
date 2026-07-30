@@ -1,7 +1,7 @@
 <div class="mo-page" x-data="{ cartOpen: $wire.entangle('showCartDrawer') }">
     @once
-        <link rel="stylesheet" href="{{ asset('assets/css/mesas.css') }}">
-        <link rel="stylesheet" href="{{ asset('assets/css/mesa-orden.css') }}">
+        <link rel="stylesheet" href="{{ asset('assets/css/mesas.css') }}?v={{ filemtime(public_path('assets/css/mesas.css')) }}">
+        <link rel="stylesheet" href="{{ asset('assets/css/mesa-orden.css') }}?v={{ filemtime(public_path('assets/css/mesa-orden.css')) }}">
     @endonce
 
     @if(session('orderSent'))
@@ -42,7 +42,8 @@
             <div class="mo-search-wrap">
                 <i class="bx bx-search mo-search-icon"></i>
                 <input type="text" class="mo-search-input"
-                       wire:model.live.debounce.250ms="search"
+                       wire:model.live.debounce.450ms="search"
+                       aria-label="Buscar productos"
                        placeholder="Buscar producto…">
                 @if($search)
                     <button type="button" class="mo-search-clear" wire:click="$set('search','')" aria-label="Limpiar búsqueda">
@@ -85,13 +86,14 @@
                                 <span class="mo-product-qty-badge">{{ $inCart }}</span>
                             @endif
                             @if($product->image)
-                                <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}" class="mo-product-img">
+                                <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
+                                     class="mo-product-img" width="320" height="216" loading="lazy" decoding="async">
                             @else
                                 <div class="mo-product-placeholder"><i class="bx bx-food-menu"></i></div>
                             @endif
                             <div class="mo-product-name">{{ $product->name }}</div>
                             <div class="mo-product-price">${{ number_format($product->price, 2) }}</div>
-                            @if($product->is_customizable || $product->addonGroups->count() || $product->ingredients->count())
+                            @if($product->is_customizable || $product->addon_groups_count || $product->ingredients_count)
                                 <div class="mo-product-custom-hint"><i class="bx bx-customize"></i><span>Personalizar</span></div>
                             @endif
                         </button>
@@ -137,21 +139,33 @@
             <div class="mo-cart-items">
                 @forelse($cart as $line)
                 <div class="mo-cart-item" wire:key="cart-{{ $line['cart_id'] }}">
-                    <div class="mo-cart-item-name">{{ $line['name'] }}</div>
-                    @if(!empty($line['addons']))
-                        <div class="mo-cart-item-mods">
-                            @foreach($line['addons'] as $a)
-                                <span class="mo-cart-mod-chip">+ {{ $a['addon_name'] }}</span>
-                            @endforeach
+                    <div class="mo-cart-item-main">
+                        @if(!empty($line['image']))
+                            <img class="mo-cart-item-image" src="{{ Storage::url($line['image']) }}"
+                                 alt="" width="48" height="48" loading="lazy" decoding="async">
+                        @else
+                            <span class="mo-cart-item-image mo-cart-item-image--empty" aria-hidden="true">
+                                <i class="bx bx-food-menu"></i>
+                            </span>
+                        @endif
+                        <div class="mo-cart-item-copy">
+                            <div class="mo-cart-item-name">{{ $line['name'] }}</div>
+                            @if(!empty($line['addons']))
+                                <div class="mo-cart-item-mods">
+                                    @foreach($line['addons'] as $a)
+                                        <span class="mo-cart-mod-chip">+ {{ $a['addon_name'] }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+                            @if(!empty($line['ingredients']))
+                                <div class="mo-cart-item-mods">
+                                    @foreach($line['ingredients'] as $i)
+                                        <span class="mo-cart-mod-chip mo-cart-mod-chip--ing">{{ $i['ingredient_name'] }}@if($i['quantity']>1)×{{ $i['quantity'] }}@endif</span>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
-                    @endif
-                    @if(!empty($line['ingredients']))
-                        <div class="mo-cart-item-mods">
-                            @foreach($line['ingredients'] as $i)
-                                <span class="mo-cart-mod-chip mo-cart-mod-chip--ing">{{ $i['ingredient_name'] }}@if($i['quantity']>1)×{{ $i['quantity'] }}@endif</span>
-                            @endforeach
-                        </div>
-                    @endif
+                    </div>
                     <div class="mo-cart-item-controls">
                         <button type="button" class="mo-qty-btn" wire:click="decrementQty('{{ $line['cart_id'] }}')" aria-label="Reducir {{ $line['name'] }}">
                             <i class="bx bx-minus"></i>
@@ -227,50 +241,144 @@
         $maxIngs   = (int)($prod->max_ingredients ?? 0);
         $totalIngs = array_sum($selectedIngredients ?? []);
     @endphp
-    <div class="mo-modal-backdrop" wire:click.self="$set('showCustomize', false)">
+    <div class="mo-modal-backdrop" wire:click.self="closeCustomize"
+         x-data="{
+            addons: @js(collect($selectedAddons)->filter()->keys()->map(fn($id) => (int) $id)->values()),
+            ingredients: @js((object) $selectedIngredients),
+            qty: @js($itemQty),
+            notes: @js($itemNotes),
+            clientError: '',
+            submitting: false,
+            hasAddon(id) { return this.addons.includes(Number(id)); },
+            groupCount(ids) { return ids.filter(id => this.hasAddon(id)).length; },
+            totalAddons() { return this.addons.length; },
+            totalIngredients() {
+                return Object.values(this.ingredients).reduce((sum, value) => sum + Number(value || 0), 0);
+            },
+            toggleAddon(id, groupIds, minimum, maximum, productMaximum) {
+                id = Number(id);
+                this.clientError = '';
+                if (this.hasAddon(id)) {
+                    if (this.groupCount(groupIds) <= minimum) {
+                        this.clientError = `Debes mantener al menos ${minimum} opción(es) en este grupo.`;
+                        return;
+                    }
+                    this.addons = this.addons.filter(value => value !== id);
+                    return;
+                }
+                if (maximum === 1) {
+                    if (this.groupCount(groupIds) === 0 && productMaximum > 0 && this.totalAddons() >= productMaximum) {
+                        this.clientError = `Este producto permite máximo ${productMaximum} complemento(s).`;
+                        return;
+                    }
+                    this.addons = this.addons.filter(value => !groupIds.includes(value));
+                    this.addons.push(id);
+                    return;
+                }
+                if (maximum > 0 && this.groupCount(groupIds) >= maximum) {
+                    this.clientError = `Este grupo permite máximo ${maximum} opción(es).`;
+                    return;
+                }
+                if (productMaximum > 0 && this.totalAddons() >= productMaximum) {
+                    this.clientError = `Este producto permite máximo ${productMaximum} complemento(s).`;
+                    return;
+                }
+                this.addons.push(id);
+            },
+            changeIngredient(id, delta, maximum) {
+                id = Number(id);
+                this.clientError = '';
+                const current = Number(this.ingredients[id] || 0);
+                if (delta > 0 && maximum > 0 && this.totalIngredients() >= maximum) {
+                    this.clientError = `Este producto permite máximo ${maximum} ingrediente(s).`;
+                    return;
+                }
+                const next = Math.max(0, current + delta);
+                if (next === 0) delete this.ingredients[id];
+                else this.ingredients[id] = next;
+            },
+            submit(wire) {
+                this.submitting = true;
+                wire.confirmCustomize(this.addons, this.ingredients, this.qty, this.notes)
+                    .finally(() => this.submitting = false);
+            }
+         }"
+         x-on:keydown.escape.window="$wire.closeCustomize()">
         <div class="mo-modal" role="dialog" aria-modal="true" aria-labelledby="mo-customize-title">
             <div class="mo-modal-header">
-                <div>
-                    <h6 id="mo-customize-title" class="mo-modal-title">{{ $prod->name }}</h6>
-                    <span class="text-muted small">${{ number_format($prod->price, 2) }} base · {{ $prod->max_addons ? 'Máx. '.$prod->max_addons.' complementos' : 'Complementos configurables' }}</span>
+                <div class="mo-modal-product">
+                    @if($prod->image)
+                        <img src="{{ Storage::url($prod->image) }}" alt="" class="mo-modal-product-image"
+                             width="64" height="64" decoding="async">
+                    @else
+                        <span class="mo-modal-product-image mo-modal-product-image--empty" aria-hidden="true">
+                            <i class="bx bx-food-menu"></i>
+                        </span>
+                    @endif
+                    <div>
+                        <h2 id="mo-customize-title" class="mo-modal-title">{{ $prod->name }}</h2>
+                        <span class="mo-modal-subtitle">${{ number_format($prod->price, 2) }} base · {{ $prod->max_addons ? 'Máx. '.$prod->max_addons.' complementos' : 'Complementos configurables' }}</span>
+                    </div>
                 </div>
-                <button type="button" class="mo-modal-close" wire:click="$set('showCustomize', false)" aria-label="Cerrar personalización">
+                <button type="button" class="mo-modal-close" wire:click="closeCustomize" aria-label="Cerrar personalización">
                     <i class="bx bx-x"></i>
                 </button>
             </div>
             <div class="mo-modal-body">
+                <div class="mo-client-alert" x-show="clientError" x-cloak role="alert">
+                    <i class="bx bx-info-circle" aria-hidden="true"></i>
+                    <span x-text="clientError"></span>
+                </div>
 
                 {{-- Addon groups --}}
                 @foreach($prod->addonGroups as $group)
                 @php
-                    $groupSelected = collect($group->addons)->filter(fn($a) => isset($selectedAddons[$a->id]))->count();
-                    $maxSelections = (int)$group->max_selections;
-                    $maxReached    = $maxSelections > 0 && $groupSelected >= $maxSelections;
+                    $groupIds = $group->addons->pluck('id')->map(fn($id) => (int) $id)->values();
+                    $minimum = $group->is_required
+                        ? max(1, (int) $group->min_selections)
+                        : (int) $group->min_selections;
+                    $configuredMaximum = (int) $group->max_selections;
+                    $maximum = $configuredMaximum > 0
+                        ? max($minimum, min($configuredMaximum, $group->addons->count()))
+                        : $group->addons->count();
                 @endphp
                 <div class="mo-addon-group">
                     <div class="mo-addon-group-label">
                         <span>{{ $group->name }}</span>
-                        <small class="mo-addon-rule">{{ $group->is_required ? 'Obligatorio' : 'Opcional' }} · Mín. {{ $group->is_required ? max(1, (int)$group->min_selections) : (int)$group->min_selections }} · Máx. {{ (int)$group->max_selections > 0 ? (int)$group->max_selections : 'sin límite' }}</small>
+                        <small class="mo-addon-rule">{{ $group->is_required ? 'Obligatorio' : 'Opcional' }} · Mín. {{ $minimum }} · Máx. {{ $maximum }}</small>
                         @if($group->is_required)
                             <span class="mo-required-badge">Requerido</span>
                         @endif
-                        @if($maxSelections > 0)
-                            <span class="mo-addon-count-hint {{ $maxReached ? 'at-max' : '' }}">
-                                {{ $groupSelected }}/{{ $maxSelections }}
-                            </span>
-                        @endif
+                        <span class="mo-addon-count-hint"
+                              :class="{ 'at-max': groupCount(@js($groupIds)) >= {{ $maximum }} }">
+                            <span x-text="groupCount(@js($groupIds))"></span>/{{ $maximum }}
+                        </span>
                     </div>
                     @error('addons_'.$group->id)
                         <small class="text-danger d-block mb-1">{{ $message }}</small>
                     @enderror
                     <div class="mo-addon-options">
                         @foreach($group->addons as $addon)
-                        @php $isSelected = isset($selectedAddons[$addon->id]); @endphp
-                        <button type="button" class="mo-addon-option {{ $isSelected ? 'selected' : '' }} {{ !$isSelected && $maxReached ? 'mo-addon-disabled' : '' }}"
-                                wire:click="toggleAddon({{ $addon->id }})"
-                                @if(!$isSelected && $maxReached) disabled @endif>
+                        <button type="button" class="mo-addon-option"
+                                x-on:click="toggleAddon({{ $addon->id }}, @js($groupIds), {{ $minimum }}, {{ $maximum }}, {{ (int) $prod->max_addons }})"
+                                :class="{ 'selected': hasAddon({{ $addon->id }}), 'mo-addon-disabled': !hasAddon({{ $addon->id }}) && (({{ $maximum }} > 1 && groupCount(@js($groupIds)) >= {{ $maximum }}) || ({{ (int) $prod->max_addons }} > 0 && totalAddons() >= {{ (int) $prod->max_addons }} && !({{ $maximum }} === 1 && groupCount(@js($groupIds)) > 0))) }"
+                                :aria-pressed="hasAddon({{ $addon->id }}) ? 'true' : 'false'"
+                                :disabled="!hasAddon({{ $addon->id }}) && (({{ $maximum }} > 1 && groupCount(@js($groupIds)) >= {{ $maximum }}) || ({{ (int) $prod->max_addons }} > 0 && totalAddons() >= {{ (int) $prod->max_addons }} && !({{ $maximum }} === 1 && groupCount(@js($groupIds)) > 0)))">
+                            @if($addon->image)
+                                <img src="{{ Storage::url($addon->image) }}" alt="" class="mo-option-image"
+                                     width="48" height="48" loading="lazy" decoding="async">
+                            @else
+                                <span class="mo-option-image mo-option-image--empty" aria-hidden="true">
+                                    <i class="bx bx-plus-circle"></i>
+                                </span>
+                            @endif
                             <span class="mo-addon-check"><i class="bx bx-check"></i></span>
-                            <span class="mo-addon-name">{{ $addon->name }}</span>
+                            <span class="mo-addon-copy">
+                                <span class="mo-addon-name">{{ $addon->name }}</span>
+                                @if($addon->description)
+                                    <small>{{ $addon->description }}</small>
+                                @endif
+                            </span>
                             @if($addon->extra_price > 0)
                                 <span class="mo-addon-price">+${{ number_format($addon->extra_price, 2) }}</span>
                             @else
@@ -290,42 +398,51 @@
                         <span>Ingredientes</span>
                         <small class="mo-addon-rule">Mín. {{ $prod->min_ingredients ?? 0 }} · Máx. {{ $maxIngs > 0 ? $maxIngs : 'sin límite' }}</small>
                         @if($maxIngs > 0)
-                            <span class="mo-addon-count-hint {{ $totalIngs >= $maxIngs ? 'at-max' : '' }}">
-                                {{ $totalIngs }}/{{ $maxIngs }}
+                            <span class="mo-addon-count-hint" :class="{ 'at-max': totalIngredients() >= {{ $maxIngs }} }">
+                                <span x-text="totalIngredients()"></span>/{{ $maxIngs }}
                             </span>
                         @endif
                     </div>
-                    @if($maxIngs > 0 && $totalIngs >= $maxIngs)
-                        <div class="mo-ing-max-hint">
-                            <i class="bx bx-info-circle me-1"></i>Máximo {{ $maxIngs }} ingrediente(s) alcanzado
+                    @if($maxIngs > 0)
+                        <div class="mo-ing-max-hint" x-show="totalIngredients() >= {{ $maxIngs }}" x-cloak>
+                            <i class="bx bx-info-circle me-1"></i>Máximo de {{ $maxIngs }} ingrediente(s) alcanzado
                         </div>
                     @endif
                     @error('ingredients')<small class="text-danger d-block mb-1">{{ $message }}</small>@enderror
                     <div class="mo-addon-options">
                         @foreach($prod->ingredients as $ing)
-                        @php
-                            $ingQty      = $selectedIngredients[$ing->id] ?? 0;
-                            $canAddMore  = $maxIngs === 0 || $totalIngs < $maxIngs;
-                        @endphp
                         <div class="mo-ingredient-row">
-                            <span class="mo-addon-name">
-                                {{ $ing->name }}
+                            @if($ing->image)
+                                <img src="{{ Storage::url($ing->image) }}" alt="" class="mo-option-image"
+                                     width="48" height="48" loading="lazy" decoding="async">
+                            @else
+                                <span class="mo-option-image mo-option-image--empty" aria-hidden="true">
+                                    <i class="bx bx-leaf"></i>
+                                </span>
+                            @endif
+                            <span class="mo-addon-copy">
+                                <span class="mo-addon-name">{{ $ing->name }}</span>
+                                @if($ing->description)
+                                    <small>{{ $ing->description }}</small>
+                                @endif
                                 @if($ing->extra_price > 0)
-                                    <small class="text-muted">+${{ number_format($ing->extra_price, 2) }}/u</small>
+                                    <small>+${{ number_format($ing->extra_price, 2) }}/unidad</small>
                                 @else
-                                    <small class="text-muted">Sin costo</small>
+                                    <small>Sin costo</small>
                                 @endif
                             </span>
                             <div class="mo-ing-controls">
                                 <button type="button" class="mo-qty-btn"
-                                        wire:click="setIngredientQty({{ $ing->id }}, {{ max(0, $ingQty - 1) }})"
-                                        @if($ingQty === 0) disabled @endif>
+                                        x-on:click="changeIngredient({{ $ing->id }}, -1, {{ $maxIngs }})"
+                                        :disabled="Number(ingredients[{{ $ing->id }}] || 0) === 0"
+                                        aria-label="Quitar {{ $ing->name }}">
                                     <i class="bx bx-minus"></i>
                                 </button>
-                                <span class="mo-qty-val">{{ $ingQty }}</span>
+                                <span class="mo-qty-val" x-text="Number(ingredients[{{ $ing->id }}] || 0)"></span>
                                 <button type="button" class="mo-qty-btn"
-                                        wire:click="setIngredientQty({{ $ing->id }}, {{ $ingQty + 1 }})"
-                                        @if(!$canAddMore) disabled @endif>
+                                        x-on:click="changeIngredient({{ $ing->id }}, 1, {{ $maxIngs }})"
+                                        :disabled="{{ $maxIngs }} > 0 && totalIngredients() >= {{ $maxIngs }}"
+                                        aria-label="Agregar {{ $ing->name }}">
                                     <i class="bx bx-plus"></i>
                                 </button>
                             </div>
@@ -339,11 +456,13 @@
                 <div class="mo-addon-group">
                     <div class="mo-addon-group-label"><span>Cantidad</span><small class="mo-addon-rule">Máximo 99 por producto</small></div>
                     <div class="mo-ing-controls">
-                        <button type="button" class="mo-qty-btn" wire:click="$set('itemQty', {{ max(1, $itemQty - 1) }})" aria-label="Reducir cantidad">
+                        <button type="button" class="mo-qty-btn" x-on:click="qty = Math.max(1, qty - 1)"
+                                :disabled="qty <= 1" aria-label="Reducir cantidad">
                             <i class="bx bx-minus"></i>
                         </button>
-                        <span class="mo-qty-val">{{ $itemQty }}</span>
-                        <button type="button" class="mo-qty-btn" wire:click="$set('itemQty', {{ min(99, $itemQty + 1) }})" aria-label="Aumentar cantidad">
+                        <span class="mo-qty-val" x-text="qty"></span>
+                        <button type="button" class="mo-qty-btn" x-on:click="qty = Math.min(99, qty + 1)"
+                                :disabled="qty >= 99" aria-label="Aumentar cantidad">
                             <i class="bx bx-plus"></i>
                         </button>
                     </div>
@@ -352,16 +471,26 @@
                 {{-- Notes --}}
                 <div class="mo-addon-group">
                     <div class="mo-addon-group-label"><span>Nota (opcional)</span><small class="mo-addon-rule">Visible para cocina</small></div>
-                    <input type="text" class="form-control form-control-sm"
-                           wire:model="itemNotes" placeholder="Sin cebolla, bien cocido…">
+                    <label for="mo-item-notes" class="visually-hidden">Nota para cocina</label>
+                    <textarea id="mo-item-notes" class="form-control" rows="2" maxlength="500"
+                              x-model="notes" placeholder="Ej. sin cebolla, bien cocido…"></textarea>
                 </div>
                 @error('itemQty')<small class="text-danger d-block mb-2">{{ $message }}</small>@enderror
+                @error('itemNotes')<small class="text-danger d-block mb-2">{{ $message }}</small>@enderror
 
             </div>
             <div class="mo-modal-footer">
-                <button type="button" class="btn btn-outline-secondary btn-sm" wire:click="$set('showCustomize', false)">Cancelar</button>
-                <button type="button" class="mo-send-btn mo-confirm-btn" wire:click="confirmCustomize">
-                    {{ $editingCartId ? 'Actualizar' : 'Agregar al carrito' }}
+                <button type="button" class="btn btn-outline-secondary" wire:click="closeCustomize">Cancelar</button>
+                <button type="button" class="mo-send-btn mo-confirm-btn" x-on:click="submit($wire)"
+                        :disabled="submitting">
+                    <span x-show="!submitting">
+                        <i class="bx bx-cart-add" aria-hidden="true"></i>
+                        {{ $editingCartId ? 'Actualizar producto' : 'Agregar al pedido' }}
+                    </span>
+                    <span x-show="submitting" x-cloak>
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        Guardando…
+                    </span>
                 </button>
             </div>
         </div>

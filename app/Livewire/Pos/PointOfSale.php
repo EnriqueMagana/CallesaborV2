@@ -9,6 +9,7 @@ use App\Models\Expense;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaGroup;
+use App\Models\MesaService;
 use App\Models\MesaSplit;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -20,7 +21,9 @@ use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\QuotationItemAddon;
 use App\Models\QuotationItemIngredient;
+use App\Services\MesaServiceManager;
 use App\Services\ThermalTicketRenderer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -29,6 +32,10 @@ use Livewire\Component;
 
 class PointOfSale extends Component
 {
+    private const MAX_ITEM_QUANTITY = 99;
+
+    private const MAX_ITEM_NOTES_LENGTH = 500;
+
     // ─── Cart ─────────────────────────────────────────────────────────────────
     public array $cart = [];
 
@@ -207,6 +214,10 @@ class PointOfSale extends Component
 
     public string $reprintType = 'ventanilla'; // ventanilla | mesas | delivery
 
+    public bool $tableTrackingLoaded = false;
+
+    public ?string $tableTrackingRefreshedAt = null;
+
     // ──────────────────────────────────────────────────────────────────────────
 
     #[Computed]
@@ -215,34 +226,37 @@ class PointOfSale extends Component
         return CashRegister::where('is_open', true)->latest('opened_at')->first();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 60)]
     public function categoriesWithProducts()
     {
-        $search = $this->productSearch;
-        $catId = $this->selectedCategoryId;
-
-        return Category::with(['products' => function ($q) use ($search) {
-            $q->where('is_active', true)
-                ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
-                ->orderBy('sort_order')->orderBy('name');
-        }])
+        return Category::query()
+            ->select(['id', 'name', 'icon', 'sort_order'])
+            ->with(['products' => function ($q) {
+                $q->where('is_active', true)
+                    ->select([
+                        'id', 'category_id', 'name', 'description', 'image', 'price',
+                        'is_customizable', 'max_addons', 'min_ingredients',
+                        'max_ingredients', 'sort_order',
+                    ])
+                    ->withCount(['addonGroups', 'ingredients'])
+                    ->orderBy('sort_order')->orderBy('name');
+            }])
             ->where('is_active', true)
-            ->when($catId, fn ($q) => $q->where('id', $catId))
             ->orderBy('sort_order')->orderBy('name')
-            ->get()
-            ->filter(fn ($cat) => $cat->products->isNotEmpty());
+            ->get();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 60)]
     public function productsWithoutCategory()
     {
-        if ($this->selectedCategoryId) {
-            return collect();
-        }
-
         return Product::whereNull('category_id')
             ->where('is_active', true)
-            ->when($this->productSearch, fn ($q) => $q->where('name', 'like', "%{$this->productSearch}%"))
+            ->select([
+                'id', 'category_id', 'name', 'description', 'image', 'price',
+                'is_customizable', 'max_addons', 'min_ingredients',
+                'max_ingredients', 'sort_order',
+            ])
+            ->withCount(['addonGroups', 'ingredients'])
             ->orderBy('name')
             ->get();
     }
@@ -250,10 +264,9 @@ class PointOfSale extends Component
     #[Computed]
     public function allCategories()
     {
-        return Category::where('is_active', true)
-            ->whereHas('products', fn ($q) => $q->where('is_active', true))
-            ->orderBy('sort_order')->orderBy('name')
-            ->get();
+        return $this->categoriesWithProducts
+            ->filter(fn (Category $category) => $category->products->isNotEmpty())
+            ->values();
     }
 
     #[Computed]
@@ -263,11 +276,31 @@ class PointOfSale extends Component
             return null;
         }
 
-        return Product::with([
-            'addonGroups' => fn ($q) => $q->where('is_active', true)
-                ->with(['addons' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')]),
-            'ingredients' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order'),
-        ])->find($this->customizingProductId);
+        return Product::query()
+            ->select([
+                'id', 'name', 'description', 'image', 'price', 'is_customizable',
+                'max_addons', 'min_ingredients', 'max_ingredients',
+            ])
+            ->with([
+                'addonGroups' => fn ($q) => $q->where('is_active', true)
+                    ->select([
+                        'addon_groups.id', 'addon_groups.name', 'addon_groups.description',
+                        'addon_groups.is_required', 'addon_groups.min_selections',
+                        'addon_groups.max_selections', 'addon_groups.sort_order',
+                    ])
+                    ->with(['addons' => fn ($q) => $q->where('is_active', true)
+                        ->select([
+                            'id', 'addon_group_id', 'name', 'description', 'image',
+                            'extra_price', 'sort_order',
+                        ])
+                        ->orderBy('sort_order')]),
+                'ingredients' => fn ($q) => $q->where('is_active', true)
+                    ->select([
+                        'ingredients.id', 'ingredients.name', 'ingredients.description',
+                        'ingredients.image', 'ingredients.extra_price', 'ingredients.sort_order',
+                    ])
+                    ->orderBy('ingredients.sort_order'),
+            ])->find($this->customizingProductId);
     }
 
     #[Computed]
@@ -302,7 +335,7 @@ class PointOfSale extends Component
                 fn ($addon) => isset($this->selectedAddons[$addon->id])
             )->count();
             $minimum = $this->effectiveGroupMinimum($group);
-            $maximum = max($minimum, min((int) $group->max_selections, $available));
+            $maximum = $this->effectiveGroupMaximum($group, $available, $minimum);
 
             if ($available < $minimum || $selected < $minimum || $selected > $maximum) {
                 return false;
@@ -311,7 +344,11 @@ class PointOfSale extends Component
 
         $ingredients = array_sum($this->selectedIngredients);
 
-        return $ingredients >= (int) $product->min_ingredients
+        $addonsAreValid = ! $product->max_addons
+            || collect($this->selectedAddons)->filter()->count() <= (int) $product->max_addons;
+
+        return $addonsAreValid
+            && $ingredients >= (int) $product->min_ingredients
             && (! $product->max_ingredients || $ingredients <= (int) $product->max_ingredients);
     }
 
@@ -400,6 +437,81 @@ class PointOfSale extends Component
                     'total' => (float) $orders->sum('total'),
                 ];
             });
+    }
+
+    #[Computed]
+    public function tableTrackingServices()
+    {
+        $cashRegisterId = $this->activeCashRegister?->id;
+
+        if (! $cashRegisterId || ! $this->tableTrackingLoaded) {
+            return collect();
+        }
+
+        return MesaService::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->active()
+            ->with([
+                'mesas.area',
+                'primaryMesa.area',
+                'orders' => fn ($query) => $query
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->with(['items.addons', 'items.ingredients'])
+                    ->oldest('created_at'),
+            ])
+            ->oldest('opened_at')
+            ->get();
+    }
+
+    #[Computed]
+    public function mesaServiceHistory()
+    {
+        $cashRegisterId = $this->activeCashRegister?->id;
+
+        if (! $cashRegisterId) {
+            return collect();
+        }
+
+        $search = trim($this->reprintSearch);
+
+        return MesaService::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->whereIn('status', ['pagada', 'liberada'])
+            ->with([
+                'mesas.area',
+                'primaryMesa.area',
+                'closer',
+                'orders.items',
+                'orders.payments',
+                'splits',
+            ])
+            ->when($search, fn ($query) => $query->where(function ($inner) use ($search) {
+                $inner->where('service_label', 'like', "%{$search}%")
+                    ->orWhere('opener_name_snapshot', 'like', "%{$search}%")
+                    ->orWhereHas('orders', fn ($orders) => $orders->where('id', 'like', "%{$search}%"));
+            }))
+            ->latest('closed_at')
+            ->limit(40)
+            ->get();
+    }
+
+    public function openTableTracking(): void
+    {
+        $this->tableTrackingLoaded = true;
+        $this->refreshTableTracking();
+    }
+
+    public function closeTableTracking(): void
+    {
+        $this->tableTrackingLoaded = false;
+        unset($this->tableTrackingServices);
+    }
+
+    public function refreshTableTracking(): void
+    {
+        $this->tableTrackingLoaded = true;
+        $this->tableTrackingRefreshedAt = now()->format('g:i:s A');
+        unset($this->tableTrackingServices);
     }
 
     #[Computed]
@@ -496,25 +608,70 @@ class PointOfSale extends Component
             return collect();
         }
 
-        return Mesa::with([
+        $serviceMesas = MesaService::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->where('status', 'en_cuenta')
+            ->whereHas('orders', fn ($query) => $query
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
+            ->with([
+                'primaryMesa.area',
+                'primaryMesa.currentAssignment.waiter',
+                'mesas',
+                'orders' => fn ($query) => $query
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->with('items'),
+                'splits' => fn ($query) => $query
+                    ->whereIn('status', ['pendiente', 'parcial'])
+                    ->latest('id'),
+            ])
+            ->oldest('opened_at')
+            ->get()
+            ->map(function (MesaService $service) {
+                $mesa = $service->primaryMesa ?: $service->mesas->first();
+                if (! $mesa) {
+                    return null;
+                }
+
+                $mesa->setRelation('orders', $service->orders);
+                $mesa->setRelation('splits', $service->splits);
+                $mesa->active_service = $service;
+                $mesa->operational_label = $service->service_label;
+                $split = $service->splits->first();
+                $mesa->active_split = $split;
+                $mesa->mesa_total = $split
+                    ? collect($split->split_data)
+                        ->reject(fn ($account) => (bool) ($account['paid'] ?? false))
+                        ->sum('total')
+                    : $mesa->orders->sum('total');
+
+                return $mesa;
+            })
+            ->filter()
+            ->values();
+
+        // Compatibilidad con órdenes creadas antes de la migración o desde
+        // integraciones que aún no envían mesa_service_id.
+        $legacyMesas = Mesa::with([
             'area',
             'currentAssignment.waiter',
-            'orders' => fn ($q) => $q->where('cash_register_id', $cashRegisterId)
+            'orders' => fn ($query) => $query
+                ->where('cash_register_id', $cashRegisterId)
+                ->whereNull('mesa_service_id')
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
                 ->with('items'),
-            // Tomamos únicamente el split vigente; los completados ya no deben
-            // aparecer como cuentas pendientes en caja.
-            'splits' => fn ($q) => $q->whereIn('status', ['pendiente', 'parcial'])->latest('id'),
+            'splits' => fn ($query) => $query
+                ->whereNull('mesa_service_id')
+                ->whereIn('status', ['pendiente', 'parcial'])
+                ->latest('id'),
         ])
-            // El estado de la mesa y sus órdenes activas son la fuente de
-            // verdad: una mesa liberada no pertenece a este panel aunque
-            // exista un split antiguo pendiente.
             ->where('status', 'en_cuenta')
-            ->whereHas('orders', fn ($q) => $q->where('cash_register_id', $cashRegisterId)
+            ->whereHas('orders', fn ($query) => $query
+                ->where('cash_register_id', $cashRegisterId)
+                ->whereNull('mesa_service_id')
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
             ->orderBy('number')
             ->get()
-            ->map(function ($mesa) {
+            ->map(function (Mesa $mesa) {
                 $split = $mesa->splits->first();
                 $mesa->active_split = $split;
                 $mesa->mesa_total = $split
@@ -525,6 +682,83 @@ class PointOfSale extends Component
 
                 return $mesa;
             });
+
+        return $serviceMesas->concat($legacyMesas)->values();
+    }
+
+    #[Computed]
+    public function mesaPaymentContext(): array
+    {
+        $empty = [
+            'mesa' => null,
+            'service' => null,
+            'split' => null,
+            'account' => null,
+            'accountLabel' => '',
+            'orders' => collect(),
+            'items' => collect(),
+            'total' => 0.0,
+            'isSplit' => false,
+        ];
+
+        if (! $this->showMesaPayModal || ! $this->mesaPayId) {
+            return $empty;
+        }
+
+        $cashRegisterId = $this->activeCashRegister?->id;
+        $mesa = Mesa::with(['area', 'currentAssignment.waiter'])->find($this->mesaPayId);
+        if (! $mesa || ! $cashRegisterId) {
+            return $empty;
+        }
+
+        $service = app(MesaServiceManager::class)->findActiveForMesa($mesa, $cashRegisterId);
+
+        if ($this->mesaSplitId !== null) {
+            $split = MesaSplit::whereIn('status', ['pendiente', 'parcial'])
+                ->where(function ($query) use ($cashRegisterId) {
+                    $query->whereHas('mesaService', fn ($serviceQuery) => $serviceQuery
+                        ->where('cash_register_id', $cashRegisterId)
+                        ->active())
+                        ->orWhere(function ($legacy) {
+                            $legacy->whereNull('mesa_service_id')
+                                ->where('mesa_id', $this->mesaPayId);
+                        });
+                })
+                ->find($this->mesaSplitId);
+            $account = $split?->split_data[$this->mesaSplitAccountIdx] ?? null;
+
+            return [
+                ...$empty,
+                'mesa' => $mesa,
+                'service' => $service,
+                'split' => $split,
+                'account' => $account,
+                'accountLabel' => (string) ($account['label'] ?? ''),
+                'items' => collect($account['items'] ?? []),
+                'total' => (float) ($account['total'] ?? 0),
+                'isSplit' => true,
+            ];
+        }
+
+        $orders = $service
+            ? $service->orders()
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->with('items')
+                ->get()
+            : $mesa->orders()
+                ->where('cash_register_id', $cashRegisterId)
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->with('items')
+                ->get();
+
+        return [
+            ...$empty,
+            'mesa' => $mesa,
+            'service' => $service,
+            'accountLabel' => $service?->service_label ?? $mesa->display_name,
+            'orders' => $orders,
+            'total' => (float) $orders->sum('total'),
+        ];
     }
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
@@ -567,13 +801,28 @@ class PointOfSale extends Component
     public function selectCategory(?int $id): void
     {
         $this->selectedCategoryId = $id;
-        unset($this->categoriesWithProducts, $this->productsWithoutCategory);
     }
 
     // ─── Customize product modal ───────────────────────────────────────────────
 
     public function openCustomizeModal(int $productId): void
     {
+        $product = Product::query()
+            ->where('is_active', true)
+            ->select(['id', 'name', 'price', 'image', 'is_customizable'])
+            ->withCount(['addonGroups', 'ingredients'])
+            ->find($productId);
+
+        if (! $product) {
+            return;
+        }
+
+        if (! $product->is_customizable && $product->addon_groups_count === 0 && $product->ingredients_count === 0) {
+            $this->addSimpleProductToCart($product);
+
+            return;
+        }
+
         $this->customizingProductId = $productId;
         $this->editingCartId = null;
         $this->selectedAddons = [];
@@ -583,6 +832,57 @@ class PointOfSale extends Component
         $this->showCustomizeModal = true;
         unset($this->customizingProduct, $this->totalSelectedIngredients);
         $this->preselectRequiredSingletons();
+    }
+
+    public function closeCustomizeModal(): void
+    {
+        $this->resetErrorBag();
+        $this->resetCustomizationState();
+    }
+
+    private function resetCustomizationState(): void
+    {
+        $this->showCustomizeModal = false;
+        $this->customizingProductId = null;
+        $this->editingCartId = null;
+        $this->selectedAddons = [];
+        $this->selectedIngredients = [];
+        $this->itemNotes = '';
+        $this->itemQuantity = 1;
+        unset($this->customizingProduct, $this->totalSelectedIngredients, $this->customizationIsValid);
+    }
+
+    private function addSimpleProductToCart(Product $product): void
+    {
+        $duplicate = $this->findDuplicateCartItem($product->id, [], []);
+
+        if ($duplicate !== null) {
+            if ($this->cart[$duplicate]['quantity'] >= self::MAX_ITEM_QUANTITY) {
+                $this->dispatch('notify', type: 'warning', message: 'La cantidad máxima por producto es 99.');
+
+                return;
+            }
+            $this->cart[$duplicate]['quantity']++;
+            $this->cart[$duplicate]['subtotal'] = $this->cart[$duplicate]['unit_total'] * $this->cart[$duplicate]['quantity'];
+        } else {
+            $this->cart[] = [
+                'cart_id' => Str::uuid()->toString(),
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_price' => (float) $product->price,
+                'product_image' => $product->image,
+                'quantity' => 1,
+                'unit_extra' => 0,
+                'unit_total' => (float) $product->price,
+                'subtotal' => (float) $product->price,
+                'notes' => '',
+                'addons' => [],
+                'ingredients' => [],
+            ];
+        }
+
+        unset($this->cartTotal, $this->cartCount);
+        $this->saveCart();
     }
 
     public function editCartItem(string $cartId): void
@@ -622,7 +922,7 @@ class PointOfSale extends Component
         }
 
         $minimum = $this->effectiveGroupMinimum($group);
-        $maximum = max($minimum, min((int) $group->max_selections, $group->addons->count()));
+        $maximum = $this->effectiveGroupMaximum($group, $group->addons->count(), $minimum);
 
         if (isset($this->selectedAddons[$addonId])) {
             $selectedInGroup = $group->addons->filter(
@@ -659,6 +959,16 @@ class PointOfSale extends Component
         return $group->is_required
             ? max(1, (int) $group->min_selections)
             : (int) $group->min_selections;
+    }
+
+    private function effectiveGroupMaximum($group, int $available, ?int $minimum = null): int
+    {
+        $minimum ??= $this->effectiveGroupMinimum($group);
+        $configured = (int) $group->max_selections;
+
+        return $configured > 0
+            ? max($minimum, min($configured, $available))
+            : $available;
     }
 
     private function preselectRequiredSingletons(): void
@@ -703,8 +1013,74 @@ class PointOfSale extends Component
 
     public function addToCart(): void
     {
+        $this->confirmCustomize();
+    }
+
+    public function confirmCustomize(
+        ?array $addonIds = null,
+        ?array $ingredientQuantities = null,
+        ?int $quantity = null,
+        ?string $notes = null,
+    ): void {
         $product = $this->customizingProduct;
         if (! $product) {
+            return;
+        }
+
+        $this->resetErrorBag();
+
+        if ($addonIds !== null) {
+            $requestedAddonIds = collect($addonIds)
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+            $allowedAddonIds = $product->addonGroups->flatMap->addons->pluck('id');
+
+            if ($requestedAddonIds->diff($allowedAddonIds)->isNotEmpty()) {
+                $this->addError('addons_general', 'La selección contiene complementos no disponibles.');
+
+                return;
+            }
+
+            $this->selectedAddons = $requestedAddonIds
+                ->mapWithKeys(fn ($id) => [$id => true])
+                ->all();
+        }
+
+        if ($ingredientQuantities !== null) {
+            $allowedIngredientIds = $product->ingredients->pluck('id')->map(fn ($id) => (int) $id);
+            $requestedIngredientIds = collect(array_keys($ingredientQuantities))
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id);
+
+            if ($requestedIngredientIds->diff($allowedIngredientIds)->isNotEmpty()) {
+                $this->addError('ingredients', 'La selección contiene ingredientes no disponibles.');
+
+                return;
+            }
+
+            $this->selectedIngredients = collect($ingredientQuantities)
+                ->filter(fn ($qty, $id) => is_numeric($id) && is_numeric($qty) && (int) $qty > 0)
+                ->mapWithKeys(fn ($qty, $id) => [(int) $id => (int) $qty])
+                ->all();
+        }
+
+        if ($quantity !== null) {
+            $this->itemQuantity = $quantity;
+        }
+        if ($notes !== null) {
+            $this->itemNotes = trim($notes);
+        }
+
+        if ($this->itemQuantity < 1 || $this->itemQuantity > self::MAX_ITEM_QUANTITY) {
+            $this->addError('itemQuantity', 'La cantidad debe estar entre 1 y 99.');
+
+            return;
+        }
+        if (mb_strlen($this->itemNotes) > self::MAX_ITEM_NOTES_LENGTH) {
+            $this->addError('itemNotes', 'La nota no puede superar 500 caracteres.');
+
             return;
         }
 
@@ -715,7 +1091,7 @@ class PointOfSale extends Component
 
             $minimum = $this->effectiveGroupMinimum($group);
             $available = $group->addons->count();
-            $maximum = max($minimum, min((int) $group->max_selections, $available));
+            $maximum = $this->effectiveGroupMaximum($group, $available, $minimum);
 
             if ($available < $minimum) {
                 $this->addError('addons_'.$group->id, "«{$group->name}» no tiene suficientes opciones disponibles.");
@@ -732,6 +1108,14 @@ class PointOfSale extends Component
 
                 return;
             }
+        }
+
+        $maximumAddons = (int) ($product->max_addons ?? 0);
+        $totalAddons = collect($this->selectedAddons)->filter()->count();
+        if ($maximumAddons > 0 && $totalAddons > $maximumAddons) {
+            $this->addError('addons_general', "Este producto permite máximo {$maximumAddons} complemento(s).");
+
+            return;
         }
 
         $totalIng = array_sum($this->selectedIngredients);
@@ -794,6 +1178,11 @@ class PointOfSale extends Component
             $dupIndex = $this->findDuplicateCartItem($product->id, $addons, $ingredients);
 
             if ($dupIndex !== null && $this->itemNotes === '') {
+                if ($this->cart[$dupIndex]['quantity'] + $this->itemQuantity > self::MAX_ITEM_QUANTITY) {
+                    $this->addError('itemQuantity', 'La cantidad acumulada del producto no puede superar 99.');
+
+                    return;
+                }
                 $this->cart[$dupIndex]['quantity'] += $this->itemQuantity;
                 $this->cart[$dupIndex]['subtotal'] = $this->cart[$dupIndex]['unit_total'] * $this->cart[$dupIndex]['quantity'];
             } else {
@@ -814,9 +1203,7 @@ class PointOfSale extends Component
             }
         }
 
-        $this->showCustomizeModal = false;
-        $this->customizingProductId = null;
-        $this->editingCartId = null;
+        $this->resetCustomizationState();
         unset($this->cartTotal, $this->cartCount);
         $this->saveCart();
     }
@@ -834,6 +1221,10 @@ class PointOfSale extends Component
     {
         foreach ($this->cart as &$item) {
             if ($item['cart_id'] === $cartId) {
+                if ($item['quantity'] >= self::MAX_ITEM_QUANTITY) {
+                    $this->dispatch('notify', type: 'warning', message: 'La cantidad máxima por producto es 99.');
+                    break;
+                }
                 $item['quantity']++;
                 $item['subtotal'] = $item['unit_total'] * $item['quantity'];
                 break;
@@ -1040,6 +1431,9 @@ class PointOfSale extends Component
         if (empty($this->cart)) {
             return;
         }
+        if (! $this->cartContentsAreValid()) {
+            return;
+        }
 
         $isContraEntrega = $this->orderType === 'delivery' && $this->deliveryMethod === 'contra_entrega';
 
@@ -1058,24 +1452,28 @@ class PointOfSale extends Component
             return;
         }
 
-        $order = $this->persistOrder($this->orderType, $isContraEntrega ? 'pendiente' : 'pagada');
+        $order = DB::transaction(function () use ($isContraEntrega) {
+            $order = $this->persistOrder($this->orderType, $isContraEntrega ? 'pendiente' : 'pagada');
 
-        if (! $isContraEntrega) {
-            foreach ($this->payments as $p) {
-                $payment = OrderPayment::create([
+            if (! $isContraEntrega && $this->payments !== []) {
+                $timestamp = now();
+                OrderPayment::insert(collect($this->payments)->map(fn ($payment) => [
                     'order_id' => $order->id,
-                    'method' => $this->mapPaymentMethod($p['method']),
-                    'amount' => $p['amount'],
-                ]);
-
-                if ($p['method'] === 'cash') {
-                    $payment->update([
-                        'received_amount' => $p['cash_received'] ?? $p['amount'],
-                        'change_amount' => $p['cash_change'] ?? 0,
-                    ]);
-                }
+                    'method' => $this->mapPaymentMethod($payment['method']),
+                    'amount' => $payment['amount'],
+                    'received_amount' => $payment['method'] === 'cash'
+                        ? ($payment['cash_received'] ?? $payment['amount'])
+                        : null,
+                    'change_amount' => $payment['method'] === 'cash'
+                        ? ($payment['cash_change'] ?? 0)
+                        : 0,
+                    'created_at' => $timestamp,
+                    'updated_at' => $timestamp,
+                ])->all());
             }
-        }
+
+            return $order;
+        });
 
         $this->showCheckoutModal = false;
         $this->finishSale($order, openTicket: true);
@@ -1085,6 +1483,9 @@ class PointOfSale extends Component
     {
         abort_unless(auth()->user()?->can('crear ordenes'), 403);
         if (empty($this->cart)) {
+            return;
+        }
+        if (! $this->cartContentsAreValid()) {
             return;
         }
 
@@ -1121,6 +1522,9 @@ class PointOfSale extends Component
         if (empty($this->cart)) {
             return;
         }
+        if (! $this->cartContentsAreValid()) {
+            return;
+        }
 
         if (empty($this->customerName) && ! $this->customerId) {
             $this->dispatch('notify', type: 'warning', message: 'Nombre del cliente requerido para pagar después.');
@@ -1153,54 +1557,57 @@ class PointOfSale extends Component
             return;
         }
 
-        $quotation = Quotation::create([
-            'created_by' => auth()->id(),
-            'customer_id' => $this->customerId,
-            'name' => $this->quotationName ?: null,
-            'notes' => $this->quotationNotes ?: null,
-            'customer_name' => $this->customerName ?: null,
-            'customer_phone' => $this->customerPhone ?: null,
-            'total' => $this->cartTotal,
-            'status' => 'active',
-        ]);
-
-        foreach ($this->cart as $item) {
-            $qi = QuotationItem::create([
-                'quotation_id' => $quotation->id,
-                'product_id' => $item['product_id'],
-                'product_name' => $item['product_name'],
-                'product_price' => $item['product_price'],
-                'quantity' => $item['quantity'],
-                'subtotal' => $item['subtotal'],
-                'notes' => $item['notes'] ?: null,
+        DB::transaction(function (): void {
+            $quotation = Quotation::create([
+                'created_by' => auth()->id(),
+                'customer_id' => $this->customerId,
+                'name' => $this->quotationName ?: null,
+                'notes' => $this->quotationNotes ?: null,
+                'customer_name' => $this->customerName ?: null,
+                'customer_phone' => $this->customerPhone ?: null,
+                'total' => $this->cartTotal,
+                'status' => 'active',
             ]);
 
-            foreach ($item['addons'] as $a) {
-                QuotationItemAddon::create([
-                    'quotation_item_id' => $qi->id,
-                    'addon_id' => $a['addon_id'],
-                    'addon_name' => $a['addon_name'],
-                    'extra_price' => $a['extra_price'],
-                    'quantity' => 1,
+            foreach ($this->cart as $item) {
+                $qi = QuotationItem::create([
+                    'quotation_id' => $quotation->id,
+                    'product_id' => $item['product_id'],
+                    'product_name' => $item['product_name'],
+                    'product_price' => $item['product_price'],
+                    'quantity' => $item['quantity'],
+                    'subtotal' => $item['subtotal'],
+                    'notes' => $item['notes'] ?: null,
                 ]);
-            }
 
-            foreach ($item['ingredients'] as $i) {
-                QuotationItemIngredient::create([
-                    'quotation_item_id' => $qi->id,
-                    'ingredient_id' => $i['ingredient_id'],
-                    'ingredient_name' => $i['ingredient_name'],
-                    'extra_price' => $i['extra_price'],
-                    'quantity' => $i['quantity'],
-                ]);
+                foreach ($item['addons'] as $a) {
+                    QuotationItemAddon::create([
+                        'quotation_item_id' => $qi->id,
+                        'addon_id' => $a['addon_id'],
+                        'addon_name' => $a['addon_name'],
+                        'extra_price' => $a['extra_price'],
+                        'quantity' => 1,
+                    ]);
+                }
+
+                foreach ($item['ingredients'] as $i) {
+                    QuotationItemIngredient::create([
+                        'quotation_item_id' => $qi->id,
+                        'ingredient_id' => $i['ingredient_id'],
+                        'ingredient_name' => $i['ingredient_name'],
+                        'extra_price' => $i['extra_price'],
+                        'quantity' => $i['quantity'],
+                    ]);
+                }
             }
-        }
+        });
 
         $this->showSaveQuotationModal = false;
         $this->quotationName = '';
         $this->quotationNotes = '';
+        $this->clearCart();
         unset($this->quotations);
-        $this->dispatch('notify', type: 'success', message: 'Cotización guardada.');
+        $this->dispatch('notify', type: 'success', message: 'Pedido guardado. El carrito está listo para una nueva venta.');
     }
 
     public function loadQuotation(int $id): void
@@ -1288,12 +1695,12 @@ class PointOfSale extends Component
     public function updatedReprintType(): void
     {
         $this->reprintSearch = '';
-        unset($this->recentOrders);
+        unset($this->recentOrders, $this->mesaServiceHistory);
     }
 
     public function updatedReprintSearch(): void
     {
-        unset($this->recentOrders);
+        unset($this->recentOrders, $this->mesaServiceHistory);
     }
 
     // ─── Gastos ────────────────────────────────────────────────────────────────
@@ -1452,6 +1859,7 @@ class PointOfSale extends Component
     public function openMesaPayModal(int $mesaId): void
     {
         abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+        $this->resetErrorBag();
         $this->mesaPayId = $mesaId;
         $this->mesaSplitId = null;
         $this->mesaSplitAccountIdx = null;
@@ -1462,6 +1870,7 @@ class PointOfSale extends Component
         $this->mesaPayCard = '';
         $this->mesaPayRef = '';
         $this->showMesaPayModal = true;
+        unset($this->mesaPaymentContext);
     }
 
     public function reopenMesa(int $mesaId): void
@@ -1471,22 +1880,95 @@ class PointOfSale extends Component
             return;
         }
 
-        $mesa->update(['status' => 'ocupada']);
-        unset($this->mesasPendientes);
+        $service = $this->activeCashRegister
+            ? app(MesaServiceManager::class)->reopen($mesa, $this->activeCashRegister->id)
+            : null;
+        $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
+        Mesa::whereIn('id', $memberIds)->update(['status' => 'ocupada']);
+        unset($this->mesasPendientes, $this->tableTrackingServices);
         $this->dispatch('notify', type: 'success', message: "Mesa {$mesa->display_name} reabierta.");
     }
 
     public function discardEmptyMesaAccount(int $mesaId): void
     {
-        $mesa = Mesa::with(['orders' => fn ($q) => $q->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])])->find($mesaId);
-        if (! $mesa || $mesa->status !== 'en_cuenta' || $mesa->orders->sum('total') > 0.009) {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+
+        $cashRegisterId = $this->activeCashRegister?->id;
+        $mesa = Mesa::find($mesaId);
+        if (! $mesa || $mesa->status !== 'en_cuenta' || ! $cashRegisterId) {
+            $this->dispatch('notify', type: 'warning', message: 'La cuenta ya no está disponible.');
+
+            return;
+        }
+
+        $manager = app(MesaServiceManager::class);
+        $service = $manager->findActiveForMesa($mesa, $cashRegisterId);
+        $split = MesaSplit::query()
+            ->where('mesa_id', $mesa->id)
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->when(
+                $service,
+                fn ($query) => $query->where('mesa_service_id', $service->id),
+                fn ($query) => $query->whereNull('mesa_service_id')
+            )
+            ->latest('id')
+            ->first();
+
+        if ($split) {
+            $splitData = $split->split_data ?? [];
+            $pendingIndexes = collect($splitData)
+                ->keys()
+                ->filter(fn ($index) => ! (bool) ($splitData[$index]['paid'] ?? false));
+            $hasPendingBalance = $pendingIndexes->contains(
+                fn ($index) => (float) ($splitData[$index]['total'] ?? 0) > 0.009
+            );
+
+            if ($pendingIndexes->isEmpty() || $hasPendingBalance) {
+                $this->dispatch('notify', type: 'warning', message: 'Solo se pueden eliminar subcuentas pendientes con saldo de $0.00.');
+
+                return;
+            }
+
+            DB::transaction(function () use ($split, $splitData, $pendingIndexes, $mesa, $service, $cashRegisterId): void {
+                $discardedAt = now()->toIso8601String();
+                foreach ($pendingIndexes as $index) {
+                    $splitData[$index]['paid'] = true;
+                    $splitData[$index]['discarded'] = true;
+                    $splitData[$index]['discarded_at'] = $discardedAt;
+                    $splitData[$index]['discarded_by'] = auth()->id();
+                }
+
+                $split->update([
+                    'split_data' => $splitData,
+                    'status' => 'completado',
+                ]);
+
+                $this->completeMesaSplit($split, $mesa, $service, $cashRegisterId);
+            });
+
+            unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+            $this->dispatch('mesa-payment-completed', mesaId: $mesa->id, released: true);
+            $this->dispatch('notify', type: 'success', message: "Subcuenta sin consumo eliminada; {$mesa->display_name} quedó disponible.");
+
+            return;
+        }
+
+        $hasActiveOrders = Order::query()
+            ->where('mesa_id', $mesa->id)
+            ->where('cash_register_id', $cashRegisterId)
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->exists();
+        if ($hasActiveOrders) {
             $this->dispatch('notify', type: 'warning', message: 'Solo se pueden descartar cuentas en cero y sin órdenes activas.');
 
             return;
         }
 
-        $this->releaseMesa($mesa);
-        unset($this->mesasPendientes);
+        if ($service) {
+            $manager->releaseWithoutPayment($service, auth()->id(), 'Cuenta vacía descartada desde POS');
+        }
+        $this->releaseMesa($mesa, $service);
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
         $this->dispatch('notify', type: 'success', message: "Cuenta vacía de {$mesa->display_name} eliminada; mesa disponible.");
     }
 
@@ -1500,7 +1982,7 @@ class PointOfSale extends Component
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar cuenta vacía',
-            message: "La cuenta de <strong>{$mesa->display_name}</strong> está en cero. Se eliminará el cierre y la mesa quedará disponible. No se generará ningún movimiento de caja.",
+            message: "La subcuenta pendiente de <strong>{$mesa->display_name}</strong> está en $0.00. Se conservarán los pagos y el histórico; la mesa quedará disponible sin generar otro movimiento de caja.",
             action: 'discardEmptyMesaAccount',
             params: ['mesaId' => $mesaId],
             confirmText: 'Eliminar cuenta',
@@ -1511,10 +1993,12 @@ class PointOfSale extends Component
     public function openMesaSplitPayModal(int $splitId, int $accountIdx): void
     {
         abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+        $this->resetErrorBag();
         $cashRegisterId = $this->activeCashRegister?->id;
         $split = MesaSplit::whereIn('status', ['pendiente', 'parcial'])
-            ->whereHas('mesa.orders', fn ($q) => $q->where('cash_register_id', $cashRegisterId)
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
+            ->whereHas('mesaService', fn ($query) => $query
+                ->where('cash_register_id', $cashRegisterId)
+                ->active())
             ->findOrFail($splitId);
         $this->mesaPayId = $split->mesa_id;
         $this->mesaSplitId = $splitId;
@@ -1526,36 +2010,44 @@ class PointOfSale extends Component
         $this->mesaPayCard = '';
         $this->mesaPayRef = '';
         $this->showMesaPayModal = true;
+        unset($this->mesaPaymentContext);
     }
 
     public function closeMesaPayModal(): void
     {
+        $this->resetErrorBag();
         $this->showMesaPayModal = false;
         $this->mesaPayId = null;
         $this->mesaSplitId = null;
         $this->mesaSplitAccountIdx = null;
         $this->mesaPayments = [];
+        unset($this->mesaPaymentContext);
     }
 
     public function addMesaPayment(): void
     {
-        $cashRegisterId = $this->activeCashRegister?->id;
-        if ($this->mesaSplitId !== null) {
-            $split = MesaSplit::whereHas('mesa.orders', fn ($q) => $q->where('cash_register_id', $cashRegisterId)
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
-                ->find($this->mesaSplitId);
-            $total = $split ? (float) ($split->split_data[$this->mesaSplitAccountIdx]['total'] ?? 0) : 0;
-        } else {
-            $mesa = Mesa::with(['orders' => fn ($q) => $q->where('cash_register_id', $cashRegisterId)
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])])
-                ->find($this->mesaPayId);
-            $total = $mesa ? (float) $mesa->orders->sum('total') : 0;
-        }
+        $total = (float) ($this->mesaPaymentContext['total'] ?? 0);
 
         $paid = collect($this->mesaPayments)->sum('amount');
         $rem = max(0, $total - $paid);
-        $amount = (float) $this->mesaPayAmount ?: $rem;
+        $amount = (float) $this->mesaPayAmount;
+        $this->resetErrorBag(['mesaPayAmount', 'mesaPayReceived', 'mesaPayments']);
+
         if ($amount <= 0) {
+            $this->addError('mesaPayAmount', 'Captura el monto que se aplicará a este pago.');
+
+            return;
+        }
+
+        if ($amount > $rem + 0.01) {
+            $this->addError('mesaPayAmount', 'El monto no puede superar el saldo pendiente.');
+
+            return;
+        }
+
+        if (! in_array($this->mesaPayMethod, ['cash', 'card', 'transfer'], true)) {
+            $this->addError('mesaPayAmount', 'Selecciona un método de pago válido.');
+
             return;
         }
 
@@ -1563,8 +2055,20 @@ class PointOfSale extends Component
 
         if ($this->mesaPayMethod === 'cash') {
             $received = (float) $this->mesaPayReceived;
-            $payment['cash_received'] = $received > 0 ? $received : $amount;
-            $payment['cash_change'] = max(0, ($received > 0 ? $received : $amount) - $amount);
+            if ($received <= 0) {
+                $this->addError('mesaPayReceived', 'Captura cuánto efectivo entregó el cliente.');
+
+                return;
+            }
+
+            if ($received < $amount - 0.01) {
+                $this->addError('mesaPayReceived', 'El efectivo recibido no cubre el monto a aplicar.');
+
+                return;
+            }
+
+            $payment['cash_received'] = $received;
+            $payment['cash_change'] = max(0, $received - $amount);
         } elseif ($this->mesaPayMethod === 'card') {
             $payment['card_last4'] = $this->mesaPayCard;
         } elseif ($this->mesaPayMethod === 'transfer') {
@@ -1583,18 +2087,37 @@ class PointOfSale extends Component
         array_splice($this->mesaPayments, $index, 1);
     }
 
+    private function hasValidMesaPayments(): bool
+    {
+        if (empty($this->mesaPayments)) {
+            return false;
+        }
+
+        $total = (float) ($this->mesaPaymentContext['total'] ?? 0);
+        $paid = collect($this->mesaPayments)->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
+        if ($paid <= 0 || $paid > $total + 0.01) {
+            return false;
+        }
+
+        return collect($this->mesaPayments)->every(function ($payment): bool {
+            $method = $payment['method'] ?? null;
+            $amount = (float) ($payment['amount'] ?? 0);
+            if (! in_array($method, ['cash', 'card', 'transfer'], true) || $amount <= 0) {
+                return false;
+            }
+
+            return $method !== 'cash'
+                || (float) ($payment['cash_received'] ?? 0) >= $amount - 0.01;
+        });
+    }
+
     public function confirmMesaPayment(): void
     {
         abort_unless(auth()->user()?->can('cobrar mesas'), 403);
-        // Para un pago único, el cajero puede confirmar directamente. Si no
-        // agregó una parcialidad manualmente, usamos el saldo pendiente con
-        // el método seleccionado en el modal.
-        if (empty($this->mesaPayments)) {
-            $this->addMesaPayment();
-        }
 
-        if (empty($this->mesaPayments)) {
-            $this->dispatch('notify', type: 'warning', message: 'Agrega un monto válido para continuar.');
+        if (! $this->hasValidMesaPayments()) {
+            $this->addError('mesaPayments', 'Agrega al menos un pago antes de cobrar la cuenta.');
+            $this->dispatch('notify', type: 'warning', message: 'Primero agrega el pago y confirma el monto recibido.');
 
             return;
         }
@@ -1609,20 +2132,25 @@ class PointOfSale extends Component
     private function confirmFullMesaPayment(): void
     {
         $cashRegisterId = $this->activeCashRegister?->id;
-        $mesa = Mesa::with([
-            'area',
-            'currentAssignment.waiter',
-            'orders' => fn ($q) => $q->where('cash_register_id', $cashRegisterId)
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->with('items'),
-        ])->whereHas('orders', fn ($q) => $q->where('cash_register_id', $cashRegisterId)
-            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
-            ->find($this->mesaPayId);
+        $mesa = Mesa::with(['area', 'currentAssignment.waiter'])->find($this->mesaPayId);
         if (! $mesa) {
             return;
         }
 
-        $orders = $mesa->orders;
+        $service = app(MesaServiceManager::class)->findActiveForMesa($mesa, $cashRegisterId);
+        $orders = $service
+            ? $service->orders()
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->with('items')
+                ->get()
+            : $mesa->orders()
+                ->where('cash_register_id', $cashRegisterId)
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->with('items')
+                ->get();
+        if ($orders->isEmpty()) {
+            return;
+        }
         $mesaTotal = (float) $orders->sum('total');
         $paid = collect($this->mesaPayments)->sum('amount');
 
@@ -1655,7 +2183,10 @@ class PointOfSale extends Component
         }
 
         $assignment = $mesa->currentAssignment;
-        $this->releaseMesa($mesa);
+        if ($service) {
+            app(MesaServiceManager::class)->completePaid($service, auth()->id());
+        }
+        $this->releaseMesa($mesa, $service);
 
         // Print ticket
         $ticketItems = $orders->flatMap(fn ($o) => $o->items->map(fn ($i) => [
@@ -1667,7 +2198,7 @@ class PointOfSale extends Component
         $this->dispatch('pos-reprint-show',
             html_cliente: $this->buildMesaTicketHtml(
                 mesa: $mesa,
-                accountLabel: $mesa->display_name,
+                accountLabel: $service?->service_label ?? $mesa->display_name,
                 items: $ticketItems,
                 total: $mesaTotal,
                 payments: $this->mesaPayments,
@@ -1680,8 +2211,9 @@ class PointOfSale extends Component
         $this->showMesaPayModal = false;
         $this->mesaPayId = null;
         $this->mesaPayments = [];
-        unset($this->mesasPendientes);
-        $this->dispatch('notify', type: 'success', message: "Mesa {$mesa->display_name} cobrada y liberada.");
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+        $label = $service?->service_label ?? $mesa->display_name;
+        $this->dispatch('notify', type: 'success', message: "{$label} cobrado y liberado.");
     }
 
     private function confirmSplitAccountPayment(): void
@@ -1690,11 +2222,15 @@ class PointOfSale extends Component
         $split = MesaSplit::with([
             'mesa.area',
             'mesa.currentAssignment.waiter',
-        ])->whereHas('mesa.orders', fn ($q) => $q->where('cash_register_id', $cashRegisterId)
-            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
+        ])->whereHas('mesaService', fn ($query) => $query
+            ->where('cash_register_id', $cashRegisterId)
+            ->active())
             ->findOrFail($this->mesaSplitId);
 
         $mesa = $split->mesa;
+        $service = $split->mesa_service_id
+            ? MesaService::find($split->mesa_service_id)
+            : app(MesaServiceManager::class)->findActiveForMesa($mesa, $cashRegisterId);
         $splitData = $split->split_data;
         $account = $splitData[$this->mesaSplitAccountIdx] ?? null;
         if (! $account || ($account['paid'] ?? false)) {
@@ -1728,8 +2264,12 @@ class PointOfSale extends Component
 
         // Fallback: distribute across active orders
         if (empty($orderAmounts)) {
-            $activeOrders = Order::where('mesa_id', $mesa->id)
-                ->where('cash_register_id', $cashRegisterId)
+            $activeOrders = Order::query()
+                ->when(
+                    $service,
+                    fn ($query) => $query->where('mesa_service_id', $service->id),
+                    fn ($query) => $query->where('mesa_id', $mesa->id)->where('cash_register_id', $cashRegisterId)
+                )
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
                 ->get();
             $share = $accountTotal / max(1, $activeOrders->count());
@@ -1768,20 +2308,7 @@ class PointOfSale extends Component
         ]);
 
         if ($allPaid) {
-            // Cierra cualquier split activo duplicado que pudiera existir por
-            // el flujo anterior. Ningún split pendiente debe mantener la mesa
-            // visible después de liquidar su última subcuenta.
-            MesaSplit::where('mesa_id', $mesa->id)
-                ->where('id', '!=', $split->id)
-                ->whereIn('status', ['pendiente', 'parcial'])
-                ->update(['status' => 'completado']);
-
-            Order::where('mesa_id', $mesa->id)
-                ->where('cash_register_id', $cashRegisterId)
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->update(['status' => 'pagada', 'paid_at' => now()]);
-
-            $this->releaseMesa($mesa);
+            $this->completeMesaSplit($split, $mesa, $service, $cashRegisterId);
         }
 
         // Build ticket items from split_data snapshot
@@ -1809,7 +2336,7 @@ class PointOfSale extends Component
         $this->mesaSplitAccountIdx = null;
         $this->mesaPayId = null;
         $this->mesaPayments = [];
-        unset($this->mesasPendientes);
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
         $this->dispatch('mesa-payment-completed', mesaId: $mesa->id, released: $allPaid);
 
         $msg = $allPaid
@@ -1818,9 +2345,50 @@ class PointOfSale extends Component
         $this->dispatch('notify', type: 'success', message: $msg);
     }
 
-    private function releaseMesa(Mesa $mesa): void
+    private function completeMesaSplit(
+        MesaSplit $split,
+        Mesa $mesa,
+        ?MesaService $service,
+        int $cashRegisterId
+    ): void {
+        // Ningún split pendiente del mismo servicio debe mantener visible una
+        // mesa después de liquidar o descartar su última subcuenta.
+        MesaSplit::query()
+            ->where('mesa_id', $mesa->id)
+            ->where('id', '!=', $split->id)
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->when(
+                $service,
+                fn ($query) => $query->where('mesa_service_id', $service->id),
+                fn ($query) => $query->whereNull('mesa_service_id')
+            )
+            ->update(['status' => 'completado']);
+
+        Order::query()
+            ->when(
+                $service,
+                fn ($query) => $query->where('mesa_service_id', $service->id),
+                fn ($query) => $query->where('mesa_id', $mesa->id)->where('cash_register_id', $cashRegisterId)
+            )
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->update(['status' => 'pagada', 'paid_at' => now()]);
+
+        if ($service) {
+            app(MesaServiceManager::class)->completePaid($service, auth()->id());
+        }
+
+        $this->releaseMesa($mesa, $service);
+    }
+
+    private function releaseMesa(Mesa $mesa, ?MesaService $service = null): void
     {
-        MesaAssignment::where('mesa_id', $mesa->id)
+        $groupId = $mesa->mesa_group_id ?: $service?->mesa_group_id;
+        $memberIds = $service?->mesas()->pluck('mesas.id')->all()
+            ?: ($groupId
+                ? Mesa::where('mesa_group_id', $groupId)->pluck('id')->all()
+                : [$mesa->id]);
+
+        MesaAssignment::whereIn('mesa_id', $memberIds)
             ->whereNull('released_at')
             ->update([
                 'released_by' => auth()->id(),
@@ -1828,15 +2396,11 @@ class PointOfSale extends Component
                 'release_reason' => 'Cobrado desde POS',
             ]);
 
-        $groupId = $mesa->mesa_group_id;
-        $mesa->update(['status' => 'disponible', 'mesa_group_id' => null]);
+        Mesa::whereIn('id', $memberIds)
+            ->update(['status' => 'disponible', 'mesa_group_id' => null]);
 
         if ($groupId) {
-            $remaining = Mesa::where('mesa_group_id', $groupId)->where('id', '!=', $mesa->id)->count();
-            if ($remaining <= 1) {
-                Mesa::where('mesa_group_id', $groupId)->update(['mesa_group_id' => null]);
-                MesaGroup::destroy($groupId);
-            }
+            MesaGroup::destroy($groupId);
         }
     }
 
@@ -1855,7 +2419,14 @@ class PointOfSale extends Component
             return false;
         }
 
-        $this->releaseMesa($mesa);
+        $service = $this->activeCashRegister
+            ? app(MesaServiceManager::class)->findActiveForMesa($mesa, $this->activeCashRegister->id)
+            : null;
+        if ($service) {
+            app(MesaServiceManager::class)->completePaid($service, auth()->id());
+        }
+        $this->releaseMesa($mesa, $service);
+        unset($this->tableTrackingServices, $this->mesaServiceHistory);
 
         return true;
     }
@@ -2079,6 +2650,7 @@ HTML;
             $this->mesasPendientes,
             $this->recentOrders,
             $this->reprintMesaGroups,
+            $this->tableTrackingServices,
         );
         $message = $mesaWasReleased
             ? "Orden #{$order->id} cobrada. Era la última nota y la mesa quedó disponible."
@@ -2244,6 +2816,21 @@ HTML;
             ->findOrFail($orderId);
 
         $this->dispatchOrderTicketPreview($order);
+    }
+
+    public function openMesaServiceHistoryTicket(int $serviceId): void
+    {
+        abort_unless(auth()->user()?->can('reimprimir tickets'), 403);
+
+        $service = MesaService::query()
+            ->where('cash_register_id', $this->activeCashRegister?->id)
+            ->whereIn('status', ['pagada', 'liberada'])
+            ->findOrFail($serviceId);
+
+        $this->dispatch('pos-reprint-show',
+            html_cliente: app(ThermalTicketRenderer::class)->renderMesaService($service),
+            html_cocina: '',
+        );
     }
 
     private function dispatchOrderTicketPreview(Order $order): void
@@ -2564,60 +3151,98 @@ HTML;
         return 'customer';
     }
 
-    private function persistOrder(string $type, string $status): Order
+    private function cartContentsAreValid(): bool
     {
-        $cash = $this->activeCashRegister;
+        if (mb_strlen($this->orderNotes) > self::MAX_ITEM_NOTES_LENGTH) {
+            $this->addError('orderNotes', 'La nota general no puede superar 500 caracteres.');
 
-        $order = Order::create([
-            'cash_register_id' => $cash?->id,
-            'customer_id' => $this->customerId,
-            'customer_name' => $this->customerName ?: null,
-            'customer_phone' => $this->customerPhone ?: null,
-            'customer_address' => $type === 'delivery' ? ($this->customerAddress ?: null) : null,
-            'customer_references' => $type === 'delivery' ? ($this->customerReferences ?: null) : null,
-            'served_by' => auth()->id(),
-            'type' => $type,
-            'delivery_method' => $type === 'delivery' ? $this->deliveryMethod : null,
-            'status' => $status,
-            'subtotal' => $this->cartTotal,
-            'total' => $this->cartTotal,
-            'notes' => $this->orderNotes ?: null,
-            'paid_at' => $status === 'pagada' ? now() : null,
-        ]);
+            return false;
+        }
 
         foreach ($this->cart as $item) {
-            $orderItem = OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $item['product_id'],
-                'product_name' => $item['product_name'],
-                'product_price' => $item['product_price'],
-                'quantity' => $item['quantity'],
-                'subtotal' => $item['subtotal'],
-                'notes' => $item['notes'] ?: null,
-            ]);
+            $quantity = (int) ($item['quantity'] ?? 0);
+            if ($quantity < 1 || $quantity > self::MAX_ITEM_QUANTITY) {
+                $this->dispatch('notify', type: 'warning', message: 'Cada producto debe tener una cantidad entre 1 y 99.');
 
-            foreach ($item['addons'] as $a) {
-                OrderItemAddon::create([
-                    'order_item_id' => $orderItem->id,
-                    'addon_id' => $a['addon_id'],
-                    'addon_name' => $a['addon_name'],
-                    'extra_price' => $a['extra_price'],
-                    'quantity' => 1,
-                ]);
-            }
-
-            foreach ($item['ingredients'] as $i) {
-                OrderItemIngredient::create([
-                    'order_item_id' => $orderItem->id,
-                    'ingredient_id' => $i['ingredient_id'],
-                    'ingredient_name' => $i['ingredient_name'],
-                    'extra_price' => $i['extra_price'],
-                    'quantity' => $i['quantity'],
-                ]);
+                return false;
             }
         }
 
-        return $order;
+        return true;
+    }
+
+    private function persistOrder(string $type, string $status): Order
+    {
+        $cash = $this->activeCashRegister;
+        $total = $this->cartTotal;
+
+        return DB::transaction(function () use ($cash, $total, $type, $status) {
+            $order = Order::create([
+                'cash_register_id' => $cash?->id,
+                'customer_id' => $this->customerId,
+                'customer_name' => $this->customerName ?: null,
+                'customer_phone' => $this->customerPhone ?: null,
+                'customer_address' => $type === 'delivery' ? ($this->customerAddress ?: null) : null,
+                'customer_references' => $type === 'delivery' ? ($this->customerReferences ?: null) : null,
+                'served_by' => auth()->id(),
+                'type' => $type,
+                'delivery_method' => $type === 'delivery' ? $this->deliveryMethod : null,
+                'status' => $status,
+                'subtotal' => $total,
+                'total' => $total,
+                'notes' => $this->orderNotes ?: null,
+                'paid_at' => $status === 'pagada' ? now() : null,
+            ]);
+
+            $addonRows = [];
+            $ingredientRows = [];
+            $timestamp = now();
+
+            foreach ($this->cart as $item) {
+                $orderItem = OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $item['product_id'],
+                    'product_name' => $item['product_name'],
+                    'product_price' => $item['product_price'],
+                    'quantity' => $item['quantity'],
+                    'subtotal' => $item['subtotal'],
+                    'notes' => $item['notes'] ?: null,
+                ]);
+
+                foreach ($item['addons'] as $addon) {
+                    $addonRows[] = [
+                        'order_item_id' => $orderItem->id,
+                        'addon_id' => $addon['addon_id'],
+                        'addon_name' => $addon['addon_name'],
+                        'extra_price' => $addon['extra_price'],
+                        'quantity' => 1,
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
+                    ];
+                }
+
+                foreach ($item['ingredients'] as $ingredient) {
+                    $ingredientRows[] = [
+                        'order_item_id' => $orderItem->id,
+                        'ingredient_id' => $ingredient['ingredient_id'],
+                        'ingredient_name' => $ingredient['ingredient_name'],
+                        'extra_price' => $ingredient['extra_price'],
+                        'quantity' => $ingredient['quantity'],
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
+                    ];
+                }
+            }
+
+            if ($addonRows !== []) {
+                OrderItemAddon::insert($addonRows);
+            }
+            if ($ingredientRows !== []) {
+                OrderItemIngredient::insert($ingredientRows);
+            }
+
+            return $order;
+        });
     }
 
     private function finishSale(Order $order, bool $openTicket): void

@@ -59,8 +59,12 @@
         </div>
         <div class="modal-footer-pos">
             <button wire:click="$set('showSaveQuotationModal',false)" class="pos-btn pos-btn-secondary">Cancelar</button>
-            <button wire:click="saveQuotation" class="pos-btn pos-btn-primary">
-                <i class="bx bx-save"></i> Guardar
+            <button wire:click="saveQuotation" wire:loading.attr="disabled" wire:target="saveQuotation"
+                class="pos-btn pos-btn-primary">
+                <span wire:loading wire:target="saveQuotation" class="pos-btn-spinner"></span>
+                <i wire:loading.remove wire:target="saveQuotation" class="bx bx-save"></i>
+                <span wire:loading.remove wire:target="saveQuotation">Guardar y limpiar</span>
+                <span wire:loading wire:target="saveQuotation">Guardando…</span>
             </button>
         </div>
     </div>

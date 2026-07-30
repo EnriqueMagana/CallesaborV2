@@ -1,44 +1,58 @@
-<div class="pos-overlay-panel" :class="panels.mesas ? 'show' : ''">
-    <div class="pos-overlay-backdrop" @click="panels.mesas = false"></div>
-    <section class="pos-panel pos-area-panel pos-tables-panel" role="dialog" aria-modal="true" aria-labelledby="pos-tables-title">
-        <header class="panel-header pos-area-panel__header">
-            <span class="pos-area-panel__mark is-tables"><i class="bx bx-table"></i></span>
-            <div>
-                <span class="pos-area-panel__eyebrow">Área operativa</span>
-                <h2 id="pos-tables-title">Mesas</h2>
-                <p>Cada mesa agrupa sus órdenes. La última nota pagada libera la mesa.</p>
+<x-pos.area-panel panel="mesas" title="Cobrar mesas" title-id="pos-tables-title"
+    eyebrow="Área de cobro" description="Consulta consumos, retoma la mesa si hace falta y cobra la cuenta completa o dividida."
+    icon="bx-table" tone="tables" panel-class="pos-tables-panel" close-label="Cerrar Mesas">
+        <x-slot:tools>
+            <div class="pos-area-guidance"><i class="bx bx-credit-card"></i>
+                <span>Selecciona la cuenta que vas a cobrar. La última cuenta pagada libera las mesas del servicio.</span>
             </div>
-            <button type="button" class="btn-panel-close" @click="panels.mesas = false" aria-label="Cerrar Mesas"><i class="bx bx-x"></i></button>
-        </header>
-
-        <div class="pos-area-panel__tools">
-            <div class="pos-area-guidance"><i class="bx bx-info-circle"></i><span>Imprime cada orden para enviarla a preparación; después márcala lista antes de cobrar.</span></div>
             <div class="pos-area-summary"><strong>{{ $this->mesasPendientes->count() }}</strong><span>mesas por cobrar</span></div>
-        </div>
+        </x-slot:tools>
 
-        <div wire:loading.flex wire:target="reopenMesa,discardEmptyMesaAccount,openMesaPayModal,confirmMesaPayment" class="pos-skeleton-list" aria-label="Cargando mesas">
-            @for($s = 0; $s < 2; $s++)
-                <div class="pos-table-skeleton"><span></span><div><i></i><i></i><i></i></div></div>
-            @endfor
-        </div>
-        <div wire:loading.class="is-loading" wire:target="reopenMesa,discardEmptyMesaAccount,openMesaPayModal,confirmMesaPayment" class="panel-body pos-area-panel__body">
+        <x-slot:body>
+        <div class="panel-body pos-area-panel__body pos-tables-accordion"
+            x-data="{ openMesa: @js($this->mesasPendientes->first()?->id) }">
             @forelse ($this->mesasPendientes as $mesa)
-                @php $allOrdersReady = $mesa->orders->isNotEmpty() && $mesa->orders->every(fn ($order) => in_array($order->status, ['lista', 'entregada'], true)); @endphp
-                <article class="pos-table-group" wire:key="pos-table-{{ $mesa->id }}">
-                    <header class="pos-table-group__header">
+                @php
+                    $allOrdersReady = $mesa->orders->isNotEmpty() && $mesa->orders->every(fn ($order) => in_array($order->status, ['lista', 'entregada'], true));
+                    $pendingSplitAccounts = $mesa->active_split
+                        ? collect($mesa->active_split->split_data)->reject(fn ($account) => (bool) ($account['paid'] ?? false))
+                        : collect();
+                @endphp
+                <article class="pos-table-group pos-table-billing-group" wire:key="pos-table-{{ $mesa->id }}">
+                    <header class="pos-table-group__header pos-table-billing-group__header">
+                        <button type="button" class="pos-table-billing-toggle"
+                            id="billing-table-toggle-{{ $mesa->id }}"
+                            @click="openMesa = openMesa === {{ $mesa->id }} ? null : {{ $mesa->id }}"
+                            :aria-expanded="(openMesa === {{ $mesa->id }}).toString()"
+                            aria-controls="billing-table-content-{{ $mesa->id }}">
                         <div class="pos-table-group__identity">
                             <span><i class="bx bx-table"></i></span>
                             <div>
-                                <strong>{{ $mesa->display_name }}</strong>
+                                <strong>{{ $mesa->operational_label ?? $mesa->display_name }}</strong>
                                 <small>{{ $mesa->area?->name ?: 'Área general' }}@if($mesa->currentAssignment) · {{ $mesa->currentAssignment->waiter?->name }}@endif</small>
                             </div>
                         </div>
                         <div class="pos-table-group__total">
                             <strong>${{ number_format($mesa->mesa_total, 2) }}</strong>
-                            <small>{{ $mesa->orders->count() }} {{ $mesa->orders->count() === 1 ? 'orden activa' : 'órdenes activas' }}</small>
+                            @if ($mesa->active_split)
+                                <small>{{ $pendingSplitAccounts->count() }} {{ $pendingSplitAccounts->count() === 1 ? 'subcuenta pendiente' : 'subcuentas pendientes' }}</small>
+                            @else
+                                <small>{{ $mesa->orders->count() }}
+                                    {{ $mesa->orders->count() === 1 ? 'orden activa' : 'órdenes activas' }}</small>
+                            @endif
                         </div>
+                        <span class="pos-table-billing-toggle__chevron" aria-hidden="true">
+                            <i class="bx bx-chevron-down" :class="{ 'is-expanded': openMesa === {{ $mesa->id }} }"></i>
+                        </span>
+                        </button>
                     </header>
 
+                    <div class="pos-table-billing-group__content"
+                        id="billing-table-content-{{ $mesa->id }}"
+                        role="region" aria-labelledby="billing-table-toggle-{{ $mesa->id }}"
+                        x-show="openMesa === {{ $mesa->id }}" x-cloak
+                        x-transition:enter.opacity.duration.180ms
+                        x-transition:leave.opacity.duration.120ms>
                     @if ($mesa->active_split && (float) $mesa->mesa_total > 0.009)
                         <section class="pos-table-split-list pos-table-split-list--primary" aria-label="Subcuentas pendientes de {{ $mesa->display_name }}">
                             <div class="pos-table-split-list__title">
@@ -65,19 +79,32 @@
                                 </div>
                             @endforeach
                         </section>
+                    @elseif ($mesa->active_split)
+                        <section class="pos-split-zero-state" role="status" aria-label="Subcuenta restante sin consumo">
+                            <span class="pos-split-zero-state__icon"><i class="bx bx-check-circle"></i></span>
+                            <div>
+                                <strong>Subcuenta restante sin consumo</strong>
+                                <p>Las subcuentas con consumo ya fueron cobradas. No existe un monto adicional por
+                                    cobrar en esta mesa.</p>
+                            </div>
+                        </section>
                     @endif
 
-                    <div class="pos-table-group__orders">
-                        @foreach ($mesa->orders as $tableOrder)
-                            @include('livewire.pos.partials.order-flow-card', [
-                                'flowOrder' => $tableOrder,
-                                'flowArea' => 'Mesa '.$mesa->number,
-                                'flowIcon' => 'bx-receipt',
-                                'flowSourceLabel' => $tableOrder->source === 'kiosk' ? 'Kiosco' : 'Mesero',
-                                'allowOrderPayment' => false,
-                            ])
-                        @endforeach
-                    </div>
+                    @unless ($mesa->active_split)
+                        <div class="pos-table-group__orders">
+                            @foreach ($mesa->orders as $tableOrder)
+                                @include('livewire.pos.partials.order-flow-card', [
+                                    'flowOrder' => $tableOrder,
+                                    'flowArea' => $mesa->operational_label ?? $mesa->display_name,
+                                    'flowIcon' => 'bx-receipt',
+                                    'flowSourceLabel' => $tableOrder->source === 'kiosk' ? 'Kiosco' : 'Mesero',
+                                    'allowOrderPayment' => false,
+                                    'showOperationalStatus' => false,
+                                    'showKitchenActions' => false,
+                                ])
+                            @endforeach
+                        </div>
+                    @endunless
 
                     <footer class="pos-table-group__footer">
                         @if ((float) $mesa->mesa_total <= 0.009)
@@ -94,7 +121,8 @@
                                 </button>
                             </div>
                         @else
-                        <button type="button" wire:click="reopenMesa({{ $mesa->id }})" class="pos-btn pos-btn-ghost pos-reopen-table">
+                        <button type="button" wire:click="reopenMesa({{ $mesa->id }})"
+                            class="pos-btn pos-btn-secondary pos-reopen-table">
                             <i class="bx bx-lock-open-alt"></i> Reabrir mesa
                         </button>
                         @if (!$mesa->active_split)
@@ -108,6 +136,7 @@
                         @endif
                         @endif
                     </footer>
+                    </div>
                 </article>
             @empty
                 <div class="pos-area-empty">
@@ -117,5 +146,5 @@
                 </div>
             @endforelse
         </div>
-    </section>
-</div>
+        </x-slot:body>
+</x-pos.area-panel>

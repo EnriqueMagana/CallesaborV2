@@ -22,6 +22,8 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f6f5f8}
 .pos-logo-img{display:block;object-fit:contain}
 @keyframes pos-critical-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#pos-loading-spinner{animation-duration:1.5s}}
+html.dark-style body,html.dark-style .pos-root{background:#11131a;color:#f2f4f8}
+html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 </style>
 
 <!-- Fonts (misma que el tema) -->
@@ -39,11 +41,13 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#f6f5f8}
 <link rel="stylesheet" href="{{ asset('assets/css/pos.css') }}?v={{ filemtime(public_path('assets/css/pos.css')) }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}?v={{ filemtime(public_path('assets/css/extracted-ui.css')) }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/pos-modern.css') }}?v={{ filemtime(public_path('assets/css/pos-modern.css')) }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/dark-theme.css') }}?v={{ filemtime(public_path('assets/css/dark-theme.css')) }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}"/>
 
 <!-- Helpers -->
 <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
 <script src="{{ asset('assets/js/config.js') }}"></script>
+<script src="{{ asset('assets/js/theme.js') }}?v={{ filemtime(public_path('assets/js/theme.js')) }}"></script>
 
 @livewireStyles
 
