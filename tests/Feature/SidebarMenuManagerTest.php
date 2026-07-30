@@ -159,7 +159,9 @@ class SidebarMenuManagerTest extends TestCase
         $this->actingAs($owner)
             ->get(route('app.caja'))
             ->assertOk()
-            ->assertSee('sidebar-register-locked', false);
+            ->assertSee('sidebar-register-locked', false)
+            ->assertSee('sidebar-parent-chevron sidebar-register-lock-icon', false)
+            ->assertSee('disabled aria-label=', false);
 
         CashRegister::create([
             'name' => 'Caja principal',
