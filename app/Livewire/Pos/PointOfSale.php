@@ -563,8 +563,6 @@ class PointOfSale extends Component
         return Order::with(['items', 'payments'])
             ->where('cash_register_id', $cashRegisterId)
             ->where('type', 'delivery')
-            ->where('delivery_method', 'contra_entrega')
-            ->whereDoesntHave('payments')
             ->whereIn('status', ['pendiente', 'en_preparacion', 'lista'])
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
@@ -2680,7 +2678,9 @@ HTML;
         ])
             ->where('cash_register_id', $cashRegisterId)
             ->whereIn('status', ['pendiente', 'en_preparacion'])
-            ->where(fn ($query) => $query->where('type', 'mesa')->orWhere('source', 'kiosk'))
+            ->where(fn ($query) => $query
+                ->whereIn('type', ['mesa', 'delivery'])
+                ->orWhere('source', 'kiosk'))
             ->when($this->kitchenSearch, function ($q) {
                 $search = $this->kitchenSearch;
                 $q->where(function ($q) use ($search) {
@@ -2704,7 +2704,9 @@ HTML;
 
         return Order::where('cash_register_id', $cashRegisterId)
             ->whereIn('status', ['pendiente', 'en_preparacion'])
-            ->where(fn ($query) => $query->where('type', 'mesa')->orWhere('source', 'kiosk'))
+            ->where(fn ($query) => $query
+                ->whereIn('type', ['mesa', 'delivery'])
+                ->orWhere('source', 'kiosk'))
             ->count();
     }
 

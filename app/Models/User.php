@@ -76,4 +76,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(DeliveryAssignment::class, 'driver_id');
     }
+
+    public function deliverySettlements(): HasMany
+    {
+        return $this->hasMany(DeliverySettlement::class, 'driver_id');
+    }
 }

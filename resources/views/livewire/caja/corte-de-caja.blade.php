@@ -49,7 +49,7 @@
                     <div>
                         <span class="cash-cut-blockers__eyebrow">Cierre bloqueado</span>
                         <h2 id="cash-cut-blockers-title">Hay operaciones que todavía deben resolverse</h2>
-                        <p>Cobra o cancela los pedidos y libera las mesas pendientes antes de realizar el corte.</p>
+                        <p>Finaliza pedidos, asigna todos los delivery y libera las mesas.</p>
                     </div>
                     <button type="button" class="cash-cut-refresh" wire:click="$refresh" wire:loading.attr="disabled">
                         <span wire:loading.remove><i class="bx bx-refresh" aria-hidden="true"></i>Actualizar revisión</span>
@@ -72,7 +72,7 @@
                     </article>
                     <article>
                         <span class="is-other" aria-hidden="true"><i class="bx bx-receipt"></i></span>
-                        <div><small>Ventanilla y domicilio</small><strong>{{ $blockers['summary']['counter'] + $blockers['summary']['delivery'] }}</strong></div>
+                        <div><small>Delivery sin asignar</small><strong>{{ $blockers['summary']['unassigned_delivery'] }}</strong></div>
                     </article>
                 </div>
 
@@ -84,7 +84,7 @@
                     <section aria-labelledby="cash-cut-pending-orders-title">
                         <div class="cash-cut-blocker-section-title">
                             <div>
-                                <h3 id="cash-cut-pending-orders-title">Pedidos sin finalizar</h3>
+                                <h3 id="cash-cut-pending-orders-title">Pedidos por resolver</h3>
                                 <p>{{ $blockers['orders']->count() }} pedidos · ${{ number_format($blockers['unpaid_total'], 2) }} pendientes de conciliación</p>
                             </div>
                             <span>{{ $blockers['orders']->count() }}</span>
@@ -181,7 +181,7 @@
         @else
             <section class="cash-cut-ready" aria-live="polite">
                 <span aria-hidden="true"><i class="bx bx-check-shield"></i></span>
-                <div><strong>Operación lista para conciliar</strong><p>No hay pedidos sin pagar ni mesas pendientes en este turno.</p></div>
+                <div><strong>Operación lista para conciliar</strong><p>No hay pedidos sin asignar ni mesas pendientes.</p></div>
             </section>
         @endif
 
@@ -230,6 +230,33 @@
                                 @endforeach
                             </tbody>
                             <tfoot><tr><th>Total del turno</th><th class="text-end cash-column">${{ number_format($this->totalCashIn, 2) }}</th><th class="text-end">${{ number_format($cardTotal, 2) }}</th><th class="text-end">${{ number_format($transferTotal, 2) }}</th><th class="text-end">${{ number_format($salesTotal, 2) }}</th></tr></tfoot>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="app-card cash-cut-card">
+                    <header class="cash-cut-card__header">
+                        <div><span class="cash-cut-card__icon cash-cut-card__icon--info"><i class="bx bx-cycling"></i></span><div><h2>Arqueos de delivery</h2><p>Mini cortes completados por repartidor en este turno.</p></div></div>
+                        <span class="app-count-pill">{{ $this->deliverySettlements->count() }} arqueos</span>
+                    </header>
+                    <div class="table-responsive">
+                        <table class="table app-table cash-cut-table">
+                            <thead><tr><th>Repartidor</th><th class="text-end">Notas</th><th class="text-end">Efectivo esperado</th><th class="text-end">Efectivo entregado</th><th class="text-end">Transferencias</th><th class="text-end">Diferencia</th><th>Estado</th></tr></thead>
+                            <tbody>
+                                @forelse($this->deliverySettlements as $settlement)
+                                    <tr>
+                                        <td><strong>{{ $settlement->driver?->name ?? 'Usuario eliminado' }}</strong><small class="d-block app-muted">{{ $settlement->completed_at->format('g:i A') }}</small></td>
+                                        <td class="text-end">{{ $settlement->orders_count }}</td>
+                                        <td class="text-end cash-column">${{ number_format($settlement->expected_cash, 2) }}</td>
+                                        <td class="text-end cash-column">${{ number_format($settlement->declared_cash, 2) }}</td>
+                                        <td class="text-end">${{ number_format($settlement->transfer_total, 2) }}</td>
+                                        <td class="text-end {{ (float)$settlement->difference === 0.0 ? 'cash-cut-positive' : 'cash-cut-negative' }}">${{ number_format($settlement->difference, 2) }}</td>
+                                        <td><span class="app-status app-status--success"><i class="bx bx-check-double"></i>Arqueo completado</span></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7"><div class="cash-cut-empty"><span><i class="bx bx-cycling"></i></span><div><strong>Sin arqueos de delivery</strong><p>Este turno no tiene entregas conciliadas.</p></div></div></td></tr>
+                                @endforelse
+                            </tbody>
                         </table>
                     </div>
                 </section>

@@ -15,8 +15,6 @@ class DeliveryBoard extends Component
 {
     public string $tab = 'available';
 
-    public ?int $selectedOrderId = null;
-
     public ?int $confirmingDeliveryOrderId = null;
 
     public ?string $lastCheckedAt = null;
@@ -40,7 +38,7 @@ class DeliveryBoard extends Component
         }
 
         return Order::query()
-            ->with(['deliveryAssignment.driver'])
+            ->with(['deliveryAssignment.driver', 'payments', 'kioskTerminal', 'items'])
             ->where('cash_register_id', $this->activeRegister->id)
             ->where('type', 'delivery')
             ->where('status', '!=', 'cancelada')
@@ -48,46 +46,10 @@ class DeliveryBoard extends Component
             ->get();
     }
 
-    #[Computed]
-    public function selectedOrder(): ?Order
-    {
-        if (! $this->selectedOrderId || ! $this->activeRegister) {
-            return null;
-        }
-
-        return Order::query()
-            ->with([
-                'customer',
-                'payments',
-                'deliveryAssignment.driver',
-                'items.addons',
-                'items.ingredients',
-            ])
-            ->where('cash_register_id', $this->activeRegister->id)
-            ->where('type', 'delivery')
-            ->find($this->selectedOrderId);
-    }
-
     public function refreshBoard(): void
     {
         $this->clearComputedData();
         $this->lastCheckedAt = now()->format('H:i:s');
-    }
-
-    public function openOrder(int $orderId): void
-    {
-        $this->selectedOrderId = $orderId;
-        unset($this->selectedOrder);
-
-        abort_unless($this->selectedOrder, 404);
-    }
-
-    public function closeOrder(): void
-    {
-        $this->selectedOrderId = null;
-        $this->confirmingDeliveryOrderId = null;
-        unset($this->selectedOrder);
-        $this->dispatch('delivery-detail-closed');
     }
 
     public function takeOrder(int $orderId, DeliveryWorkflow $workflow): void
@@ -105,7 +67,31 @@ class DeliveryBoard extends Component
         $this->resetErrorBag('delivery');
         $this->tab = 'assigned';
         $this->clearComputedData();
-        $this->dispatch('notify', type: 'success', message: 'Pedido asignado. Ya aparece en tus entregas.');
+        $this->dispatch('notify', type: 'success', message: 'Pedido asignado a ti. Ya aparece en Mis pedidos.');
+    }
+
+    public function markPickedUp(int $orderId, DeliveryWorkflow $workflow): void
+    {
+        abort_unless($this->canCompleteOrders(), 403);
+
+        try {
+            $workflow->markPickedUp(
+                $this->currentRegisterOrder($orderId),
+                auth()->user(),
+                auth()->user()->can('gestionar delivery'),
+            );
+        } catch (ValidationException $exception) {
+            $this->addError('delivery', $exception->validator->errors()->first('delivery'));
+
+            return;
+        } catch (AuthorizationException) {
+            abort(403);
+        }
+
+        $this->resetErrorBag('delivery');
+        $this->tab = 'assigned';
+        $this->clearComputedData();
+        $this->dispatch('notify', type: 'success', message: 'Pedido recogido. Ya puedes iniciar la entrega.');
     }
 
     public function askToMarkDelivered(int $orderId): void
@@ -140,7 +126,6 @@ class DeliveryBoard extends Component
 
         $this->resetErrorBag('delivery');
         $this->confirmingDeliveryOrderId = null;
-        $this->selectedOrderId = null;
         $this->tab = 'delivered';
         $this->clearComputedData();
         $this->dispatch('notify', type: 'success', message: 'Entrega completada y registrada.');
@@ -178,7 +163,7 @@ class DeliveryBoard extends Component
 
     private function clearComputedData(): void
     {
-        unset($this->activeRegister, $this->orders, $this->selectedOrder);
+        unset($this->activeRegister, $this->orders);
     }
 
     public function render()

@@ -69,6 +69,49 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $dineIn->id, 'status' => 'lista']);
     }
 
+    public function test_paid_delivery_remains_operational_in_pos_and_can_advance_to_ready(): void
+    {
+        [$user, $register] = $this->posContext();
+        $delivery = Order::create([
+            'cash_register_id' => $register->id,
+            'customer_name' => 'Delivery transferencia',
+            'customer_phone' => '5512345678',
+            'customer_address' => 'Calle Prueba 15',
+            'served_by' => $user->id,
+            'type' => 'delivery',
+            'source' => 'pos',
+            'fulfillment' => 'delivery',
+            'delivery_method' => 'transferencia',
+            'status' => 'pendiente',
+            'subtotal' => 100,
+            'total' => 100,
+        ]);
+        OrderItem::create([
+            'order_id' => $delivery->id,
+            'product_name' => 'Pedido delivery',
+            'product_price' => 100,
+            'quantity' => 1,
+            'subtotal' => 100,
+        ]);
+        OrderPayment::create([
+            'order_id' => $delivery->id,
+            'method' => 'transferencia',
+            'amount' => 100,
+        ]);
+
+        $pos = Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->assertSee('Delivery transferencia')
+            ->assertSee('Imprimir cocina')
+            ->call('markKitchenReady', $delivery->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'en_preparacion']);
+
+        $pos->call('markKitchenReady', $delivery->id)->assertHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'lista']);
+    }
+
     public function test_paying_the_last_table_note_releases_the_table(): void
     {
         [$user, $register, $terminal, $mesa] = $this->posContext();

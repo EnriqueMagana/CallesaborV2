@@ -44,13 +44,25 @@
                 </div>
             </section>
 
+            <section class="delivery-detail__payment {{ $order->amount_to_collect > 0 ? 'is-collect' : 'is-paid' }}"
+                aria-label="Cobro del pedido">
+                <span><i class="bx {{ $order->amount_to_collect > 0 ? 'bx-money' : 'bx-check-shield' }}"
+                        aria-hidden="true"></i></span>
+                <div>
+                    <small>Método definido por ventanilla</small>
+                    <strong>{{ $order->delivery_payment_label }}</strong>
+                    <p>Esta información es de solo lectura para el repartidor.</p>
+                </div>
+                <b>${{ number_format($order->amount_to_collect > 0 ? $order->amount_to_collect : $order->total, 2) }}</b>
+            </section>
+
             <div class="delivery-detail__facts">
                 <div><small>Cliente</small><strong>{{ $order->display_name }}</strong></div>
                 <div><small>Teléfono</small><strong>{{ $order->customer_phone ?: 'Sin teléfono' }}</strong></div>
-                <div><small>Forma de cobro</small><strong>{{ $order->delivery_method_label }}</strong></div>
                 <div>
-                    <small>Origen</small><strong>{{ $order->source === 'kiosk' ? 'Kiosco' : 'Punto de venta' }}</strong>
+                    <small>Origen auditado</small><strong>{{ $order->origin_label }}</strong>
                 </div>
+                <div><small>Modalidad</small><strong>{{ $order->delivery_method_label }}</strong></div>
             </div>
 
             @if ($assignment)

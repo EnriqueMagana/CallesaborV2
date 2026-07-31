@@ -88,7 +88,7 @@
                     <option value="pendiente">Pendiente</option>
                     <option value="en_preparacion">En preparación</option>
                     <option value="lista">Listo</option>
-                    <option value="en_reparto">Delivery asignado</option>
+                    <option value="en_reparto">Recogido para entrega</option>
                     <option value="entregada">Entregado</option>
                     <option value="pagada">Pagada</option>
                     <option value="cancelada">Cancelada</option>

@@ -59,6 +59,7 @@
 @include('livewire.pos.partials.panels.mesas')
 @include('livewire.pos.partials.panels.table-tracking')
 @include('livewire.pos.partials.panels.pickup')
+@include('livewire.pos.partials.panels.delivery')
 @include('livewire.pos.partials.panels.kitchen')
 @include('livewire.pos.partials.panels.reprint')
 

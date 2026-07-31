@@ -16,13 +16,13 @@ class CashRegister extends Model
     ];
 
     protected $casts = [
-        'initial_amount'    => 'decimal:2',
-        'final_amount'      => 'decimal:2',
-        'declared_amount'   => 'decimal:2',
+        'initial_amount' => 'decimal:2',
+        'final_amount' => 'decimal:2',
+        'declared_amount' => 'decimal:2',
         'difference_amount' => 'decimal:2',
-        'is_open'           => 'boolean',
-        'opened_at'         => 'datetime',
-        'closed_at'         => 'datetime',
+        'is_open' => 'boolean',
+        'opened_at' => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     public function opener(): BelongsTo
@@ -48,5 +48,10 @@ class CashRegister extends Model
     public function cuts(): HasMany
     {
         return $this->hasMany(CashRegisterCut::class);
+    }
+
+    public function deliverySettlements(): HasMany
+    {
+        return $this->hasMany(DeliverySettlement::class);
     }
 }

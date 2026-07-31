@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -122,7 +123,7 @@ class Order extends Model
             'pendiente' => 'Pendiente',
             'en_preparacion' => 'En preparación',
             'lista' => 'Listo',
-            'en_reparto' => 'Delivery asignado',
+            'en_reparto' => 'Recogido para entrega',
             'entregada' => 'Entregado',
             'pagada' => 'Pagada',
             'cancelada' => 'Cancelada',
@@ -160,5 +161,49 @@ class Order extends Model
             'transferencia' => 'Transferencia',
             default => '—',
         };
+    }
+
+    public function getOriginLabelAttribute(): string
+    {
+        if ($this->source === 'kiosk') {
+            return $this->kioskTerminal?->name
+                ? 'Kiosco · '.$this->kioskTerminal->name
+                : 'Kiosco';
+        }
+
+        return 'Ventanilla · POS';
+    }
+
+    public function getAmountToCollectAttribute(): float
+    {
+        if ($this->delivery_method !== 'contra_entrega') {
+            return 0;
+        }
+
+        return max(0, round((float) $this->total - (float) $this->payments->sum('amount'), 2));
+    }
+
+    public function getDeliveryPaymentLabelAttribute(): string
+    {
+        if ($this->delivery_method === 'contra_entrega') {
+            return $this->amount_to_collect > 0
+                ? 'Cobrar $'.number_format($this->amount_to_collect, 2).' en efectivo'
+                : 'Efectivo cobrado';
+        }
+
+        if ($this->payments->contains('method', 'transferencia') || $this->delivery_method === 'transferencia') {
+            return 'Transferencia confirmada';
+        }
+
+        if ($this->payments->contains('method', 'tarjeta') || $this->delivery_method === 'tarjeta') {
+            return 'Pagado con tarjeta';
+        }
+
+        return $this->payments->isNotEmpty() ? 'Pagado en sucursal' : 'Pago por confirmar';
+    }
+
+    public function scopeFinalizedForAccounting(Builder $query): Builder
+    {
+        return $query->where('status', 'pagada');
     }
 }
