@@ -23,8 +23,7 @@ class ThermalTicketRenderer
         string $type,
         ?string $printArea = null,
         bool $autoPrint = true,
-    ): string
-    {
+    ): string {
         $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'customer', 'mesa.area']);
 
         $items = $order->items->filter(fn ($item) => ! (bool) $item->is_cancelled);
@@ -66,7 +65,8 @@ class ThermalTicketRenderer
             'date' => $order->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
             'customer' => $order->display_name,
             'served_by' => $order->seller?->name,
-            'table' => $order->table_identifier,
+            'table' => $order->table_identifier ?: $order->mesa?->display_name,
+            'area' => $order->mesa?->area?->name ?: $printArea,
             'notes' => $order->notes,
             'items' => collect($items)->map(fn ($item) => [
                 'name' => $item->product_name,
@@ -272,11 +272,11 @@ class ThermalTicketRenderer
             'customer' => 'Cliente de ejemplo',
             'served_by' => 'Usuario de caja',
             'cashier' => 'Usuario de caja',
-            'table' => $type === 'customer' ? 'Mesa 4' : null,
-            'area' => 'Salón',
-            'notes' => 'Sin cebolla',
+            'table' => in_array($type, ['customer', 'kitchen_area'], true) ? 'Mesa 4' : null,
+            'area' => $type === 'kitchen_area' ? 'Cocina' : 'Salón',
+            'notes' => $type === 'kitchen_area' ? 'Entregar todos los platillos juntos.' : 'Sin cebolla',
             'items' => [
-                ['name' => 'Hamburguesa especial', 'quantity' => 1, 'subtotal' => 145, 'modifiers' => [['name' => '+ Queso extra', 'price' => 15]], 'notes' => null],
+                ['name' => 'Hamburguesa especial', 'quantity' => 1, 'subtotal' => 145, 'modifiers' => [['name' => '+ Queso extra', 'price' => 15]], 'notes' => $type === 'kitchen_area' ? 'Sin cebolla; término medio.' : null],
                 ['name' => 'Agua fresca', 'quantity' => 2, 'subtotal' => 70, 'modifiers' => [], 'notes' => null],
             ],
             'payments' => [['label' => 'Efectivo', 'amount' => 215, 'change' => 0]],
@@ -366,7 +366,7 @@ class ThermalTicketRenderer
 
     private function qrDataUri(string $value): string
     {
-        $renderer = new ImageRenderer(new RendererStyle(180, 1), new SvgImageBackEnd());
+        $renderer = new ImageRenderer(new RendererStyle(180, 1), new SvgImageBackEnd);
         $svg = (new Writer($renderer))->writeString($value);
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);

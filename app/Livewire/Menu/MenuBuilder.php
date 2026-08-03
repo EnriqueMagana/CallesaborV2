@@ -194,25 +194,25 @@ class MenuBuilder extends Component
         return PrintArea::withCount('categories')->orderBy('sort_order')->orderBy('name')->get();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function allCategories()
     {
         return Category::orderBy('name')->get();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function allAddonGroups()
     {
-        return AddonGroup::orderBy('name')->get();
+        return AddonGroup::withCount('addons')->orderBy('name')->get();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function allIngredients()
     {
         return Ingredient::where('is_active', true)->orderBy('name')->get();
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function allPrintAreas()
     {
         return PrintArea::orderBy('name')->get();
@@ -263,7 +263,7 @@ class MenuBuilder extends Component
             'pName' => 'required|string|max:120',
             'pPrice' => 'required|numeric|min:0',
             'pCategoryId' => 'nullable|exists:categories,id',
-            'pImage' => 'nullable|image|max:2048',
+            'pImage' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:6144',
             'pMaxAddons' => 'nullable|integer|min:1',
         ]);
 
@@ -579,7 +579,7 @@ class MenuBuilder extends Component
         $this->validate([
             'aName' => 'required|string|max:80',
             'aExtraPrice' => 'required|numeric|min:0',
-            'aImage' => 'nullable|image|max:1024',
+            'aImage' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:6144',
         ]);
 
         $data = [
@@ -662,7 +662,7 @@ class MenuBuilder extends Component
         $this->validate([
             'ingName' => 'required|string|max:100',
             'ingExtraPrice' => 'required|numeric|min:0',
-            'ingImage' => 'nullable|image|max:1024',
+            'ingImage' => 'nullable|image|mimes:jpg,jpeg,png,gif,webp|max:6144',
         ]);
 
         $data = [
@@ -742,7 +742,7 @@ class MenuBuilder extends Component
         $this->piMinIngredients = (string) ($product->min_ingredients ?? 0);
         $this->piMaxIngredients = (string) ($product->max_ingredients ?? 6);
         $this->showProductIngredientsModal = true;
-        unset($this->piProduct, $this->allIngredients);
+        unset($this->piProduct);
     }
 
     public function saveProductIngredients(): void

@@ -193,6 +193,12 @@
                         <span class="badge {{ $badgeMap[$r->status] ?? 'bg-label-secondary' }} mb-1">
                             {{ $r->status_label }}
                         </span>
+                        @if($r->source === 'public')
+                            <span class="badge bg-label-info mb-1"><i class="bx bx-globe me-1"></i>Solicitud web</span>
+                        @endif
+                        @if($r->is_waitlist)
+                            <span class="badge bg-label-warning mb-1"><i class="bx bx-hourglass me-1"></i>Lista de espera</span>
+                        @endif
                         <h5 class="modal-title fw-bold mb-0">{{ $r->customer_name }}</h5>
                     </div>
                     <button wire:click="closePanel" type="button" class="btn-close ms-auto" aria-label="Cerrar"></button>
@@ -204,6 +210,12 @@
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bx bx-phone text-muted"></i>
                                 <span>{{ $r->customer_phone }}</span>
+                            </div>
+                        @endif
+                        @if($r->customer_email)
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bx bx-envelope text-muted"></i>
+                                <span>{{ $r->customer_email }}</span>
                             </div>
                         @endif
                         <div class="d-flex align-items-center gap-2">
@@ -218,6 +230,12 @@
                             <i class="bx bx-group text-muted"></i>
                             <span>{{ $r->guests }} {{ $r->guests === 1 ? 'persona' : 'personas' }}</span>
                         </div>
+                        @if($r->occasion)
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bx bx-party text-muted"></i>
+                                <span>{{ $r->occasion }}</span>
+                            </div>
+                        @endif
                         @if($r->notes)
                             <div class="d-flex align-items-start gap-2">
                                 <i class="bx bx-note text-muted mt-1"></i>

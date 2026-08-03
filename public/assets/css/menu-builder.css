@@ -53,6 +53,25 @@
 .menu-color-input { width: 30px !important; height: 30px !important; min-height: 30px !important; padding: 0; }
 .menu-soft-panel { background: #f8f9ff; }
 .menu-upload-frame { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+.menu-upload-frame__skeleton {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    overflow: hidden;
+    border: 1px solid var(--app-border);
+    border-radius: .65rem;
+    background: #ebe8f0;
+}
+.menu-upload-frame__skeleton::after,
+.menu-image-uploader__skeleton::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.75) 48%, transparent 76%);
+    animation: menu-image-shimmer 1.2s infinite;
+    transform: translateX(-100%);
+}
 .menu-upload-trigger {
     width: 80px;
     height: 80px;
@@ -64,6 +83,86 @@
 }
 .menu-section-divider { border-bottom: 1px solid #eaecf0; }
 .menu-clickable { cursor: pointer; }
+
+/* Product image uploader */
+.menu-image-uploader {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid var(--app-border);
+    border-radius: 14px;
+    background: #fcfbfe;
+}
+.menu-image-uploader__preview {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border: 1px dashed #c9c3d5;
+    border-radius: 12px;
+    background: #ece9f1;
+}
+.menu-image-uploader__content,
+.menu-image-uploader__content > img {
+    width: 100%;
+    height: 100%;
+}
+.menu-image-uploader__content > img {
+    display: block;
+    object-fit: cover;
+}
+.menu-image-uploader__content > span {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 5px;
+    color: var(--app-muted);
+}
+.menu-image-uploader__content > span i { color: var(--app-primary); font-size: 30px; }
+.menu-image-uploader__content > span small { font-size: .68rem; }
+.menu-image-uploader__skeleton {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    overflow: hidden;
+    background: #ebe8f0;
+}
+.menu-image-uploader__controls {
+    align-self: center;
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+}
+.menu-image-uploader__controls > input[type=file] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+}
+.menu-image-uploader__button {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 13px;
+    color: var(--app-primary-dark);
+    border: 1px solid rgba(105,86,232,.35);
+    border-radius: 10px;
+    background: var(--app-primary-soft);
+    cursor: pointer;
+    font-size: .72rem;
+    font-weight: 750;
+}
+.menu-image-uploader__button:hover { border-color: var(--app-primary); background: #ebe7ff; }
+.menu-image-uploader__controls > input:focus-visible + small,
+.menu-image-uploader__controls:focus-within .menu-image-uploader__button { outline: 3px solid rgba(105,86,232,.18); outline-offset: 2px; }
+.menu-image-uploader__controls > small { color: var(--app-muted); font-size: .66rem; line-height: 1.45; }
+.menu-image-uploader__status { display: none; align-items: center; gap: 6px; color: var(--app-primary-dark); font-size: .68rem; }
+@keyframes menu-image-shimmer { to { transform: translateX(100%); } }
 
 /* Ingredient image preview */
 .menu-ingredient-upload { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; margin-bottom: 18px; padding: 15px; border: 1px solid var(--app-border); border-radius: 14px; background: #fcfbfe; }
@@ -83,4 +182,11 @@
     .menu-builder-page .modal-dialog { margin: 0.75rem; }
     .menu-ingredient-upload { grid-template-columns: 1fr; }
     .menu-ingredient-upload__preview { max-width: 300px; }
+    .menu-image-uploader { grid-template-columns: 1fr; }
+    .menu-image-uploader__preview { max-width: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .menu-upload-frame__skeleton::after,
+    .menu-image-uploader__skeleton::after { animation: none; }
 }

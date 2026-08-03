@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 
 class BusinessSetting extends Model
@@ -10,6 +12,8 @@ class BusinessSetting extends Model
 
     protected $casts = [
         'business_hours' => 'array',
+        'gallery_paths' => 'array',
+        'featured_product_ids' => 'array',
     ];
 
     public const DEFAULT_HOURS = [
@@ -33,7 +37,126 @@ class BusinessSetting extends Model
 
     public function getFullAddressAttribute(): string
     {
+        if (substr_count((string) $this->address, ',') >= 2) {
+            return trim($this->address);
+        }
+
         return collect([$this->address, $this->city, $this->state, $this->postal_code])
             ->filter()->implode(', ');
+    }
+
+    public function getMapLinkAttribute(): ?string
+    {
+        if ($this->maps_url) {
+            return $this->maps_url;
+        }
+
+        if (! $this->full_address) {
+            return null;
+        }
+
+        return 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($this->full_address);
+    }
+
+    public function galleryItems(): array
+    {
+        return collect($this->gallery_paths ?? [])
+            ->map(function (mixed $item): ?array {
+                if (is_string($item)) {
+                    return ['path' => $item, 'caption' => ''];
+                }
+
+                if (! is_array($item) || ! is_string($item['path'] ?? null)) {
+                    return null;
+                }
+
+                return [
+                    'path' => $item['path'],
+                    'caption' => is_string($item['caption'] ?? null) ? trim($item['caption']) : '',
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    public function openingStatus(?CarbonInterface $moment = null): array
+    {
+        $now = $moment?->copy() ?? now();
+        $hours = collect($this->business_hours ?: self::DEFAULT_HOURS)->keyBy('key');
+
+        for ($offset = -1; $offset <= 7; $offset++) {
+            $date = $now->copy()->startOfDay()->addDays($offset);
+            $day = $hours->get(strtolower($date->englishDayOfWeek));
+
+            if (! ($day['enabled'] ?? false)) {
+                continue;
+            }
+
+            $opens = $date->copy()->setTimeFromTimeString($day['opens']);
+            $closes = $date->copy()->setTimeFromTimeString($day['closes']);
+
+            if ($closes->lessThanOrEqualTo($opens)) {
+                $closes->addDay();
+            }
+
+            if ($now->betweenIncluded($opens, $closes)) {
+                return [
+                    'is_open' => true,
+                    'label' => 'Abierto ahora',
+                    'detail' => 'Cierra a las '.$closes->format('H:i'),
+                ];
+            }
+
+            if ($opens->isAfter($now)) {
+                return [
+                    'is_open' => false,
+                    'label' => 'Cerrado ahora',
+                    'detail' => ($opens->isToday() ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('H:i'),
+                ];
+            }
+        }
+
+        return ['is_open' => false, 'label' => 'Horario no disponible', 'detail' => 'Consulta nuestros horarios'];
+    }
+
+    public function reservationSlots(CarbonInterface|string $date, int $intervalMinutes = 30): array
+    {
+        $target = $date instanceof CarbonInterface ? $date->copy()->startOfDay() : Carbon::parse($date)->startOfDay();
+
+        if ($target->isBefore(now()->startOfDay()) || $target->isAfter(now()->addDays(90)->endOfDay())) {
+            return [];
+        }
+
+        $hours = collect($this->business_hours ?: self::DEFAULT_HOURS)->keyBy('key');
+        $slots = collect();
+
+        foreach ([$target->copy()->subDay(), $target->copy()] as $serviceDate) {
+            $day = $hours->get(strtolower($serviceDate->englishDayOfWeek));
+
+            if (! ($day['enabled'] ?? false)) {
+                continue;
+            }
+
+            $opens = $serviceDate->copy()->setTimeFromTimeString($day['opens']);
+            $closes = $serviceDate->copy()->setTimeFromTimeString($day['closes']);
+
+            if ($closes->lessThanOrEqualTo($opens)) {
+                $closes->addDay();
+            }
+
+            for ($slot = $opens->copy(); $slot->lessThan($closes); $slot->addMinutes($intervalMinutes)) {
+                if ($slot->isSameDay($target) && $slot->greaterThanOrEqualTo(now()->addMinutes(30))) {
+                    $slots->push($slot->format('H:i'));
+                }
+            }
+        }
+
+        return $slots->unique()->sort()->values()->all();
+    }
+
+    public function acceptsReservationAt(CarbonInterface $moment): bool
+    {
+        return in_array($moment->format('H:i'), $this->reservationSlots($moment), true);
     }
 }

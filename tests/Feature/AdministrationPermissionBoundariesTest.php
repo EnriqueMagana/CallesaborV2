@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -73,6 +75,26 @@ class AdministrationPermissionBoundariesTest extends TestCase
         Livewire::actingAs($creator)->test(MenuBuilder::class)
             ->call('confirmDeleteProduct', $existing->id)
             ->assertForbidden();
+    }
+
+    public function test_product_creator_can_upload_a_large_supported_image_with_preview_feedback(): void
+    {
+        Storage::fake('public');
+        $creator = $this->employee(['ver menu', 'crear platos']);
+        $image = UploadedFile::fake()->image('producto.jpg', 1600, 1200)->size(3072);
+
+        Livewire::actingAs($creator)->test(MenuBuilder::class)
+            ->call('openProductModal')
+            ->set('pName', 'Producto con imagen')
+            ->set('pPrice', '120.00')
+            ->set('pImage', $image)
+            ->assertSee('Imagen lista para guardar')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $product = Product::where('name', 'Producto con imagen')->firstOrFail();
+        $this->assertStringEndsWith('.webp', $product->image);
+        Storage::disk('public')->assertExists($product->image);
     }
 
     public function test_menu_specialists_are_restricted_to_their_assigned_catalog_area(): void
