@@ -2,10 +2,13 @@
     @php
         $order = $this->order;
         $isDelivery = $order->fulfillment === 'delivery' || $order->type === 'delivery';
+        $effectiveStatus = $isDelivery && $order->deliveryAssignment?->status === 'entregado'
+            ? 'entregada'
+            : $order->status;
         $states = $isDelivery
             ? ['pendiente' => 1, 'en_preparacion' => 2, 'lista' => 3, 'pagada' => 3, 'en_reparto' => 4, 'entregada' => 5, 'cancelada' => 0]
             : ['pendiente' => 1, 'en_preparacion' => 2, 'lista' => 3, 'pagada' => 3, 'cancelada' => 0];
-        $current = $states[$order->status] ?? 1;
+        $current = $states[$effectiveStatus] ?? 1;
         $driverFirstName = str($order->deliveryAssignment?->driver?->name)->before(' ')->toString();
     @endphp
 
@@ -15,24 +18,24 @@
     </header>
 
     <section class="kiosk-tracking">
-        <div class="kiosk-tracking-hero {{ $order->status === 'cancelada' ? 'is-cancelled' : '' }} {{ $isDelivery ? 'is-delivery' : '' }}">
+        <div class="kiosk-tracking-hero {{ $effectiveStatus === 'cancelada' ? 'is-cancelled' : '' }} {{ $isDelivery ? 'is-delivery' : '' }}">
             <span class="kiosk-eyebrow">Pedido #{{ $order->display_folio }}</span>
-            @if($order->status === 'cancelada')
+            @if($effectiveStatus === 'cancelada')
                 <div class="kiosk-tracking-icon"><i class="bx bx-x"></i></div><h1>Pedido cancelado</h1><p>Comunícate con el restaurante si necesitas ayuda.</p>
-            @elseif($order->status === 'entregada')
+            @elseif($effectiveStatus === 'entregada')
                 <div class="kiosk-tracking-icon"><i class="bx bx-home-heart"></i></div><h1>Pedido entregado</h1><p>Gracias por elegirnos. Esperamos que disfrutes tu pedido.</p>
-            @elseif($order->status === 'en_reparto')
+            @elseif($effectiveStatus === 'en_reparto')
                 <div class="kiosk-tracking-icon"><i class="bx bx-cycling"></i></div><h1>Tu pedido va en camino</h1><p>{{ $driverFirstName ? $driverFirstName.' lleva tu pedido al domicilio indicado.' : 'El repartidor lleva tu pedido al domicilio indicado.' }}</p>
-            @elseif(in_array($order->status, ['lista', 'pagada'], true))
+            @elseif(in_array($effectiveStatus, ['lista', 'pagada'], true))
                 <div class="kiosk-tracking-icon"><i class="bx bx-check"></i></div><h1>{{ $isDelivery ? '¡Tu pedido está listo para salir!' : '¡Tu pedido está listo!' }}</h1><p>{{ $isDelivery ? 'En breve un repartidor tomará tu entrega.' : $order->customer_name.', acércate al mostrador con tu número.' }}</p>
-            @elseif($order->status === 'en_preparacion')
+            @elseif($effectiveStatus === 'en_preparacion')
                 <div class="kiosk-tracking-icon"><i class="bx bx-bowl-hot"></i></div><h1>Estamos preparando tu pedido</h1><p>En cocina están trabajando para tenerlo listo muy pronto.</p>
             @else
                 <div class="kiosk-tracking-icon"><i class="bx bx-time-five"></i></div><h1>Pedido recibido</h1><p>En breve comenzaremos a prepararlo.</p>
             @endif
         </div>
 
-        @if($order->status !== 'cancelada')
+        @if($effectiveStatus !== 'cancelada')
             <div class="kiosk-status-timeline {{ $isDelivery ? 'is-delivery' : '' }}" aria-label="Estado del pedido">
                 @php
                     $timeline = $isDelivery

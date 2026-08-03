@@ -10,11 +10,16 @@ use App\Models\OrderItem;
 use App\Models\OrderItemAddon;
 use App\Models\OrderItemIngredient;
 use App\Models\Product;
+use App\Services\MesaServiceManager;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class MesaOrden extends Component
 {
+    private const MAX_ITEM_QUANTITY = 99;
+    private const MAX_ITEM_NOTES_LENGTH = 500;
+
     public int    $mesaId;
     public string $search         = '';
     public ?int   $categoryFilter = null;
@@ -66,11 +71,20 @@ class MesaOrden extends Component
         ])->findOrFail($this->mesaId);
     }
 
-    #[Computed]
+    #[Computed(persist: true, seconds: 60)]
     public function categories()
     {
         return Category::where('is_active', true)
-            ->with(['products' => fn($q) => $q->where('is_active', true)->orderBy('sort_order')])
+            ->select(['id', 'name', 'icon', 'sort_order'])
+            ->with(['products' => fn($q) => $q
+                ->where('is_active', true)
+                ->select([
+                    'id', 'category_id', 'name', 'description', 'image', 'price',
+                    'is_customizable', 'max_addons', 'min_ingredients',
+                    'max_ingredients', 'sort_order',
+                ])
+                ->withCount(['addonGroups', 'ingredients'])
+                ->orderBy('sort_order')])
             ->orderBy('sort_order')
             ->get();
     }
@@ -103,8 +117,26 @@ class MesaOrden extends Component
         if (!$this->customizingProduct) return null;
         return Product::with([
             'addonGroups' => fn($q) => $q->where('is_active', true)
-                ->with(['addons' => fn($q) => $q->where('is_active', true)->orderBy('sort_order')]),
-            'ingredients' => fn($q) => $q->where('is_active', true)->orderBy('sort_order'),
+                ->select([
+                    'addon_groups.id', 'addon_groups.name', 'addon_groups.description',
+                    'addon_groups.is_required', 'addon_groups.min_selections',
+                    'addon_groups.max_selections', 'addon_groups.sort_order',
+                ])
+                ->with(['addons' => fn($q) => $q
+                    ->where('is_active', true)
+                    ->select([
+                        'id', 'addon_group_id', 'name', 'description',
+                        'image', 'extra_price', 'sort_order',
+                    ])
+                    ->orderBy('sort_order')]),
+            'ingredients' => fn($q) => $q
+                ->where('is_active', true)
+                ->select([
+                    'ingredients.id', 'ingredients.name', 'ingredients.description',
+                    'ingredients.image', 'ingredients.extra_price',
+                    'ingredients.sort_order',
+                ])
+                ->orderBy('ingredients.sort_order'),
         ])->find($this->customizingProduct);
     }
 
@@ -128,16 +160,17 @@ class MesaOrden extends Component
 
     public function openCustomize(int $productId): void
     {
-        $product = Product::with([
-            'addonGroups.addons',
-            'ingredients',
-        ])->find($productId);
+        $product = Product::query()
+            ->where('is_active', true)
+            ->select(['id', 'name', 'price', 'image', 'is_customizable'])
+            ->withCount(['addonGroups', 'ingredients'])
+            ->find($productId);
 
         if (!$product) return;
 
         // If product has no customizations, add directly
-        if (!$product->is_customizable && $product->addonGroups->isEmpty() && $product->ingredients->isEmpty()) {
-            $this->addDirect($productId, $product->name, (float) $product->price);
+        if (!$product->is_customizable && $product->addon_groups_count === 0 && $product->ingredients_count === 0) {
+            $this->addProductToCart($product);
             return;
         }
 
@@ -150,6 +183,24 @@ class MesaOrden extends Component
         $this->showCustomize       = true;
         unset($this->customizingProductModel);
         $this->preselectRequiredSingletons();
+    }
+
+    public function closeCustomize(): void
+    {
+        $this->resetErrorBag();
+        $this->resetCustomizationState();
+    }
+
+    private function resetCustomizationState(): void
+    {
+        $this->showCustomize = false;
+        $this->customizingProduct = null;
+        $this->editingCartId = null;
+        $this->selectedAddons = [];
+        $this->selectedIngredients = [];
+        $this->itemNotes = '';
+        $this->itemQty = 1;
+        unset($this->customizingProductModel);
     }
 
     public function editCartItem(string $cartId): void
@@ -169,12 +220,29 @@ class MesaOrden extends Component
         unset($this->customizingProductModel);
     }
 
-    public function addDirect(int $productId, string $name, float $price): void
+    public function addDirect(int $productId): void
     {
-        $cartId = $productId . '_plain';
+        $product = Product::query()
+            ->where('is_active', true)
+            ->select(['id', 'name', 'price', 'image'])
+            ->find($productId);
+
+        if ($product) {
+            $this->addProductToCart($product);
+        }
+    }
+
+    private function addProductToCart(Product $product): void
+    {
+        $cartId = $product->id . '_plain';
         $found  = false;
         foreach ($this->cart as &$line) {
             if ($line['cart_id'] === $cartId) {
+                if ($line['qty'] >= self::MAX_ITEM_QUANTITY) {
+                    $this->addError('cart', 'La cantidad máxima por producto es 99.');
+                    unset($line);
+                    return;
+                }
                 $line['qty']++;
                 $found = true;
                 break;
@@ -185,10 +253,11 @@ class MesaOrden extends Component
         if (!$found) {
             $this->cart[] = [
                 'cart_id'    => $cartId,
-                'product_id' => $productId,
-                'name'       => $name,
-                'price'      => $price,
-                'unit_total' => $price,
+                'product_id' => $product->id,
+                'name'       => $product->name,
+                'image'      => $product->image,
+                'price'      => (float) $product->price,
+                'unit_total' => (float) $product->price,
                 'qty'        => 1,
                 'notes'      => '',
                 'addons'     => [],
@@ -197,6 +266,7 @@ class MesaOrden extends Component
         }
 
         unset($this->cartTotal, $this->cartCount);
+        $this->resetErrorBag('cart');
     }
 
     public function toggleAddon(int $addonId): void
@@ -287,10 +357,64 @@ class MesaOrden extends Component
         $this->resetErrorBag('ingredients');
     }
 
-    public function confirmCustomize(): void
+    public function confirmCustomize(
+        ?array $addonIds = null,
+        ?array $ingredientQuantities = null,
+        ?int $quantity = null,
+        ?string $notes = null,
+    ): void
     {
         $product = $this->customizingProductModel;
         if (!$product) return;
+
+        $this->resetErrorBag();
+
+        if ($addonIds !== null) {
+            $requestedAddonIds = collect($addonIds)
+                ->filter(fn($id) => is_numeric($id))
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values();
+            $allowedAddonIds = $product->addonGroups->flatMap->addons->pluck('id');
+
+            if ($requestedAddonIds->diff($allowedAddonIds)->isNotEmpty()) {
+                $this->addError('addons_general', 'La selección contiene complementos no disponibles.');
+                return;
+            }
+
+            $this->selectedAddons = $requestedAddonIds
+                ->mapWithKeys(fn($id) => [$id => true])
+                ->all();
+        }
+
+        if ($ingredientQuantities !== null) {
+            $allowedIngredientIds = $product->ingredients->pluck('id')->map(fn($id) => (int) $id);
+            $requestedIngredientIds = collect(array_keys($ingredientQuantities))
+                ->filter(fn($id) => is_numeric($id))
+                ->map(fn($id) => (int) $id);
+
+            if ($requestedIngredientIds->diff($allowedIngredientIds)->isNotEmpty()) {
+                $this->addError('ingredients', 'La selección contiene ingredientes no disponibles.');
+                return;
+            }
+
+            $this->selectedIngredients = collect($ingredientQuantities)
+                ->filter(fn($qty, $id) => is_numeric($id) && is_numeric($qty) && (int) $qty > 0)
+                ->mapWithKeys(fn($qty, $id) => [(int) $id => (int) $qty])
+                ->all();
+        }
+
+        if ($quantity !== null) {
+            $this->itemQty = $quantity;
+        }
+        if ($notes !== null) {
+            $this->itemNotes = trim($notes);
+        }
+
+        if (mb_strlen($this->itemNotes) > self::MAX_ITEM_NOTES_LENGTH) {
+            $this->addError('itemNotes', 'La nota no puede superar 500 caracteres.');
+            return;
+        }
 
         // Validate required addon groups
         foreach ($product->addonGroups as $group) {
@@ -310,6 +434,13 @@ class MesaOrden extends Component
             }
         }
 
+        $maximumAddons = (int) ($product->max_addons ?? 0);
+        $totalAddons = collect($this->selectedAddons)->filter()->count();
+        if ($maximumAddons > 0 && $totalAddons > $maximumAddons) {
+            $this->addError('addons_general', "Este producto permite máximo {$maximumAddons} complemento(s).");
+            return;
+        }
+
         $totalIngredients = array_sum($this->selectedIngredients);
         $minimumIngredients = (int) ($product->min_ingredients ?? 0);
         $maximumIngredients = (int) ($product->max_ingredients ?? 0);
@@ -322,7 +453,7 @@ class MesaOrden extends Component
             return;
         }
 
-        if ($this->itemQty < 1 || $this->itemQty > 99) {
+        if ($this->itemQty < 1 || $this->itemQty > self::MAX_ITEM_QUANTITY) {
             $this->addError('itemQty', 'La cantidad debe estar entre 1 y 99.');
             return;
         }
@@ -376,6 +507,7 @@ class MesaOrden extends Component
                 'cart_id'    => $cartId,
                 'product_id' => $product->id,
                 'name'       => $product->name,
+                'image'      => $product->image,
                 'price'      => (float) $product->price,
                 'unit_total' => $unitTotal,
                 'qty'        => $this->itemQty,
@@ -385,14 +517,22 @@ class MesaOrden extends Component
             ];
         }
 
-        $this->showCustomize = false;
+        $this->resetCustomizationState();
         unset($this->cartTotal, $this->cartCount);
     }
 
     public function incrementQty(string $cartId): void
     {
         foreach ($this->cart as &$line) {
-            if ($line['cart_id'] === $cartId) { $line['qty']++; break; }
+            if ($line['cart_id'] === $cartId) {
+                if ($line['qty'] >= self::MAX_ITEM_QUANTITY) {
+                    $this->addError('cart', 'La cantidad máxima por producto es 99.');
+                    break;
+                }
+                $line['qty']++;
+                $this->resetErrorBag('cart');
+                break;
+            }
         }
         unset($line);
         unset($this->cartTotal, $this->cartCount);
@@ -430,6 +570,19 @@ class MesaOrden extends Component
             return;
         }
 
+        if (mb_strlen($this->orderNotes) > self::MAX_ITEM_NOTES_LENGTH) {
+            $this->addError('cart', 'La nota general no puede superar 500 caracteres.');
+            return;
+        }
+
+        foreach ($this->cart as $line) {
+            $quantity = (int) ($line['qty'] ?? 0);
+            if ($quantity < 1 || $quantity > self::MAX_ITEM_QUANTITY) {
+                $this->addError('cart', 'Cada producto debe tener una cantidad entre 1 y 99.');
+                return;
+            }
+        }
+
         $register = CashRegister::where('is_open', true)->first();
         if (!$register) {
             $this->addError('cart', 'No hay caja abierta. Pide al cajero que abra la caja primero.');
@@ -438,47 +591,74 @@ class MesaOrden extends Component
 
         $total = $this->cartTotal;
 
-        $order = Order::create([
-            'cash_register_id' => $register->id,
-            'mesa_id'          => $this->mesaId,
-            'served_by'        => auth()->id(),
-            'type'             => 'mesa',
-            'status'           => 'pendiente',
-            'subtotal'         => $total,
-            'total'            => $total,
-            'notes'            => $this->orderNotes ?: null,
-        ]);
+        $order = DB::transaction(function () use ($register, $total) {
+            $mesa = Mesa::findOrFail($this->mesaId);
+            $service = app(MesaServiceManager::class)->resolveOrCreate(
+                $mesa,
+                $register,
+                auth()->id()
+            );
 
-        foreach ($this->cart as $line) {
-            $item = OrderItem::create([
-                'order_id'      => $order->id,
-                'product_id'    => $line['product_id'],
-                'product_name'  => $line['name'],
-                'product_price' => $line['price'],
-                'quantity'      => $line['qty'],
-                'subtotal'      => round($line['unit_total'] * $line['qty'], 2),
-                'notes'         => $line['notes'] ?: null,
+            $order = Order::create([
+                'cash_register_id' => $register->id,
+                'mesa_id'          => $this->mesaId,
+                'mesa_service_id'  => $service->id,
+                'served_by'        => auth()->id(),
+                'type'             => 'mesa',
+                'status'           => 'pendiente',
+                'subtotal'         => $total,
+                'total'            => $total,
+                'notes'            => $this->orderNotes ?: null,
             ]);
 
-            foreach ($line['addons'] ?? [] as $addon) {
-                OrderItemAddon::create([
-                    'order_item_id' => $item->id,
-                    'addon_id'      => $addon['addon_id'],
-                    'addon_name'    => $addon['addon_name'],
-                    'extra_price'   => $addon['extra_price'],
+            $addonRows = [];
+            $ingredientRows = [];
+            $timestamp = now();
+
+            foreach ($this->cart as $line) {
+                $item = OrderItem::create([
+                    'order_id'      => $order->id,
+                    'product_id'    => $line['product_id'],
+                    'product_name'  => $line['name'],
+                    'product_price' => $line['price'],
+                    'quantity'      => $line['qty'],
+                    'subtotal'      => round($line['unit_total'] * $line['qty'], 2),
+                    'notes'         => $line['notes'] ?: null,
                 ]);
+
+                foreach ($line['addons'] ?? [] as $addon) {
+                    $addonRows[] = [
+                        'order_item_id' => $item->id,
+                        'addon_id'      => $addon['addon_id'],
+                        'addon_name'    => $addon['addon_name'],
+                        'extra_price'   => $addon['extra_price'],
+                        'created_at'    => $timestamp,
+                        'updated_at'    => $timestamp,
+                    ];
+                }
+
+                foreach ($line['ingredients'] ?? [] as $ingredient) {
+                    $ingredientRows[] = [
+                        'order_item_id'   => $item->id,
+                        'ingredient_id'   => $ingredient['ingredient_id'],
+                        'ingredient_name' => $ingredient['ingredient_name'],
+                        'quantity'        => $ingredient['quantity'],
+                        'extra_price'     => $ingredient['extra_price'],
+                        'created_at'      => $timestamp,
+                        'updated_at'      => $timestamp,
+                    ];
+                }
             }
 
-            foreach ($line['ingredients'] ?? [] as $ing) {
-                OrderItemIngredient::create([
-                    'order_item_id'   => $item->id,
-                    'ingredient_id'   => $ing['ingredient_id'],
-                    'ingredient_name' => $ing['ingredient_name'],
-                    'quantity'        => $ing['quantity'],
-                    'extra_price'     => $ing['extra_price'],
-                ]);
+            if ($addonRows !== []) {
+                OrderItemAddon::insert($addonRows);
             }
-        }
+            if ($ingredientRows !== []) {
+                OrderItemIngredient::insert($ingredientRows);
+            }
+
+            return $order;
+        });
 
         $this->cart       = [];
         $this->orderNotes = '';
@@ -497,7 +677,12 @@ class MesaOrden extends Component
         $mesa = Mesa::find($this->mesaId);
         if (!$mesa || $mesa->status !== 'ocupada') return;
 
-        $mesa->update(['status' => 'en_cuenta']);
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->markInAccount($mesa, $register->id)
+            : null;
+        $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
+        Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
         session()->flash('success', "Mesa {$mesa->number} cerrada. Procede al cobro.");
         $this->redirect(route('app.mesas'));
     }

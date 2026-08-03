@@ -26,6 +26,14 @@
                 <span>Registrar gasto</span>
             </button>
         @endcan
+        @canany(['crear ordenes', 'editar ordenes'])
+            <button type="button" class="btn-header-action btn-header-saved"
+                @click="showSaved = true; $wire.$set('showQuotationsModal', true)"
+                aria-label="Abrir pedidos guardados para retomarlos" title="Retomar pedidos guardados">
+                <i class="bx bx-bookmark"></i>
+                <span>Guardados</span>
+            </button>
+        @endcanany
         <div data-ui="xui-h2y0md">
             <i class="bx bx-lock-open-alt"></i>
             <span>{{ $this->activeCashRegister->name }}</span>

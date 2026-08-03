@@ -8,6 +8,7 @@ use App\Models\InventoryItem;
 use App\Models\InventoryPurchase;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
+use App\Models\MesaService;
 use App\Models\Order;
 use App\Models\TicketTemplate;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -22,8 +23,7 @@ class ThermalTicketRenderer
         string $type,
         ?string $printArea = null,
         bool $autoPrint = true,
-    ): string
-    {
+    ): string {
         $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'customer', 'mesa.area']);
 
         $items = $order->items->filter(fn ($item) => ! (bool) $item->is_cancelled);
@@ -65,7 +65,8 @@ class ThermalTicketRenderer
             'date' => $order->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
             'customer' => $order->display_name,
             'served_by' => $order->seller?->name,
-            'table' => $order->table_identifier,
+            'table' => $order->table_identifier ?: $order->mesa?->display_name,
+            'area' => $order->mesa?->area?->name ?: $printArea,
             'notes' => $order->notes,
             'items' => collect($items)->map(fn ($item) => [
                 'name' => $item->product_name,
@@ -172,6 +173,68 @@ class ThermalTicketRenderer
         ]);
     }
 
+    public function renderMesaService(MesaService $service): string
+    {
+        $service->loadMissing([
+            'mesas.area',
+            'primaryMesa.area',
+            'closer',
+            'orders.items',
+            'orders.payments',
+            'splits',
+        ]);
+
+        $areas = $service->mesas->pluck('area.name')->filter()->unique()->implode(', ');
+        $members = $service->mesas
+            ->map(fn ($mesa) => $mesa->pivot->mesa_label_snapshot ?: $mesa->display_name)
+            ->implode(', ');
+        $splitLabels = $service->splits
+            ->flatMap(fn ($split) => collect($split->split_data ?? [])
+                ->filter(fn ($account) => (bool) ($account['paid'] ?? false))
+                ->pluck('label'))
+            ->filter()
+            ->unique()
+            ->implode(', ');
+
+        return $this->render('customer', [
+            'title' => $service->status === 'pagada' ? 'HISTÓRICO DE MESA' : 'AUDITORÍA DE MESA',
+            'folio' => $service->service_label,
+            'date' => ($service->closed_at ?? $service->updated_at)->format('d/m/Y H:i'),
+            'table' => $service->service_label,
+            'area' => $areas ?: $service->primaryMesa?->area?->name,
+            'served_by' => $service->opener_name_snapshot ?: 'Sin asignar',
+            'cashier' => $service->closer?->name,
+            'items' => $service->orders->flatMap(fn ($order) => $order->items->map(fn ($item) => [
+                'name' => $item->product_name,
+                'quantity' => $item->quantity,
+                'subtotal' => (float) $item->subtotal,
+                'modifiers' => [],
+                'notes' => null,
+            ]))->all(),
+            'payments' => $service->orders->flatMap->payments
+                ->groupBy('method')
+                ->map(fn ($payments, $method) => [
+                    'label' => match ($method) {
+                        'efectivo' => 'Efectivo',
+                        'tarjeta' => 'Tarjeta',
+                        'transferencia' => 'Transferencia',
+                        'contra_entrega' => 'Contra entrega',
+                        default => ucfirst($method),
+                    },
+                    'amount' => (float) $payments->sum('amount'),
+                    'change' => (float) $payments->sum('change_amount'),
+                ])->values()->all(),
+            'total' => (float) $service->total_snapshot,
+            'notes' => collect([
+                $members ? "Mesas ocupadas: {$members}" : null,
+                $splitLabels ? "Subcuentas cobradas: {$splitLabels}" : null,
+                $service->status === 'liberada' ? "Liberada sin cobro: {$service->close_reason}" : null,
+                "Apertura: {$service->opened_at->format('d/m/Y H:i')}",
+            ])->filter()->implode(' · '),
+            'tracking_url' => null,
+        ]);
+    }
+
     public function renderPreview(string $type, ?TicketTemplate $template = null, ?BusinessSetting $business = null): string
     {
         if ($type === 'cash_cut') {
@@ -209,11 +272,11 @@ class ThermalTicketRenderer
             'customer' => 'Cliente de ejemplo',
             'served_by' => 'Usuario de caja',
             'cashier' => 'Usuario de caja',
-            'table' => $type === 'customer' ? 'Mesa 4' : null,
-            'area' => 'Salón',
-            'notes' => 'Sin cebolla',
+            'table' => in_array($type, ['customer', 'kitchen_area'], true) ? 'Mesa 4' : null,
+            'area' => $type === 'kitchen_area' ? 'Cocina' : 'Salón',
+            'notes' => $type === 'kitchen_area' ? 'Entregar todos los platillos juntos.' : 'Sin cebolla',
             'items' => [
-                ['name' => 'Hamburguesa especial', 'quantity' => 1, 'subtotal' => 145, 'modifiers' => [['name' => '+ Queso extra', 'price' => 15]], 'notes' => null],
+                ['name' => 'Hamburguesa especial', 'quantity' => 1, 'subtotal' => 145, 'modifiers' => [['name' => '+ Queso extra', 'price' => 15]], 'notes' => $type === 'kitchen_area' ? 'Sin cebolla; término medio.' : null],
                 ['name' => 'Agua fresca', 'quantity' => 2, 'subtotal' => 70, 'modifiers' => [], 'notes' => null],
             ],
             'payments' => [['label' => 'Efectivo', 'amount' => 215, 'change' => 0]],
@@ -303,7 +366,7 @@ class ThermalTicketRenderer
 
     private function qrDataUri(string $value): string
     {
-        $renderer = new ImageRenderer(new RendererStyle(180, 1), new SvgImageBackEnd());
+        $renderer = new ImageRenderer(new RendererStyle(180, 1), new SvgImageBackEnd);
         $svg = (new Writer($renderer))->writeString($value);
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);

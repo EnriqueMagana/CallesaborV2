@@ -26,7 +26,8 @@
         @if($item->register_locked)
             <button type="button" class="menu-link sidebar-register-locked" disabled aria-label="{{ $item->label }}: requiere una caja abierta" title="Requiere una caja abierta">
                 @if($item->icon)<i class="menu-icon tf-icons bx {{ $item->icon }}"></i>@endif
-                <div>{{ $item->label }}</div><i class="bx bx-lock-alt sidebar-register-lock-icon" aria-hidden="true"></i>
+                <div>{{ $item->label }}</div>
+                <span class="sidebar-parent-chevron sidebar-register-lock-icon" aria-hidden="true"><i class="bx bx-lock-alt"></i></span>
             </button>
         @else
             <a href="{{ $item->resolved_url }}" class="menu-link" @if($item->route_name && ! $usesStandaloneLayout) wire:navigate @endif>

@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Mesas;
 
+use App\Models\CashRegister;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaGroup;
 use App\Models\MesaSplit;
 use App\Models\OrderItem;
+use App\Services\MesaServiceManager;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -284,8 +286,14 @@ class SplitCuenta extends Component
             ];
         }
 
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->resolveOrCreate($this->mesa, $register, auth()->id())
+            : null;
+
         $split = MesaSplit::create([
             'mesa_id'    => $this->mesaId,
+            'mesa_service_id' => $service?->id,
             'created_by' => auth()->id(),
             'split_data' => $splitData,
             'status'     => 'pendiente',
@@ -293,7 +301,11 @@ class SplitCuenta extends Component
         ]);
 
         $this->confirmed = $split->id;
-        $this->mesa->update(['status' => 'en_cuenta']);
+        $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$this->mesaId];
+        Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
+        if ($register) {
+            app(MesaServiceManager::class)->markInAccount($this->mesa, $register->id);
+        }
         unset($this->mesa, $this->accountTotals);
 
         session()->flash('success', 'Split guardado y enviado a caja para su cobro.');
@@ -308,7 +320,15 @@ class SplitCuenta extends Component
         MesaSplit::destroy($this->confirmed);
         $this->confirmed = null;
         $this->showCancelConfirm = false;
-        Mesa::find($this->mesaId)?->update(['status' => 'ocupada']);
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $mesa = Mesa::find($this->mesaId);
+        if ($register && $mesa) {
+            $service = app(MesaServiceManager::class)->reopen($mesa, $register->id);
+            $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
+            Mesa::whereIn('id', $memberIds)->update(['status' => 'ocupada']);
+        } elseif ($mesa) {
+            $mesa->update(['status' => 'ocupada']);
+        }
         unset($this->mesa);
     }
 

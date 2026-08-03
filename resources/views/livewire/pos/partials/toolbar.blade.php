@@ -3,7 +3,7 @@
     <button type="button" class="tb-btn tb-btn--window" :class="panels.pickup ? 'is-active' : ''"
         @click="panels.pickup = true; $wire.$refresh()" aria-label="Abrir pedidos no pagados">
         <span class="tb-btn__icon"><i class="bx bx-receipt"></i></span>
-        <span class="tb-btn__copy"><strong>Pedidos no pagados</strong><small>Ventanilla y recoger</small></span>
+        <span class="tb-btn__copy"><strong>Por cobrar</strong><small>Ventanilla y recoger</small></span>
         @if ($this->pickupOrders->count() > 0)<span class="tb-btn__badge">{{ $this->pickupOrders->count() }}</span>@endif
     </button>
     @endcan
@@ -15,21 +15,19 @@
         <span class="tb-btn__copy"><strong>Cobrar mesas</strong><small>Cuentas cerradas</small></span>
         @if ($this->mesasPendientes->count() > 0)<span class="tb-btn__badge">{{ $this->mesasPendientes->count() }}</span>@endif
     </button>
-    @endcan
 
-    @canany(['crear ordenes', 'editar ordenes'])
-    <button type="button" class="tb-btn tb-btn--saved" :class="showSaved ? 'is-active' : ''"
-        @click="showSaved = true; $wire.$set('showQuotationsModal', true)" aria-label="Abrir pedidos guardados">
-        <span class="tb-btn__icon"><i class="bx bx-bookmark"></i></span>
-        <span class="tb-btn__copy"><strong>Pedidos guardados</strong><small>Carritos y notas</small></span>
+    <button type="button" class="tb-btn tb-btn--tracking" :class="panels.tracking ? 'is-active' : ''"
+        @click="panels.tracking = true; $wire.openTableTracking()" aria-label="Abrir seguimiento operativo de mesas">
+        <span class="tb-btn__icon"><i class="bx bx-radar"></i></span>
+        <span class="tb-btn__copy"><strong>Comandas</strong><small>Cocina de mesas</small></span>
     </button>
-    @endcanany
+    @endcan
 
     @can('reimprimir tickets')
     <button type="button" class="tb-btn tb-btn--reprint" :class="panels.reprint ? 'is-active' : ''"
         @click="panels.reprint = true; $wire.$refresh()" aria-label="Abrir reimpresión de tickets">
         <span class="tb-btn__icon"><i class="bx bx-printer"></i></span>
-        <span class="tb-btn__copy"><strong>Reimpresión</strong><small>Cocina y cliente</small></span>
+        <span class="tb-btn__copy"><strong>Reimprimir</strong><small>Cocina y cliente</small></span>
     </button>
     @endcan
 </nav>

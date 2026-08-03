@@ -443,29 +443,29 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Imagen</label>
-                            <input wire:model="pImage" type="file" class="form-control @error('pImage') is-invalid @enderror" accept="image/*">
-                            @error('pImage') <div class="invalid-feedback">{{ $message }}</div> @enderror
-
-                            {{-- Preview: new upload takes priority over current --}}
-                            @if($pImage)
-                                <div class="mt-2 d-flex align-items-center gap-3">
-                                    <div wire:loading wire:target="pImage" class="text-muted small">
-                                        <span class="spinner-border spinner-border-sm me-1"></span> Cargando…
-                                    </div>
-                                    <div wire:loading.remove wire:target="pImage">
-                                        <img src="{{ $pImage->temporaryUrl() }}" class="rounded shadow-sm menu-preview-image">
-                                        <div class="small text-muted mt-1">
-                                            Se guardará como <strong>.webp</strong>
-                                        </div>
+                            <label class="form-label" for="product-image">Imagen del producto</label>
+                            <div class="menu-image-uploader">
+                                <div class="menu-image-uploader__preview">
+                                    <div class="menu-image-uploader__skeleton" wire:loading.flex wire:target="pImage" role="status"><span class="visually-hidden">Procesando imagen</span></div>
+                                    <div wire:loading.remove wire:target="pImage" class="menu-image-uploader__content">
+                                        @if($pImage)
+                                            <img src="{{ $pImage->temporaryUrl() }}" alt="Vista previa de {{ $pName ?: 'nuevo producto' }}" width="320" height="240">
+                                        @elseif($pCurrentImage)
+                                            <img src="{{ asset('storage/'.$pCurrentImage) }}" alt="Imagen actual de {{ $pName }}" width="320" height="240">
+                                        @else
+                                            <span><i class="bx bx-image-add"></i><small>Sin imagen</small></span>
+                                        @endif
                                     </div>
                                 </div>
-                            @elseif($pCurrentImage)
-                                <div class="mt-2 d-flex align-items-center gap-3">
-                                    <img src="{{ asset('storage/'.$pCurrentImage) }}" class="rounded shadow-sm menu-preview-image" >
-                                    <div class="small text-muted">Imagen actual</div>
+                                <div class="menu-image-uploader__controls">
+                                    <label class="menu-image-uploader__button" for="product-image"><i class="bx bx-upload"></i><span>{{ $pImage || $pCurrentImage ? 'Cambiar imagen' : 'Seleccionar imagen' }}</span></label>
+                                    <input id="product-image" wire:model.live="pImage" type="file" class="@error('pImage') is-invalid @enderror" accept="image/jpeg,image/png,image/gif,image/webp">
+                                    <small>JPG, PNG, GIF o WebP · máximo 6 MB. Se optimizará automáticamente.</small>
+                                    <span wire:loading.flex wire:target="pImage" class="menu-image-uploader__status"><i class="bx bx-loader-alt bx-spin"></i>Preparando vista previa…</span>
+                                    @if($pImage)<span class="menu-upload-success"><i class="bx bx-check-circle"></i>Imagen lista para guardar.</span>@endif
                                 </div>
-                            @endif
+                            </div>
+                            @error('pImage') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
                         <div class="form-check form-switch mb-3">
                             <input wire:model.live="pIsCustomizable" class="form-check-input" type="checkbox" id="pIsCustomizable">
@@ -495,7 +495,7 @@
                                     id="pag_{{ $group->id }}">
                                 <label class="form-check-label" for="pag_{{ $group->id }}">
                                     <span class="fw-semibold">{{ $group->name }}</span>
-                                    <span class="text-muted small ms-1">({{ $group->addons()->count() }})</span>
+                                    <span class="text-muted small ms-1">({{ $group->addons_count }})</span>
                                     @if($group->is_required)
                                         <span class="badge bg-label-danger ms-1 menu-text-micro" >Obligatorio</span>
                                     @endif
@@ -511,7 +511,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showProductModal',false)">Cancelar</button>
-                <button type="button" class="btn btn-primary" wire:click="saveProduct">
+                <button type="button" class="btn btn-primary" wire:click="saveProduct" wire:loading.attr="disabled" wire:target="saveProduct,pImage">
                     <span wire:loading.remove wire:target="saveProduct">
                         <i class="bx bx-check me-1"></i> {{ $editProductId ? 'Actualizar' : 'Crear producto' }}
                     </span>
@@ -577,7 +577,7 @@ $iconList = [
                     </div>
                     {{-- Manual input --}}
                     <div x-show="customIcon" x-cloak class="mb-2">
-                        <input wire:model.live="cIcon" type="text" class="form-control form-control-sm" placeholder="bx-food-menu">
+                        <input wire:model.live.debounce.350ms="cIcon" type="text" class="form-control form-control-sm" placeholder="bx-food-menu">
                         <div class="form-text">Clase de <a href="https://boxicons.com" target="_blank">Boxicons</a> sin el prefijo "bx ".</div>
                     </div>
                     {{-- Icon grid --}}
@@ -596,9 +596,9 @@ $iconList = [
                     <label class="form-label">Color</label>
                     <div class="input-group">
                         <span class="input-group-text p-1">
-                            <input wire:model.live="cColor" type="color" class="form-control form-control-color border-0 menu-color-input" title="Color">
+                            <input wire:model.change="cColor" type="color" class="form-control form-control-color border-0 menu-color-input" title="Color">
                         </span>
-                        <input wire:model.live="cColor" type="text" class="form-control" placeholder="#696cff">
+                        <input wire:model.blur="cColor" type="text" class="form-control" placeholder="#696cff">
                     </div>
                 </div>
                 <div class="mb-3">
@@ -731,29 +731,26 @@ $iconList = [
                                 <label class="form-label">Imagen</label>
                                 <div class="d-flex align-items-start gap-3 flex-wrap">
                                     {{-- Preview box --}}
-                                    <div  class="menu-upload-frame">
-                                        @if($aImage)
-                                            <div wire:loading wire:target="aImage"  class="menu-upload-trigger">
-                                                <span class="spinner-border spinner-border-sm text-primary"></span>
-                                            </div>
-                                            <span wire:loading.remove wire:target="aImage">
+                                    <div class="menu-upload-frame">
+                                        <div class="menu-upload-frame__skeleton" wire:loading.flex wire:target="aImage" aria-label="Procesando imagen"></div>
+                                        <span wire:loading.remove wire:target="aImage">
+                                            @if($aImage)
                                                 <img src="{{ $aImage->temporaryUrl() }}"
                                                      class="rounded shadow-sm menu-media menu-media-80">
-                                            </span>
-                                        @elseif($aCurrentImage)
-                                            <img src="{{ asset('storage/'.$aCurrentImage) }}" class="rounded shadow-sm menu-media menu-media-80" >
-                                        @else
-                                            <div  class="menu-media-placeholder menu-media-80">
-                                                <i class="bx bx-image menu-placeholder-icon menu-icon-20" ></i>
-                                            </div>
-                                        @endif
+                                            @elseif($aCurrentImage)
+                                                <img src="{{ asset('storage/'.$aCurrentImage) }}" class="rounded shadow-sm menu-media menu-media-80">
+                                            @else
+                                                <span class="menu-media-placeholder menu-media-80"><i class="bx bx-image menu-placeholder-icon menu-icon-20"></i></span>
+                                            @endif
+                                        </span>
                                     </div>
                                     {{-- File input --}}
                                     <div class="flex-grow-1">
-                                        <input wire:model="aImage" type="file"
+                                        <input wire:model.live="aImage" type="file"
                                                class="form-control @error('aImage') is-invalid @enderror"
-                                               accept="image/*">
+                                               accept="image/jpeg,image/png,image/gif,image/webp">
                                         @error('aImage') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        <div class="form-text">JPG, PNG, GIF o WebP de hasta 6 MB.</div>
                                         @if($aImage)
                                             <div class="small text-muted mt-1">
                                                 <i class="bx bx-check-circle text-success me-1"></i>
@@ -774,7 +771,7 @@ $iconList = [
                             <button class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddonForm',false)">
                                 <i class="bx bx-x me-1"></i> Cancelar
                             </button>
-                            <button class="btn btn-sm btn-primary" wire:click="saveAddon">
+                            <button type="button" class="btn btn-sm btn-primary" wire:click="saveAddon" wire:loading.attr="disabled" wire:target="saveAddon,aImage">
                                 <span wire:loading.remove wire:target="saveAddon">
                                     <i class="bx bx-check me-1"></i> {{ $editAddonId ? 'Actualizar' : 'Agregar complemento' }}
                                 </span>
@@ -908,9 +905,9 @@ $iconList = [
                     </div>
                     <div class="menu-ingredient-upload__controls">
                         <label class="form-label" for="ingImage">Imagen del ingrediente</label>
-                        <input id="ingImage" wire:model="ingImage" type="file" class="form-control @error('ingImage') is-invalid @enderror" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <input id="ingImage" wire:model.live="ingImage" type="file" class="form-control @error('ingImage') is-invalid @enderror" accept="image/jpeg,image/png,image/gif,image/webp">
                         @error('ingImage') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        <p class="form-text">JPG, PNG, GIF o WebP de hasta 1 MB. Se optimiza automáticamente a WebP.</p>
+                        <p class="form-text">JPG, PNG, GIF o WebP de hasta 6 MB. Se optimiza automáticamente a WebP.</p>
                         @if($ingImage)
                             <div class="menu-upload-success" role="status"><i class="bx bx-check-circle" aria-hidden="true"></i><span>Nueva imagen lista para guardar.</span></div>
                         @elseif($ingCurrentImage)
@@ -928,7 +925,7 @@ $iconList = [
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" wire:click="$set('showIngredientModal',false)">Cancelar</button>
-                <button type="button" class="btn btn-primary" wire:click="saveIngredient">
+                <button type="button" class="btn btn-primary" wire:click="saveIngredient" wire:loading.attr="disabled" wire:target="saveIngredient,ingImage">
                     <span wire:loading.remove wire:target="saveIngredient"><i class="bx bx-check me-1"></i> {{ $editIngredientId ? 'Actualizar' : 'Crear' }}</span>
                     <span wire:loading wire:target="saveIngredient"  class="menu-loading"><span class="spinner-border spinner-border-sm"></span> Guardando…</span>
                 </button>
@@ -1052,9 +1049,9 @@ $iconList = [
                     <label class="form-label">Color identificador</label>
                     <div class="input-group">
                         <span class="input-group-text p-1">
-                            <input wire:model.live="areaColor" type="color" class="form-control form-control-color border-0 menu-color-input" >
+                            <input wire:model.change="areaColor" type="color" class="form-control form-control-color border-0 menu-color-input" >
                         </span>
-                        <input wire:model.live="areaColor" type="text" class="form-control" placeholder="#696cff">
+                        <input wire:model.blur="areaColor" type="text" class="form-control" placeholder="#696cff">
                     </div>
                 </div>
                 <div class="form-check form-switch">

@@ -13,7 +13,13 @@
 
     <div class="cart-items">
         @forelse($cart as $item)
-            <div class="cart-item">
+            <div class="cart-item" wire:key="pos-cart-{{ $item['cart_id'] }}">
+                @if(!empty($item['product_image']))
+                    <img class="cart-item-image" src="{{ Storage::url($item['product_image']) }}"
+                         alt="" width="52" height="52" loading="lazy" decoding="async">
+                @else
+                    <span class="cart-item-image is-empty" aria-hidden="true"><i class="bx bx-food-menu"></i></span>
+                @endif
                 <div class="cart-qty-controls">
                     <button type="button" class="qty-btn" wire:click="decrementCartItem('{{ $item['cart_id'] }}')" aria-label="Reducir cantidad de {{ $item['product_name'] }}">
                         <i class="bx bx-minus"></i>
@@ -63,8 +69,8 @@
         @if(!empty($cart))
             <div class="cart-note-bar">
                 <i class="bx bx-message-dots"></i>
-                <input type="text" wire:model.live.debounce.400ms="orderNotes" class="pos-input"
-                       data-ui="xui-1s0sgt3" placeholder="Nota general...">
+                <input type="text" wire:model.blur="orderNotes" maxlength="500" class="pos-input"
+                       data-ui="xui-1s0sgt3" placeholder="Nota general para cocina...">
             </div>
             <div class="cart-totals">
                 <div class="total-row main">

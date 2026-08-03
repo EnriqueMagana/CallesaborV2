@@ -12,6 +12,7 @@ class DeliveryAssignment extends Model
         'driver_id',
         'assigned_by',
         'delivered_by',
+        'delivery_settlement_id',
         'status',
         'assigned_at',
         'delivered_at',
@@ -40,5 +41,10 @@ class DeliveryAssignment extends Model
     public function deliveredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'delivered_by')->withTrashed();
+    }
+
+    public function settlement(): BelongsTo
+    {
+        return $this->belongsTo(DeliverySettlement::class, 'delivery_settlement_id');
     }
 }

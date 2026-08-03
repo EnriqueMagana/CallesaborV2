@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -75,6 +77,26 @@ class AdministrationPermissionBoundariesTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_product_creator_can_upload_a_large_supported_image_with_preview_feedback(): void
+    {
+        Storage::fake('public');
+        $creator = $this->employee(['ver menu', 'crear platos']);
+        $image = UploadedFile::fake()->image('producto.jpg', 1600, 1200)->size(3072);
+
+        Livewire::actingAs($creator)->test(MenuBuilder::class)
+            ->call('openProductModal')
+            ->set('pName', 'Producto con imagen')
+            ->set('pPrice', '120.00')
+            ->set('pImage', $image)
+            ->assertSee('Imagen lista para guardar')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $product = Product::where('name', 'Producto con imagen')->firstOrFail();
+        $this->assertStringEndsWith('.webp', $product->image);
+        Storage::disk('public')->assertExists($product->image);
+    }
+
     public function test_menu_specialists_are_restricted_to_their_assigned_catalog_area(): void
     {
         $complements = $this->employee(['ver menu', 'gestionar complementos']);
@@ -130,6 +152,40 @@ class AdministrationPermissionBoundariesTest extends TestCase
 
         $this->assertDatabaseHas('roles', ['name' => 'supervisor-prueba']);
         $this->assertDatabaseHas('permissions', ['name' => 'permiso temporal de prueba']);
+    }
+
+    public function test_roles_page_exposes_accessible_modals_and_dark_theme_styles(): void
+    {
+        $manager = $this->employee(['gestionar roles', 'gestionar permisos']);
+
+        $this->actingAs($manager)
+            ->get(route('app.roles-permisos'))
+            ->assertOk()
+            ->assertSee('assets/css/role-permissions.css', false)
+            ->assertSee('roles-tabs', false)
+            ->assertSee('roles-role-card', false);
+
+        Livewire::actingAs($manager)->test(RolePermissionManager::class)
+            ->call('openCreateRole')
+            ->assertSee('roles-modal-layer', false)
+            ->assertSee('roles-modal-close', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('wire:click="closeRoleForm"', false)
+            ->assertSee('id="role-name"', false)
+            ->call('closeRoleForm')
+            ->assertSet('showRoleForm', false)
+            ->call('openCreatePerm')
+            ->assertSee('wire:click="closePermForm"', false)
+            ->assertSee('id="permission-name"', false)
+            ->call('closePermForm')
+            ->assertSet('showPermForm', false);
+
+        $styles = file_get_contents(public_path('assets/css/role-permissions.css'));
+
+        $this->assertStringContainsString('html.dark-style .roles-page', $styles);
+        $this->assertStringContainsString('.roles-modal-close', $styles);
+        $this->assertStringContainsString('top: -54px', $styles);
+        $this->assertStringContainsString('@media (max-width: 767.98px)', $styles);
     }
 
     private function employee(array $permissions): User

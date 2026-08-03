@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
 use App\Models\Order;
+use App\Models\OrderPayment;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -22,8 +23,8 @@ class DeliveryWorkflow
                 throw ValidationException::withMessages(['delivery' => 'Este pedido no corresponde a delivery.']);
             }
 
-            if (! in_array($lockedOrder->status, ['lista', 'pagada'], true)) {
-                throw ValidationException::withMessages(['delivery' => 'El pedido debe estar listo antes de asignarlo.']);
+            if (! in_array($lockedOrder->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true)) {
+                throw ValidationException::withMessages(['delivery' => 'Este pedido ya no está disponible para asignación.']);
             }
 
             if (DeliveryAssignment::query()->where('order_id', $lockedOrder->id)->exists()) {
@@ -38,9 +39,36 @@ class DeliveryWorkflow
                 'assigned_at' => now(),
             ]);
 
+            return $assignment->load('driver');
+        });
+    }
+
+    public function markPickedUp(Order $order, User $actor, bool $canManageAll = false): DeliveryAssignment
+    {
+        return DB::transaction(function () use ($order, $actor, $canManageAll): DeliveryAssignment {
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $this->ensureOrderBelongsToOpenRegister($lockedOrder);
+
+            $assignment = DeliveryAssignment::query()
+                ->where('order_id', $lockedOrder->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $assignment || $assignment->status !== 'asignado') {
+                throw ValidationException::withMessages(['delivery' => 'Este pedido no está asignado para entrega.']);
+            }
+
+            if (! $canManageAll && $assignment->driver_id !== $actor->id) {
+                throw new AuthorizationException('Solo el repartidor asignado puede recoger este pedido.');
+            }
+
+            if (! in_array($lockedOrder->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true)) {
+                throw ValidationException::withMessages(['delivery' => 'El pedido ya fue recogido o dejó de estar disponible.']);
+            }
+
             $lockedOrder->update(['status' => 'en_reparto']);
 
-            return $assignment->load('driver');
+            return $assignment->fresh('driver');
         });
     }
 
@@ -63,12 +91,42 @@ class DeliveryWorkflow
                 throw new AuthorizationException('Solo el repartidor asignado puede completar esta entrega.');
             }
 
+            if ($lockedOrder->status !== 'en_reparto') {
+                throw ValidationException::withMessages(['delivery' => 'Primero confirma que recogiste el pedido.']);
+            }
+
             $assignment->update([
                 'status' => 'entregado',
                 'delivered_by' => $actor->id,
                 'delivered_at' => now(),
             ]);
-            $lockedOrder->update(['status' => 'entregada']);
+
+            $paid = (float) $lockedOrder->payments()->sum('amount');
+            $remaining = max(0, round((float) $lockedOrder->total - $paid, 2));
+
+            if ($remaining > 0) {
+                $paymentMethod = match ($lockedOrder->delivery_method) {
+                    'contra_entrega' => 'efectivo',
+                    'tarjeta' => 'tarjeta',
+                    'transferencia' => 'transferencia',
+                    default => throw ValidationException::withMessages([
+                        'delivery' => 'Ventanilla debe definir el método de pago antes de completar la entrega.',
+                    ]),
+                };
+
+                OrderPayment::create([
+                    'order_id' => $lockedOrder->id,
+                    'method' => $paymentMethod,
+                    'amount' => $remaining,
+                    'received_amount' => $paymentMethod === 'efectivo' ? $remaining : null,
+                    'change_amount' => $paymentMethod === 'efectivo' ? 0 : null,
+                ]);
+            }
+
+            $lockedOrder->update([
+                'status' => 'pagada',
+                'paid_at' => $lockedOrder->paid_at ?? now(),
+            ]);
 
             return $assignment->fresh(['driver', 'deliveredBy']);
         });

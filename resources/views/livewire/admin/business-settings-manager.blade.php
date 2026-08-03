@@ -27,7 +27,11 @@
                     'identity' => ['01','bx-id-card','Identidad comercial','Nombre, plataforma y RFC'],
                     'contact' => ['02','bx-map','Contacto y ubicación','Canales y domicilio'],
                     'hours' => ['03','bx-time-five','Horarios','Apertura por día'],
-                    'visual' => ['04','bx-image','Identidad visual','Logos y banner'],
+                    'social' => ['04','bx-share-alt','Redes sociales','Instagram, Facebook y TikTok'],
+                    'visual' => ['05','bx-image','Identidad visual','Logos y banner'],
+                    'appearance' => ['06','bx-palette','Color del menú','Acento principal público'],
+                    'gallery' => ['07','bx-images','Galería','Fotos del negocio'],
+                    'featured' => ['08','bx-star','Destacados','Favoritos de la casa'],
                 ] as $sectionKey => $section)
                     <button type="button" wire:click="setBusinessSection('{{ $sectionKey }}')" class="{{ $businessSection === $sectionKey ? 'is-active' : '' }}" aria-pressed="{{ $businessSection === $sectionKey ? 'true' : 'false' }}">
                         <span>{{ $section[0] }}</span><i class="bx {{ $section[1] }}"></i><span><strong>{{ $section[2] }}</strong><small>{{ $section[3] }}</small></span><i class="bx bx-chevron-right"></i>
@@ -52,41 +56,148 @@
                         <x-business.field label="WhatsApp" for="business-whatsapp"><input id="business-whatsapp" type="tel" wire:model.blur="whatsapp" placeholder="Ej. 55 9876 5432"></x-business.field>
                         <x-business.field label="Correo electrónico" for="business-email" :error="$errors->first('email')"><input id="business-email" type="email" wire:model.blur="email" placeholder="contacto@negocio.com" autocomplete="email"></x-business.field>
                         <x-business.field label="Sitio web" for="business-web" :error="$errors->first('website')"><input id="business-web" type="url" wire:model.blur="website" placeholder="https://www.negocio.com"></x-business.field>
-                        <x-business.field label="Calle, número y colonia" for="business-address" full><input id="business-address" type="text" wire:model.blur="address" placeholder="Ej. Av. Principal 123, Col. Centro" autocomplete="street-address"></x-business.field>
-                        <x-business.field label="Ciudad o municipio" for="business-city"><input id="business-city" type="text" wire:model.blur="city" placeholder="Ej. Guadalajara" autocomplete="address-level2"></x-business.field>
-                        <x-business.field label="Estado" for="business-state"><input id="business-state" type="text" wire:model.blur="state" placeholder="Ej. Jalisco" autocomplete="address-level1"></x-business.field>
+                        <x-business.field label="Ubicación para Google Maps" for="business-address" hint="Escribe la dirección completa; se convertirá automáticamente en un enlace de Maps." full><div class="biz-input-with-icon"><i class="bx bx-map-pin"></i><input id="business-address" type="text" wire:model.blur="address" placeholder="Ej. C. 33 185A, Ticul, 97860 Ticul, Yuc." autocomplete="street-address"></div></x-business.field>
+                        <x-business.field label="Ciudad o municipio (opcional)" for="business-city"><input id="business-city" type="text" wire:model.blur="city" placeholder="Ej. Ticul" autocomplete="address-level2"></x-business.field>
+                        <x-business.field label="Estado (opcional)" for="business-state"><input id="business-state" type="text" wire:model.blur="state" placeholder="Ej. Yucatán" autocomplete="address-level1"></x-business.field>
                         <x-business.field label="Código postal" for="business-postal"><input id="business-postal" type="text" wire:model.blur="postalCode" placeholder="Ej. 44100" autocomplete="postal-code" maxlength="10" inputmode="numeric"></x-business.field>
+                        <x-business.field label="Enlace personalizado de Google Maps (opcional)" for="business-maps" hint="Solo úsalo si deseas reemplazar el enlace generado desde la dirección." :error="$errors->first('mapsUrl')" full><div class="biz-input-with-icon"><i class="bx bx-link"></i><input id="business-maps" type="url" wire:model.blur="mapsUrl" placeholder="https://maps.app.goo.gl/..." inputmode="url"></div></x-business.field>
                     </div>
                 @elseif($businessSection === 'hours')
-                    <div class="biz-section-heading"><div><span>03</span><div><h2>Horarios de la sucursal</h2><p>Define qué días opera el negocio y su horario habitual.</p></div></div></div>
-                    <div class="business-hours" role="group" aria-label="Horario semanal">
+                    <div class="biz-section-heading"><div><span>03</span><div><h2>Horarios de la sucursal</h2><p>Configura la semana con controles claros y una respuesta inmediata.</p></div></div></div>
+                    <div class="business-hours-summary">
+                        <span><i class="bx bx-calendar-check"></i></span>
+                        <div><strong>{{ collect($businessHours)->where('enabled', true)->count() }} días abiertos</strong><small>El estado público se calcula automáticamente usando estos horarios.</small></div>
+                        <div class="business-hours-presets" aria-label="Configuraciones rápidas">
+                            <button type="button" wire:click="setHoursPreset('weekdays')">Lun–Vie</button>
+                            <button type="button" wire:click="setHoursPreset('everyday')">Todos</button>
+                            <button type="button" wire:click="setHoursPreset('closed')">Cerrar todos</button>
+                        </div>
+                    </div>
+                    <fieldset class="business-hours">
+                        <legend class="visually-hidden">Horario semanal</legend>
                         @foreach($businessHours as $index => $day)
                             <article class="business-hour {{ $day['enabled'] ? 'is-open' : '' }}" wire:key="business-hour-{{ $day['key'] }}">
-                                <label class="business-hour__switch"><input type="checkbox" wire:model.live="businessHours.{{ $index }}.enabled"><span></span><strong>{{ $day['label'] }}</strong></label>
+                                <label class="business-hour__switch" for="business-hour-{{ $day['key'] }}"><input id="business-hour-{{ $day['key'] }}" type="checkbox" wire:model.live="businessHours.{{ $index }}.enabled"><span aria-hidden="true"></span><span><strong>{{ $day['label'] }}</strong><small>{{ $day['enabled'] ? 'Sucursal abierta' : 'Sin servicio' }}</small></span></label>
                                 @if($day['enabled'])
-                                    <label><span>Abre</span><input type="time" wire:model="businessHours.{{ $index }}.opens" aria-label="Hora de apertura del {{ $day['label'] }}"></label>
-                                    <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                                    <label><span>Cierra</span><input type="time" wire:model="businessHours.{{ $index }}.closes" aria-label="Hora de cierre del {{ $day['label'] }}"></label>
-                                    <span class="business-hour__status"><i class="bx bx-check-circle"></i>Abierto</span>
+                                    <div class="business-hour__range">
+                                        <label><span>Abre</span><input type="time" wire:model.blur="businessHours.{{ $index }}.opens" aria-label="Hora de apertura del {{ $day['label'] }}"></label>
+                                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+                                        <label><span>Cierra</span><input type="time" wire:model.blur="businessHours.{{ $index }}.closes" aria-label="Hora de cierre del {{ $day['label'] }}"></label>
+                                    </div>
+                                    <span class="business-hour__status"><i class="bx bx-check-circle"></i>Disponible</span>
                                 @else
                                     <span class="business-hour__closed"><i class="bx bx-moon"></i>Cerrado</span>
                                 @endif
                             </article>
                         @endforeach
-                    </div>
+                    </fieldset>
                     @error('businessHours.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
-                @else
-                    <div class="biz-section-heading"><div><span>04</span><div><h2>Identidad visual</h2><p>Previsualización inmediata y archivos optimizados para cada contexto.</p></div></div></div>
+                @elseif($businessSection === 'social')
+                    <div class="biz-section-heading"><div><span>04</span><div><h2>Redes sociales</h2><p>Enlaces oficiales que aparecerán al pie del menú público.</p></div></div></div>
+                    <div class="biz-form-grid">
+                        <x-business.field label="Instagram" for="business-instagram" hint="Incluye https:// y el perfil completo." :error="$errors->first('instagramUrl')"><input id="business-instagram" type="url" wire:model.blur="instagramUrl" placeholder="https://instagram.com/tu-negocio"></x-business.field>
+                        <x-business.field label="Facebook" for="business-facebook" :error="$errors->first('facebookUrl')"><input id="business-facebook" type="url" wire:model.blur="facebookUrl" placeholder="https://facebook.com/tu-negocio"></x-business.field>
+                        <x-business.field label="TikTok" for="business-tiktok" :error="$errors->first('tiktokUrl')"><input id="business-tiktok" type="url" wire:model.blur="tiktokUrl" placeholder="https://tiktok.com/@tu-negocio"></x-business.field>
+                        <div class="business-social-note"><i class="bx bxl-whatsapp"></i><span><strong>WhatsApp ya está conectado</strong><small>Se toma del número configurado en “Contacto y ubicación”.</small></span></div>
+                    </div>
+                    <div class="business-section-note"><i class="bx bx-link-external"></i><span><strong>Solo se muestran canales configurados</strong><small>Los enlaces se abren en una pestaña nueva con protección de privacidad.</small></span></div>
+                @elseif($businessSection === 'visual')
+                    <div class="biz-section-heading"><div><span>05</span><div><h2>Identidad visual</h2><p>Previsualización inmediata y archivos optimizados para cada contexto.</p></div></div></div>
                     <div class="biz-media-grid">
                         <x-business.media-upload title="Logo principal" description="PNG, JPG o WebP. Máximo 4 MB." model="logoUpload" :path="$logoPath" :upload="$logoUpload" />
                         <x-business.media-upload title="Logo para tickets" description="Recomendado: monocromático y alto contraste." model="ticketLogoUpload" :path="$ticketLogoPath" :upload="$ticketLogoUpload" />
-                        <x-business.media-upload title="Banner" description="Imagen horizontal para kiosco y comunicación." model="bannerUpload" :path="$bannerPath" :upload="$bannerUpload" />
+                        <x-business.media-upload title="Banner del menú" description="Horizontal, recomendado 1600 × 720 px." model="bannerUpload" :path="$bannerPath" :upload="$bannerUpload" />
                     </div>
                     @foreach(['logoUpload','ticketLogoUpload','bannerUpload'] as $uploadError)@error($uploadError)<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror @endforeach
                     <div class="business-section-note"><i class="bx bx-image-alt"></i><span><strong>La vista previa aparece antes de guardar</strong><small>Mientras el navegador procesa el archivo verás un skeleton. El espacio queda reservado para evitar saltos visuales.</small></span></div>
+                @elseif($businessSection === 'appearance')
+                    <div class="biz-section-heading"><div><span>06</span><div><h2>Color principal del menú</h2><p>Personaliza los acentos sobre el fondo blanco de la vitrina pública.</p></div></div></div>
+                    <div class="business-color-editor">
+                        <label for="primary-color-picker" class="business-color-editor__preview" style="--preview-color: {{ $primaryColor }}">
+                            <span><i class="bx bx-palette"></i></span>
+                            <strong>Vista previa del acento</strong>
+                            <small>Botones, estados, etiquetas y foco accesible.</small>
+                        </label>
+                        <div>
+                            <x-business.field label="Selecciona un color" for="primary-color-picker" :error="$errors->first('primaryColor')">
+                                <input id="primary-color-picker" type="color" wire:model.live="primaryColor" aria-describedby="primary-color-value">
+                            </x-business.field>
+                            <code id="primary-color-value">{{ strtoupper($primaryColor) }}</code>
+                        </div>
+                    </div>
+                    <div class="business-section-note"><i class="bx bx-universal-access"></i><span><strong>La interfaz mantiene fondo blanco y texto oscuro</strong><small>El color se usa como acento para conservar claridad y una lectura cómoda.</small></span></div>
+                @elseif($businessSection === 'gallery')
+                    <div class="biz-section-heading"><div><span>07</span><div><h2>Galería pública</h2><p>Organiza hasta {{ \App\Livewire\Admin\BusinessSettingsManager::MAX_GALLERY_IMAGES }} fotografías con un breve pie de foto.</p></div></div></div>
+                    <div class="business-gallery-toolbar">
+                        <div><i class="bx bx-images"></i><span><strong>{{ count($galleryPaths) + count($galleryUploads) }} de {{ \App\Livewire\Admin\BusinessSettingsManager::MAX_GALLERY_IMAGES }}</strong><small>Fotografías utilizadas</small></span></div>
+                        <p><i class="bx bx-info-circle"></i>El pie de foto también se utiliza como descripción accesible en la página pública.</p>
+                    </div>
+                    <div class="business-gallery" aria-live="polite">
+                        @foreach($galleryPaths as $index => $item)
+                            <article class="business-gallery__item" wire:key="gallery-saved-{{ $index }}">
+                                <div class="business-gallery__media">
+                                    <span class="business-gallery__skeleton" aria-hidden="true"></span>
+                                    <img src="{{ Storage::url($item['path']) }}" alt="{{ $item['caption'] ?: 'Fotografía '.($index + 1).' de la galería' }}" loading="lazy" decoding="async">
+                                    <span class="business-gallery__number">{{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}</span>
+                                    <button type="button" wire:click="removeGalleryImage({{ $index }})" wire:confirm="¿Eliminar esta imagen de la galería?" aria-label="Eliminar fotografía {{ $index + 1 }}"><i class="bx bx-trash"></i></button>
+                                </div>
+                                <label><span>Pie de foto</span><input type="text" wire:model.blur="galleryPaths.{{ $index }}.caption" maxlength="120" placeholder="Ej. Terraza principal al atardecer"></label>
+                            </article>
+                        @endforeach
+                        @foreach($galleryUploads as $index => $upload)
+                            <article class="business-gallery__item is-pending" wire:key="gallery-new-{{ $index }}">
+                                <div class="business-gallery__media">
+                                    <span class="business-gallery__skeleton" aria-hidden="true"></span>
+                                    <img src="{{ $upload->temporaryUrl() }}" alt="Vista previa de nueva fotografía">
+                                    <span class="business-gallery__pending-label">Nueva</span>
+                                    <button type="button" wire:click="removePendingGalleryImage({{ $index }})" aria-label="Quitar nueva fotografía {{ $index + 1 }}"><i class="bx bx-x"></i></button>
+                                </div>
+                                <label><span>Pie de foto</span><input type="text" wire:model.blur="galleryUploadCaptions.{{ $index }}" maxlength="120" placeholder="Describe brevemente la fotografía"></label>
+                            </article>
+                        @endforeach
+                        <article class="business-gallery__loading-card" wire:loading.grid wire:target="galleryUploads" aria-label="Cargando fotografías">
+                            <span class="business-gallery__skeleton" aria-hidden="true"></span>
+                            <div><span></span><span></span></div>
+                        </article>
+                    </div>
+                    @if(count($galleryPaths) + count($galleryUploads) < \App\Livewire\Admin\BusinessSettingsManager::MAX_GALLERY_IMAGES)
+                        <label class="business-gallery-upload">
+                            <input type="file" wire:model.live="galleryUploads" accept="image/png,image/jpeg,image/webp" multiple>
+                            <i class="bx bx-images"></i>
+                            <span><strong>Agregar fotografías</strong><small>JPG, PNG o WebP · máximo 6 MB por imagen · puedes seleccionar varias</small></span>
+                        </label>
+                    @endif
+                    @error('galleryUploads')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                    @error('galleryUploads.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                    @error('galleryPaths.*.caption')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                    @error('galleryUploadCaptions.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                    @if(count($galleryPaths) || count($galleryUploads))
+                        <button type="button" class="biz-primary-button business-gallery-save" wire:click="saveGallery" wire:loading.attr="disabled" wire:target="saveGallery,galleryUploads">
+                            <span wire:loading.remove wire:target="saveGallery"><i class="bx bx-cloud-upload"></i>Guardar galería y pies de foto</span>
+                            <span wire:loading wire:target="saveGallery">Guardando galería…</span>
+                        </button>
+                    @endif
+                @else
+                    <div class="biz-section-heading"><div><span>08</span><div><h2>Productos destacados</h2><p>Elige hasta 8 opciones para la sección “Favoritos de la casa”.</p></div></div></div>
+                    <div class="business-featured-products">
+                        @forelse($this->availablePublicProducts as $product)
+                            <label wire:key="featured-product-{{ $product->id }}">
+                                <input type="checkbox" wire:model="featuredProductIds" value="{{ $product->id }}">
+                                <span class="business-featured-products__image">
+                                    @if($product->image)<img src="{{ Storage::url($product->image) }}" alt="">@else<i class="bx bx-bowl-rice"></i>@endif
+                                </span>
+                                <span><strong>{{ $product->name }}</strong><small>{{ $product->category?->name ?? 'Sin categoría' }} · ${{ number_format((float) $product->price, 2) }}</small></span>
+                                <span class="business-featured-products__star" aria-hidden="true"><i class="bx bxs-star"></i></span>
+                            </label>
+                        @empty
+                            <div class="business-section-note"><i class="bx bx-info-circle"></i><span><strong>Aún no hay productos activos</strong><small>Activa productos desde el módulo Menú para poder destacarlos.</small></span></div>
+                        @endforelse
+                    </div>
+                    @error('featuredProductIds')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                    @error('featuredProductIds.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 @endif
 
-                <footer class="biz-form-actions"><p><i class="bx bx-cloud-upload"></i>Los cambios se aplicarán después de guardar.</p><button type="submit" class="biz-primary-button" wire:loading.attr="disabled" wire:target="saveBusiness,logoUpload,ticketLogoUpload,bannerUpload"><span wire:loading.remove wire:target="saveBusiness"><i class="bx bx-save"></i>Guardar configuración</span><span wire:loading wire:target="saveBusiness">Guardando…</span></button></footer>
+                <footer class="biz-form-actions"><p><i class="bx bx-cloud-upload"></i>Los cambios se aplicarán después de guardar.</p><button type="submit" class="biz-primary-button" wire:loading.attr="disabled" wire:target="saveBusiness,logoUpload,ticketLogoUpload,bannerUpload,galleryUploads"><span wire:loading.remove wire:target="saveBusiness"><i class="bx bx-save"></i>Guardar configuración</span><span wire:loading wire:target="saveBusiness">Guardando…</span></button></footer>
             </form>
         </div>
     @elseif($activeTab === 'tickets' && $canManageBusiness)

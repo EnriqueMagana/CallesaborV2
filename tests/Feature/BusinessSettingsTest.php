@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\BusinessSettingsManager;
+use App\Models\Area;
 use App\Models\BusinessSetting;
 use App\Models\CashRegister;
 use App\Models\CashRegisterCut;
+use App\Models\Mesa;
+use App\Models\Order;
+use App\Models\Product;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\ThermalTicketRenderer;
@@ -54,6 +58,7 @@ class BusinessSettingsTest extends TestCase
             ->set('businessName', 'Calle Sabor Centro')
             ->set('platformName', 'Calle Sabor POS')
             ->set('rfc', 'csb010101abc')
+            ->set('mapsUrl', 'https://maps.app.goo.gl/calle-sabor')
             ->call('saveBusiness')
             ->assertHasNoErrors()
             ->call('setTab', 'tickets')
@@ -67,6 +72,7 @@ class BusinessSettingsTest extends TestCase
             'business_name' => 'Calle Sabor Centro',
             'platform_name' => 'Calle Sabor POS',
             'rfc' => 'CSB010101ABC',
+            'maps_url' => 'https://maps.app.goo.gl/calle-sabor',
         ]);
         $this->assertDatabaseHas('ticket_templates', [
             'key' => 'customer',
@@ -84,7 +90,10 @@ class BusinessSettingsTest extends TestCase
         $attributes = TicketTemplate::defaultsFor('customer');
         $attributes['show_qr'] = true;
         $attributes['blocks'] = collect($attributes['blocks'])->map(function (array $block): array {
-            if ($block['key'] === 'qr') $block['enabled'] = true;
+            if ($block['key'] === 'qr') {
+                $block['enabled'] = true;
+            }
+
             return $block;
         })->all();
 
@@ -99,6 +108,59 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringContainsString('data:image/svg+xml;base64,', $html);
         $this->assertStringContainsString('assets/css/ticket-print.css', $html);
         $this->assertStringNotContainsString('<style', $html);
+    }
+
+    public function test_kitchen_area_ticket_includes_table_and_order_and_item_notes(): void
+    {
+        $preview = app(ThermalTicketRenderer::class)->renderPreview(
+            'kitchen_area',
+            new TicketTemplate(TicketTemplate::defaultsFor('kitchen_area')),
+            BusinessSetting::current(),
+        );
+
+        $this->assertStringContainsString('Mesa 4', $preview);
+        $this->assertStringContainsString('Entregar todos los platillos juntos.', $preview);
+        $this->assertStringContainsString('Sin cebolla; término medio.', $preview);
+
+        $user = User::factory()->create();
+        $register = CashRegister::create([
+            'name' => 'Caja cocina',
+            'opened_by' => $user->id,
+            'initial_amount' => 500,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $area = Area::create(['name' => 'Terraza']);
+        $mesa = Mesa::create([
+            'area_id' => $area->id,
+            'number' => 12,
+            'capacity' => 4,
+            'status' => 'ocupada',
+        ]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $mesa->id,
+            'served_by' => $user->id,
+            'type' => 'mesa',
+            'status' => 'pendiente',
+            'subtotal' => 145,
+            'total' => 145,
+            'notes' => 'Servir todos los platillos al mismo tiempo.',
+        ]);
+        $order->items()->create([
+            'product_name' => 'Hamburguesa especial',
+            'product_price' => 145,
+            'quantity' => 1,
+            'subtotal' => 145,
+            'notes' => 'Sin cebolla y término medio.',
+        ]);
+
+        $html = app(ThermalTicketRenderer::class)->renderOrder($order, 'kitchen_area', autoPrint: false);
+
+        $this->assertStringContainsString('Mesa 12', $html);
+        $this->assertStringContainsString('Terraza', $html);
+        $this->assertStringContainsString('Servir todos los platillos al mismo tiempo.', $html);
+        $this->assertStringContainsString('Sin cebolla y término medio.', $html);
     }
 
     public function test_cash_cut_ticket_has_editable_sections_and_a_complete_preview(): void
@@ -218,5 +280,132 @@ class BusinessSettingsTest extends TestCase
         $this->assertSame('08:30', $setting->business_hours[0]['opens']);
         $this->assertTrue($setting->business_hours[6]['enabled']);
         Storage::disk('public')->assertExists($setting->logo_path);
+    }
+
+    public function test_owner_can_configure_the_public_menu_modules(): void
+    {
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $product = Product::create(['name' => 'Favorito de prueba', 'price' => 95, 'is_active' => true]);
+
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->set('primaryColor', '#166534')
+            ->set('instagramUrl', 'https://instagram.com/callesabor')
+            ->set('tiktokUrl', 'https://tiktok.com/@callesabor')
+            ->set('featuredProductIds', [(string) $product->id])
+            ->set('galleryUploads', [
+                UploadedFile::fake()->image('ambiente.jpg', 1200, 900),
+                UploadedFile::fake()->image('platillo.jpg', 1200, 900),
+            ])
+            ->call('saveBusiness')
+            ->assertHasNoErrors();
+
+        $setting = BusinessSetting::current()->fresh();
+        $this->assertSame('#166534', $setting->primary_color);
+        $this->assertSame('https://instagram.com/callesabor', $setting->instagram_url);
+        $this->assertSame([$product->id], $setting->featured_product_ids);
+        $this->assertCount(2, $setting->gallery_paths);
+        Storage::disk('public')->assertExists($setting->gallery_paths[0]['path']);
+    }
+
+    public function test_public_menu_color_must_preserve_readable_contrast(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->set('primaryColor', '#f5f5f5')
+            ->call('saveBusiness')
+            ->assertHasErrors(['primaryColor']);
+    }
+
+    public function test_gallery_can_be_saved_independently_from_the_business_form(): void
+    {
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->set('galleryUploads', [
+                UploadedFile::fake()->image('comedor.jpg', 1200, 900),
+                UploadedFile::fake()->image('terraza.jpg', 1200, 900),
+            ])
+            ->set('galleryUploadCaptions', ['Comedor principal', 'Terraza al atardecer'])
+            ->call('saveGallery')
+            ->assertHasNoErrors()
+            ->assertSet('galleryUploads', [])
+            ->assertSet('galleryUploadCaptions', []);
+
+        $setting = BusinessSetting::current()->fresh();
+        $this->assertCount(2, $setting->gallery_paths);
+        $this->assertSame('Comedor principal', $setting->gallery_paths[0]['caption']);
+        $this->assertSame('Terraza al atardecer', $setting->gallery_paths[1]['caption']);
+        Storage::disk('public')->assertExists($setting->gallery_paths[0]['path']);
+        Storage::disk('public')->assertExists($setting->gallery_paths[1]['path']);
+    }
+
+    public function test_gallery_preserves_legacy_paths_and_allows_caption_editing_and_deletion(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('business/gallery/legacy.jpg', 'image');
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        BusinessSetting::current()->update(['gallery_paths' => ['business/gallery/legacy.jpg']]);
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->assertSet('galleryPaths.0.path', 'business/gallery/legacy.jpg')
+            ->set('galleryPaths.0.caption', 'Nuestra primera sucursal')
+            ->call('saveGallery')
+            ->assertHasNoErrors();
+
+        $setting = BusinessSetting::current()->fresh();
+        $this->assertSame('Nuestra primera sucursal', $setting->gallery_paths[0]['caption']);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->call('removeGalleryImage', 0)
+            ->assertHasNoErrors();
+
+        Storage::disk('public')->assertMissing('business/gallery/legacy.jpg');
+        $this->assertSame([], BusinessSetting::current()->fresh()->gallery_paths);
+    }
+
+    public function test_gallery_accepts_more_than_eight_images(): void
+    {
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+        $uploads = collect(range(1, 9))
+            ->map(fn (int $number) => UploadedFile::fake()->image("gallery-{$number}.jpg", 320, 240))
+            ->all();
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->set('galleryUploads', $uploads)
+            ->call('saveGallery')
+            ->assertHasNoErrors();
+
+        $this->assertCount(9, BusinessSetting::current()->fresh()->gallery_paths);
+    }
+
+    public function test_owner_can_apply_accessible_hour_presets(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->call('setHoursPreset', 'weekdays')
+            ->assertSet('businessHours.0.enabled', true)
+            ->assertSet('businessHours.4.enabled', true)
+            ->assertSet('businessHours.5.enabled', false)
+            ->assertSet('businessHours.6.enabled', false)
+            ->call('setHoursPreset', 'everyday')
+            ->assertSet('businessHours.6.enabled', true);
     }
 }

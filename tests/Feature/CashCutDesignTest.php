@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Livewire\Caja\CorteDeCaja;
+use App\Livewire\Caja\Dashboard as CashDashboard;
 use App\Models\Area;
 use App\Models\CashRegister;
+use App\Models\DeliveryAssignment;
 use App\Models\Mesa;
 use App\Models\Order;
+use App\Models\OrderPayment;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -173,6 +176,124 @@ class CashCutDesignTest extends TestCase
 
         $this->assertTrue($register->fresh()->is_open);
         $this->assertDatabaseMissing('cash_register_cuts', ['cash_register_id' => $register->id]);
+    }
+
+    public function test_paid_delivery_without_driver_assignment_blocks_the_cut(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $delivery = $this->createPendingOrder($register, $user, [
+            'customer_name' => 'Delivery sin repartidor',
+            'type' => 'delivery',
+            'delivery_method' => 'transferencia',
+            'status' => 'pagada',
+            'paid_at' => now(),
+        ]);
+        OrderPayment::create([
+            'order_id' => $delivery->id,
+            'method' => 'transferencia',
+            'amount' => $delivery->total,
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(CorteDeCaja::class)
+            ->set('declaredCash', '500.00')
+            ->assertSee('Delivery sin asignar')
+            ->assertSee("Orden #{$delivery->display_folio}")
+            ->call('confirmCut')
+            ->assertHasErrors(['cutBlockers']);
+    }
+
+    public function test_delivered_paid_delivery_does_not_block_cut_before_optional_driver_arqueo(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $driver = User::factory()->create();
+        $delivery = $this->createPendingOrder($register, $user, [
+            'customer_name' => 'Cliente entregado',
+            'type' => 'delivery',
+            'delivery_method' => 'contra_entrega',
+            'status' => 'pagada',
+            'paid_at' => now(),
+            'total' => 230,
+        ]);
+        OrderPayment::create([
+            'order_id' => $delivery->id,
+            'method' => 'efectivo',
+            'amount' => 230,
+            'received_amount' => 230,
+            'change_amount' => 0,
+        ]);
+        DeliveryAssignment::create([
+            'order_id' => $delivery->id,
+            'driver_id' => $driver->id,
+            'assigned_by' => $driver->id,
+            'delivered_by' => $driver->id,
+            'status' => 'entregado',
+            'assigned_at' => now()->subHour(),
+            'delivered_at' => now(),
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(CorteDeCaja::class)
+            ->set('declaredCash', '730.00')
+            ->call('confirmCut')
+            ->assertHasNoErrors()
+            ->assertSet('showConfirm', true);
+
+        $this->assertDatabaseMissing('delivery_settlements', [
+            'cash_register_id' => $register->id,
+            'driver_id' => $driver->id,
+        ]);
+    }
+
+    public function test_cash_dashboard_completes_a_driver_mini_cut(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $user->givePermissionTo('ver caja');
+        $driver = User::factory()->create(['name' => 'Repartidor Norte']);
+        $delivery = $this->createPendingOrder($register, $user, [
+            'type' => 'delivery',
+            'delivery_method' => 'contra_entrega',
+            'status' => 'pagada',
+            'paid_at' => now(),
+            'total' => 180,
+        ]);
+        OrderPayment::create([
+            'order_id' => $delivery->id,
+            'method' => 'efectivo',
+            'amount' => 180,
+        ]);
+        DeliveryAssignment::create([
+            'order_id' => $delivery->id,
+            'driver_id' => $driver->id,
+            'assigned_by' => $driver->id,
+            'delivered_by' => $driver->id,
+            'status' => 'entregado',
+            'assigned_at' => now()->subHour(),
+            'delivered_at' => now(),
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(CashDashboard::class)
+            ->assertSee('Mini cortes de repartidores')
+            ->assertSee('Repartidor Norte')
+            ->assertSee('Realizar arqueo')
+            ->call('openDeliverySettlement', $driver->id)
+            ->assertSet('settlementDeclaredCash', '180.00')
+            ->set('settlementNotes', 'Entregó las notas completas.')
+            ->call('completeDeliverySettlement')
+            ->assertHasNoErrors()
+            ->assertSet('settlementDriverId', null)
+            ->assertSee('Arqueo completado');
+
+        $this->assertDatabaseHas('delivery_settlements', [
+            'cash_register_id' => $register->id,
+            'driver_id' => $driver->id,
+            'declared_cash' => 180,
+            'notes' => 'Entregó las notas completas.',
+        ]);
     }
 
     private function cashContext(): array

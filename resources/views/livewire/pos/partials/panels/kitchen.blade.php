@@ -1,27 +1,24 @@
-<div class="pos-overlay-panel" :class="panels.kitchen ? 'show' : ''">
-    <div class="pos-overlay-backdrop" @click="panels.kitchen = false"></div>
-    <div class="pos-panel">
-        <div class="panel-header">
-            <i class="bx bx-restaurant" data-ui="xui-17t7e5w"></i>
-            <h5>Cocina — Flujo de preparación</h5>
-            <button class="btn-panel-close" @click="panels.kitchen = false"><i class="bx bx-x"></i></button>
-        </div>
-
-        <div data-ui="xui-13pr088">
-            <div data-ui="xui-1eviv88">
+<x-pos.area-panel panel="kitchen" title="Flujo de preparación" title-id="pos-kitchen-title"
+    eyebrow="Cocina" description="Consulta las órdenes recibidas y avanza su preparación sin perder el contexto."
+    icon="bx-restaurant" tone="kitchen" panel-class="pos-kitchen-panel" close-label="Cerrar Cocina">
+        <x-slot:tools>
+            <label class="pos-area-search">
                 <i class="bx bx-search" data-ui="xui-r3yeoq"></i>
+                <span class="visually-hidden">Buscar órdenes de cocina</span>
                 <input type="text" wire:model.live.debounce.300ms="kitchenSearch"
                        class="pos-input" data-ui="xui-1le4og8"
                        placeholder="Buscar por mesa, cliente o # orden…">
+            </label>
+            <div class="pos-area-summary">
+                <strong>{{ $this->kitchenOrders->count() }}</strong><span>órdenes activas</span>
             </div>
-        </div>
+        </x-slot:tools>
 
-        <div class="panel-body" data-ui="xui-1y41yc7">
             @if($this->kitchenOrders->isEmpty())
-                <div data-ui="xui-tiicut">
-                    <i class="bx bx-check-circle" data-ui="xui-159i0fq"></i>
-                    <div data-ui="xui-nw60f0">Todo en orden</div>
-                    <div data-ui="xui-op3n57">No hay órdenes pendientes de cocina.</div>
+                <div class="pos-area-empty">
+                    <span><i class="bx bx-check-circle"></i></span>
+                    <h3>Todo en orden</h3>
+                    <p>No hay órdenes pendientes de cocina.</p>
                 </div>
             @else
                 <div data-ui="xui-z8pdt">
@@ -45,6 +42,9 @@
                                 <div data-ui="xui-g0zfpy">
                                     @if($order->source === 'kiosk')
                                         Kiosco · {{ match($order->fulfillment) { 'dine_in' => 'Comer aquí', 'delivery' => 'Domicilio', default => 'Para recoger' } }}
+                                        @if($order->fulfillment === 'dine_in' && $order->mesa)
+                                            · Mesa {{ $order->mesa->number }}
+                                        @endif
                                     @else
                                         Mesa {{ $order->mesa?->number ?? '—' }}
                                     @endif
@@ -121,6 +121,4 @@
                 </div>
                 @endforeach
             @endif
-        </div>
-    </div>
-</div>
+</x-pos.area-panel>

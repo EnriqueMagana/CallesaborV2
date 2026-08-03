@@ -8,33 +8,43 @@
                  :class="{'text-bg-success':t.type==='success','text-bg-danger':t.type==='error','text-bg-info':t.type==='info'}">
                 <div class="d-flex">
                     <div class="toast-body fw-medium" x-text="t.message"></div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="toasts.splice(i,1)"></button>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                            aria-label="Cerrar notificación" @click="toasts.splice(i,1)"></button>
                 </div>
             </div>
         </template>
     </div>
 
     {{-- Cabecera --}}
-    <header class="app-page-header">
+    <header class="app-page-header roles-hero">
         <div class="app-page-heading">
-            <span class="app-page-icon" aria-hidden="true"><i class="bx bx-shield-quarter"></i></span>
+            <span class="app-page-icon roles-hero__icon" aria-hidden="true"><i class="bx bx-shield-quarter"></i></span>
             <div>
                 <div class="app-eyebrow">Administración · Acceso</div>
                 <h1 class="app-page-title">Roles y permisos</h1>
                 <p class="app-page-subtitle">Define responsabilidades y controla el acceso a cada módulo del sistema.</p>
             </div>
         </div>
-        <span class="app-count-pill"><i class="bx bx-lock-alt" aria-hidden="true"></i>Control de acceso</span>
+        <div class="roles-hero__summary" aria-label="Resumen de control de acceso">
+            @can('gestionar roles')
+            <span><i class="bx bx-shield" aria-hidden="true"></i><strong>{{ $this->roles->count() }}</strong> roles</span>
+            @endcan
+            @can('gestionar permisos')
+            <span><i class="bx bx-key" aria-hidden="true"></i><strong>{{ $this->permissionsByGroup->flatten()->count() }}</strong> permisos</span>
+            @endcan
+        </div>
     </header>
 
     {{-- Tabs --}}
-    <ul class="nav nav-pills app-tabs mb-4 gap-2" role="tablist" aria-label="Gestión de acceso">
+    <ul class="nav nav-pills app-tabs roles-tabs" role="tablist" aria-label="Gestión de acceso">
         @can('gestionar roles')
         <li class="nav-item">
-            <button wire:click="$set('activeTab','roles')"
+            <button type="button" role="tab" aria-selected="{{ $activeTab === 'roles' ? 'true' : 'false' }}"
+                    wire:click="$set('activeTab','roles')"
                     class="nav-link {{ $activeTab==='roles' ? 'active' : '' }}">
-                <i class="bx bx-shield me-1"></i>Roles
-                <span class="badge {{ $activeTab==='roles' ? 'bg-white text-primary' : 'bg-label-primary' }} ms-1">
+                <span class="roles-tab__icon"><i class="bx bx-shield" aria-hidden="true"></i></span>
+                <span>Roles<small>Responsabilidades del equipo</small></span>
+                <span class="roles-tab__count">
                     {{ $this->roles->count() }}
                 </span>
             </button>
@@ -42,10 +52,12 @@
         @endcan
         @can('gestionar permisos')
         <li class="nav-item">
-            <button wire:click="$set('activeTab','permissions')"
+            <button type="button" role="tab" aria-selected="{{ $activeTab === 'permissions' ? 'true' : 'false' }}"
+                    wire:click="$set('activeTab','permissions')"
                     class="nav-link {{ $activeTab==='permissions' ? 'active' : '' }}">
-                <i class="bx bx-key me-1"></i>Permisos
-                <span class="badge {{ $activeTab==='permissions' ? 'bg-white text-primary' : 'bg-label-primary' }} ms-1">
+                <span class="roles-tab__icon"><i class="bx bx-key" aria-hidden="true"></i></span>
+                <span>Permisos<small>Acciones disponibles</small></span>
+                <span class="roles-tab__count">
                     {{ $this->permissionsByGroup->flatten()->count() }}
                 </span>
             </button>
@@ -59,16 +71,18 @@
     ================================================================= --}}
     @can('gestionar roles')
     @if($activeTab === 'roles')
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="fw-semibold mb-0 text-muted">
-            {{ $this->roles->count() }} roles registrados
-        </h6>
-        <button class="btn btn-primary btn-sm" wire:click="openCreateRole">
-            <i class="bx bx-plus me-1"></i>Nuevo rol
+    <div class="roles-toolbar">
+        <div>
+            <span class="roles-toolbar__eyebrow">Directorio de roles</span>
+            <h2>{{ $this->roles->count() }} roles registrados</h2>
+            <p>Selecciona un rol para revisar usuarios, permisos y acciones disponibles.</p>
+        </div>
+        <button type="button" class="roles-primary-action" wire:click="openCreateRole">
+            <i class="bx bx-plus" aria-hidden="true"></i><span>Nuevo rol</span>
         </button>
     </div>
 
-    <div class="row g-3">
+    <div class="roles-grid">
         @foreach($this->roles as $role)
         @php
             $rc = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
@@ -76,47 +90,43 @@
             $c  = $rc[$role->name] ?? 'secondary';
             $ic = $ri[$role->name] ?? 'bx-user';
         @endphp
-        <div class="col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100"
-                 data-ui="xui-y4ry0a"
-                 wire:click="selectRole({{ $role->id }})"
-                 wire:key="role-card-{{ $role->id }}">
+        <button type="button" class="card roles-role-card"
+                data-ui="xui-y4ry0a"
+                wire:click="selectRole({{ $role->id }})"
+                wire:key="role-card-{{ $role->id }}"
+                aria-label="Abrir detalles del rol {{ $role->name }}">
                 <div class="card-body">
-                    <div class="d-flex align-items-start justify-content-between mb-3">
-                        <div class="avatar">
-                            <span class="avatar-initial rounded-circle bg-label-{{ $c }}">
-                                <i class="bx {{ $ic }}"></i>
-                            </span>
-                        </div>
-                        <span class="badge bg-label-{{ $c }}">
-                            {{ $role->users_count }} usuario(s)
+                    <div class="roles-role-card__top">
+                        <span class="roles-role-card__icon bg-label-{{ $c }}">
+                            <i class="bx {{ $ic }}" aria-hidden="true"></i>
+                        </span>
+                        <span class="roles-role-card__users">
+                            <i class="bx bx-user" aria-hidden="true"></i>{{ $role->users_count }}
                         </span>
                     </div>
-                    <h6 class="mb-1 fw-bold">{{ ucfirst($role->name) }}</h6>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="badge bg-label-primary">
-                            {{ $role->permissions_count }} permisos
-                        </span>
+                    <h3>{{ ucfirst($role->name) }}</h3>
+                    <p>{{ $role->permissions_count }} permisos asignados</p>
+                    <div class="roles-role-card__footer">
                         @if($role->name === 'super-admin')
-                            <span class="badge bg-label-danger">Bypass total</span>
+                            <span class="roles-risk-badge"><i class="bx bx-crown" aria-hidden="true"></i>Acceso total</span>
+                        @else
+                            <span><i class="bx bx-check-shield" aria-hidden="true"></i>Acceso configurado</span>
                         @endif
+                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
                     </div>
                 </div>
-            </div>
-        </div>
+        </button>
         @endforeach
 
         {{-- Card nueva rol --}}
-        <div class="col-sm-6 col-xl-3">
-            <div class="card border-0 h-100 d-flex align-items-center justify-content-center"
-                 data-ui="xui-152wzt9"
-                 wire:click="openCreateRole">
-                <div class="text-center text-muted py-3">
-                    <i class="bx bx-plus-circle fs-3 mb-1 d-block"></i>
-                    <small>Crear nuevo rol</small>
-                </div>
-            </div>
-        </div>
+        <button type="button" class="roles-create-card"
+                data-ui="xui-152wzt9"
+                wire:click="openCreateRole"
+                aria-label="Crear un nuevo rol">
+            <span><i class="bx bx-plus" aria-hidden="true"></i></span>
+            <strong>Crear nuevo rol</strong>
+            <small>Define responsabilidades y permisos</small>
+        </button>
     </div>
     @endif
     @endcan
@@ -127,16 +137,18 @@
     ================================================================= --}}
     @can('gestionar permisos')
     @if($activeTab === 'permissions')
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="fw-semibold mb-0 text-muted">
-            Permisos organizados por mÃ³dulo
-        </h6>
-        <button class="btn btn-primary btn-sm" wire:click="openCreatePerm">
-            <i class="bx bx-plus me-1"></i>Nuevo permiso
+    <div class="roles-toolbar">
+        <div>
+            <span class="roles-toolbar__eyebrow">Catálogo de permisos</span>
+            <h2>Permisos por módulo</h2>
+            <p>Consulta qué acciones existen y en qué módulo se utilizan.</p>
+        </div>
+        <button type="button" class="roles-primary-action" wire:click="openCreatePerm">
+            <i class="bx bx-plus" aria-hidden="true"></i><span>Nuevo permiso</span>
         </button>
     </div>
 
-    <div class="row g-4">
+    <div class="roles-permission-grid">
         @foreach($this->permissionsByGroup as $grp => $perms)
         @php
             $gc = ['usuarios'=>'primary','clientes'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
@@ -144,34 +156,28 @@
             $gc_val = $gc[$grp] ?? 'secondary';
             $gi_val = $gi[$grp] ?? 'bx-key';
         @endphp
-        <div class="col-md-6 col-xl-4">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header border-0 pb-0 d-flex align-items-center gap-2">
-                    <span class="avatar avatar-sm">
-                        <span class="avatar-initial rounded-circle bg-label-{{ $gc_val }}">
-                            <i class="bx {{ $gi_val }}"></i>
-                        </span>
+            <section class="card roles-permission-group">
+                <header class="roles-permission-group__header">
+                    <span class="roles-permission-group__icon bg-label-{{ $gc_val }}">
+                        <i class="bx {{ $gi_val }}" aria-hidden="true"></i>
                     </span>
                     <div>
-                        <h6 class="mb-0 fw-bold text-capitalize">{{ $grp }}</h6>
-                        <small class="text-muted">{{ $perms->count() }} permiso(s)</small>
+                        <h3>{{ $grp }}</h3>
+                        <small>{{ $perms->count() }} {{ $perms->count() === 1 ? 'permiso' : 'permisos' }}</small>
                     </div>
-                </div>
-                <div class="card-body pt-3">
-                    <div class="d-flex flex-column gap-2">
+                </header>
+                <div class="roles-permission-group__body">
                         @foreach($perms as $perm)
-                        <div class="d-flex align-items-center justify-content-between
-                                    px-2 py-1 rounded bg-light"
-                             data-ui="xui-1wc3lz9"
-                             wire:click="selectPerm({{ $perm->id }})">
-                            <span class="small fw-medium">{{ $perm->name }}</span>
-                            <i class="bx bx-chevron-right text-muted"></i>
-                        </div>
+                        <button type="button" class="roles-permission-row"
+                                data-ui="xui-1wc3lz9"
+                                wire:click="selectPerm({{ $perm->id }})"
+                                aria-label="Abrir permiso {{ $perm->name }}">
+                            <span><i class="bx bx-key" aria-hidden="true"></i>{{ $perm->name }}</span>
+                            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                        </button>
                         @endforeach
-                    </div>
                 </div>
-            </div>
-        </div>
+            </section>
         @endforeach
     </div>
     @endif
@@ -188,12 +194,18 @@
         $mc  = $rc2[$selectedRole->name] ?? 'secondary';
         $mic = $ri2[$selectedRole->name] ?? 'bx-user';
     @endphp
-    <div class="modal-backdrop fade show" data-ui="xui-1mk4i26" wire:click="closeRolePanel"></div>
-    <div class="modal fade show d-block" tabindex="-1" data-ui="xui-n1v1df" role="dialog">
-        <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-            <div class="modal-content border-0 shadow-lg">
+    <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26" wire:click="closeRolePanel"></div>
+    <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
+         role="dialog" aria-modal="true" aria-labelledby="role-detail-title"
+         x-on:keydown.escape.window="$wire.closeRolePanel()">
+        <div class="modal-dialog modal-lg roles-modal-dialog" role="document">
+            <button type="button" class="roles-modal-close" wire:click="closeRolePanel"
+                    aria-label="Cerrar detalles del rol" title="Cerrar">
+                <i class="bx bx-x" aria-hidden="true"></i>
+            </button>
+            <div class="modal-content roles-modal-content">
 
-                <div class="modal-header border-bottom">
+                <div class="modal-header roles-modal-header">
                     <div class="d-flex align-items-center gap-3">
                         <div class="avatar">
                             <span class="avatar-initial rounded-circle bg-label-{{ $mc }}">
@@ -201,16 +213,15 @@
                             </span>
                         </div>
                         <div>
-                            <h5 class="modal-title fw-bold mb-0">{{ ucfirst($selectedRole->name) }}</h5>
+                            <h2 id="role-detail-title" class="modal-title">{{ ucfirst($selectedRole->name) }}</h2>
                             <small class="text-muted">
-                                {{ $selectedRole->users_count }} usuario(s) Â· {{ $selectedRole->permissions->count() }} permiso(s)
+                                {{ $selectedRole->users_count }} usuario(s) · {{ $selectedRole->permissions->count() }} permiso(s)
                             </small>
                         </div>
                     </div>
-                    <button type="button" class="btn-close" wire:click="closeRolePanel"></button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body roles-modal-body">
                     @if($selectedRole->name === 'super-admin')
                     <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-4">
                         <i class="bx bx-crown fs-5"></i>
@@ -238,17 +249,17 @@
                     @endforelse
                 </div>
 
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button class="btn btn-outline-secondary" wire:click="closeRolePanel">
+                <div class="modal-footer roles-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" wire:click="closeRolePanel">
                         Cerrar
                     </button>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-outline-danger"
+                        <button type="button" class="btn btn-outline-danger"
                                 wire:click="confirmDeleteRole({{ $selectedRole->id }})"
                                 @if(in_array($selectedRole->name, ['owner','super-admin','admin'])) disabled title="No se puede eliminar" @endif>
                             <i class="bx bx-trash me-1"></i>Eliminar
                         </button>
-                        <button class="btn btn-primary" wire:click="openEditRole">
+                        <button type="button" class="btn btn-primary" wire:click="openEditRole">
                             <i class="bx bx-edit me-1"></i>Editar rol
                         </button>
                     </div>
@@ -264,39 +275,43 @@
          MODAL: Crear / Editar rol
     ================================================================= --}}
     @if($showRoleForm)
-    <div class="modal-backdrop fade show" data-ui="xui-1mk4i26"
-         wire:click="{{ $rolePanel ? '$set(\'showRoleForm\', false)' : 'closeRolePanel' }}"></div>
-    <div class="modal fade show d-block" tabindex="-1" data-ui="xui-n1v1df" role="dialog">
-        <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
-            <div class="modal-content border-0 shadow-lg">
+    <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26"
+         wire:click="closeRoleForm"></div>
+    <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
+         role="dialog" aria-modal="true" aria-labelledby="role-form-title"
+         x-on:keydown.escape.window="$wire.closeRoleForm()">
+        <div class="modal-dialog modal-xl roles-modal-dialog" role="document">
+            <button type="button" class="roles-modal-close" wire:click="closeRoleForm"
+                    aria-label="Cerrar formulario de rol" title="Cerrar">
+                <i class="bx bx-x" aria-hidden="true"></i>
+            </button>
+            <div class="modal-content roles-modal-content roles-modal-content--wide">
 
-                <div class="modal-header border-bottom">
+                <div class="modal-header roles-modal-header">
                     <div class="d-flex align-items-center gap-3">
                         <div class="rounded-circle bg-label-primary d-flex align-items-center justify-content-center"
                              data-ui="xui-w39nd4">
                             <i class="bx {{ $rolePanel ? 'bx-edit' : 'bx-plus' }} fs-5 text-primary"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title fw-bold mb-0">
+                            <h2 id="role-form-title" class="modal-title">
                                 {{ $rolePanel ? 'Editar rol: ' . $roleName : 'Nuevo rol' }}
-                            </h5>
+                            </h2>
                             <small class="text-muted">
                                 {{ $rolePanel ? 'Modifica nombre y permisos' : 'Configura nombre y permisos iniciales' }}
                             </small>
                         </div>
                     </div>
-                    <button type="button" class="btn-close"
-                            wire:click="{{ $rolePanel ? '$set(\'showRoleForm\', false)' : 'closeRolePanel' }}"></button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body roles-modal-body">
                     <div class="row g-4">
                         {{-- Nombre del rol --}}
                         <div class="col-12">
-                            <label class="form-label fw-medium">
+                            <label for="role-name" class="form-label fw-medium">
                                 Nombre del rol <span class="text-danger">*</span>
                             </label>
-                            <input wire:model="roleName" type="text"
+                            <input id="role-name" wire:model="roleName" type="text"
                                    class="form-control @error('roleName') is-invalid @enderror"
                                    placeholder="ej: supervisor" />
                             @error('roleName')
@@ -314,7 +329,6 @@
                                     $gi3 = ['usuarios'=>'bx-group','clientes'=>'bx-user-pin','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
                                     $gc3v = $gc3[$grp] ?? 'secondary';
                                     $gi3v = $gi3[$grp] ?? 'bx-folder';
-                                    $allSelected = collect($perms)->every(fn($p) => in_array($p->name, $rolePermissions));
                                 @endphp
                                 <div class="col-md-6 col-xl-4">
                                     <div class="card border shadow-none h-100">
@@ -349,12 +363,12 @@
                     </div>
                 </div>
 
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button class="btn btn-outline-secondary"
-                            wire:click="{{ $rolePanel ? '$set(\'showRoleForm\', false)' : 'closeRolePanel' }}">
+                <div class="modal-footer roles-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" wire:click="closeRoleForm">
                         Cancelar
                     </button>
-                    <button class="btn btn-primary" wire:click="saveRole">
+                    <button type="button" class="btn btn-primary" wire:click="saveRole"
+                            wire:loading.attr="disabled" wire:target="saveRole">
                         <span wire:loading.remove wire:target="saveRole">
                             <i class="bx bx-save me-1"></i>{{ $rolePanel ? 'Guardar cambios' : 'Crear rol' }}
                         </span>
@@ -376,30 +390,35 @@
          MODAL: Detalle de permiso
     ================================================================= --}}
     @if($permPanel && $selectedPerm && !$showPermForm)
-    <div class="modal-backdrop fade show" data-ui="xui-1mk4i26" wire:click="closePermPanel"></div>
-    <div class="modal fade show d-block" tabindex="-1" data-ui="xui-n1v1df" role="dialog">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content border-0 shadow-lg">
+    <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26" wire:click="closePermPanel"></div>
+    <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
+         role="dialog" aria-modal="true" aria-labelledby="permission-detail-title"
+         x-on:keydown.escape.window="$wire.closePermPanel()">
+        <div class="modal-dialog roles-modal-dialog roles-modal-dialog--compact" role="document">
+            <button type="button" class="roles-modal-close" wire:click="closePermPanel"
+                    aria-label="Cerrar detalles del permiso" title="Cerrar">
+                <i class="bx bx-x" aria-hidden="true"></i>
+            </button>
+            <div class="modal-content roles-modal-content">
 
-                <div class="modal-header border-bottom">
+                <div class="modal-header roles-modal-header">
                     <div class="d-flex align-items-center gap-3">
                         <div class="rounded-circle bg-label-warning d-flex align-items-center justify-content-center"
                              data-ui="xui-w39nd4">
                             <i class="bx bx-key fs-5 text-warning"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title fw-bold mb-0">{{ $selectedPerm->name }}</h5>
+                            <h2 id="permission-detail-title" class="modal-title">{{ $selectedPerm->name }}</h2>
                             <span class="badge bg-label-primary text-capitalize">{{ $selectedPerm->group }}</span>
                         </div>
                     </div>
-                    <button type="button" class="btn-close" wire:click="closePermPanel"></button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body roles-modal-body">
                     <p class="text-uppercase small fw-semibold text-muted mb-3">
                         <i class="bx bx-shield me-1"></i>Usado en roles
                     </p>
-                    @php $usedInRoles = \Spatie\Permission\Models\Role::whereHas('permissions', fn($q) => $q->where('name', $selectedPerm->name))->get(); @endphp
+                    @php $usedInRoles = $selectedPerm->roles; @endphp
                     @forelse($usedInRoles as $r)
                         @php
                             $rc3 = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
@@ -413,17 +432,17 @@
                     @endforelse
                 </div>
 
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button class="btn btn-outline-secondary" wire:click="closePermPanel">
+                <div class="modal-footer roles-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" wire:click="closePermPanel">
                         Cerrar
                     </button>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-outline-danger"
+                        <button type="button" class="btn btn-outline-danger"
                                 wire:click="confirmDeletePerm({{ $selectedPerm->id }})">
                             <i class="bx bx-trash me-1"></i>Eliminar
                         </button>
-                        <button class="btn btn-primary"
-                                wire:click="$set('showPermForm', true)">
+                        <button type="button" class="btn btn-primary"
+                                wire:click="openEditPerm">
                             <i class="bx bx-edit me-1"></i>Editar
                         </button>
                     </div>
@@ -439,37 +458,41 @@
          MODAL: Crear / Editar permiso
     ================================================================= --}}
     @if($showPermForm)
-    <div class="modal-backdrop fade show" data-ui="xui-1mk4i26"
-         wire:click="{{ $permPanel ? '$set(\'showPermForm\', false)' : 'closePermPanel' }}"></div>
-    <div class="modal fade show d-block" tabindex="-1" data-ui="xui-n1v1df" role="dialog">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content border-0 shadow-lg">
+    <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26"
+         wire:click="closePermForm"></div>
+    <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
+         role="dialog" aria-modal="true" aria-labelledby="permission-form-title"
+         x-on:keydown.escape.window="$wire.closePermForm()">
+        <div class="modal-dialog roles-modal-dialog roles-modal-dialog--compact" role="document">
+            <button type="button" class="roles-modal-close" wire:click="closePermForm"
+                    aria-label="Cerrar formulario de permiso" title="Cerrar">
+                <i class="bx bx-x" aria-hidden="true"></i>
+            </button>
+            <div class="modal-content roles-modal-content">
 
-                <div class="modal-header border-bottom">
+                <div class="modal-header roles-modal-header">
                     <div class="d-flex align-items-center gap-3">
                         <div class="rounded-circle bg-label-warning d-flex align-items-center justify-content-center"
                              data-ui="xui-w39nd4">
                             <i class="bx {{ $permPanel ? 'bx-edit' : 'bx-plus' }} fs-5 text-warning"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title fw-bold mb-0">
+                            <h2 id="permission-form-title" class="modal-title">
                                 {{ $permPanel ? 'Editar permiso' : 'Nuevo permiso' }}
-                            </h5>
+                            </h2>
                             <small class="text-muted">
-                                {{ $permPanel ? 'Modifica nombre y mÃ³dulo' : 'Define nombre y mÃ³dulo' }}
+                                {{ $permPanel ? 'Modifica nombre y módulo' : 'Define nombre y módulo' }}
                             </small>
                         </div>
                     </div>
-                    <button type="button" class="btn-close"
-                            wire:click="{{ $permPanel ? '$set(\'showPermForm\', false)' : 'closePermPanel' }}"></button>
                 </div>
 
-                <div class="modal-body">
+                <div class="modal-body roles-modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-medium">
+                        <label for="permission-name" class="form-label fw-medium">
                             Nombre del permiso <span class="text-danger">*</span>
                         </label>
-                        <input wire:model="permName" type="text"
+                        <input id="permission-name" wire:model="permName" type="text"
                                class="form-control @error('permName') is-invalid @enderror"
                                placeholder="ej: exportar reportes" />
                         @error('permName')
@@ -477,12 +500,12 @@
                         @enderror
                     </div>
                     <div class="mb-1">
-                        <label class="form-label fw-medium">
-                            MÃ³dulo <span class="text-danger">*</span>
+                        <label for="permission-group" class="form-label fw-medium">
+                            Módulo <span class="text-danger">*</span>
                         </label>
-                        <select wire:model="permGroup"
+                        <select id="permission-group" wire:model="permGroup"
                                 class="form-select @error('permGroup') is-invalid @enderror">
-                            <option value="">Selecciona un mÃ³dulo</option>
+                            <option value="">Selecciona un módulo</option>
                             @foreach($groups as $g)
                                 <option value="{{ $g }}">{{ ucfirst($g) }}</option>
                             @endforeach
@@ -493,12 +516,12 @@
                     </div>
                 </div>
 
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button class="btn btn-outline-secondary"
-                            wire:click="{{ $permPanel ? '$set(\'showPermForm\', false)' : 'closePermPanel' }}">
+                <div class="modal-footer roles-modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" wire:click="closePermForm">
                         Cancelar
                     </button>
-                    <button class="btn btn-warning" wire:click="savePerm">
+                    <button type="button" class="btn btn-warning" wire:click="savePerm"
+                            wire:loading.attr="disabled" wire:target="savePerm">
                         <span wire:loading.remove wire:target="savePerm">
                             <i class="bx bx-save me-1"></i>{{ $permPanel ? 'Guardar cambios' : 'Crear permiso' }}
                         </span>

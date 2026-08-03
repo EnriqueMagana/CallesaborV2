@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -65,7 +66,7 @@ class RolePermissionManager extends Component
     public function selectRole(int $id): void
     {
         $this->authorizePermission('gestionar roles');
-        $this->selectedRole   = Role::with('permissions')->find($id);
+        $this->selectedRole   = Role::with('permissions')->withCount('users')->findOrFail($id);
         $this->rolePanel      = $id;
         $this->showRoleForm   = false;
         $this->rolePermissions = $this->selectedRole->permissions->pluck('name')->toArray();
@@ -92,11 +93,32 @@ class RolePermissionManager extends Component
         $this->roleName       = $this->selectedRole->name;
     }
 
+    public function closeRoleForm(): void
+    {
+        $this->resetValidation();
+
+        if (! $this->rolePanel || ! $this->selectedRole) {
+            $this->closeRolePanel();
+
+            return;
+        }
+
+        $this->showRoleForm = false;
+        $this->roleName = $this->selectedRole->name;
+        $this->rolePermissions = $this->selectedRole->permissions->pluck('name')->toArray();
+    }
+
     public function saveRole(): void
     {
         $this->authorizePermission('gestionar roles');
         $this->validate([
-            'roleName' => 'required|string|min:2|max:50',
+            'roleName' => [
+                'required',
+                'string',
+                'min:2',
+                'max:50',
+                Rule::unique('roles', 'name')->ignore($this->rolePanel),
+            ],
         ]);
 
         if ($this->rolePanel) {
@@ -147,7 +169,7 @@ class RolePermissionManager extends Component
     public function selectPerm(int $id): void
     {
         $this->authorizePermission('gestionar permisos');
-        $this->selectedPerm = Permission::find($id);
+        $this->selectedPerm = Permission::with('roles')->findOrFail($id);
         $this->permPanel    = $id;
         $this->showPermForm = false;
         $this->permName     = $this->selectedPerm->name;
@@ -168,12 +190,40 @@ class RolePermissionManager extends Component
         $this->permGroup = '';
     }
 
+    public function openEditPerm(): void
+    {
+        $this->authorizePermission('gestionar permisos');
+        abort_unless($this->selectedPerm, 404);
+        $this->showPermForm = true;
+    }
+
+    public function closePermForm(): void
+    {
+        $this->resetValidation();
+
+        if (! $this->permPanel || ! $this->selectedPerm) {
+            $this->closePermPanel();
+
+            return;
+        }
+
+        $this->showPermForm = false;
+        $this->permName = $this->selectedPerm->name;
+        $this->permGroup = $this->selectedPerm->group ?? '';
+    }
+
     public function savePerm(): void
     {
         $this->authorizePermission('gestionar permisos');
         $this->validate([
-            'permName'  => 'required|string|min:2|max:100',
-            'permGroup' => 'required|string',
+            'permName' => [
+                'required',
+                'string',
+                'min:2',
+                'max:100',
+                Rule::unique('permissions', 'name')->ignore($this->permPanel),
+            ],
+            'permGroup' => ['required', 'string', Rule::in($this->groups)],
         ]);
 
         if ($this->permPanel) {

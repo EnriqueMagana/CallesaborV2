@@ -285,12 +285,11 @@ class KioskOrderTest extends TestCase
         $component = Livewire::test(OrderWizard::class, ['token' => $token])
             ->call('chooseFulfillment', 'dine_in')
             ->call('openProduct', $product->id)
-            ->call('changeAddonQuantity', $group->id, $addon->id, 1)
-            ->call('changeAddonQuantity', $group->id, $addon->id, 1)
-            ->assertSet("addonQuantities.{$addon->id}", 2)
-            ->call('changeAddonQuantity', $group->id, $addon->id, 1)
+            ->call('addCustomizedProduct', [$addon->id => 3], [], 1, '')
             ->assertHasErrors('customization')
-            ->call('addCustomizedProduct')
+            ->assertSet('cart', [])
+            ->call('addCustomizedProduct', [$addon->id => 2], [], 1, '')
+            ->assertHasNoErrors('customization')
             ->assertSet('cart.0.addon_names.0', 'Queso extra ×2')
             ->assertSet('cart.0.subtotal', 120.0)
             ->set('customerName', 'Luis')
@@ -346,13 +345,11 @@ class KioskOrderTest extends TestCase
             ->assertSee('Te recomendamos Hamburguesas')
             ->assertSee('Hamburguesa clásica')
             ->assertSee('Papas crujientes')
-            ->assertSeeHtml('wire:submit="applySearch"')
-            ->assertSeeHtml('wire:model="search"')
-            ->assertDontSeeHtml('wire:model.live')
-            ->set('search', 'Hamburguesa')
-            ->call('applySearch')
-            ->assertSee('Hamburguesa clásica')
-            ->assertDontSee('Papas crujientes');
+            ->assertSeeHtml('x-on:submit.prevent')
+            ->assertSeeHtml('x-model.debounce.120ms="query"')
+            ->assertSeeHtml('x-show="matches(')
+            ->assertDontSeeHtml('wire:submit="applySearch"')
+            ->assertDontSeeHtml('wire:model="search"');
     }
 
     public function test_featured_product_uses_the_promotional_price_from_homepage_to_sale(): void

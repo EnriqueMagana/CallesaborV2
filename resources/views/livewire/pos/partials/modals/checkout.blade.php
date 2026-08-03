@@ -14,6 +14,12 @@
                 <div class="co-summary">
                     @foreach ($cart as $item)
                         <div class="co-sum-item">
+                            @if(!empty($item['product_image']))
+                                <img class="co-sum-image" src="{{ Storage::url($item['product_image']) }}"
+                                     alt="" width="48" height="48" loading="lazy" decoding="async">
+                            @else
+                                <span class="co-sum-image is-empty" aria-hidden="true"><i class="bx bx-food-menu"></i></span>
+                            @endif
                             <div>
                                 <div class="co-sum-name">{{ $item['quantity'] }}× {{ $item['product_name'] }}</div>
                                 @foreach ($item['addons'] as $a)
@@ -74,7 +80,7 @@
                     <div class="co-search-group">
                         <div class="co-search-wrap">
                             <i class="bx bx-search co-search-icon"></i>
-                            <input type="text" wire:model.live.debounce.300ms="customerSearch"
+                            <input type="search" wire:model.live.debounce.450ms="customerSearch"
                                 class="co-input co-search-input" placeholder="Buscar cliente en CRM…"
                                 autocomplete="off">
                         </div>
@@ -297,7 +303,7 @@
                             @if ($payMethod === 'cash')
                                 <div>
                                     <label class="co-label">Con cuánto paga</label>
-                                    <input type="number" wire:model.live="payCashReceived" class="co-input"
+                                    <input type="number" wire:model.live.debounce.350ms="payCashReceived" class="co-input"
                                         placeholder="0.00" step="0.50" min="0">
                                 </div>
                             @elseif($payMethod === 'card')

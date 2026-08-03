@@ -5,8 +5,12 @@ namespace Tests\Feature;
 use App\Livewire\Mesas\GestionMesas;
 use App\Livewire\Mesas\MesaOrden;
 use App\Livewire\Mesas\SplitCuenta;
+use App\Models\Addon;
+use App\Models\AddonGroup;
 use App\Models\Area;
 use App\Models\CashRegister;
+use App\Models\Category;
+use App\Models\Ingredient;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaSplit;
@@ -15,6 +19,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -240,6 +245,232 @@ class MesasPermissionsTest extends TestCase
         Livewire::actingAs($viewer)
             ->test(MesaOrden::class, ['mesa' => $mesa])
             ->assertForbidden();
+    }
+
+    public function test_table_order_accepts_more_than_two_different_products(): void
+    {
+        $area = $this->area();
+        $operator = $this->employee(['ver mesas', 'ordenar mesas']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $operator);
+        $category = Category::create(['name' => 'Pruebas', 'is_active' => true]);
+        $products = collect(range(1, 4))->map(fn($number) => Product::create([
+            'category_id' => $category->id,
+            'name' => "Producto {$number}",
+            'price' => 20 + $number,
+            'is_active' => true,
+        ]));
+
+        $component = Livewire::actingAs($operator)
+            ->test(MesaOrden::class, ['mesa' => $mesa]);
+
+        foreach ($products as $product) {
+            $component->call('openCustomize', $product->id)->assertHasNoErrors();
+        }
+
+        $component
+            ->assertCount('cart', 4)
+            ->assertSet('cart.0.name', 'Producto 1')
+            ->assertSet('cart.3.name', 'Producto 4');
+    }
+
+    public function test_pasta_then_hamburger_and_reverse_sequence_remain_interactive(): void
+    {
+        $area = $this->area();
+        $operator = $this->employee(['ver mesas', 'ordenar mesas']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $operator);
+        $category = Category::create(['name' => 'Platos', 'is_active' => true]);
+        $pasta = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Pasta',
+            'price' => 120,
+            'is_customizable' => true,
+            'min_ingredients' => 1,
+            'max_ingredients' => 3,
+            'is_active' => true,
+        ]);
+        $ingredient = Ingredient::create([
+            'name' => 'Salsa para pasta',
+            'is_active' => true,
+        ]);
+        $pasta->ingredients()->attach($ingredient->id);
+        $hamburger = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Hamburguesa',
+            'price' => 95,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($operator)
+            ->test(MesaOrden::class, ['mesa' => $mesa])
+            ->call('openCustomize', $pasta->id)
+            ->call('confirmCustomize', [], [$ingredient->id => 1], 1, '')
+            ->assertSet('showCustomize', false)
+            ->assertSet('customizingProduct', null)
+            ->assertSet('selectedIngredients', [])
+            ->call('openCustomize', $hamburger->id)
+            ->assertCount('cart', 2)
+            ->assertSet('cart.0.name', 'Pasta')
+            ->assertSet('cart.1.name', 'Hamburguesa');
+
+        Livewire::actingAs($operator)
+            ->test(MesaOrden::class, ['mesa' => $mesa])
+            ->call('openCustomize', $hamburger->id)
+            ->call('openCustomize', $pasta->id)
+            ->assertSet('showCustomize', true)
+            ->call('confirmCustomize', [], [$ingredient->id => 1], 1, '')
+            ->assertCount('cart', 2)
+            ->assertSet('cart.0.name', 'Hamburguesa')
+            ->assertSet('cart.1.name', 'Pasta');
+
+        $styles = file_get_contents(public_path('assets/css/mesa-orden.css'));
+
+        $this->assertMatchesRegularExpression(
+            '/\.mo-cart-container\s*\{[^}]*pointer-events:\s*none;/s',
+            $styles,
+            'El contenedor invisible del carrito no debe interceptar tarjetas del catálogo.',
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.mo-cart-drawer\s*\{[^}]*visibility:\s*hidden;[^}]*pointer-events:\s*none;/s',
+            $styles,
+            'El cajón cerrado debe quedar fuera de la interacción.',
+        );
+    }
+
+    public function test_customization_limits_are_enforced_again_when_product_is_confirmed(): void
+    {
+        $area = $this->area();
+        $operator = $this->employee(['ver mesas', 'ordenar mesas']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $operator);
+        $category = Category::create(['name' => 'Configurables', 'is_active' => true]);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Producto configurable',
+            'price' => 70,
+            'is_customizable' => true,
+            'max_addons' => 2,
+            'min_ingredients' => 1,
+            'max_ingredients' => 2,
+            'is_active' => true,
+        ]);
+        $group = AddonGroup::create([
+            'name' => 'Complementos',
+            'min_selections' => 0,
+            'max_selections' => 3,
+            'is_active' => true,
+        ]);
+        $addons = collect(range(1, 3))->map(fn($number) => Addon::create([
+            'addon_group_id' => $group->id,
+            'name' => "Complemento {$number}",
+            'is_active' => true,
+        ]));
+        $ingredients = collect(range(1, 3))->map(fn($number) => Ingredient::create([
+            'name' => "Ingrediente {$number}",
+            'is_active' => true,
+        ]));
+        $product->addonGroups()->attach($group->id);
+        $product->ingredients()->attach($ingredients->pluck('id'));
+
+        $component = Livewire::actingAs($operator)
+            ->test(MesaOrden::class, ['mesa' => $mesa])
+            ->call('openCustomize', $product->id)
+            ->call('confirmCustomize', $addons->pluck('id')->all(), [$ingredients[0]->id => 1], 1, '')
+            ->assertHasErrors('addons_general')
+            ->call(
+                'confirmCustomize',
+                $addons->take(2)->pluck('id')->all(),
+                [$ingredients[0]->id => 2, $ingredients[1]->id => 1],
+                1,
+                '',
+            )
+            ->assertHasErrors('ingredients');
+
+        $component
+            ->call(
+                'confirmCustomize',
+                $addons->take(2)->pluck('id')->all(),
+                [$ingredients[0]->id => 1, $ingredients[1]->id => 1],
+                1,
+                'Sin picante',
+            )
+            ->assertHasNoErrors()
+            ->assertCount('cart', 1)
+            ->assertSet('cart.0.notes', 'Sin picante');
+    }
+
+    public function test_customization_uses_local_controls_and_renders_available_images(): void
+    {
+        $area = $this->area();
+        $operator = $this->employee(['ver mesas', 'ordenar mesas']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $operator);
+        $category = Category::create(['name' => 'Imágenes', 'is_active' => true]);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Hamburguesa visual',
+            'image' => 'menu/hamburguesa.webp',
+            'price' => 90,
+            'is_customizable' => true,
+            'is_active' => true,
+        ]);
+        $ingredient = Ingredient::create([
+            'name' => 'Aguacate',
+            'image' => 'ingredients/aguacate.webp',
+            'is_active' => true,
+        ]);
+        $product->ingredients()->attach($ingredient->id);
+
+        Livewire::actingAs($operator)
+            ->test(MesaOrden::class, ['mesa' => $mesa])
+            ->call('openCustomize', $product->id)
+            ->assertSee('menu/hamburguesa.webp', false)
+            ->assertSee('ingredients/aguacate.webp', false)
+            ->assertSee('x-on:click="changeIngredient', false)
+            ->assertSee('x-on:click="submit($wire)"', false)
+            ->assertDontSee('wire:click="setIngredientQty', false)
+            ->assertDontSee('wire:click="$set(\'itemQty\'', false);
+    }
+
+    public function test_product_catalog_does_not_query_customizations_once_per_product(): void
+    {
+        $area = $this->area();
+        $operator = $this->employee(['ver mesas', 'ordenar mesas']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $operator);
+        $category = Category::create(['name' => 'Catálogo amplio', 'is_active' => true]);
+
+        foreach (range(1, 15) as $number) {
+            Product::create([
+                'category_id' => $category->id,
+                'name' => "Producto catálogo {$number}",
+                'price' => $number,
+                'is_active' => true,
+            ]);
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::actingAs($operator)
+            ->test(MesaOrden::class, ['mesa' => $mesa])
+            ->assertSee('Producto catálogo 15');
+
+        $queries = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->map(fn($query) => mb_strtolower($query));
+
+        $this->assertLessThanOrEqual(
+            2,
+            $queries->filter(fn($query) => str_contains($query, 'addon_groups'))->count(),
+            'El catálogo volvió a consultar los complementos por cada producto.',
+        );
+        $this->assertLessThanOrEqual(
+            2,
+            $queries->filter(fn($query) => str_contains($query, 'product_ingredient'))->count(),
+            'El catálogo volvió a consultar los ingredientes por cada producto.',
+        );
     }
 
     public function test_split_creation_and_cancellation_use_separate_permissions(): void

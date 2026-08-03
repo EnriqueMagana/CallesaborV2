@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MesaSplit extends Model
 {
-    protected $fillable = ['mesa_id', 'created_by', 'split_data', 'status', 'total', 'notes'];
+    protected $fillable = ['mesa_id', 'mesa_service_id', 'created_by', 'split_data', 'status', 'total', 'notes'];
 
     protected $casts = [
         'split_data' => 'array',
@@ -17,6 +17,11 @@ class MesaSplit extends Model
     public function mesa(): BelongsTo
     {
         return $this->belongsTo(Mesa::class);
+    }
+
+    public function mesaService(): BelongsTo
+    {
+        return $this->belongsTo(MesaService::class);
     }
 
     public function creator(): BelongsTo

@@ -1,19 +1,29 @@
 <?php
 
-use App\Livewire\Admin\RolePermissionManager;
-use App\Livewire\Admin\UserList;
-use App\Livewire\Admin\KioskSettings;
-use App\Livewire\Admin\BusinessSettingsManager;
+use App\Http\Controllers\InventoryPurchaseTicketController;
 use App\Http\Controllers\KioskLaunchController;
 use App\Http\Controllers\KioskMediaController;
-use App\Http\Controllers\InventoryPurchaseTicketController;
+use App\Http\Controllers\PublicHomeController;
+use App\Http\Controllers\PublicInfoController;
+use App\Http\Controllers\PublicMenuController;
+use App\Http\Middleware\EnforceSidebarModuleAccess;
+use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\PreventBackHistory;
+use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
+use App\Livewire\Admin\BusinessSettingsManager;
+use App\Livewire\Admin\KioskSettings;
+use App\Livewire\Admin\RolePermissionManager;
+use App\Livewire\Admin\UserList;
+use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\CorteDetalle;
 use App\Livewire\Caja\CorteHistorial;
-use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\Dashboard as CajaDashboard;
-use App\Livewire\Dashboard;
 use App\Livewire\Customers\CustomerManager;
+use App\Livewire\Dashboard;
 use App\Livewire\Delivery\DeliveryBoard;
+use App\Livewire\Inventory\InventoryManager;
+use App\Livewire\Kiosk\OrderTracking;
+use App\Livewire\Kiosk\OrderWizard;
 use App\Livewire\Menu\MenuBuilder;
 use App\Livewire\Mesas\GestionMesas;
 use App\Livewire\Mesas\MesaOrden;
@@ -23,22 +33,24 @@ use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
 use App\Livewire\Orders\SalesHistory;
 use App\Livewire\Pos\PointOfSale;
-use App\Livewire\Kiosk\OrderTracking;
-use App\Livewire\Kiosk\OrderWizard;
-use App\Livewire\Inventory\InventoryManager;
 use App\Livewire\Reservas\CalendarioReservas;
+use App\Models\CashRegisterCut;
 use App\Models\Order;
 use App\Models\Reservation;
 use App\Services\ThermalTicketRenderer;
-use App\Http\Middleware\EnsureUserIsActive;
-use App\Http\Middleware\EnforceSidebarModuleAccess;
-use App\Http\Middleware\PreventBackHistory;
-use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome');
+Route::get('/', PublicHomeController::class)->name('public.home');
+Route::get('/menu', PublicMenuController::class)->name('public.menu');
+Route::get('/horarios', [PublicInfoController::class, 'hours'])->name('public.hours');
+Route::get('/galeria', [PublicInfoController::class, 'gallery'])->name('public.gallery');
+Route::get('/contacto', [PublicInfoController::class, 'contact'])->name('public.contact');
+
+Route::get('/admin', function () {
+    return redirect()->route(Auth::check() ? 'app.dashboard' : 'login');
+})->name('admin.redirect');
 
 Route::get('/auth/session-status', function () {
     return response()->json([
@@ -75,7 +87,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/caja/{id}/corte', CorteDeCaja::class)->middleware('can:cerrar caja')->name('caja.corte.id');
     Route::get('/caja/cortes', CorteHistorial::class)->middleware('can:ver caja')->name('caja.cortes');
     Route::get('/caja/cortes/{cut}', CorteDetalle::class)->middleware('can:ver caja')->name('caja.corte.detalle');
-    Route::get('/caja/cut/{cut}/print', function (\App\Models\CashRegisterCut $cut, ThermalTicketRenderer $renderer) {
+    Route::get('/caja/cut/{cut}/print', function (CashRegisterCut $cut, ThermalTicketRenderer $renderer) {
         return response($renderer->renderCashCut($cut))->header('Content-Type', 'text/html; charset=UTF-8');
     })->middleware('can:reimprimir tickets')->name('caja.corte.print');
 
@@ -94,7 +106,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
         ])->get();
 
         return response()->json(
-            $reservations->map(fn($r) => $r->toCalendarEvent())
+            $reservations->map(fn ($r) => $r->toCalendarEvent())
         );
     })->middleware('can:ver reservas')->name('reservas.events');
 });

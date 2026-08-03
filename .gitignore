@@ -1,6 +1,9 @@
 *.log
 .DS_Store
 .env
+.claude
+/claude/worktrees
+.agents
 .env.backup
 .env.production
 .phpactor.json
