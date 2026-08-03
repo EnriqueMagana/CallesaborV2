@@ -14,6 +14,7 @@ class RolesAndPermissionsSeeder extends Seeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         $permissions = [
+            'punto_venta' => ['usar punto de venta'],
             'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion'],
@@ -89,6 +90,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Gerente
         $gerente = Role::firstOrCreate(['name' => 'gerente', 'guard_name' => 'web']);
         $gerente->syncPermissions([
+            'usar punto de venta',
             'ver usuarios',
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias',
@@ -111,6 +113,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Cajero
         $cajero = Role::firstOrCreate(['name' => 'cajero', 'guard_name' => 'web']);
         $cajero->syncPermissions([
+            'usar punto de venta',
             'ver clientes', 'crear clientes', 'editar clientes',
             'ver ordenes', 'crear ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
@@ -123,8 +126,9 @@ class RolesAndPermissionsSeeder extends Seeder
         // Mesero
         $mesero = Role::firstOrCreate(['name' => 'mesero', 'guard_name' => 'web']);
         $mesero->syncPermissions([
-            'ver ordenes', 'crear ordenes', 'editar ordenes',
+            'ver ordenes', 'crear ordenes', 'editar ordenes', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
+            'dividir mesas', 'cancelar divisiones mesas', 'reasignar mesas', 'gestionar grupos',
         ]);
 
         // Cocinero

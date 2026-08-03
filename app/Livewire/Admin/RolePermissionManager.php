@@ -23,26 +23,52 @@ class RolePermissionManager extends Component
             $this->activeTab = 'permissions';
         }
     }
+
     // ── Vista activa: 'roles' | 'permissions' ─────────────────────────
     public string $activeTab = 'roles';
 
     // ── Panel de rol ──────────────────────────────────────────────────
-    public ?int  $rolePanel     = null;  // id del rol seleccionado
-    public ?Role $selectedRole  = null;
-    public bool  $showRoleForm  = false; // nivel 2: crear/editar rol
-    public string $roleName     = '';
-    public array  $rolePermissions = [];  // permisos del rol en edición
+    public ?int $rolePanel = null;  // id del rol seleccionado
+
+    public ?Role $selectedRole = null;
+
+    public bool $showRoleForm = false; // nivel 2: crear/editar rol
+
+    public string $roleName = '';
+
+    public array $rolePermissions = [];  // permisos del rol en edición
 
     // ── Panel de permiso ──────────────────────────────────────────────
-    public ?int        $permPanel     = null;
-    public ?Permission $selectedPerm  = null;
-    public bool        $showPermForm  = false;
-    public string      $permName      = '';
-    public string      $permGroup     = '';
+    public ?int $permPanel = null;
+
+    public ?Permission $selectedPerm = null;
+
+    public bool $showPermForm = false;
+
+    public string $permName = '';
+
+    public string $permGroup = '';
 
     // ── Módulos / grupos disponibles ──────────────────────────────────
     public array $groups = [
-        'usuarios', 'menu', 'ordenes', 'mesas', 'caja', 'reportes', 'configuracion', 'kiosco',
+        'punto_venta', 'usuarios', 'clientes', 'menu', 'ordenes', 'mesas', 'caja',
+        'reservas', 'delivery', 'inventario', 'reportes', 'configuracion', 'kiosco',
+    ];
+
+    public array $groupDefinitions = [
+        'punto_venta' => ['label' => 'Punto de venta', 'icon' => 'bx-store-alt', 'tone' => 'success', 'description' => 'Acceso al terminal de venta y cobro directo.'],
+        'usuarios' => ['label' => 'Usuarios y roles', 'icon' => 'bx-group', 'tone' => 'primary', 'description' => 'Personal, cuentas y control de acceso.'],
+        'clientes' => ['label' => 'Clientes', 'icon' => 'bx-user-pin', 'tone' => 'info', 'description' => 'Directorio y datos de clientes.'],
+        'menu' => ['label' => 'Menú', 'icon' => 'bx-food-menu', 'tone' => 'success', 'description' => 'Productos, categorías y complementos.'],
+        'ordenes' => ['label' => 'Órdenes', 'icon' => 'bx-receipt', 'tone' => 'info', 'description' => 'Pedidos, estados y tickets.'],
+        'mesas' => ['label' => 'Mesas', 'icon' => 'bx-table', 'tone' => 'warning', 'description' => 'Servicio, cuentas y distribución del salón.'],
+        'caja' => ['label' => 'Caja', 'icon' => 'bx-wallet', 'tone' => 'danger', 'description' => 'Apertura, cobro, gastos y cortes.'],
+        'reservas' => ['label' => 'Reservaciones', 'icon' => 'bx-calendar-check', 'tone' => 'primary', 'description' => 'Calendario y atención de reservaciones.'],
+        'delivery' => ['label' => 'Delivery', 'icon' => 'bx-cycling', 'tone' => 'warning', 'description' => 'Asignación y entrega de pedidos.'],
+        'inventario' => ['label' => 'Inventario', 'icon' => 'bx-package', 'tone' => 'success', 'description' => 'Insumos, ajustes y compras.'],
+        'reportes' => ['label' => 'Reportes', 'icon' => 'bx-bar-chart-alt-2', 'tone' => 'secondary', 'description' => 'Indicadores, históricos y exportaciones.'],
+        'configuracion' => ['label' => 'Configuración', 'icon' => 'bx-cog', 'tone' => 'secondary', 'description' => 'Negocio, navegación y reglas del sistema.'],
+        'kiosco' => ['label' => 'Kioscos', 'icon' => 'bx-devices', 'tone' => 'info', 'description' => 'Terminales de autoservicio.'],
     ];
 
     // ── Computed ──────────────────────────────────────────────────────
@@ -56,9 +82,12 @@ class RolePermissionManager extends Component
     #[Computed]
     public function permissionsByGroup()
     {
-        return Permission::orderBy('group')->orderBy('name')
+        $order = array_flip($this->groups);
+
+        return Permission::orderBy('name')
             ->get()
-            ->groupBy('group');
+            ->groupBy(fn (Permission $permission): string => $permission->group ?: 'sin_modulo')
+            ->sortBy(fn ($permissions, string $group): int => $order[$group] ?? 999);
     }
 
     // ── Roles: acciones ───────────────────────────────────────────────
@@ -66,9 +95,9 @@ class RolePermissionManager extends Component
     public function selectRole(int $id): void
     {
         $this->authorizePermission('gestionar roles');
-        $this->selectedRole   = Role::with('permissions')->withCount('users')->findOrFail($id);
-        $this->rolePanel      = $id;
-        $this->showRoleForm   = false;
+        $this->selectedRole = Role::with('permissions')->withCount('users')->findOrFail($id);
+        $this->rolePanel = $id;
+        $this->showRoleForm = false;
         $this->rolePermissions = $this->selectedRole->permissions->pluck('name')->toArray();
     }
 
@@ -80,17 +109,18 @@ class RolePermissionManager extends Component
     public function openCreateRole(): void
     {
         $this->authorizePermission('gestionar roles');
-        $this->closeRolePanel();
-        $this->showRoleForm = true;
+        $this->rolePanel = null;
+        $this->selectedRole = null;
         $this->roleName = '';
         $this->rolePermissions = [];
+        $this->showRoleForm = true;
     }
 
     public function openEditRole(): void
     {
         $this->authorizePermission('gestionar roles');
-        $this->showRoleForm   = true;
-        $this->roleName       = $this->selectedRole->name;
+        $this->showRoleForm = true;
+        $this->roleName = $this->selectedRole->name;
     }
 
     public function closeRoleForm(): void
@@ -170,10 +200,10 @@ class RolePermissionManager extends Component
     {
         $this->authorizePermission('gestionar permisos');
         $this->selectedPerm = Permission::with('roles')->findOrFail($id);
-        $this->permPanel    = $id;
+        $this->permPanel = $id;
         $this->showPermForm = false;
-        $this->permName     = $this->selectedPerm->name;
-        $this->permGroup    = $this->selectedPerm->group ?? '';
+        $this->permName = $this->selectedPerm->name;
+        $this->permGroup = $this->selectedPerm->group ?? '';
     }
 
     public function closePermPanel(): void
@@ -186,7 +216,7 @@ class RolePermissionManager extends Component
         $this->authorizePermission('gestionar permisos');
         $this->closePermPanel();
         $this->showPermForm = true;
-        $this->permName  = '';
+        $this->permName = '';
         $this->permGroup = '';
     }
 
@@ -228,15 +258,15 @@ class RolePermissionManager extends Component
 
         if ($this->permPanel) {
             $this->selectedPerm->update([
-                'name'  => $this->permName,
+                'name' => $this->permName,
                 'group' => $this->permGroup,
             ]);
             $this->dispatch('notify', type: 'success', message: 'Permiso actualizado.');
         } else {
             Permission::create([
-                'name'       => $this->permName,
+                'name' => $this->permName,
                 'guard_name' => 'web',
-                'group'      => $this->permGroup,
+                'group' => $this->permGroup,
             ]);
             $this->dispatch('notify', type: 'success', message: 'Permiso creado.');
         }
@@ -270,10 +300,10 @@ class RolePermissionManager extends Component
     #[On('modal-confirmed')]
     public function handleModalConfirmed(string $action, array $params = []): void
     {
-        match($action) {
+        match ($action) {
             'deleteRole' => $this->deleteRole($params[0]),
             'deletePerm' => $this->deletePerm($params[0]),
-            default      => null,
+            default => null,
         };
     }
 

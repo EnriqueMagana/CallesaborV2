@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Orders;
 
+use App\Models\CashRegister;
 use App\Models\Order;
-use App\Models\OrderItem;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -12,16 +12,25 @@ class OrderDetail extends Component
     public Order $order;
 
     // ─── Cancel item modal ─────────────────────────────────────────────────────
-    public bool   $showCancelItemModal = false;
-    public ?int   $cancelItemId        = null;
+    public bool $showCancelItemModal = false;
+
+    public ?int $cancelItemId = null;
 
     // ─── Cancel order modal ────────────────────────────────────────────────────
-    public bool   $showCancelModal  = false;
-    public string $cancelReason     = '';
+    public bool $showCancelModal = false;
+
+    public string $cancelReason = '';
 
     public function mount(Order $order): void
     {
         abort_unless(auth()->user()?->can('ver ordenes'), 403);
+        $canViewHistory = auth()->user()?->can('ver reportes') ?? false;
+        $activeRegisterId = CashRegister::query()
+            ->where('is_open', true)
+            ->latest('opened_at')
+            ->value('id');
+        abort_unless($canViewHistory || ($activeRegisterId && $order->cash_register_id === (int) $activeRegisterId), 404);
+
         $this->order = $order->load([
             'seller',
             'cashRegister',
@@ -40,14 +49,15 @@ class OrderDetail extends Component
     public function openCancelItemModal(int $itemId): void
     {
         abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
-        $this->cancelItemId       = $itemId;
+        $this->order->items()->findOrFail($itemId);
+        $this->cancelItemId = $itemId;
         $this->showCancelItemModal = true;
     }
 
     public function confirmCancelItem(): void
     {
         abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
-        $item = OrderItem::findOrFail($this->cancelItemId);
+        $item = $this->order->items()->findOrFail($this->cancelItemId);
 
         $item->update([
             'is_cancelled' => true,
@@ -58,7 +68,7 @@ class OrderDetail extends Component
         $this->recalculateOrder($item->order_id);
 
         $this->showCancelItemModal = false;
-        $this->cancelItemId        = null;
+        $this->cancelItemId = null;
         $this->refreshOrder();
         $this->dispatch('notify', type: 'warning', message: 'Ítem cancelado.');
     }
@@ -68,7 +78,7 @@ class OrderDetail extends Component
     public function openCancelModal(): void
     {
         abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
-        $this->cancelReason   = '';
+        $this->cancelReason = '';
         $this->showCancelModal = true;
     }
 
@@ -78,14 +88,14 @@ class OrderDetail extends Component
         $this->validate(['cancelReason' => 'required|string|min:5|max:255']);
 
         $this->order->update([
-            'status'              => 'cancelada',
-            'cancelled_by'        => auth()->id(),
+            'status' => 'cancelada',
+            'cancelled_by' => auth()->id(),
             'cancellation_reason' => $this->cancelReason,
-            'cancelled_at'        => now(),
+            'cancelled_at' => now(),
         ]);
 
         $this->showCancelModal = false;
-        $this->cancelReason    = '';
+        $this->cancelReason = '';
         $this->refreshOrder();
         $this->dispatch('notify', type: 'warning', message: 'Orden cancelada.');
     }
@@ -97,13 +107,14 @@ class OrderDetail extends Component
     {
         match ($action) {
             'deleteItem' => $this->deleteItem($params['id']),
-            default      => null,
+            default => null,
         };
     }
 
     public function confirmDeleteItem(int $id): void
     {
         abort_unless(auth()->user()?->can('eliminar items de ordenes'), 403);
+        $this->order->items()->findOrFail($id);
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar ítem',
@@ -116,7 +127,7 @@ class OrderDetail extends Component
     private function deleteItem(int $id): void
     {
         abort_unless(auth()->user()?->can('eliminar items de ordenes'), 403);
-        $item = OrderItem::findOrFail($id);
+        $item = $this->order->items()->findOrFail($id);
         $orderId = $item->order_id;
         $item->delete();
         $this->recalculateOrder($orderId);

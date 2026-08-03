@@ -12,14 +12,16 @@
         get selectedSlot() { return this.slots.find(slot => slot.time === this.selectedTime) || null; },
         tablesNeeded(slot, guests) {
             if (!slot || !slot.enforced) return 0;
-            let remaining = Number(guests);
-            let used = 0;
-            for (const capacity of slot.table_capacities || []) {
-                remaining -= Number(capacity);
-                used++;
-                if (remaining <= 0) return used;
-            }
-            return (slot.table_capacities || []).length + 1;
+            const states = new Map([[0, []]]);
+            (slot.table_capacities || []).forEach((capacity, index) => {
+                [...states.entries()].forEach(([sum, indexes]) => {
+                    const nextSum = sum + Number(capacity);
+                    const candidate = [...indexes, index];
+                    if (!states.has(nextSum) || candidate.length < states.get(nextSum).length) states.set(nextSum, candidate);
+                });
+            });
+            const match = [...states.entries()].filter(([sum]) => sum >= Number(guests)).sort((a, b) => a[0] - b[0] || a[1].length - b[1].length)[0];
+            return match ? match[1].length : (slot.table_capacities || []).length + 1;
         },
         canFitSlot(slot) {
             if (!slot || !slot.enforced) return true;

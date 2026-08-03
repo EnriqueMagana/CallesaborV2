@@ -218,6 +218,105 @@ html.dark-style .customers-table tbody tr:hover {
     background: rgba(255, 255, 255, .035);
 }
 
+/* Auditoría transversal: tablas personalizadas que no usan .table de Bootstrap. */
+html.dark-style .content-wrapper table {
+    color: var(--app-ink);
+    border-color: var(--app-border) !important;
+    background: var(--app-surface) !important;
+}
+
+html.dark-style .content-wrapper table :is(thead, tfoot) :is(th, td),
+html.dark-style :is(
+    .admin-management-page,
+    .menu-builder-page,
+    .users-page,
+    .orders-page,
+    .inventory-page,
+    .customers-page,
+    .cash-cut-page,
+    .delivery-page
+) table :is(thead, tfoot) :is(th, td) {
+    color: var(--app-muted) !important;
+    border-color: var(--app-border) !important;
+    background: #282531 !important;
+}
+
+html.dark-style .content-wrapper table tbody td {
+    color: var(--app-ink);
+    border-color: var(--app-border) !important;
+    background: transparent !important;
+}
+
+html.dark-style .content-wrapper table tbody tr {
+    border-color: var(--app-border) !important;
+    background: transparent !important;
+}
+
+html.dark-style .content-wrapper table tbody tr:hover,
+html.dark-style .content-wrapper table tbody tr.is-selected {
+    background: rgba(155, 140, 255, .09) !important;
+}
+
+html.dark-style :is(
+    .users-table-wrap,
+    .orders-table-wrap,
+    .customers-table-scroll,
+    .inventory-table-wrap,
+    .delivery-reconciliation__table-wrap,
+    .app-table-card
+) {
+    color: var(--app-ink);
+    border-color: var(--app-border) !important;
+    background: var(--app-surface) !important;
+}
+
+/* Botones claros: preservan jerarquía y contraste en el tema oscuro. */
+html.dark-style :is(.btn-light, .btn-outline-secondary, .btn-outline-dark, .btn-white) {
+    color: #e2deeb !important;
+    border-color: #5a5567 !important;
+    background: #282531 !important;
+}
+
+html.dark-style :is(.btn-light, .btn-outline-secondary, .btn-outline-dark, .btn-white):hover,
+html.dark-style :is(.btn-light, .btn-outline-secondary, .btn-outline-dark, .btn-white):focus-visible {
+    color: #fff !important;
+    border-color: #786e91 !important;
+    background: #34303f !important;
+}
+
+html.dark-style :is(
+    .customer-secondary-action,
+    .customer-row-actions button,
+    .users-row-actions button,
+    .orders-row-actions button
+) {
+    color: #ddd8e8 !important;
+    border-color: var(--app-border) !important;
+    background: #282531 !important;
+}
+
+html.dark-style .pagination .page-link {
+    color: #c8c0ff;
+    border-color: var(--app-border);
+    background: #201e29;
+}
+
+html.dark-style .pagination .page-item.active .page-link {
+    color: #fff;
+    border-color: #7665e8;
+    background: #7665e8;
+}
+
+html.dark-style .btn-close:not(.btn-close-white) {
+    filter: invert(1) grayscale(1) brightness(1.8);
+}
+
+@media (max-width: 767.98px) {
+    html.dark-style .content-wrapper table tbody tr {
+        background: var(--app-surface) !important;
+    }
+}
+
 html.dark-style .app-session-ended-dialog {
     color: var(--app-ink);
     border-color: var(--app-border);

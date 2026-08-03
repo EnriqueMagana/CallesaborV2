@@ -63,7 +63,7 @@ class SidebarMenuSeeder extends Seeder
         ]);
         $this->item('restaurant.pos', [
             'parent_id' => $restaurant->id, 'label' => 'Punto de venta', 'type' => 'link',
-            'icon' => 'bx-store-alt', 'route_name' => 'app.pos', 'permission' => 'crear ordenes', 'sort_order' => 20,
+            'icon' => 'bx-store-alt', 'route_name' => 'app.pos', 'permission' => 'usar punto de venta', 'sort_order' => 20,
         ]);
         $operations = $this->item('group.operations', [
             'parent_id' => $restaurant->id, 'label' => 'Operación', 'type' => 'group',
@@ -133,6 +133,8 @@ class SidebarMenuSeeder extends Seeder
             ->update(['permission' => 'ver reservas']);
         SidebarMenuItem::where('system_key', 'operations.sales-history')
             ->update(['permission' => 'ver reportes']);
+        SidebarMenuItem::where('system_key', 'restaurant.pos')
+            ->update(['permission' => 'usar punto de venta']);
     }
 
     private function item(string $systemKey, array $defaults): SidebarMenuItem

@@ -78,8 +78,13 @@ class ReservationAvailabilityService
 
                 return $reservation->reserved_at->lt($endsAt) && $reservationEndsAt->gt($startsAt);
             });
-            $usedSeats = (int) $overlapping->sum('guests');
-            $usedTables = (int) $overlapping->sum(fn (Reservation $reservation) => $this->tablesNeeded($tableCapacities->all(), $reservation->guests));
+            $availableCapacities = $tableCapacities->all();
+            foreach ($overlapping->sortByDesc('guests') as $reservation) {
+                $selectedIndexes = $this->selectTableIndexes($availableCapacities, $reservation->guests);
+                foreach (collect($selectedIndexes)->sortDesc() as $index) {
+                    array_splice($availableCapacities, $index, 1);
+                }
+            }
 
             return [
                 'time' => $time,
@@ -87,10 +92,10 @@ class ReservationAvailabilityService
                 'enforced' => $enforced,
                 'total_seats' => $enforced ? $totalSeats : null,
                 'total_tables' => $enforced ? $totalTables : null,
-                'remaining_seats' => $enforced ? max(0, $totalSeats - $usedSeats) : null,
-                'remaining_tables' => $enforced ? max(0, $totalTables - $usedTables) : null,
-                'max_table_capacity' => $enforced ? (int) $tableCapacities->max() : null,
-                'table_capacities' => $tableCapacities->all(),
+                'remaining_seats' => $enforced ? array_sum($availableCapacities) : null,
+                'remaining_tables' => $enforced ? count($availableCapacities) : null,
+                'max_table_capacity' => $enforced ? (int) max($availableCapacities ?: [0]) : null,
+                'table_capacities' => $availableCapacities,
             ];
         })->all();
     }
@@ -101,14 +106,31 @@ class ReservationAvailabilityService
             return 0;
         }
 
-        $remaining = max(1, $guests);
-        foreach ($capacities as $index => $capacity) {
-            $remaining -= max(1, (int) $capacity);
-            if ($remaining <= 0) {
-                return $index + 1;
+        $selected = $this->selectTableIndexes($capacities, $guests);
+
+        return array_sum($capacities) >= $guests ? count($selected) : count($capacities) + 1;
+    }
+
+    private function selectTableIndexes(array $capacities, int $guests): array
+    {
+        $states = [0 => []];
+        foreach (array_values($capacities) as $index => $capacity) {
+            $next = $states;
+            foreach ($states as $sum => $indexes) {
+                $newSum = $sum + max(1, (int) $capacity);
+                $candidate = [...$indexes, $index];
+                if (! isset($next[$newSum]) || count($candidate) < count($next[$newSum])) {
+                    $next[$newSum] = $candidate;
+                }
             }
+            $states = $next;
         }
 
-        return count($capacities) + 1;
+        $target = collect(array_keys($states))
+            ->filter(fn (int $sum) => $sum >= max(1, $guests))
+            ->sortBy(fn (int $sum) => sprintf('%010d-%010d', $sum, count($states[$sum])))
+            ->first();
+
+        return $target !== null ? $states[$target] : array_keys($capacities);
     }
 }
