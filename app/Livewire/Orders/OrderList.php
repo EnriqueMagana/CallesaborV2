@@ -174,7 +174,10 @@ class OrderList extends Component
     #[Computed]
     public function cashRegisters()
     {
-        return CashRegister::orderByDesc('opened_at')->get();
+        return CashRegister::query()
+            ->where('is_open', true)
+            ->orderByDesc('opened_at')
+            ->get();
     }
 
     // ─── Status edit ───────────────────────────────────────────────────────────
@@ -182,7 +185,7 @@ class OrderList extends Component
     public function openStatusModal(int $id): void
     {
         abort_unless(auth()->user()?->can('editar ordenes'), 403);
-        $order = Order::findOrFail($id);
+        $order = $this->currentRegisterOrders()->findOrFail($id);
         if ($order->status === 'cancelada') {
             $this->dispatch('notify', type: 'warning', message: 'No se puede cambiar el estado de una orden cancelada.');
 
@@ -198,7 +201,7 @@ class OrderList extends Component
         abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $this->validate(['editStatus' => 'required|in:pendiente,en_preparacion,lista,pagada,cancelada']);
 
-        $order = Order::findOrFail($this->editStatusOrderId);
+        $order = $this->currentRegisterOrders()->findOrFail($this->editStatusOrderId);
 
         $data = ['status' => $this->editStatus];
         if ($this->editStatus === 'pagada' && ! $order->paid_at) {
@@ -217,6 +220,7 @@ class OrderList extends Component
     public function openCancelModal(int $id): void
     {
         abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
+        $this->currentRegisterOrders()->findOrFail($id);
         $this->cancelOrderId = $id;
         $this->cancelReason = '';
         $this->showCancelModal = true;
@@ -227,7 +231,7 @@ class OrderList extends Component
         abort_unless(auth()->user()?->can('cancelar ordenes'), 403);
         $this->validate(['cancelReason' => 'required|string|min:5|max:255']);
 
-        Order::findOrFail($this->cancelOrderId)->update([
+        $this->currentRegisterOrders()->findOrFail($this->cancelOrderId)->update([
             'status' => 'cancelada',
             'cancelled_by' => auth()->id(),
             'cancellation_reason' => $this->cancelReason,
@@ -255,6 +259,7 @@ class OrderList extends Component
     public function confirmDeleteOrder(int $id): void
     {
         abort_unless(auth()->user()?->can('eliminar ordenes'), 403);
+        $this->currentRegisterOrders()->findOrFail($id);
         $this->dispatch('open-confirm',
             type: 'danger',
             title: 'Eliminar orden',
@@ -267,7 +272,7 @@ class OrderList extends Component
     private function deleteOrder(int $id): void
     {
         abort_unless(auth()->user()?->can('eliminar ordenes'), 403);
-        Order::findOrFail($id)->delete();
+        $this->currentRegisterOrders()->findOrFail($id)->delete();
         unset($this->orders);
         $this->dispatch('notify', type: 'danger', message: 'Orden eliminada permanentemente.');
     }
@@ -276,5 +281,17 @@ class OrderList extends Component
     {
         return view('livewire.orders.order-list')
             ->layout('layouts.app');
+    }
+
+    private function currentRegisterOrders()
+    {
+        $registerId = CashRegister::query()
+            ->where('is_open', true)
+            ->latest('opened_at')
+            ->value('id');
+
+        return Order::query()
+            ->when($registerId, fn ($query) => $query->where('cash_register_id', $registerId))
+            ->when(! $registerId, fn ($query) => $query->whereRaw('1 = 0'));
     }
 }

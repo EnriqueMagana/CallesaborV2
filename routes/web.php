@@ -7,6 +7,7 @@ use App\Http\Controllers\PublicHomeController;
 use App\Http\Controllers\PublicInfoController;
 use App\Http\Controllers\PublicMenuController;
 use App\Http\Middleware\EnforceSidebarModuleAccess;
+use App\Http\Middleware\EnsureOrderBelongsToCurrentRegister;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
@@ -79,7 +80,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/clientes', CustomerManager::class)->middleware('can:ver clientes')->name('clientes');
     Route::get('/historial-ventas', SalesHistory::class)->middleware('can:ver reportes')->name('historial-ventas');
     Route::get('/ordenes/{order}', OrderDetail::class)->middleware('can:ver ordenes')->name('ordenes.show');
-    Route::get('/pos', PointOfSale::class)->name('pos');
+    Route::get('/pos', PointOfSale::class)->middleware('can:usar punto de venta')->name('pos');
     Route::get('/delivery', DeliveryBoard::class)->middleware('can:ver delivery')->name('delivery');
     Route::get('/inventario', InventoryManager::class)->middleware('can:ver inventario')->name('inventario');
     Route::get('/caja', CajaDashboard::class)->middleware('can:ver caja')->name('caja');
@@ -118,19 +119,19 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class]
     Route::get('/cocina/{order}', function (Order $order, Request $request, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'kitchen_area', $request->query('area')))
             ->header('Content-Type', 'text/html; charset=UTF-8');
-    })->middleware('can:reimprimir tickets')->name('cocina');
+    })->middleware(['can:reimprimir tickets', EnsureOrderBelongsToCurrentRegister::class])->name('cocina');
 
     Route::get('/ventanilla/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'counter'))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->middleware('can:reimprimir tickets')->name('ventanilla');
+    })->middleware(['can:reimprimir tickets', EnsureOrderBelongsToCurrentRegister::class])->name('ventanilla');
 
     Route::get('/delivery/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'delivery'))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->middleware('can:reimprimir tickets')->name('delivery');
+    })->middleware(['can:reimprimir tickets', EnsureOrderBelongsToCurrentRegister::class])->name('delivery');
 
     Route::get('/cliente/{order}', function (Order $order, ThermalTicketRenderer $renderer) {
         return response($renderer->renderOrder($order, 'customer'))->header('Content-Type', 'text/html; charset=UTF-8');
-    })->middleware('can:reimprimir tickets')->name('cliente');
+    })->middleware(['can:reimprimir tickets', EnsureOrderBelongsToCurrentRegister::class])->name('cliente');
 });
 
 // Legacy dashboard route redirects to /app

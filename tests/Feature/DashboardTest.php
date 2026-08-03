@@ -7,6 +7,7 @@ use App\Models\KioskTerminal;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Services\DashboardDataBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -139,6 +140,45 @@ class DashboardTest extends TestCase
             ->assertSee('Hamburguesa especial')
             ->assertDontSee('Ticket promedio')
             ->assertDontSee('$300.00');
+    }
+
+    public function test_dashboard_metrics_only_include_the_current_open_register(): void
+    {
+        $owner = $this->userWithRole('owner');
+        $closedRegister = CashRegister::create([
+            'name' => 'Caja anterior',
+            'opened_by' => $owner->id,
+            'initial_amount' => 0,
+            'opened_at' => now()->subHours(4),
+            'closed_at' => now()->subHours(2),
+            'is_open' => false,
+        ]);
+        $oldOrder = $this->order($closedRegister, $owner, 999);
+        OrderItem::create([
+            'order_id' => $oldOrder->id,
+            'product_name' => 'Producto de caja anterior',
+            'product_price' => 999,
+            'quantity' => 1,
+            'subtotal' => 999,
+        ]);
+
+        $openRegister = $this->openRegister($owner);
+        $currentOrder = $this->order($openRegister, $owner, 80);
+        OrderItem::create([
+            'order_id' => $currentOrder->id,
+            'product_name' => 'Producto actual',
+            'product_price' => 80,
+            'quantity' => 1,
+            'subtotal' => 80,
+        ]);
+
+        $this->actingAs($owner);
+        $dashboard = app(DashboardDataBuilder::class)->build($owner, 'today');
+
+        $this->assertSame('$80.00', $dashboard['kpis'][0]['value']);
+        $this->assertSame([0, 0, 0, 1], $dashboard['chart_data']['status']['values']);
+        $this->assertSame('Producto actual', $dashboard['team_performance']['top_products']->first()['name']);
+        $this->assertFalse($dashboard['team_performance']['top_products']->contains('name', 'Producto de caja anterior'));
     }
 
     private function userWithRole(string $role): User

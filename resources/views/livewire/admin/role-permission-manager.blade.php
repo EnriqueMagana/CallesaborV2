@@ -151,10 +151,9 @@
     <div class="roles-permission-grid">
         @foreach($this->permissionsByGroup as $grp => $perms)
         @php
-            $gc = ['usuarios'=>'primary','clientes'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
-            $gi = ['usuarios'=>'bx-group','clientes'=>'bx-user-pin','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
-            $gc_val = $gc[$grp] ?? 'secondary';
-            $gi_val = $gi[$grp] ?? 'bx-key';
+            $groupMeta = $groupDefinitions[$grp] ?? ['label' => str($grp)->replace('_', ' ')->title(), 'icon' => 'bx-key', 'tone' => 'secondary', 'description' => 'Permisos pendientes de clasificación.'];
+            $gc_val = $groupMeta['tone'];
+            $gi_val = $groupMeta['icon'];
         @endphp
             <section class="card roles-permission-group">
                 <header class="roles-permission-group__header">
@@ -162,10 +161,11 @@
                         <i class="bx {{ $gi_val }}" aria-hidden="true"></i>
                     </span>
                     <div>
-                        <h3>{{ $grp }}</h3>
+                        <h3>{{ $groupMeta['label'] }}</h3>
                         <small>{{ $perms->count() }} {{ $perms->count() === 1 ? 'permiso' : 'permisos' }}</small>
                     </div>
                 </header>
+                <p class="roles-permission-group__description">{{ $groupMeta['description'] }}</p>
                 <div class="roles-permission-group__body">
                         @foreach($perms as $perm)
                         <button type="button" class="roles-permission-row"
@@ -187,7 +187,7 @@
     {{-- ================================================================
          MODAL: Detalle de rol
     ================================================================= --}}
-    @if($rolePanel && $selectedRole && !$showRoleForm)
+    @if($this->rolePanel && $this->selectedRole && !$this->showRoleForm)
     @php
         $rc2 = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
         $ri2 = ['super-admin'=>'bx-crown','admin'=>'bx-shield','gerente'=>'bx-briefcase','cajero'=>'bx-money','mesero'=>'bx-dish','cocinero'=>'bx-restaurant'];
@@ -234,9 +234,14 @@
                     </p>
                     @php $permGroups = $selectedRole->permissions->groupBy('group'); @endphp
                     @forelse($permGroups as $grp => $perms)
+                    @php
+                        $groupMeta = $groupDefinitions[$grp] ?? [
+                            'label' => str($grp)->replace('_', ' ')->title(),
+                        ];
+                    @endphp
                     <div class="mb-3">
                         <small class="text-uppercase fw-semibold text-muted d-block mb-2">
-                            <i class="bx bx-folder me-1 text-primary"></i>{{ $grp }}
+                            <i class="bx bx-folder me-1 text-primary"></i>{{ $groupMeta['label'] }}
                         </small>
                         <div class="d-flex flex-wrap gap-1 ps-3">
                             @foreach($perms as $p)
@@ -274,7 +279,7 @@
     {{-- ================================================================
          MODAL: Crear / Editar rol
     ================================================================= --}}
-    @if($showRoleForm)
+    @if($this->showRoleForm)
     <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26"
          wire:click="closeRoleForm"></div>
     <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
@@ -325,22 +330,22 @@
                             <div class="row g-3">
                                 @foreach($this->permissionsByGroup as $grp => $perms)
                                 @php
-                                    $gc3 = ['usuarios'=>'primary','clientes'=>'primary','menu'=>'success','ordenes'=>'info','mesas'=>'warning','caja'=>'danger','reportes'=>'secondary','configuracion'=>'dark'];
-                                    $gi3 = ['usuarios'=>'bx-group','clientes'=>'bx-user-pin','menu'=>'bx-food-menu','ordenes'=>'bx-receipt','mesas'=>'bx-table','caja'=>'bx-dollar-circle','reportes'=>'bx-bar-chart','configuracion'=>'bx-cog'];
-                                    $gc3v = $gc3[$grp] ?? 'secondary';
-                                    $gi3v = $gi3[$grp] ?? 'bx-folder';
+                                    $groupMeta = $groupDefinitions[$grp] ?? ['label' => str($grp)->replace('_', ' ')->title(), 'icon' => 'bx-folder', 'tone' => 'secondary', 'description' => 'Permisos pendientes de clasificación.'];
+                                    $gc3v = $groupMeta['tone'];
+                                    $gi3v = $groupMeta['icon'];
                                 @endphp
                                 <div class="col-md-6 col-xl-4">
                                     <div class="card border shadow-none h-100">
                                         <div class="card-header py-2 d-flex align-items-center justify-content-between">
                                             <div class="d-flex align-items-center gap-2">
                                                 <i class="bx {{ $gi3v }} text-{{ $gc3v }}"></i>
-                                                <span class="small fw-semibold text-capitalize">{{ $grp }}</span>
+                                                <span class="small fw-semibold">{{ $groupMeta['label'] }}</span>
                                             </div>
                                             <span class="badge bg-label-{{ $gc3v }}">
                                                 {{ collect($perms)->filter(fn($p) => in_array($p->name, $rolePermissions))->count() }}/{{ count($perms) }}
                                             </span>
                                         </div>
+                                        <p class="roles-module-description">{{ $groupMeta['description'] }}</p>
                                         <div class="card-body py-2">
                                             <div class="d-flex flex-column gap-1">
                                                 @foreach($perms as $perm)
@@ -389,7 +394,7 @@
     {{-- ================================================================
          MODAL: Detalle de permiso
     ================================================================= --}}
-    @if($permPanel && $selectedPerm && !$showPermForm)
+    @if($this->permPanel && $this->selectedPerm && !$this->showPermForm)
     <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26" wire:click="closePermPanel"></div>
     <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
          role="dialog" aria-modal="true" aria-labelledby="permission-detail-title"
@@ -457,7 +462,7 @@
     {{-- ================================================================
          MODAL: Crear / Editar permiso
     ================================================================= --}}
-    @if($showPermForm)
+    @if($this->showPermForm)
     <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26"
          wire:click="closePermForm"></div>
     <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
@@ -507,7 +512,7 @@
                                 class="form-select @error('permGroup') is-invalid @enderror">
                             <option value="">Selecciona un módulo</option>
                             @foreach($groups as $g)
-                                <option value="{{ $g }}">{{ ucfirst($g) }}</option>
+                                <option value="{{ $g }}">{{ $groupDefinitions[$g]['label'] ?? str($g)->replace('_', ' ')->title() }}</option>
                             @endforeach
                         </select>
                         @error('permGroup')

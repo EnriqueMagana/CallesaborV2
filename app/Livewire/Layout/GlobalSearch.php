@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Layout;
 
+use App\Models\CashRegister;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
@@ -19,7 +20,7 @@ class GlobalSearch extends Component
     {
         return [
             ['label' => 'Dashboard',           'icon' => 'bx-home-circle',    'route' => 'app.dashboard',        'keywords' => 'dashboard inicio home',                        'permission' => null],
-            ['label' => 'Punto de Venta',      'icon' => 'bx-store-alt',      'route' => 'app.pos',              'keywords' => 'pos venta caja cobrar pedido',                  'permission' => 'crear ordenes'],
+            ['label' => 'Punto de Venta',      'icon' => 'bx-store-alt',      'route' => 'app.pos',              'keywords' => 'pos venta caja cobrar pedido',                  'permission' => 'usar punto de venta'],
             ['label' => 'Mesas',                'icon' => 'bx-table',          'route' => 'app.mesas',            'keywords' => 'mesas salon terraza asignar waiter mesero',     'permission' => 'ver ordenes'],
             ['label' => 'Reservaciones',       'icon' => 'bx-calendar-check', 'route' => 'app.reservas',         'keywords' => 'reservas calendario reservacion',               'permission' => 'ver reservas'],
             ['label' => 'Órdenes',             'icon' => 'bx-receipt',        'route' => 'app.ordenes',          'keywords' => 'ordenes pedidos historial',                     'permission' => 'ver ordenes'],
@@ -39,9 +40,14 @@ class GlobalSearch extends Component
     private function can(string $permission): bool
     {
         $user = auth()->user();
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
         // super-admin bypasa todo (Spatie Gate::before)
-        if ($user->hasAnyRole(['owner', 'super-admin'])) return true;
+        if ($user->hasAnyRole(['owner', 'super-admin'])) {
+            return true;
+        }
+
         return $user->can($permission);
     }
 
@@ -50,32 +56,35 @@ class GlobalSearch extends Component
     {
         $q = trim($this->query);
 
-        if (strlen($q) < 2) return [];
+        if (strlen($q) < 2) {
+            return [];
+        }
 
         $lower = mb_strtolower($q);
-        $user  = auth()->user();
+        $user = auth()->user();
 
         // ── Módulos (instantáneo, filtrados por permiso) ──
         $nav = collect($this->modules())
             ->filter(function ($m) use ($lower, $user) {
                 // Primero verifica permiso
-                if ($m['permission'] !== null && !$this->can($m['permission'])) {
+                if ($m['permission'] !== null && ! $this->can($m['permission'])) {
                     return false;
                 }
                 if (! app(SidebarModuleAccess::class)->allows($user, $m['route'])) {
                     return false;
                 }
+
                 // Luego filtra por texto
                 return str_contains(mb_strtolower($m['label']), $lower)
                     || str_contains(mb_strtolower($m['keywords']), $lower);
             })
             ->take(4)
-            ->map(fn($m) => [
-                'type'        => 'nav',
-                'label'       => $m['label'],
-                'icon'        => $m['icon'],
+            ->map(fn ($m) => [
+                'type' => 'nav',
+                'label' => $m['label'],
+                'icon' => $m['icon'],
                 'description' => 'Módulo',
-                'url'         => route($m['route']),
+                'url' => route($m['route']),
             ])
             ->values()
             ->toArray();
@@ -83,19 +92,27 @@ class GlobalSearch extends Component
         // ── Órdenes (requiere 'ver ordenes') ──
         $orders = [];
         if ($this->can('ver ordenes')) {
-            $orders = Order::where(function($q2) use ($q) {
+            $activeRegisterId = CashRegister::query()
+                ->where('is_open', true)
+                ->latest('opened_at')
+                ->value('id');
+
+            $orders = Order::query()
+                ->when($activeRegisterId, fn ($orders) => $orders->where('cash_register_id', $activeRegisterId))
+                ->when(! $activeRegisterId, fn ($orders) => $orders->whereRaw('1 = 0'))
+                ->where(function ($q2) use ($q) {
                     $q2->where('id', 'like', "%{$q}%")
-                       ->orWhere('customer_name', 'like', "%{$q}%");
+                        ->orWhere('customer_name', 'like', "%{$q}%");
                 })
                 ->latest()
                 ->take(3)
                 ->get()
-                ->map(fn($o) => [
-                    'type'        => 'order',
-                    'label'       => '#'.$o->id.' · '.($o->customer_name ?: 'Anónimo'),
-                    'icon'        => 'bx-receipt',
+                ->map(fn ($o) => [
+                    'type' => 'order',
+                    'label' => '#'.$o->id.' · '.($o->customer_name ?: 'Anónimo'),
+                    'icon' => 'bx-receipt',
                     'description' => '$'.number_format($o->total, 2).' · '.$o->status_label.' · '.$o->created_at->format('d/m/Y'),
-                    'url'         => route('app.ordenes.show', $o),
+                    'url' => route('app.ordenes.show', $o),
                 ])
                 ->toArray();
         }
@@ -108,12 +125,12 @@ class GlobalSearch extends Component
                 ->orWhere('email', 'like', "%{$q}%")
                 ->take(3)
                 ->get()
-                ->map(fn($c) => [
-                    'type'        => 'customer',
-                    'label'       => $c->name,
-                    'icon'        => 'bx-user-circle',
+                ->map(fn ($c) => [
+                    'type' => 'customer',
+                    'label' => $c->name,
+                    'icon' => 'bx-user-circle',
                     'description' => $c->phone ? 'Tel: '.$c->phone : 'Cliente',
-                    'url'         => route('app.clientes'),
+                    'url' => route('app.clientes'),
                 ])
                 ->toArray();
         }
@@ -126,12 +143,12 @@ class GlobalSearch extends Component
                 ->latest('reserved_at')
                 ->take(3)
                 ->get()
-                ->map(fn($r) => [
-                    'type'        => 'reservation',
-                    'label'       => $r->customer_name,
-                    'icon'        => 'bx-calendar-check',
+                ->map(fn ($r) => [
+                    'type' => 'reservation',
+                    'label' => $r->customer_name,
+                    'icon' => 'bx-calendar-check',
                     'description' => $r->reserved_at->format('d/m/Y g:i A').' · '.$r->guests.'p · '.$r->status_label,
-                    'url'         => route('app.reservas'),
+                    'url' => route('app.reservas'),
                 ])
                 ->toArray();
         }
@@ -142,22 +159,22 @@ class GlobalSearch extends Component
             $products = Product::where('name', 'like', "%{$q}%")
                 ->take(3)
                 ->get()
-                ->map(fn($p) => [
-                    'type'        => 'product',
-                    'label'       => $p->name,
-                    'icon'        => 'bx-food-menu',
+                ->map(fn ($p) => [
+                    'type' => 'product',
+                    'label' => $p->name,
+                    'icon' => 'bx-food-menu',
                     'description' => '$'.number_format($p->price, 2),
-                    'url'         => route('app.constructor-menu'),
+                    'url' => route('app.constructor-menu'),
                 ])
                 ->toArray();
         }
 
         return [
-            'nav'          => $nav,
-            'orders'       => $orders,
-            'customers'    => $customers,
+            'nav' => $nav,
+            'orders' => $orders,
+            'customers' => $customers,
             'reservations' => $reservations,
-            'products'     => $products,
+            'products' => $products,
         ];
     }
 

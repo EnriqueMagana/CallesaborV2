@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Caja\Dashboard as CashDashboard;
 use App\Livewire\Caja\CorteDeCaja;
+use App\Livewire\Caja\Dashboard as CashDashboard;
 use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
 use App\Livewire\Pos\PointOfSale;
@@ -273,6 +273,24 @@ class OperationalPermissionsTest extends TestCase
             ->get(route('print.cliente', $order))
             ->assertOk()
             ->assertSee('CUENTA DEL CLIENTE');
+    }
+
+    public function test_operational_users_cannot_open_or_print_orders_from_a_closed_register(): void
+    {
+        [$viewer, $closedRegister, $oldOrder] = $this->orderContext(['ver ordenes', 'reimprimir tickets']);
+        $closedRegister->update([
+            'is_open' => false,
+            'closed_at' => now(),
+        ]);
+        $this->register($viewer);
+
+        $this->actingAs($viewer)
+            ->get(route('app.ordenes.show', $oldOrder))
+            ->assertNotFound();
+
+        $this->actingAs($viewer)
+            ->get(route('print.cliente', $oldOrder))
+            ->assertNotFound();
     }
 
     public function test_charging_a_ready_order_requires_cerrar_ordenes(): void

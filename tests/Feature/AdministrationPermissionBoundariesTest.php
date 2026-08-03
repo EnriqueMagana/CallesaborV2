@@ -167,6 +167,7 @@ class AdministrationPermissionBoundariesTest extends TestCase
 
         Livewire::actingAs($manager)->test(RolePermissionManager::class)
             ->call('openCreateRole')
+            ->assertSet('showRoleForm', true)
             ->assertSee('roles-modal-layer', false)
             ->assertSee('roles-modal-close', false)
             ->assertSee('aria-modal="true"', false)
@@ -184,7 +185,7 @@ class AdministrationPermissionBoundariesTest extends TestCase
 
         $this->assertStringContainsString('html.dark-style .roles-page', $styles);
         $this->assertStringContainsString('.roles-modal-close', $styles);
-        $this->assertStringContainsString('top: -54px', $styles);
+        $this->assertStringContainsString('top: -52px', $styles);
         $this->assertStringContainsString('@media (max-width: 767.98px)', $styles);
     }
 

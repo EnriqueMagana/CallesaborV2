@@ -202,7 +202,7 @@ class PublicReservation extends Component
         }
 
         $token = (string) Str::uuid();
-        $created = DB::transaction(function () use ($validated, $reservedAt, $token): bool {
+        $result = DB::transaction(function () use ($validated, $reservedAt, $token): string|false {
             $availability = app(ReservationAvailabilityService::class)->forMoment(
                 BusinessSetting::current(),
                 $reservedAt,
@@ -230,15 +230,17 @@ class PublicReservation extends Component
                 'public_token' => $token,
             ]);
 
-            return true;
+            return $requiresWaitlist ? 'waitlist' : 'reserved';
         });
 
-        if (! $created) {
+        if (! $result) {
             $this->step = 2;
             $this->addError('selectedTime', 'Ya no hay capacidad suficiente para este horario. Puedes elegir otra hora o aceptar la lista de espera.');
 
             return;
         }
+
+        $this->acceptWaitlist = $result === 'waitlist';
 
         RateLimiter::hit($rateKey, 3600);
         $this->confirmationCode = strtoupper(substr(str_replace('-', '', $token), 0, 8));

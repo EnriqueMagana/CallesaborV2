@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -16,6 +17,7 @@ class PermissionSeederCoverageTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $expected = [
+            'punto_venta' => ['usar punto de venta'],
             'mesas' => [
                 'crear areas de mesas', 'editar areas de mesas', 'eliminar areas de mesas',
                 'crear mesas', 'editar mesas', 'eliminar mesas', 'cambiar estado mesas',
@@ -51,7 +53,32 @@ class PermissionSeederCoverageTest extends TestCase
         $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('editar clientes'));
         $this->assertFalse(Role::findByName('cajero')->hasPermissionTo('eliminar clientes'));
         $this->assertTrue(Role::findByName('cocinero')->hasPermissionTo('reimprimir tickets'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('usar punto de venta'));
+        $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('reimprimir tickets'));
+        $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('dividir mesas'));
+        $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('cancelar divisiones mesas'));
+        $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('reasignar mesas'));
+        $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('gestionar grupos'));
+        $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('usar punto de venta'));
         $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('registrar gastos'));
         $this->assertFalse(Role::findByName('repartidor')->hasPermissionTo('editar mesas'));
+    }
+
+    public function test_waiter_order_permissions_do_not_unlock_the_point_of_sale_module(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $waiter = User::factory()->create();
+        $waiter->assignRole('mesero');
+        $cashier = User::factory()->create();
+        $cashier->assignRole('cajero');
+
+        $this->actingAs($waiter)
+            ->get(route('app.pos'))
+            ->assertForbidden();
+
+        $this->actingAs($cashier)
+            ->get(route('app.pos'))
+            ->assertOk();
     }
 }

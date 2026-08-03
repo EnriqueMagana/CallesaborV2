@@ -15,9 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardDataBuilder
 {
-    public function __construct(private readonly SidebarModuleAccess $menuAccess)
-    {
-    }
+    public function __construct(private readonly SidebarModuleAccess $menuAccess) {}
 
     public function build(User $user, string $period): array
     {
@@ -50,6 +48,7 @@ class DashboardDataBuilder
 
         $orders = Order::query()
             ->when($canOpenOrders, fn (Builder $query) => $query->with(['mesa.area', 'seller']))
+            ->where('cash_register_id', $openRegister->id)
             ->whereBetween('created_at', [$from, $to]);
 
         $assignedTableIds = collect();
@@ -113,7 +112,7 @@ class DashboardDataBuilder
             'show_team_performance' => $canViewReports,
             'financial_access' => $financialAccess,
             'team_performance' => $canViewReports
-                ? $this->teamPerformance($periodOrders, $financialAccess)
+                ? $this->teamPerformance($periodOrders, $financialAccess, $openRegister->id)
                 : null,
             'quick_actions' => $this->quickActions($mode, $user),
             'can_manage_kiosks' => $canManageKiosks,
@@ -271,7 +270,7 @@ class DashboardDataBuilder
         ];
     }
 
-    private function teamPerformance(Collection $periodOrders, bool $financialAccess): array
+    private function teamPerformance(Collection $periodOrders, bool $financialAccess, int $cashRegisterId): array
     {
         $from = now()->startOfDay();
         $to = now()->endOfDay();
@@ -290,6 +289,7 @@ class DashboardDataBuilder
 
         $leaders = Order::query()
             ->join('users', 'users.id', '=', 'orders.served_by')
+            ->where('orders.cash_register_id', $cashRegisterId)
             ->whereBetween('orders.created_at', [$from, $to])
             ->where('orders.status', '!=', 'cancelada')
             ->groupBy('users.id', 'users.name')
@@ -305,6 +305,7 @@ class DashboardDataBuilder
 
         $topProducts = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.cash_register_id', $cashRegisterId)
             ->whereBetween('orders.created_at', [$from, $to])
             ->where('orders.status', '!=', 'cancelada')
             ->where('order_items.is_cancelled', false)
@@ -369,7 +370,7 @@ class DashboardDataBuilder
                 $add('Actualizar estado', 'Revisa pedidos listos y entregados.', 'bx-refresh', 'app.ordenes');
             }
         } else {
-            if ($user->can('crear ordenes')) {
+            if ($user->can('usar punto de venta')) {
                 $add('Abrir POS', 'Crea y cobra una orden.', 'bx-store', 'app.pos');
             }
             if ($user->can('ver ordenes')) {
