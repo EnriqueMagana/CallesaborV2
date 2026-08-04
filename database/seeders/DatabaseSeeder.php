@@ -24,12 +24,15 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
         ]);
 
+        $this->call(RolesAndPermissionsSeeder::class);
+
+        // El usuario administrador debe quedar listo aunque falle después
+        // algún seeder de datos operativos o del menú lateral.
+        $user->syncRoles(['super-admin']);
+
         $this->call([
-            RolesAndPermissionsSeeder::class,
             SidebarMenuSeeder::class,
             MesasSeeder::class,
         ]);
-
-        $user->assignRole('super-admin');
     }
 }
