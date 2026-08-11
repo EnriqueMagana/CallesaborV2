@@ -319,7 +319,7 @@
 
         <section class="home-menu-cta section-pattern2" data-home-reveal>
             <div class="menu-container home-menu-cta__inner">
-                <span><i class="bx bx-restaurant" aria-hidden="true"></i></span>
+                <span><i class="bx bx-restaurant " aria-hidden="true"></i></span>
                 <div>
                     <small>¿Ya sabes qué se te antoja?</small>
                     <h2>La carta completa está lista para ti</h2>
