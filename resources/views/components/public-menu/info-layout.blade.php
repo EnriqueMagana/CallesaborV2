@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
 </head>
 <body style="--menu-primary: {{ $business->primary_color ?? '#15803d' }}">
-    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <a class="menu-skip-link skip-link" href="#contenido">Saltar al contenido</a>
     <x-public-menu.brand-header
         :business="$business"
         :opening-status="$openingStatus"
@@ -26,7 +26,7 @@
         :action-href="route('public.menu').'#menu'"
         action-icon="bx-left-arrow-alt"
     />
-    <main class="info-page__main" id="contenido">
+    <main class="info-page__main" id="contenido" tabindex="-1">
         {{ $slot }}
     </main>
     <x-public-menu.footer :business="$business" />

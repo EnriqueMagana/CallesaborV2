@@ -45,12 +45,14 @@
                             <i class="bx bx-user me-2" aria-hidden="true"></i><span>Mi perfil</span>
                         </a>
                     </li>
+                    {{-- Modo oscuro pausado temporalmente; la interfaz opera solo en modo claro.
                     <li>
                         <button type="button" class="dropdown-item app-theme-toggle" data-theme-toggle aria-label="Cambiar a modo oscuro" aria-pressed="false">
                             <i class="bx bx-moon me-2" data-theme-toggle-icon aria-hidden="true"></i>
                             <span data-theme-toggle-label>Modo oscuro</span>
                         </button>
                     </li>
+                    --}}
                     <li><div class="dropdown-divider"></div></li>
                     <li>
                         <button type="button" class="dropdown-item" wire:click="logout" wire:loading.attr="disabled" wire:target="logout">

@@ -1,17 +1,20 @@
 @props([
     'business',
     'openingStatus',
+    'eyebrow' => 'Banner 1',
+    'message' => null,
     'actionLabel' => 'Explorar la carta',
     'actionHref' => null,
     'actionIcon' => 'bx-down-arrow-alt',
 ])
 @php($resolvedActionHref = $actionHref ?: route('public.menu') . '#menu')
+@php($heroMessage = $message ?: $business->business_name . ' te espera con platos preparados para compartir, mesas listas y un ambiente cuidadosamente diseñado para tu próxima visita.')
 
 <header class="menu-cover" id="inicio">
     <div class="menu-cover__media {{ $business->banner_path ? 'has-image' : '' }}">
         @if ($business->banner_path)
-            <img src="{{ Storage::url($business->banner_path) }}" alt="" width="1600" height="640"
-                fetchpriority="high">
+            <img src="{{ Storage::url($business->banner_path) }}" alt="Ambiente de {{ $business->business_name }}"
+                width="1600" height="640" fetchpriority="high">
         @endif
         <div class="menu-cover__overlay"></div>
         <div class="menu-container menu-cover__topbar">
