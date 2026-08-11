@@ -231,27 +231,19 @@ class AuthenticationTest extends TestCase
         $this->assertStringContainsString('.dashboard-welcome { position:relative; z-index:5;', $dashboard);
     }
 
-    public function test_admin_layout_exposes_a_persistent_accessible_theme_toggle(): void
+    public function test_admin_layout_is_temporarily_limited_to_light_mode(): void
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->get(route('app.dashboard'));
 
         $response->assertOk()
-            ->assertSee('assets/js/theme.js', false)
-            ->assertSee('assets/css/dark-theme.css', false)
-            ->assertSee('data-theme-toggle', false)
-            ->assertSee('data-theme-toggle-icon', false)
-            ->assertSee('data-theme-toggle-label', false)
-            ->assertSee('Modo oscuro');
-
-        $themeScript = file_get_contents(public_path('assets/js/theme.js'));
-        $darkTheme = file_get_contents(public_path('assets/css/dark-theme.css'));
-
-        $this->assertStringContainsString('callesabor-color-theme', $themeScript);
-        $this->assertStringContainsString('localStorage.setItem', $themeScript);
-        $this->assertStringContainsString('livewire:navigated', $themeScript);
-        $this->assertStringContainsString('html.dark-style', $darkTheme);
+            ->assertSee('<meta name="color-scheme" content="light">', false)
+            ->assertSee('class="light-style layout-menu-fixed"', false)
+            ->assertDontSee('assets/js/theme.js', false)
+            ->assertDontSee('assets/css/dark-theme.css', false)
+            ->assertDontSee('data-theme-toggle', false)
+            ->assertDontSee('Modo oscuro');
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void

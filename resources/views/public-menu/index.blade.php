@@ -24,7 +24,7 @@
     />
 
     <main>
-        <section class="menu-discovery" id="menu" aria-labelledby="catalog-title">
+        <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
             <div class="menu-container">
                 <div class="menu-search">
                     <label for="menu-search-input"><i class="bx bx-search" aria-hidden="true"></i><span class="sr-only">Buscar en el menú</span></label>

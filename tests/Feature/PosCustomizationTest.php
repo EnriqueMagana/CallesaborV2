@@ -190,6 +190,29 @@ class PosCustomizationTest extends TestCase
         );
     }
 
+    public function test_catalog_styles_keep_many_product_cards_readable_and_scrollable(): void
+    {
+        $css = file_get_contents(public_path('assets/css/pos-modern.css'));
+
+        $this->assertIsString($css);
+        $this->assertMatchesRegularExpression(
+            '/\.catalog-grid\s*\{[^}]*grid-auto-rows:\s*max-content;[^}]*overflow-y:\s*auto;/s',
+            $css,
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.prod-card\s*\{[^}]*display:\s*flex;[^}]*min-height:\s*172px;/s',
+            $css,
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.prod-name\s*\{[^}]*white-space:\s*normal;[^}]*-webkit-line-clamp:\s*2;/s',
+            $css,
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.prod-price\s*\{[^}]*margin-top:\s*auto;/s',
+            $css,
+        );
+    }
+
     private function customizableProduct(int $optionCount): array
     {
         $product = Product::create([

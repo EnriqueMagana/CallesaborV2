@@ -6,11 +6,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme" content="light">
 
     <title>{{ $businessSettings?->platform_name ?? config('app.name', 'Laravel') }} - Admin</title>
 
+    {{-- Modo oscuro pausado temporalmente.
     <script src="{{ asset('assets/js/theme.js') }}?v={{ filemtime(public_path('assets/js/theme.js')) }}" data-navigate-once></script>
+    --}}
 
     <!-- Favicon -->
     <link rel="icon" href="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}" />
@@ -60,7 +62,9 @@
     <link rel="stylesheet" href="{{ asset('assets/css/role-permissions.css') }}?v={{ filemtime(public_path('assets/css/role-permissions.css')) }}" />
 
     @stack('styles')
+    {{-- Modo oscuro pausado temporalmente.
     <link rel="stylesheet" href="{{ asset('assets/css/dark-theme.css') }}?v={{ filemtime(public_path('assets/css/dark-theme.css')) }}" />
+    --}}
 
     <!-- Helpers -->
     <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
