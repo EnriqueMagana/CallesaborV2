@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet"
         href="{{ asset('assets/vendor/fonts/boxicons.css') }}?v={{ filemtime(public_path('assets/vendor/fonts/boxicons.css')) }}">
@@ -25,6 +25,14 @@
 
 <body class="public-home" style="--menu-primary: {{ $business->primary_color ?? '#15803d' }}">
     <a class="menu-skip-link" href="#experiencia">Saltar al contenido</a>
+    <div class="home-preloader" data-home-preloader role="status" aria-live="polite"
+        aria-label="Cargando {{ $business->business_name }}">
+        <div class="home-preloader__chase" aria-hidden="true">
+            @for ($dot = 0; $dot < 6; $dot++)
+                <span></span>
+            @endfor
+        </div>
+    </div>
     @php
         $heroSlides = [
             ['image' => 'banner1.jpg', 'alt' => 'Salón principal de ' . $business->business_name],
@@ -33,7 +41,7 @@
         ];
     @endphp
 
-    <header class="home-hero" id="inicio" data-home-hero role="region" aria-roledescription="carrusel"
+    <header class="home-hero" id="inicio" data-home-hero role="region"
         aria-label="Presentación de {{ $business->business_name }}">
         <div class="home-hero__slides" aria-live="off">
             @foreach ($heroSlides as $slide)
@@ -41,7 +49,7 @@
                     role="group" aria-label="Imagen {{ $loop->iteration }} de {{ count($heroSlides) }}"
                     aria-hidden="{{ $loop->first ? 'false' : 'true' }}">
                     <img src="{{ asset('assets/img/restaurant/' . $slide['image']) }}" alt="{{ $slide['alt'] }}"
-                        width="1280" height="720" loading="{{ $loop->first ? 'eager' : 'lazy' }}"
+                        width="1920" height="1080" loading="{{ $loop->first ? 'eager' : 'lazy' }}"
                         fetchpriority="{{ $loop->first ? 'high' : 'auto' }}" decoding="async">
                 </figure>
             @endforeach
@@ -80,7 +88,10 @@
 
         <div class="menu-container home-hero__content">
             <div class="home-hero__copy">
-                <h1>Sabores que convierten una comida en un recuerdo.</h1>
+                <span class="home-hero__badge"><i class="bx bx-spa" aria-hidden="true"></i>{{ $business->home_badge ?: 'Cocina honesta · sabor local · momentos memorables' }}</span>
+                <h1>{{ $business->home_headline ?: 'Sabores que convierten una comida en un recuerdo.' }}</h1>
+                <p>{{ $business->home_description ?: 'Descubre una carta preparada con ingredientes frescos, recetas con identidad y la hospitalidad que hace especial cada visita.' }}
+                </p>
                 <div class="home-hero__actions">
                     <a class="home-hero__primary" href="{{ route('public.menu') }}">
                         <span>Explorar el menú</span><i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
@@ -111,12 +122,12 @@
     <main id="experiencia" tabindex="-1">
         <section class="home-intro menu-container" aria-labelledby="home-intro-title" data-home-reveal>
             <div class="home-intro__copy">
-                <span class="menu-kicker">Hospitalidad con sabor local</span>
-                <h2 id="home-intro-title">Una experiencia auténtica, pensada para disfrutarse sin prisa.</h2>
-                <p>En {{ $business->business_name }} reunimos cocina, ambiente y servicio para que cada visita se
-                    sienta
-                    especial. Conoce nuestra propuesta antes de llegar y reserva en pocos pasos desde cualquier
-                    dispositivo.</p>
+                <span class="menu-kicker">{{ $business->home_intro_kicker ?: 'Hospitalidad con sabor local' }}</span>
+                <h2 id="home-intro-title">
+                    {{ $business->home_intro_title ?: 'Una experiencia auténtica, pensada para disfrutarse sin prisa.' }}
+                </h2>
+                <p>{{ $business->home_intro_description ?: 'En ' . $business->business_name . ' reunimos cocina, ambiente y servicio para que cada visita se sienta especial. Conoce nuestra propuesta antes de llegar y reserva en pocos pasos desde cualquier dispositivo.' }}
+                </p>
                 <div class="home-intro__badges" aria-label="Beneficios de la experiencia">
                     <span><i class="bx bx-dish" aria-hidden="true"></i>Ingredientes frescos</span>
                     <span><i class="bx bx-time" aria-hidden="true"></i>Servicio ágil</span>
@@ -135,7 +146,7 @@
             </div>
         </section>
 
-        <section class="home-highlights section-pattern2" aria-labelledby="home-highlights-title" data-home-reveal>
+        <section class="home-highlights" aria-labelledby="home-highlights-title" data-home-reveal>
             <div class="menu-container">
                 <div class="section-heading">
                     <div><span class="menu-kicker">Experiencia</span>
@@ -163,7 +174,7 @@
         </section>
 
         @if ($categories->isNotEmpty())
-            <section class="home-categories section-pattern1" aria-labelledby="home-categories-title"
+            <section class="home-categories" aria-labelledby="home-categories-title"
                 data-home-reveal>
                 <div class="menu-container">
                     <div class="section-heading">
@@ -202,8 +213,9 @@
             </section>
         @endif
 
-        <section class="home-reservation" id="reservar" aria-labelledby="reservation-section-title"
+        <section class="home-reservation home-section--white-divider" id="reservar" aria-labelledby="reservation-section-title"
             data-home-reveal>
+            <span class="home-section-divider" aria-hidden="true"></span>
             <div class="menu-container home-reservation__compact">
                 <span class="home-reservation__icon"><i class="bx bx-calendar-heart" aria-hidden="true"></i></span>
                 <div>
@@ -215,7 +227,7 @@
             </div>
         </section>
 
-        <section class="home-gallery section-pattern2" id="galeria" aria-labelledby="home-gallery-title"
+        <section class="home-gallery" id="galeria" aria-labelledby="home-gallery-title"
             data-home-reveal>
             <div class="menu-container">
                 <div class="section-heading">
@@ -252,7 +264,7 @@
             </div>
         </section>
 
-        <section class="home-visit section-pattern1" id="horarios" aria-labelledby="home-hours-title"
+        <section class="home-visit" id="horarios" aria-labelledby="home-hours-title"
             data-home-reveal>
             <div class="menu-container home-visit__grid">
                 <article class="home-hours-card">
@@ -317,7 +329,8 @@
             </div>
         </section>
 
-        <section class="home-menu-cta section-pattern2" data-home-reveal>
+        <section class="home-menu-cta home-section--white-divider" data-home-reveal>
+            <span class="home-section-divider" aria-hidden="true"></span>
             <div class="menu-container home-menu-cta__inner">
                 <span><i class="bx bx-restaurant " aria-hidden="true"></i></span>
                 <div>

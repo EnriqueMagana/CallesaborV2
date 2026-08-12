@@ -73,6 +73,18 @@ class BusinessSettingsManager extends Component
 
     public string $primaryColor = '#15803d';
 
+    public string $homeBadge = '';
+
+    public string $homeHeadline = '';
+
+    public string $homeDescription = '';
+
+    public string $homeIntroKicker = '';
+
+    public string $homeIntroTitle = '';
+
+    public string $homeIntroDescription = '';
+
     public array $galleryPaths = [];
 
     public array $galleryUploads = [];
@@ -136,7 +148,7 @@ class BusinessSettingsManager extends Component
     public function setBusinessSection(string $section): void
     {
         $this->authorizeManage();
-        abort_unless(in_array($section, ['identity', 'contact', 'hours', 'social', 'visual', 'appearance', 'gallery', 'featured'], true), 404);
+        abort_unless(in_array($section, ['identity', 'contact', 'hours', 'social', 'visual', 'appearance', 'homepage', 'gallery', 'featured'], true), 404);
         $this->businessSection = $section;
     }
 
@@ -181,6 +193,12 @@ class BusinessSettingsManager extends Component
                 },
             ],
             'galleryUploads' => 'array',
+            'homeBadge' => 'nullable|string|max:120',
+            'homeHeadline' => 'nullable|string|max:180',
+            'homeDescription' => 'nullable|string|max:600',
+            'homeIntroKicker' => 'nullable|string|max:80',
+            'homeIntroTitle' => 'nullable|string|max:180',
+            'homeIntroDescription' => 'nullable|string|max:600',
             'galleryUploads.*' => 'image|max:6144',
             'galleryPaths.*.caption' => 'nullable|string|max:120',
             'galleryUploadCaptions' => 'array',
@@ -229,6 +247,12 @@ class BusinessSettingsManager extends Component
             'maps_url' => trim($this->mapsUrl) ?: null,
             'business_hours' => array_values($this->businessHours),
             'primary_color' => strtolower($this->primaryColor),
+            'home_badge' => trim($this->homeBadge) ?: null,
+            'home_headline' => trim($this->homeHeadline) ?: null,
+            'home_description' => trim($this->homeDescription) ?: null,
+            'home_intro_kicker' => trim($this->homeIntroKicker) ?: null,
+            'home_intro_title' => trim($this->homeIntroTitle) ?: null,
+            'home_intro_description' => trim($this->homeIntroDescription) ?: null,
             'gallery_paths' => array_values($galleryPaths),
             'featured_product_ids' => array_values(array_map('intval', $this->featuredProductIds)),
             'updated_by' => auth()->id(),
@@ -457,6 +481,12 @@ class BusinessSettingsManager extends Component
         $this->bannerPath = $setting->banner_path;
         $this->businessHours = $setting->business_hours ?: BusinessSetting::DEFAULT_HOURS;
         $this->primaryColor = $setting->primary_color ?: '#15803d';
+        $this->homeBadge = $setting->home_badge ?? '';
+        $this->homeHeadline = $setting->home_headline ?? '';
+        $this->homeDescription = $setting->home_description ?? '';
+        $this->homeIntroKicker = $setting->home_intro_kicker ?? '';
+        $this->homeIntroTitle = $setting->home_intro_title ?? '';
+        $this->homeIntroDescription = $setting->home_intro_description ?? '';
         $this->galleryPaths = $setting->galleryItems();
         $this->featuredProductIds = array_map('strval', $setting->featured_product_ids ?? []);
     }

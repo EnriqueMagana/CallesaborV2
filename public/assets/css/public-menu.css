@@ -271,6 +271,79 @@ body.has-product-modal{overflow:hidden}
 .menu-status--closed{color:#7c3f0c;border-color:#f0c995;background:#fff8ec;box-shadow:0 8px 24px rgba(124,63,12,.1)}.menu-status--closed>span:first-child{background:#d97706;box-shadow:0 0 0 5px rgba(217,119,6,.13)}.menu-status--closed strong{color:#7c3f0c}.menu-status--closed small{color:#93612f}.menu-status--open{color:#126534;border-color:#b9dfc5;background:#f0faf3;box-shadow:0 8px 24px rgba(18,101,52,.1)}.menu-status--open strong{color:#126534}.menu-status--open small{color:#487458}.menu-status>span:last-child{align-content:center}.menu-status strong,.menu-status small{line-height:1.3}
 .reservation-progress{position:relative;align-items:start}.reservation-progress li{min-width:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;text-align:center}.reservation-progress li:not(:last-child)::after{position:absolute;z-index:0;top:16px;left:calc(50% + 24px);width:calc(100% - 48px);height:2px;margin:0}.reservation-progress li>span{z-index:1}.reservation-progress small{min-height:18px;display:block;white-space:normal;line-height:1.25}.reservation-modal .reservation-times--capacity{grid-template-columns:repeat(2,minmax(0,1fr));max-height:270px;gap:10px}.reservation-times--capacity>button{min-height:72px!important;display:grid!important;grid-template-columns:40px minmax(0,1fr) 30px!important;justify-content:stretch!important;gap:10px!important;padding:10px!important;color:var(--menu-text)!important;border:1px solid var(--menu-border)!important;border-radius:16px!important;background:#fff!important;text-align:left;box-shadow:0 6px 18px rgba(24,57,34,.045);transition:border-color .18s ease,background-color .18s ease,box-shadow .18s ease,transform .18s ease}.reservation-times--capacity>button:hover{border-color:color-mix(in srgb,var(--menu-primary) 42%,var(--menu-border))!important;box-shadow:0 9px 24px rgba(24,57,34,.08);transform:translateY(-1px)}.reservation-time__icon{width:40px;height:40px;display:grid;place-items:center;color:var(--menu-primary);border-radius:12px;background:var(--menu-soft);font-size:20px}.reservation-time__copy{min-width:0;display:grid;align-content:center}.reservation-time__copy strong{font-size:.76rem;font-variant-numeric:tabular-nums}.reservation-time__copy small{overflow:hidden;color:var(--menu-muted);font-size:.56rem;font-weight:600;text-overflow:ellipsis;white-space:nowrap}.reservation-time__state{width:28px;height:28px;display:grid;place-items:center;align-self:center;color:var(--menu-muted);border-radius:50%;background:var(--menu-soft);font-size:18px}.reservation-times--capacity>button.is-limited:not(.is-selected){border-color:#f1d59b!important;background:#fffdf7!important}.reservation-times--capacity>button.is-full:not(.is-selected){border-color:#ead1b0!important;background:#fff9f0!important}.reservation-times--capacity>button.is-full:not(.is-selected) .reservation-time__icon,.reservation-times--capacity>button.is-full:not(.is-selected) .reservation-time__state{color:#a9580b;background:#ffedcf}.reservation-times--capacity>button.is-selected{color:#fff!important;border-color:#115c31!important;background:linear-gradient(135deg,color-mix(in srgb,var(--menu-primary) 82%,#0c3d21),#115c31)!important;box-shadow:0 12px 26px rgba(17,92,49,.23)!important}.reservation-times--capacity>button.is-selected .reservation-time__icon{color:#fff;background:rgba(255,255,255,.16)}.reservation-times--capacity>button.is-selected .reservation-time__copy strong,.reservation-times--capacity>button.is-selected .reservation-time__copy small{color:#fff}.reservation-times--capacity>button.is-selected .reservation-time__copy small{opacity:.82}.reservation-times--capacity>button.is-selected .reservation-time__state{color:#115c31;background:#fff}.reservation-capacity-alert{display:grid;grid-template-columns:42px minmax(0,1fr);gap:11px;padding:14px;color:#713f12;border:1px solid #f0cf98;border-radius:16px;background:#fff9ed}.reservation-capacity-alert>span{width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:#ffedc9;font-size:22px}.reservation-capacity-alert strong{font-size:.7rem}.reservation-capacity-alert p{margin:3px 0 10px;color:#855a2e;font-size:.62rem;line-height:1.55}.reservation-capacity-alert label{display:block;cursor:pointer}.reservation-capacity-alert label input{position:absolute;opacity:0;pointer-events:none}.reservation-capacity-alert label span{min-height:44px;display:flex;align-items:center;gap:7px;padding:8px 11px;color:#713f12;border:1px solid #e7c17f;border-radius:12px;background:#fff;font-size:.63rem;font-weight:800}.reservation-capacity-alert label input:checked+span{color:#fff;border-color:#a9580b;background:#a9580b}.reservation-waitlist-chip{width:max-content;max-width:100%;display:inline-flex;align-items:center;gap:6px;padding:7px 10px;color:#8a4c0e;border-radius:10px;background:#fff0d5;font-size:.61rem;font-weight:800}.reservation-error--client{margin:0}.reservation-modal__footer-actions{width:100%;display:flex;align-items:center;justify-content:flex-end;gap:10px}.reservation-modal__footer-actions .reservation-primary{min-width:180px}
 @media(max-width:680px){.menu-cover .menu-status--closed{border-color:#f0c995;background:#fff8ec}.menu-cover .menu-status--open{border-color:#b9dfc5;background:#f0faf3}.reservation-progress{padding-inline:10px}.reservation-progress small{display:block;font-size:.5rem}.reservation-progress li:not(:last-child)::after{left:calc(50% + 21px);width:calc(100% - 42px)}.reservation-modal .reservation-times--capacity{grid-template-columns:1fr 1fr;gap:8px}.reservation-times--capacity>button{min-height:76px!important;grid-template-columns:36px minmax(0,1fr) 26px!important;gap:8px!important;padding:9px!important}.reservation-time__icon{width:36px;height:36px}.reservation-time__copy strong{font-size:.72rem}.reservation-time__copy small{font-size:.52rem}.reservation-modal__footer-actions .reservation-primary{min-width:0;flex:1}.reservation-capacity-alert{grid-template-columns:1fr}.reservation-capacity-alert>span{display:none}}
+
+/* Restaurant footer inspired by the original Calle Sabor site */
+.menu-footer--restaurant {
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    color: rgba(255,255,255,.78);
+    background-color: #17231b;
+    background-image: linear-gradient(rgba(16,31,21,.91),rgba(16,31,21,.96)),url("../img/restaurant/cta_bg.jpg");
+    background-position: center;
+    background-size: cover;
+}
+.menu-footer--restaurant::before {
+    height: 26px;
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    left: 0;
+    content: "";
+    background-color: transparent;
+    background-image: url("../img/restaurant/pattern2.png");
+    background-repeat: repeat-x;
+    background-position: center top;
+    background-size: auto 26px;
+    pointer-events: none;
+}
+.menu-footer__top {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns:minmax(0,1.75fr) minmax(190px,.75fr) minmax(230px,.9fr);
+    gap: clamp(36px,6vw,86px);
+    padding-block: 104px 70px;
+}
+.menu-footer__about { max-width: 560px; }
+.menu-footer__logo { width: max-content; display: block; margin-bottom: 22px; }
+.menu-footer__logo img { width: auto; max-width: 150px; height: 82px; display: block; object-fit: contain; object-position: left center; }
+.menu-footer__about h2 { margin: 0 0 12px; color: #fff; font-family: var(--menu-font-display); font-size: clamp(1.55rem,2.4vw,2.25rem); letter-spacing: -.04em; }
+.menu-footer__about p { max-width: 540px; margin: 0; color: rgba(255,255,255,.72); font-size: .9rem; line-height: 1.75; }
+.menu-footer--restaurant .menu-socials { margin-top: 24px; }
+.menu-footer--restaurant .menu-socials a { width: 46px; height: 46px; color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; background: rgba(255,255,255,.09); transition: transform .22s ease,background-color .22s ease,border-color .22s ease; }
+.menu-footer--restaurant .menu-socials a:hover { color: #fff; border-color: var(--menu-primary); background: var(--menu-primary); transform: translateY(-3px); }
+.menu-footer__column h2 { position: relative; margin: 8px 0 28px; padding-bottom: 13px; color: #fff; font-family: var(--menu-font-display); font-size: 1.05rem; letter-spacing: -.02em; }
+.menu-footer__column h2::after { width: 38px; height: 3px; position: absolute; bottom: 0; left: 0; content: ""; border-radius: 999px; background: var(--menu-primary); }
+.menu-footer__column ul { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; }
+.menu-footer__column li { min-width: 0; }
+.menu-footer__column a { min-height: 30px; display: inline-flex; align-items: center; gap: 7px; color: rgba(255,255,255,.74); font-size: .82rem; line-height: 1.5; transition: color .2s ease,transform .2s ease; }
+.menu-footer__column a:hover { color: #fff; transform: translateX(3px); }
+.menu-footer__column a i { color: #8cd79c; font-size: 18px; }
+.menu-footer__contact li { display: grid; grid-template-columns: 26px minmax(0,1fr); align-items: start; gap: 9px; color: rgba(255,255,255,.74); font-size: .82rem; line-height: 1.6; }
+.menu-footer__contact li > i { margin-top: 2px; color: #8cd79c; font-size: 20px; }
+.menu-footer__contact li a { min-height: 0; overflow-wrap: anywhere; }
+.menu-footer__bottom { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 20px; border-top: 1px solid rgba(255,255,255,.13); }
+.menu-footer__bottom p { margin: 0; color: rgba(255,255,255,.62); font-size: .73rem; }
+.menu-footer__bottom p strong { color: #9ee4ad; }
+.menu-footer__bottom > a { min-height: 44px; display: inline-flex; align-items: center; gap: 7px; padding: 0 15px; color: #fff; border: 1px solid rgba(255,255,255,.17); border-radius: 999px; background: rgba(255,255,255,.07); font-size: .73rem; font-weight: 750; transition: background-color .2s ease,border-color .2s ease; }
+.menu-footer__bottom > a:hover { border-color: var(--menu-primary); background: var(--menu-primary); }
+
+@media(max-width:900px){
+    .menu-footer__top { grid-template-columns:minmax(0,1.25fr) minmax(180px,.75fr); }
+    .menu-footer__about { grid-column:1/-1; max-width:680px; }
+}
+@media(max-width:600px){
+    .menu-footer__top { grid-template-columns:1fr; gap:38px; padding-block:78px 52px; }
+    .menu-footer__about { grid-column:auto; }
+    .menu-footer__logo img { height:70px; }
+    .menu-footer__column h2 { margin-bottom:20px; }
+    .menu-footer__column ul { gap:10px; }
+    .menu-footer__column a,.menu-footer__contact li { font-size:.88rem; }
+    .menu-footer__bottom { min-height:0; align-items:flex-start; flex-direction:column; gap:14px; padding-block:24px max(24px,env(safe-area-inset-bottom)); }
+    .menu-footer__bottom > a { width:100%; justify-content:center; }
+}
 @media(max-width:390px){.reservation-modal .reservation-times--capacity{grid-template-columns:1fr}.reservation-times--capacity>button{min-height:68px!important}}
 @media(prefers-reduced-motion:reduce){.reservation-times--capacity>button{transition:none}.reservation-times--capacity>button:hover{transform:none}}
 

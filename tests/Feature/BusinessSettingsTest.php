@@ -323,6 +323,30 @@ class BusinessSettingsTest extends TestCase
             ->assertHasErrors(['primaryColor']);
     }
 
+    public function test_owner_can_edit_the_public_homepage_content(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->call('setBusinessSection', 'homepage')
+            ->set('homeBadge', 'Cocina yucateca desde 1998')
+            ->set('homeHeadline', 'El sabor de nuestra tierra, servido en tu mesa.')
+            ->set('homeDescription', 'Una experiencia local preparada con ingredientes frescos.')
+            ->set('homeIntroKicker', 'Nuestra esencia')
+            ->set('homeIntroTitle', 'Recetas que cuentan una historia.')
+            ->set('homeIntroDescription', 'Cada plato celebra nuestras raíces y a quienes nos visitan.')
+            ->call('saveBusiness')
+            ->assertHasNoErrors();
+
+        $this->get(route('public.home'))
+            ->assertOk()
+            ->assertSeeText('Cocina yucateca desde 1998')
+            ->assertSeeText('El sabor de nuestra tierra, servido en tu mesa.')
+            ->assertSeeText('Recetas que cuentan una historia.');
+    }
+
     public function test_gallery_can_be_saved_independently_from_the_business_form(): void
     {
         Storage::fake('public');
