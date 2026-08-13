@@ -57,6 +57,8 @@ class PublicLandingPagesTest extends TestCase
             ->assertSee('assets/img/restaurant/banner5.jpg', false)
             ->assertSee('assets/img/restaurant/banner7.jpg', false)
             ->assertSee('data-home-hero', false)
+            ->assertSee('data-home-preloader', false)
+            ->assertDontSee('home-hero__visual', false)
             ->assertDontSee('data-home-hero-progress', false)
             ->assertDontSee('data-home-hero-prev', false)
             ->assertDontSee('data-home-hero-pause', false)
@@ -69,8 +71,12 @@ class PublicLandingPagesTest extends TestCase
 
         $this->assertIsString($css);
         $this->assertIsString($javascript);
+        $this->assertStringContainsString('home-section-divider', $css);
         $this->assertStringContainsString('pattern.png', $css);
         $this->assertStringContainsString('pattern2.png', $css);
+        $this->assertStringContainsString('background-color: transparent;', $css);
+        $this->assertFileExists(public_path('assets/img/restaurant/pattern.png'));
+        $this->assertFileExists(public_path('assets/img/restaurant/pattern2.png'));
         $this->assertStringContainsString('min-height: 56px;', $css);
         $this->assertStringContainsString('@media (max-width: 390px)', $css);
         $this->assertStringContainsString('prefers-reduced-motion: reduce', $css);
@@ -78,6 +84,7 @@ class PublicLandingPagesTest extends TestCase
         $this->assertStringNotContainsString('data-home-hero-progress', $javascript);
         $this->assertStringNotContainsString('data-home-hero-pause', $javascript);
         $this->assertStringContainsString('IntersectionObserver', $javascript);
+        $this->assertStringContainsString('initializePreloader', $javascript);
     }
 
     public function test_every_static_home_icon_exists_in_the_installed_boxicons_font(): void
