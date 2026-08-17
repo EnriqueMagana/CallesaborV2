@@ -7,8 +7,7 @@ use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
-new #[Layout('layouts.guest')] class extends Component
-{
+new #[Layout('layouts.guest')] class extends Component {
     public LoginForm $form;
 
     public bool $showSessionConfirmation = false;
@@ -50,10 +49,7 @@ new #[Layout('layouts.guest')] class extends Component
             return;
         }
 
-        app(SingleSessionManager::class)->start(
-            Auth::guard('web')->user(),
-            Session::driver(),
-        );
+        app(SingleSessionManager::class)->start(Auth::guard('web')->user(), Session::driver());
 
         // Dashboard uses a different layout and stylesheet bundle.
         // A full navigation prevents a flash of unstyled admin content.
@@ -63,21 +59,17 @@ new #[Layout('layouts.guest')] class extends Component
 
 <div class="auth-login" x-data="{ showPassword: false }">
     <header class="auth-login__header">
-        <div class="auth-login__topline">
-            <span class="auth-login__eyebrow">Panel administrativo</span>
-            <span class="auth-login__secure"><i class="bx bx-shield-quarter" aria-hidden="true"></i>Acceso protegido</span>
-        </div>
-        <h2>Inicia tu turno con seguridad</h2>
+        <h2>¡Qué gusto verte!</h2>
         <p>Usa las credenciales asignadas a tu cuenta para entrar al espacio de trabajo.</p>
     </header>
 
-    @if(session('auth_warning'))
+    @if (session('auth_warning'))
         <div class="auth-notice auth-notice--warning" role="alert">
             <i class="bx bx-log-out-circle" aria-hidden="true"></i><span>{{ session('auth_warning') }}</span>
         </div>
     @endif
 
-    @if(session('status'))
+    @if (session('status'))
         <div class="auth-notice auth-notice--success" role="status">
             <i class="bx bx-check-circle" aria-hidden="true"></i><span>{{ session('status') }}</span>
         </div>
@@ -89,28 +81,38 @@ new #[Layout('layouts.guest')] class extends Component
             <div class="auth-input-wrap">
                 <i class="bx bx-envelope" aria-hidden="true"></i>
                 <input wire:model.blur="form.email" id="email" type="email" name="email" required autofocus
-                    autocomplete="username" autocapitalize="none" spellcheck="false"
-                    placeholder="nombre@negocio.com" aria-describedby="email-help email-error">
+                    autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="nombre@callesabor.com"
+                    aria-describedby="email-help email-error">
             </div>
             <small id="email-help" class="auth-field__help">Usa el correo asignado por el administrador.</small>
-            @error('form.email')<p id="email-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
+            @error('form.email')
+                <p id="email-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle"
+                        aria-hidden="true"></i>{{ $message }}</p>
+            @enderror
         </div>
 
         <div class="auth-field {{ $errors->has('form.password') ? 'has-error' : '' }}">
             <div class="auth-field__label-row">
                 <label for="password">Contraseña</label>
-                @if(Route::has('password.request'))
+                @if (Route::has('password.request'))
                     <a href="{{ route('password.request') }}" wire:navigate>¿Olvidaste tu contraseña?</a>
                 @endif
             </div>
             <div class="auth-input-wrap">
                 <i class="bx bx-lock-alt" aria-hidden="true"></i>
-                <input wire:model="form.password" id="password" x-bind:type="showPassword ? 'text' : 'password'" name="password" required autocomplete="current-password" placeholder="Ingresa tu contraseña" aria-describedby="password-error">
-                <button type="button" class="auth-password-toggle" x-on:click="showPassword = !showPassword" x-bind:aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" x-bind:aria-pressed="showPassword">
+                <input wire:model="form.password" id="password" x-bind:type="showPassword ? 'text' : 'password'"
+                    name="password" required autocomplete="current-password" placeholder="Ingresa tu contraseña"
+                    aria-describedby="password-error">
+                <button type="button" class="auth-password-toggle" x-on:click="showPassword = !showPassword"
+                    x-bind:aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    x-bind:aria-pressed="showPassword">
                     <i class="bx" x-bind:class="showPassword ? 'bx-hide' : 'bx-show'" aria-hidden="true"></i>
                 </button>
             </div>
-            @error('form.password')<p id="password-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
+            @error('form.password')
+                <p id="password-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle"
+                        aria-hidden="true"></i>{{ $message }}</p>
+            @enderror
         </div>
 
         <label class="auth-remember" for="remember">
@@ -120,35 +122,48 @@ new #[Layout('layouts.guest')] class extends Component
         </label>
 
         <button type="submit" class="auth-submit" wire:loading.attr="disabled" wire:target="login">
-            <span wire:loading.remove wire:target="login">Iniciar sesión <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
-            <span wire:loading.flex wire:target="login"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Verificando acceso…</span>
+            <span wire:loading.remove wire:target="login">Iniciar sesión <i class="bx bx-right-arrow-alt"
+                    aria-hidden="true"></i></span>
+            <span wire:loading.flex wire:target="login"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>
+                Verificando acceso…</span>
         </button>
     </form>
 
     <div class="auth-security-note">
-        <i class="bx bx-devices" aria-hidden="true"></i>
-        <p><strong>Una cuenta, un navegador activo.</strong><span>Si ingresas desde otro navegador, la sesión anterior se cerrará automáticamente.</span></p>
+        <i class="bx bx-rocket" aria-hidden="true"></i>
+        <p>
+            <strong>Tu negocio, todo en un solo lugar.</strong>
+            <span>Gestiona tus operaciones de forma rápida, simple y organizada.</span>
+        </p>
     </div>
 
-    @if($showSessionConfirmation)
+    @if ($showSessionConfirmation)
         <div class="auth-session-modal" role="presentation">
-            <button type="button" class="auth-session-modal__backdrop" wire:click="cancelSessionTakeover" aria-label="Cerrar confirmación"></button>
-            <section class="auth-session-dialog" role="alertdialog" aria-modal="true" aria-labelledby="active-session-title" aria-describedby="active-session-description">
+            <button type="button" class="auth-session-modal__backdrop" wire:click="cancelSessionTakeover"
+                aria-label="Cerrar confirmación"></button>
+            <section class="auth-session-dialog" role="alertdialog" aria-modal="true"
+                aria-labelledby="active-session-title" aria-describedby="active-session-description">
                 <span class="auth-session-dialog__icon" aria-hidden="true"><i class="bx bx-devices"></i></span>
                 <span class="auth-session-dialog__eyebrow">Sesión activa detectada</span>
                 <h3 id="active-session-title">Ya tienes una sesión iniciada en otro dispositivo</h3>
-                <p id="active-session-description">Si continúas aquí, cerraremos la sesión anterior y este navegador quedará como el único acceso activo.</p>
+                <p id="active-session-description">Si continúas aquí, cerraremos la sesión anterior y este navegador
+                    quedará como el único acceso activo.</p>
                 <div class="auth-session-dialog__notice">
                     <i class="bx bx-info-circle" aria-hidden="true"></i>
                     <span>No se perderán ventas ni información guardada; solo se cerrará el acceso anterior.</span>
                 </div>
                 <div class="auth-session-dialog__actions">
-                    <button type="button" class="auth-session-dialog__cancel" wire:click="cancelSessionTakeover" wire:loading.attr="disabled" wire:target="confirmSessionTakeover,cancelSessionTakeover">
+                    <button type="button" class="auth-session-dialog__cancel" wire:click="cancelSessionTakeover"
+                        wire:loading.attr="disabled" wire:target="confirmSessionTakeover,cancelSessionTakeover">
                         Cerrar
                     </button>
-                    <button type="button" class="auth-session-dialog__confirm" wire:click="confirmSessionTakeover" wire:loading.attr="disabled" wire:target="confirmSessionTakeover">
-                        <span wire:loading.remove wire:target="confirmSessionTakeover">Iniciar aquí <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
-                        <span wire:loading.flex wire:target="confirmSessionTakeover"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Cerrando sesión anterior…</span>
+                    <button type="button" class="auth-session-dialog__confirm" wire:click="confirmSessionTakeover"
+                        wire:loading.attr="disabled" wire:target="confirmSessionTakeover">
+                        <span wire:loading.remove wire:target="confirmSessionTakeover">Iniciar aquí <i
+                                class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
+                        <span wire:loading.flex wire:target="confirmSessionTakeover"><i
+                                class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Cerrando sesión
+                            anterior…</span>
                     </button>
                 </div>
             </section>

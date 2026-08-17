@@ -4,13 +4,24 @@
         <span class="dashboard-rest__star dashboard-rest__star--one"></span>
         <span class="dashboard-rest__star dashboard-rest__star--two"></span>
         <span class="dashboard-rest__star dashboard-rest__star--three"></span>
+
         <div class="dashboard-rest__shop">
             <span class="dashboard-rest__awning"></span>
             <span class="dashboard-rest__door"></span>
-            <span class="dashboard-rest__sign"><i class="bx bx-power-off"></i></span>
+            <span class="dashboard-rest__sign">
+                <i class="bx bx-power-off"></i>
+            </span>
         </div>
     </div>
-    <span class="dashboard-rest__eyebrow">Turno finalizado</span>
-    <h1 id="dashboard-rest-title">Todos a descansar</h1>
-    <p>No hay una caja abierta. El dashboard volverá a mostrar la operación cuando inicie el siguiente turno.</p>
+
+    <span class="dashboard-rest__eyebrow">Jornada finalizada</span>
+
+    <h1 id="dashboard-rest-title">
+        ¡Excelente trabajo por hoy!
+    </h1>
+
+    <p>
+        La caja se encuentra cerrada. Cuando inicies un nuevo turno,
+        aquí podrás consultar nuevamente la actividad de tu negocio.
+    </p>
 </section>
