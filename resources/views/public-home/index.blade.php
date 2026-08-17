@@ -88,7 +88,6 @@
 
         <div class="menu-container home-hero__content">
             <div class="home-hero__copy">
-                <span class="home-hero__badge"><i class="bx bx-spa" aria-hidden="true"></i>{{ $business->home_badge ?: 'Cocina honesta · sabor local · momentos memorables' }}</span>
                 <h1>{{ $business->home_headline ?: 'Sabores que convierten una comida en un recuerdo.' }}</h1>
                 <p>{{ $business->home_description ?: 'Descubre una carta preparada con ingredientes frescos, recetas con identidad y la hospitalidad que hace especial cada visita.' }}
                 </p>
@@ -174,8 +173,7 @@
         </section>
 
         @if ($categories->isNotEmpty())
-            <section class="home-categories" aria-labelledby="home-categories-title"
-                data-home-reveal>
+            <section class="home-categories" aria-labelledby="home-categories-title" data-home-reveal>
                 <div class="menu-container">
                     <div class="section-heading">
                         <div><span class="menu-kicker">La carta</span>
@@ -213,9 +211,8 @@
             </section>
         @endif
 
-        <section class="home-reservation home-section--white-divider" id="reservar" aria-labelledby="reservation-section-title"
-            data-home-reveal>
-            <span class="home-section-divider" aria-hidden="true"></span>
+        <section class="home-reservation home-section--white-divider" id="reservar"
+            aria-labelledby="reservation-section-title" data-home-reveal>
             <div class="menu-container home-reservation__compact">
                 <span class="home-reservation__icon"><i class="bx bx-calendar-heart" aria-hidden="true"></i></span>
                 <div>
@@ -227,8 +224,7 @@
             </div>
         </section>
 
-        <section class="home-gallery" id="galeria" aria-labelledby="home-gallery-title"
-            data-home-reveal>
+        <section class="home-gallery" id="galeria" aria-labelledby="home-gallery-title" data-home-reveal>
             <div class="menu-container">
                 <div class="section-heading">
                     <div><span class="menu-kicker">Ambiente y sabor</span>
@@ -264,8 +260,7 @@
             </div>
         </section>
 
-        <section class="home-visit" id="horarios" aria-labelledby="home-hours-title"
-            data-home-reveal>
+        <section class="home-visit" id="horarios" aria-labelledby="home-hours-title" data-home-reveal>
             <div class="menu-container home-visit__grid">
                 <article class="home-hours-card">
                     <header>
@@ -330,7 +325,6 @@
         </section>
 
         <section class="home-menu-cta home-section--white-divider" data-home-reveal>
-            <span class="home-section-divider" aria-hidden="true"></span>
             <div class="menu-container home-menu-cta__inner">
                 <span><i class="bx bx-restaurant " aria-hidden="true"></i></span>
                 <div>
