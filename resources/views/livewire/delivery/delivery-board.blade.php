@@ -4,16 +4,16 @@
     $canTakeOrders = $this->canTakeOrders();
     $canCompleteOrders = $this->canCompleteOrders();
     $bank = $orders->filter(
-        fn ($order) => ! $order->deliveryAssignment
-            && in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true),
+        fn($order) => !$order->deliveryAssignment &&
+            in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true),
     );
     $assigned = $orders
-        ->filter(fn ($order) => $order->deliveryAssignment?->status === 'asignado')
-        ->when(! $canManageAll, fn ($items) => $items->where('deliveryAssignment.driver_id', auth()->id()));
+        ->filter(fn($order) => $order->deliveryAssignment?->status === 'asignado')
+        ->when(!$canManageAll, fn($items) => $items->where('deliveryAssignment.driver_id', auth()->id()));
     $delivered = $orders
-        ->filter(fn ($order) => $order->deliveryAssignment?->status === 'entregado')
-        ->when(! $canManageAll, fn ($items) => $items->where('deliveryAssignment.driver_id', auth()->id()))
-        ->sortByDesc(fn ($order) => $order->deliveryAssignment->delivered_at);
+        ->filter(fn($order) => $order->deliveryAssignment?->status === 'entregado')
+        ->when(!$canManageAll, fn($items) => $items->where('deliveryAssignment.driver_id', auth()->id()))
+        ->sortByDesc(fn($order) => $order->deliveryAssignment->delivered_at);
     $paymentMethodMeta = [
         'efectivo' => ['Efectivo', 'bx-money'],
         'transferencia' => ['Transferencia', 'bx-transfer'],
@@ -21,8 +21,8 @@
     ];
     $reconciliationRows = $delivered->map(function ($order) {
         $payments = $order->payments
-            ->groupBy(fn ($payment) => $payment->method === 'contra_entrega' ? 'efectivo' : $payment->method)
-            ->map(fn ($items) => (float) $items->sum('amount'));
+            ->groupBy(fn($payment) => $payment->method === 'contra_entrega' ? 'efectivo' : $payment->method)
+            ->map(fn($items) => (float) $items->sum('amount'));
 
         return [
             'order' => $order,
@@ -31,20 +31,26 @@
         ];
     });
     $paymentTotals = collect($paymentMethodMeta)->mapWithKeys(
-        fn ($meta, $method) => [$method => (float) $reconciliationRows->sum(
-            fn ($row) => $row['payments']->get($method, 0),
-        )],
+        fn($meta, $method) => [
+            $method => (float) $reconciliationRows->sum(fn($row) => $row['payments']->get($method, 0)),
+        ],
     );
     $reconciliationTotal = (float) $paymentTotals->sum();
-    $searchValue = fn ($order) => str(implode(' ', [
-        $order->display_folio,
-        $order->display_name,
-        $order->customer_phone,
-        $order->customer_address,
-        $order->customer_references,
-        $order->delivery_method_label,
-        $order->origin_label,
-    ]))->ascii()->lower()->squish()->toString();
+    $searchValue = fn($order) => str(
+        implode(' ', [
+            $order->display_folio,
+            $order->display_name,
+            $order->customer_phone,
+            $order->customer_address,
+            $order->customer_references,
+            $order->delivery_method_label,
+            $order->origin_label,
+        ]),
+    )
+        ->ascii()
+        ->lower()
+        ->squish()
+        ->toString();
     $searchIndex = [
         'available' => $bank->map($searchValue)->values()->all(),
         'assigned' => $assigned->map($searchValue)->values()->all(),
@@ -69,7 +75,8 @@
         this.toasts.push(toast);
         setTimeout(() => this.toasts = this.toasts.filter(item => item.id !== toast.id), 3800);
     }
-}" x-on:notify.window="notify($event.detail)">
+}"
+    x-on:notify.window="notify($event.detail)">
     <a href="#delivery-orders" class="delivery-skip-link">Saltar al banco de pedidos</a>
 
     <header class="delivery-bank__topbar">
@@ -95,7 +102,7 @@
         </div>
     </header>
 
-    @if (! $this->activeRegister)
+    @if (!$this->activeRegister)
         <section class="delivery-empty delivery-empty--shift" aria-labelledby="delivery-no-shift-title">
             <span><i class="bx bx-lock-alt" aria-hidden="true"></i></span>
             <h2 id="delivery-no-shift-title">No hay una caja abierta</h2>
@@ -115,16 +122,14 @@
                         <p>Las tarjetas se expanden sin salir del banco.</p>
                     </div>
                 </div>
-                <label class="delivery-search" for="delivery-search-input" x-show="tab !== 'reconciliation'"
-                    x-cloak>
+                <label class="delivery-search" for="delivery-search-input" x-show="tab !== 'reconciliation'" x-cloak>
                     <span>Buscar pedido</span>
                     <div>
                         <i class="bx bx-search" aria-hidden="true"></i>
                         <input id="delivery-search-input" x-ref="searchInput" type="search"
-                            x-model.debounce.120ms="query" placeholder="Folio, cliente o dirección"
-                            autocomplete="off">
-                        <button type="button" x-show="query" x-cloak
-                            x-on:click="query = ''; $refs.searchInput.focus()" aria-label="Limpiar búsqueda">
+                            x-model.debounce.120ms="query" placeholder="Folio, cliente o dirección" autocomplete="off">
+                        <button type="button" x-show="query" x-cloak x-on:click="query = ''; $refs.searchInput.focus()"
+                            aria-label="Limpiar búsqueda">
                             <i class="bx bx-x" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -134,22 +139,20 @@
             <nav class="delivery-bank__tabs" role="tablist" aria-label="Estados del banco de pedidos">
                 <button id="delivery-tab-available" type="button" role="tab"
                     aria-controls="delivery-panel-available" x-on:click="changeTab('available')"
-                    x-bind:class="tab === 'available' && 'is-active'"
-                    x-bind:aria-selected="tab === 'available'">
+                    x-bind:class="tab === 'available' && 'is-active'" x-bind:aria-selected="tab === 'available'">
                     <i class="bx bx-store-alt" aria-hidden="true"></i><span>Banco</span><b>{{ $bank->count() }}</b>
                 </button>
-                <button id="delivery-tab-assigned" type="button" role="tab"
-                    aria-controls="delivery-panel-assigned" x-on:click="changeTab('assigned')"
-                    x-bind:class="tab === 'assigned' && 'is-active'"
+                <button id="delivery-tab-assigned" type="button" role="tab" aria-controls="delivery-panel-assigned"
+                    x-on:click="changeTab('assigned')" x-bind:class="tab === 'assigned' && 'is-active'"
                     x-bind:aria-selected="tab === 'assigned'">
                     <i class="bx bx-user-check" aria-hidden="true"></i>
                     <span>{{ $canManageAll ? 'Asignados' : 'Mis pedidos' }}</span><b>{{ $assigned->count() }}</b>
                 </button>
                 <button id="delivery-tab-delivered" type="button" role="tab"
                     aria-controls="delivery-panel-delivered" x-on:click="changeTab('delivered')"
-                    x-bind:class="tab === 'delivered' && 'is-active'"
-                    x-bind:aria-selected="tab === 'delivered'">
-                    <i class="bx bx-check-double" aria-hidden="true"></i><span>Entregados</span><b>{{ $delivered->count() }}</b>
+                    x-bind:class="tab === 'delivered' && 'is-active'" x-bind:aria-selected="tab === 'delivered'">
+                    <i class="bx bx-check-double"
+                        aria-hidden="true"></i><span>Entregados</span><b>{{ $delivered->count() }}</b>
                 </button>
                 <button id="delivery-tab-reconciliation" type="button" role="tab"
                     aria-controls="delivery-panel-reconciliation" x-on:click="changeTab('reconciliation')"
@@ -190,19 +193,18 @@
             </div>
 
             @foreach ([
-                'available' => [$bank, 'El banco está libre', 'Los pedidos de kiosco y ventanilla aparecerán aquí desde que sean capturados.', 'bx-package'],
-                'assigned' => [$assigned, 'No tienes pedidos asignados', 'Toma una tarjeta del banco para comenzar.', 'bx-user-check'],
-                'delivered' => [$delivered, 'Todavía no hay pedidos entregados', 'Las entregas confirmadas durante este turno aparecerán aquí.', 'bx-check-shield'],
-            ] as $panel => [$panelOrders, $emptyTitle, $emptyCopy, $emptyIcon])
-                <div id="delivery-panel-{{ $panel }}" class="delivery-tab-panel" role="tabpanel" tabindex="-1"
-                    aria-labelledby="delivery-tab-{{ $panel }}" x-ref="{{ $panel }}Panel"
-                    x-show="tab === '{{ $panel }}'" x-cloak wire:loading.remove wire:target="refreshBoard">
+        'available' => [$bank, 'El banco está libre', 'Los pedidos de kiosco y ventanilla aparecerán aquí desde que sean capturados.', 'bx-package'],
+        'assigned' => [$assigned, 'No tienes pedidos asignados', 'Toma una tarjeta del banco para comenzar.', 'bx-user-check'],
+        'delivered' => [$delivered, 'Todavía no hay pedidos entregados', 'Las entregas confirmadas durante este turno aparecerán aquí.', 'bx-check-shield'],
+    ] as $panel => [$panelOrders, $emptyTitle, $emptyCopy, $emptyIcon])
+                <div id="delivery-panel-{{ $panel }}" class="delivery-tab-panel" role="tabpanel"
+                    tabindex="-1" aria-labelledby="delivery-tab-{{ $panel }}"
+                    x-ref="{{ $panel }}Panel" x-show="tab === '{{ $panel }}'" x-cloak
+                    wire:loading.remove wire:target="refreshBoard">
                     <div class="delivery-bank__grid">
                         @foreach ($panelOrders as $order)
-                            <x-delivery.order-card :order="$order" :takeable="$panel === 'available'"
-                                :show-driver="in_array($panel, ['assigned', 'delivered'], true)"
-                                :can-take="$canTakeOrders" :can-complete="$canCompleteOrders"
-                                :can-manage-all="$canManageAll" />
+                            <x-delivery.order-card :order="$order" :takeable="$panel === 'available'" :show-driver="in_array($panel, ['assigned', 'delivered'], true)"
+                                :can-take="$canTakeOrders" :can-complete="$canCompleteOrders" :can-manage-all="$canManageAll" />
                         @endforeach
                     </div>
 
@@ -265,8 +267,8 @@
                                     <small>{{ $methodLabel }}</small>
                                     <strong>${{ number_format($paymentTotals->get($method, 0), 2) }}</strong>
                                     <p>
-                                        {{ $reconciliationRows->filter(fn ($row) => $row['payments']->get($method, 0) > 0)->count() }}
-                                        {{ $reconciliationRows->filter(fn ($row) => $row['payments']->get($method, 0) > 0)->count() === 1 ? 'nota' : 'notas' }}
+                                        {{ $reconciliationRows->filter(fn($row) => $row['payments']->get($method, 0) > 0)->count() }}
+                                        {{ $reconciliationRows->filter(fn($row) => $row['payments']->get($method, 0) > 0)->count() === 1 ? 'nota' : 'notas' }}
                                     </p>
                                 </div>
                             </article>
@@ -290,7 +292,8 @@
                             <header>
                                 <div>
                                     <h4>Detalle de notas</h4>
-                                    <p>{{ $canManageAll ? 'Entregas de todos los repartidores' : 'Tus entregas confirmadas' }}</p>
+                                    <p>{{ $canManageAll ? 'Entregas de todos los repartidores' : 'Tus entregas confirmadas' }}
+                                    </p>
                                 </div>
                                 <strong>${{ number_format($reconciliationTotal, 2) }}</strong>
                             </header>
@@ -317,7 +320,8 @@
                                                     <small>{{ $order->display_name }}</small>
                                                 </td>
                                                 <td data-label="Entrega">
-                                                    <time datetime="{{ optional($order->deliveryAssignment->delivered_at)->toIso8601String() }}">
+                                                    <time
+                                                        datetime="{{ optional($order->deliveryAssignment->delivered_at)->toIso8601String() }}">
                                                         {{ optional($order->deliveryAssignment->delivered_at)->format('H:i') ?? 'Sin hora' }}
                                                     </time>
                                                     <small>{{ $order->origin_label }}</small>
@@ -332,8 +336,10 @@
                                                         @forelse ($row['payments'] as $method => $amount)
                                                             @php([$methodLabel, $methodIcon] = $paymentMethodMeta[$method] ?? [str($method)->headline(), 'bx-wallet'])
                                                             <span class="is-{{ $method }}">
-                                                                <i class="bx {{ $methodIcon }}" aria-hidden="true"></i>
-                                                                {{ $methodLabel }} <b>${{ number_format($amount, 2) }}</b>
+                                                                <i class="bx {{ $methodIcon }}"
+                                                                    aria-hidden="true"></i>
+                                                                {{ $methodLabel }}
+                                                                <b>${{ number_format($amount, 2) }}</b>
                                                             </span>
                                                         @empty
                                                             <span class="is-missing"><i class="bx bx-error-circle"
@@ -353,23 +359,12 @@
                     @endif
                 </section>
             </div>
-
-            <p id="delivery-refresh-help" class="delivery-manual-note" aria-live="polite">
-                <i class="bx bx-refresh" aria-hidden="true"></i>
-                <span>
-                    Actualización manual
-                    @if ($lastCheckedAt)
-                        · última consulta {{ $lastCheckedAt }}
-                    @endif
-                </span>
-            </p>
         </section>
     @endif
 
     @if ($confirmingDeliveryOrderId)
         <div class="delivery-confirm-layer" role="presentation" x-data
-            x-on:keydown.escape.window="$wire.cancelDeliveryConfirmation()"
-            x-init="$nextTick(() => $refs.cancelDelivery.focus())">
+            x-on:keydown.escape.window="$wire.cancelDeliveryConfirmation()" x-init="$nextTick(() => $refs.cancelDelivery.focus())">
             <button type="button" class="delivery-modal-layer__backdrop" wire:click="cancelDeliveryConfirmation"
                 aria-label="Cancelar confirmación"></button>
             <section class="delivery-confirm" role="alertdialog" aria-modal="true"
@@ -377,7 +372,8 @@
                 <span class="delivery-confirm__icon"><i class="bx bx-check-double" aria-hidden="true"></i></span>
                 <span class="delivery-confirm__eyebrow">Confirmación final</span>
                 <h2 id="delivery-confirm-title">¿El cliente recibió el pedido?</h2>
-                <p id="delivery-confirm-copy">Se registrará la hora de entrega y el pedido pasará al historial del turno.</p>
+                <p id="delivery-confirm-copy">Se registrará la hora de entrega y el pedido pasará al historial del
+                    turno.</p>
                 <div>
                     <button x-ref="cancelDelivery" type="button" class="delivery-btn delivery-btn--secondary"
                         wire:click="cancelDeliveryConfirmation">Todavía no</button>
