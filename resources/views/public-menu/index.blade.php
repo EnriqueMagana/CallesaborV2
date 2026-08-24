@@ -44,7 +44,10 @@
                 <p class="menu-search__status" id="menu-search-status" aria-live="polite"></p>
             </div>
 
-            <nav class="category-nav" aria-label="Categorías del menú">
+            <nav @class([
+                'category-nav',
+                'category-nav--circles' => $menuSettings->category_style === 'circles',
+            ]) aria-label="Categorías del menú">
                 <div class="menu-container category-nav__rail" data-category-rail>
                     <button class="category-nav__control category-nav__control--previous" type="button"
                         data-category-previous aria-label="Ver categorías anteriores"
@@ -58,11 +61,18 @@
                         <span><strong>Todo</strong><small>{{ $totalProducts }} opciones</small></span>
                     </a>
                     @foreach ($categories as $category)
+                        @php($categoryPreview = $category->products->first(fn ($product) => filled($product->image)))
                         <a href="#category-{{ $category->id }}" class="category-nav__item"
                             data-category-link="category-{{ $category->id }}">
                             <span class="category-nav__icon"
-                                style="--category-color: {{ $category->color ?: $business->primary_color }}"><i
-                                    class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i></span>
+                                style="--category-color: {{ $category->color ?: $business->primary_color }}">
+                                @if ($menuSettings->category_style === 'circles' && $categoryPreview)
+                                    <img src="{{ Storage::url($categoryPreview->image) }}" alt="" width="64" height="64"
+                                        loading="lazy" decoding="async">
+                                @else
+                                    <i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i>
+                                @endif
+                            </span>
                             <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
                                     {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
                         </a>
@@ -171,9 +181,12 @@
                     <div><span class="menu-kicker">Conoce el restaurante</span>
                         <h2 id="restaurant-info-title">Información útil</h2>
                     </div>
-                    <p>Consulta nuestros horarios, fotografías y canales oficiales.</p>
+                    <p>{{ $menuSettings->show_gallery ? 'Consulta nuestros horarios, fotografías y canales oficiales.' : 'Consulta nuestros horarios y canales oficiales.' }}</p>
                 </div>
-                <div class="menu-info-links__grid">
+                <div @class([
+                    'menu-info-links__grid',
+                    'menu-info-links__grid--without-gallery' => ! $menuSettings->show_gallery,
+                ])>
                     <a href="{{ route('public.home') }}#reservar" class="menu-info-card menu-info-card--reservation">
                         <span class="menu-info-card__icon"><i class="bx bx-calendar-check"
                                 aria-hidden="true"></i></span>
@@ -188,17 +201,19 @@
                                 {{ $openingStatus['detail'] }}</span></span>
                         <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
                     </a>
-                    <a href="{{ route('public.gallery') }}" class="menu-info-card menu-info-card--gallery">
-                        @if ($galleryImages->isNotEmpty())
-                            <img src="{{ Storage::url($galleryImages->first()['path']) }}" alt=""
-                                width="520" height="320" loading="lazy">
-                        @endif
-                        <span class="menu-info-card__shade"></span>
-                        <span class="menu-info-card__icon"><i class="bx bx-images" aria-hidden="true"></i></span>
-                        <span><small>Nuestros
-                                espacios</small><strong>Galería</strong><span>{{ $galleryImages->count() ? $galleryImages->count() . ' ' . ($galleryImages->count() === 1 ? 'fotografía' : 'fotografías') : 'Próximamente' }}</span></span>
-                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                    </a>
+                    @if ($menuSettings->show_gallery)
+                        <a href="{{ route('public.gallery') }}" class="menu-info-card menu-info-card--gallery">
+                            @if ($galleryImages->isNotEmpty())
+                                <img src="{{ Storage::url($galleryImages->first()['path']) }}" alt=""
+                                    width="520" height="320" loading="lazy">
+                            @endif
+                            <span class="menu-info-card__shade"></span>
+                            <span class="menu-info-card__icon"><i class="bx bx-images" aria-hidden="true"></i></span>
+                            <span><small>Nuestros
+                                    espacios</small><strong>Galería</strong><span>{{ $galleryImages->count() ? $galleryImages->count() . ' ' . ($galleryImages->count() === 1 ? 'fotografía' : 'fotografías') : 'Próximamente' }}</span></span>
+                            <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+                        </a>
+                    @endif
                     <a href="{{ route('public.contact') }}" class="menu-info-card menu-info-card--contact">
                         <span class="menu-info-card__icon"><i class="bx bx-message-rounded-dots"
                                 aria-hidden="true"></i></span>
@@ -211,7 +226,7 @@
         </section>
     </main>
 
-    <x-public-menu.footer :business="$business" />
+    <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
 
     <dialog class="product-modal" id="product-detail-modal" aria-labelledby="product-modal-title">
         <div class="product-modal__shell">

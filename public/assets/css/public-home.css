@@ -1239,3 +1239,91 @@ body.has-reservation-modal { overflow: hidden; overscroll-behavior: none; }
     .home-hero__content { width: min(calc(100% - 22px), 1240px); }
     .home-hero h1 { font-size: clamp(2.15rem, 11vw, 2.75rem); }
 }
+
+/* Digital menu category presentation: circular visual navigation. */
+.home-categories--circles .home-categories__rail {
+    grid-auto-columns: minmax(156px, 190px);
+    align-items: start;
+    gap: 24px;
+}
+
+.home-categories--circles .home-category-card {
+    display: grid;
+    justify-items: center;
+    overflow: visible;
+    color: var(--menu-text);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    text-align: center;
+}
+
+.home-categories--circles .home-category-card:hover {
+    border-color: transparent;
+    box-shadow: none;
+    transform: translateY(-4px);
+}
+
+.home-categories--circles .home-category-card__media {
+    width: 156px;
+    height: 156px;
+    border: 5px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 16px 34px rgba(27, 75, 42, .16);
+}
+
+.home-categories--circles .home-category-card__media > span:first-child {
+    border-radius: inherit;
+    font-size: 48px;
+}
+
+.home-categories--circles .home-category-card__media > span:last-child {
+    right: 50%;
+    bottom: 3px;
+    transform: translateX(50%);
+    white-space: nowrap;
+}
+
+.home-categories--circles .home-category-card > div:last-child {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 4px;
+    padding: 14px 4px 4px;
+}
+
+.home-categories--circles .home-category-card > div:last-child > span:first-child,
+.home-categories--circles .home-category-card > div:last-child > i {
+    display: none;
+}
+
+.home-categories--circles .home-category-card > div:last-child > span:nth-child(2) {
+    justify-items: center;
+}
+
+.home-categories--circles .home-category-card strong {
+    font-size: 1.12rem;
+    line-height: 1.2;
+}
+
+.home-categories--circles .home-category-card small {
+    max-width: 170px;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+@media (max-width: 760px) {
+    .home-categories--circles .home-categories__rail {
+        grid-auto-columns: 132px;
+        gap: 16px;
+    }
+
+    .home-categories--circles .home-category-card__media {
+        width: 124px;
+        height: 124px;
+    }
+
+    .home-categories--circles .home-category-card strong { font-size: .94rem; }
+    .home-categories--circles .home-category-card small { max-width: 128px; }
+}

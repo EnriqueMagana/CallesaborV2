@@ -513,25 +513,38 @@
 }
 
 @media (min-width: 769px) {
+  .mesas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
   .mesa-card-footer {
     min-height: 64px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 116px 32px;
+    display: flex;
     align-items: center;
-    column-gap: 10px;
+    gap: 8px;
   }
   .mesa-card-footer > :is(.mesa-waiter, .btn-asignarme) {
+    flex: 1 1 auto;
     min-width: 0;
-    width: 100%;
-    grid-column: 1;
+    width: auto;
+  }
+  .mesa-card-footer > .btn-asignarme {
+    min-height: 44px;
+    padding: 8px 12px;
   }
   .mesa-card-footer > .btn-cerrar-mesa {
-    width: 116px;
-    grid-column: 2;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 104px;
   }
   .mesa-card-footer > .mesa-card-actions {
-    grid-column: 3;
-    justify-self: end;
+    flex: 0 0 44px;
+    width: 44px;
+    margin-left: auto;
+  }
+  .mesa-card-footer .mesa-action-trigger {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
   }
 }
 .mesa-waiter {
@@ -578,10 +591,12 @@
 
 /* ── Asignarme button (visible on card footer) ── */
 .btn-asignarme {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 1;
+  min-width: 0;
   padding: 6px 12px;
   border: 1.5px solid var(--c-disponible);
   border-radius: 8px;
@@ -603,6 +618,7 @@
 .btn-asignarme--kiosk { color: #5746cf; border-color: rgba(105, 86, 232, .28); background: #f0edff; }
 .btn-asignarme--kiosk:hover { color: #fff; border-color: #5746cf; background: #5746cf; }
 .btn-cerrar-mesa {
+  box-sizing: border-box;
   min-height: 44px;
   padding: 8px 11px;
   border: 1.5px solid rgba(217,119,6,.42);
@@ -648,6 +664,11 @@
   background: var(--c-bg);
   border-color: var(--c-primary);
   color: var(--c-primary);
+}
+.mesa-action-trigger:focus-visible,
+.btn-asignarme:focus-visible {
+  outline: 3px solid rgba(105,108,255,.3);
+  outline-offset: 2px;
 }
 .mesa-action-menu {
   position: absolute;
@@ -1384,7 +1405,7 @@
   .split-layout { grid-template-columns: 1fr 300px; }
 }
 @media (max-width: 991px) {
-  .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
   .mesa-card-group { grid-column: span 2; }
   .split-layout { grid-template-columns: 1fr; }
   .split-accounts-panel { order: -1; }

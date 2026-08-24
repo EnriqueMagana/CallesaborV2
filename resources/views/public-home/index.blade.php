@@ -179,7 +179,10 @@
         </section>
 
         @if ($menuSettings->show_categories && $categories->isNotEmpty())
-            <section class="home-categories" aria-labelledby="home-categories-title" data-home-reveal>
+            <section @class([
+                'home-categories',
+                'home-categories--circles' => $menuSettings->category_style === 'circles',
+            ]) aria-labelledby="home-categories-title" data-home-reveal>
                 <div class="menu-container">
                     <div class="section-heading">
                         <div><span class="menu-kicker">La carta</span>
@@ -191,7 +194,10 @@
                         @foreach ($categories as $category)
                             @php($preview = $category->products->first())
                             <a href="{{ route('public.menu') }}#category-{{ $category->id }}"
-                                class="home-category-card"
+                                @class([
+                                    'home-category-card',
+                                    'home-category-card--circle' => $menuSettings->category_style === 'circles',
+                                ])
                                 style="--category-color: {{ $category->color ?: $menuSettings->primary_color }}">
                                 <div class="home-category-card__media">
                                     @if ($preview?->image)
