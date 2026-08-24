@@ -579,6 +579,27 @@
 .btn-asignarme i { font-size: .9rem; }
 .btn-asignarme--kiosk { color: #5746cf; border-color: rgba(105, 86, 232, .28); background: #f0edff; }
 .btn-asignarme--kiosk:hover { color: #fff; border-color: #5746cf; background: #5746cf; }
+.btn-cerrar-mesa {
+  min-height: 44px;
+  padding: 8px 11px;
+  border: 1.5px solid rgba(217,119,6,.42);
+  border-radius: 9px;
+  background: rgba(245,158,11,.1);
+  color: #9a5b05;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: .75rem;
+  font-weight: 750;
+  line-height: 1.1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--mesa-transition);
+}
+.btn-cerrar-mesa:hover { color: #fff; border-color: #b96b05; background: #b96b05; box-shadow: 0 3px 10px rgba(185,107,5,.25); }
+.btn-cerrar-mesa:focus-visible { outline: 3px solid rgba(105,108,255,.3); outline-offset: 2px; }
+.btn-cerrar-mesa:disabled { opacity: .55; cursor: wait; }
 .mesas-tab--kiosk { color: #5746cf; }
 .mesas-tab--kiosk.active { color: #5746cf; background: #f0edff; }
 .mesas-tab-badge.badge-purple { color: #5746cf; background: #e9e4ff; }
@@ -792,6 +813,25 @@
 .mesas-modal--sm { max-width: 380px; text-align: center; padding-bottom: 8px; }
 .mesas-modal--lg { max-width: 680px; }
 .mesas-modal--xl { max-width: 780px; }
+.mesas-modal--close-choice { max-width: 560px; }
+.mesas-modal-eyebrow { display:block; margin-bottom:3px; color:#8b5b0a; font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.mesas-close-options { display:grid; gap:10px; }
+.mesas-close-option {
+  width:100%; min-height:72px; padding:13px 14px; border:1.5px solid var(--c-border); border-radius:13px;
+  background:var(--c-surface); color:var(--c-text); display:grid; grid-template-columns:44px 1fr 24px;
+  align-items:center; gap:12px; text-align:left; cursor:pointer; transition:var(--mesa-transition);
+}
+.mesas-close-option:hover { border-color:#b96b05; background:rgba(245,158,11,.06); box-shadow:0 5px 16px rgba(78,53,14,.08); }
+.mesas-close-option:focus-visible { outline:3px solid rgba(105,108,255,.3); outline-offset:2px; }
+.mesas-close-option:disabled { opacity:.55; cursor:wait; }
+.mesas-close-option__icon { width:44px; height:44px; border-radius:12px; display:grid; place-items:center; background:rgba(245,158,11,.12); color:#9a5b05; font-size:1.25rem; }
+.mesas-close-option--split .mesas-close-option__icon { background:rgba(105,108,255,.12); color:#595cd9; }
+.mesas-close-option > span:nth-child(2) { display:grid; gap:3px; }
+.mesas-close-option strong { font-size:.9rem; }
+.mesas-close-option small { color:var(--c-text-muted); font-size:.76rem; line-height:1.35; }
+.mesas-close-option > .bx-chevron-right { color:var(--c-text-muted); font-size:1.25rem; }
+.mesas-close-warning { margin-top:14px; padding:10px 12px; border-radius:10px; background:rgba(245,158,11,.09); color:#80510a; display:flex; align-items:flex-start; gap:8px; font-size:.76rem; line-height:1.45; }
+.mesas-close-warning i { margin-top:2px; font-size:1rem; }
 .split-cancel-backdrop { z-index: 1300; }
 .split-cancel-modal { padding: 24px 22px 20px; }
 .split-cancel-modal__icon { width:52px; height:52px; margin:0 auto 13px; display:grid; place-items:center; border-radius:16px; background:#f0edff; color:#696cff; font-size:1.55rem; }
@@ -1492,6 +1532,8 @@
   .mesa-card-topbar { padding: 7px 10px 4px; gap: 4px; }
   .mesa-card-body { padding: 6px 10px 8px; }
   .mesa-card-footer { padding: 7px 10px 8px; }
+  .mesa-card-footer { flex-wrap: wrap; }
+  .btn-cerrar-mesa { flex: 1 1 auto; padding-inline: 8px; font-size: .7rem; }
 
   /* Smaller number on mobile */
   .mesa-number { font-size: 2.2rem; }
@@ -1543,4 +1585,12 @@
   .mesas-grid--compact {
     grid-template-columns: repeat(4, 1fr) !important;
   }
+  .mesas-modal--close-choice .mesas-modal-body { padding: 15px; }
+  .mesas-close-option { grid-template-columns:40px 1fr 18px; min-height:68px; padding:11px; gap:9px; }
+  .mesas-close-option__icon { width:40px; height:40px; }
+  .mesas-modal--close-choice .mesas-modal-actions .btn { width:100%; min-height:44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesas-modal, .mesas-close-option, .btn-cerrar-mesa { animation:none; transition:none; }
 }

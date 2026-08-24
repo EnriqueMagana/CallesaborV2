@@ -151,6 +151,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(PointOfSale::class)
+            ->call('openTablesBilling')
             ->assertSeeHtml('class="pos-table-billing-toggle"')
             ->call('openMesaPayModal', $first->id)
             ->assertSee('$200.00')
@@ -164,6 +165,53 @@ class GroupedMesaServiceWorkflowTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $secondOrder->id, 'status' => 'pagada']);
         $this->assertDatabaseHas('order_payments', ['order_id' => $firstOrder->id, 'amount' => 125]);
         $this->assertDatabaseHas('order_payments', ['order_id' => $secondOrder->id, 'amount' => 75]);
+    }
+
+    public function test_empty_grouped_service_is_visible_and_cancellation_releases_every_member(): void
+    {
+        [$user, $register, $group, $first, $second] = $this->context();
+        $service = app(MesaServiceManager::class)->resolveOrCreate($first, $register, $user->id);
+        $service->update(['status' => 'en_cuenta', 'in_account_at' => now()]);
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openTablesBilling')
+            ->assertSee('Grupo Terraza')
+            ->assertSee('Servicio sin consumo')
+            ->call('discardEmptyMesaAccount', $first->id)
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseHas('mesa_services', ['id' => $service->id, 'status' => 'liberada']);
+        $this->assertDatabaseHas('mesas', ['id' => $first->id, 'status' => 'disponible', 'mesa_group_id' => null]);
+        $this->assertDatabaseHas('mesas', ['id' => $second->id, 'status' => 'disponible', 'mesa_group_id' => null]);
+        $this->assertDatabaseMissing('mesa_groups', ['id' => $group->id]);
+    }
+
+    public function test_grouped_service_cannot_be_discarded_when_a_secondary_table_has_an_active_order(): void
+    {
+        [$user, $register, $group, $first, $second] = $this->context();
+        $service = app(MesaServiceManager::class)->resolveOrCreate($first, $register, $user->id);
+        $service->update(['status' => 'en_cuenta', 'in_account_at' => now()]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $second->id,
+            'mesa_service_id' => $service->id,
+            'served_by' => $user->id,
+            'type' => 'mesa',
+            'status' => 'lista',
+            'subtotal' => 80,
+            'total' => 80,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('discardEmptyMesaAccount', $first->id)
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseHas('mesa_services', ['id' => $service->id, 'status' => 'en_cuenta']);
+        $this->assertDatabaseHas('mesas', ['id' => $first->id, 'status' => 'en_cuenta', 'mesa_group_id' => $group->id]);
+        $this->assertDatabaseHas('mesas', ['id' => $second->id, 'status' => 'en_cuenta', 'mesa_group_id' => $group->id]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'lista']);
     }
 
     private function context(): array

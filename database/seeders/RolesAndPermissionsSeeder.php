@@ -17,7 +17,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'punto_venta' => ['usar punto de venta'],
             'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
-            'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion'],
+            'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion', 'gestionar menu digital'],
             'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'eliminar items de ordenes', 'eliminar ordenes', 'cerrar ordenes', 'reimprimir tickets'],
             'mesas' => [
                 'ver mesas',
@@ -93,7 +93,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'usar punto de venta',
             'ver usuarios',
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
-            'ver menu', 'crear platos', 'editar platos', 'gestionar categorias',
+            'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
             'ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',

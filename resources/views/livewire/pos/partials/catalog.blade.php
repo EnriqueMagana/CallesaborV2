@@ -51,7 +51,7 @@
                      wire:loading.attr="disabled" wire:target="openCustomizeModal({{ $product->id }})"
                      wire:key="pos-product-{{ $product->id }}"
                      class="prod-card {{ $inCart ? 'in-cart' : '' }}"
-                     aria-label="Agregar {{ $product->name }} por ${{ number_format($product->price, 2) }}">
+                     aria-label="{{ $hasOptions ? 'Personalizar' : 'Agregar' }} {{ $product->name }} por ${{ number_format($product->price, 2) }}{{ $inCart ? ', '.$cartQty.' en el pedido' : '' }}">
                     <div class="prod-img">
                         @if($product->image)
                             <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
@@ -60,11 +60,17 @@
                             <i class="bx bx-dish no-img" aria-hidden="true"></i>
                         @endif
                         @if($inCart)<span class="prod-badge-qty">{{ $cartQty }}</span>@endif
-                        @if($hasOptions)<span class="prod-badge-addon"><i class="bx bx-customize"></i> Personalizar</span>@endif
+                        @if($hasOptions)<span class="prod-badge-addon"><i class="bx bx-customize" aria-hidden="true"></i> Personalizar</span>@endif
                     </div>
                     <div class="prod-info">
                         <span class="prod-name">{{ $product->name }}</span>
-                        <strong class="prod-price">${{ number_format($product->price, 2) }}</strong>
+                        <span class="prod-card-footer">
+                            <strong class="prod-price">${{ number_format($product->price, 2) }}</strong>
+                            <span class="prod-card-cta" aria-hidden="true">
+                                <i class="bx {{ $inCart ? 'bx-check' : ($hasOptions ? 'bx-slider-alt' : 'bx-plus') }}"></i>
+                                <span>{{ $inCart ? 'En pedido' : ($hasOptions ? 'Elegir' : 'Agregar') }}</span>
+                            </span>
+                        </span>
                     </div>
                 </button>
             @endforeach
@@ -82,7 +88,7 @@
                  wire:loading.attr="disabled" wire:target="openCustomizeModal({{ $product->id }})"
                  wire:key="pos-product-{{ $product->id }}"
                  class="prod-card {{ $inCart ? 'in-cart' : '' }}"
-                 aria-label="Agregar {{ $product->name }} por ${{ number_format($product->price, 2) }}">
+                 aria-label="{{ $hasOptions ? 'Personalizar' : 'Agregar' }} {{ $product->name }} por ${{ number_format($product->price, 2) }}{{ $inCart ? ', '.$cartQty.' en el pedido' : '' }}">
                 <div class="prod-img">
                     @if($product->image)
                         <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
@@ -91,11 +97,17 @@
                         <i class="bx bx-dish no-img" aria-hidden="true"></i>
                     @endif
                     @if($inCart)<span class="prod-badge-qty">{{ $cartQty }}</span>@endif
-                    @if($hasOptions)<span class="prod-badge-addon"><i class="bx bx-customize"></i> Personalizar</span>@endif
+                    @if($hasOptions)<span class="prod-badge-addon"><i class="bx bx-customize" aria-hidden="true"></i> Personalizar</span>@endif
                 </div>
                 <div class="prod-info">
                     <span class="prod-name">{{ $product->name }}</span>
-                    <strong class="prod-price">${{ number_format($product->price, 2) }}</strong>
+                    <span class="prod-card-footer">
+                        <strong class="prod-price">${{ number_format($product->price, 2) }}</strong>
+                        <span class="prod-card-cta" aria-hidden="true">
+                            <i class="bx {{ $inCart ? 'bx-check' : ($hasOptions ? 'bx-slider-alt' : 'bx-plus') }}"></i>
+                            <span>{{ $inCart ? 'En pedido' : ($hasOptions ? 'Elegir' : 'Agregar') }}</span>
+                        </span>
+                    </span>
                 </div>
             </button>
         @endforeach

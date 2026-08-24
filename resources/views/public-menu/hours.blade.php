@@ -1,5 +1,6 @@
 <x-public-menu.info-layout
     :business="$business"
+    :menu-settings="$menuSettings"
     :opening-status="$openingStatus"
     title="Horarios"
     subtitle="Consulta nuestros días y horas de atención antes de visitarnos."

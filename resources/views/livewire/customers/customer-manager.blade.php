@@ -42,7 +42,7 @@
                     id="customer-search"
                     type="search"
                     wire:model.live.debounce.450ms="search"
-                    placeholder="Nombre, teléfono, correo o dirección"
+                    placeholder="Nombre, teléfono, colonia o dirección"
                     autocomplete="off"
                 >
                 @if($search !== '')
@@ -103,7 +103,10 @@
                                         <span class="customer-contact"><i class="bx bx-phone" aria-hidden="true"></i>{{ $customer->phone ?: 'Sin teléfono' }}</span>
                                         <span class="customer-contact"><i class="bx bx-envelope" aria-hidden="true"></i>{{ $customer->email ?: 'Sin correo' }}</span>
                                     </td>
-                                    <td data-label="Dirección"><span class="customer-address">{{ $customer->address ?: 'Sin dirección registrada' }}</span></td>
+                                    <td data-label="Dirección">
+                                        <span class="customer-address">{{ $customer->address ?: 'Sin calle registrada' }}</span>
+                                        <small class="customer-neighborhood"><i class="bx bx-map-pin" aria-hidden="true"></i>{{ $customer->neighborhood ?: 'Sin colonia o zona' }}</small>
+                                    </td>
                                     <td data-label="Pedidos"><span class="customer-order-count">{{ $customer->orders_count }}</span></td>
                                     <td data-label="Última actividad">
                                         <span class="customer-last-seen">
@@ -155,7 +158,8 @@
                         <div class="customer-detail-grid">
                             <article><i class="bx bx-phone" aria-hidden="true"></i><span><small>Teléfono</small><strong>{{ $selectedCustomer->phone ?: 'No registrado' }}</strong></span></article>
                             <article><i class="bx bx-envelope" aria-hidden="true"></i><span><small>Correo</small><strong>{{ $selectedCustomer->email ?: 'No registrado' }}</strong></span></article>
-                            <article class="is-wide"><i class="bx bx-map" aria-hidden="true"></i><span><small>Dirección</small><strong>{{ $selectedCustomer->address ?: 'No registrada' }}</strong></span></article>
+                            <article><i class="bx bx-map-pin" aria-hidden="true"></i><span><small>Colonia o zona</small><strong>{{ $selectedCustomer->neighborhood ?: 'No registrada' }}</strong></span></article>
+                            <article><i class="bx bx-map" aria-hidden="true"></i><span><small>Dirección</small><strong>{{ $selectedCustomer->address ?: 'No registrada' }}</strong></span></article>
                             <article class="is-wide"><i class="bx bx-navigation" aria-hidden="true"></i><span><small>Referencias</small><strong>{{ $selectedCustomer->references ?: 'Sin referencias adicionales' }}</strong></span></article>
                         </div>
 
@@ -222,10 +226,16 @@
                                 <div class="customer-input"><i class="bx bx-envelope" aria-hidden="true"></i><input id="customer-email" type="email" wire:model="email" autocomplete="email" placeholder="cliente@correo.com"></div>
                                 @error('email')<small class="customer-field-error" role="alert">{{ $message }}</small>@enderror
                             </div>
-                            <div class="customer-field is-wide">
+                            <div class="customer-field">
                                 <label for="customer-address">Dirección <em>Opcional</em></label>
-                                <div class="customer-input"><i class="bx bx-map" aria-hidden="true"></i><input id="customer-address" type="text" wire:model="address" autocomplete="street-address" placeholder="Calle, número, colonia"></div>
+                                <div class="customer-input"><i class="bx bx-map" aria-hidden="true"></i><input id="customer-address" type="text" wire:model="address" autocomplete="street-address" placeholder="Calle y número"></div>
                                 @error('address')<small class="customer-field-error" role="alert">{{ $message }}</small>@enderror
+                            </div>
+                            <div class="customer-field">
+                                <label for="customer-neighborhood">Colonia o zona <span>*</span></label>
+                                <div class="customer-input"><i class="bx bx-map-pin" aria-hidden="true"></i><input id="customer-neighborhood" type="text" wire:model="neighborhood" autocomplete="address-level3" maxlength="120" placeholder="Ej. Centro"></div>
+                                <small class="customer-field-help">Se usa para entregas y para prellenar el kiosco.</small>
+                                @error('neighborhood')<small class="customer-field-error" role="alert">{{ $message }}</small>@enderror
                             </div>
                             <div class="customer-field is-wide">
                                 <label for="customer-references">Referencias <em>Opcional</em></label>

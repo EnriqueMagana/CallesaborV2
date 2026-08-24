@@ -71,3 +71,18 @@
         grid-template-columns: 1fr;
     }
 }
+
+.customer-neighborhood {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 240px;
+    margin-top: 4px;
+    color: var(--app-primary-dark);
+    font-size: .64rem;
+    font-weight: 750;
+}
+
+.customer-neighborhood i {
+    font-size: 14px;
+}

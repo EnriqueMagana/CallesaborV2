@@ -123,7 +123,7 @@ new class extends Component
                 @error('enablePassword') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
             <button type="submit" class="btn btn-primary profile-btn" wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="enableTwoFactorAuthentication"><i class="bx bx-shield-plus me-1"></i>Activar protección</span>
+                <span wire:loading.remove wire:target="enableTwoFactorAuthentication"><i class="bx bx-shield-quarter me-1"></i>Activar protección</span>
                 <span wire:loading wire:target="enableTwoFactorAuthentication">Preparando…</span>
             </button>
         </form>

@@ -1,5 +1,6 @@
 <x-public-menu.info-layout
     :business="$business"
+    :menu-settings="$menuSettings"
     :opening-status="$openingStatus"
     title="Contacto y redes"
     subtitle="Encuentra nuestros canales oficiales y la información para visitarnos."

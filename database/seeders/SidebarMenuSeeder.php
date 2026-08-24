@@ -61,6 +61,11 @@ class SidebarMenuSeeder extends Seeder
             'parent_id' => $restaurant->id, 'label' => 'Constructor de menú', 'type' => 'link',
             'icon' => 'bx-restaurant', 'route_name' => 'app.constructor-menu', 'permission' => 'ver menu', 'sort_order' => 10,
         ]);
+        $this->item('restaurant.digital-menu', [
+            'parent_id' => $restaurant->id, 'label' => 'Menú digital', 'type' => 'link',
+            'icon' => 'bx-mobile-alt', 'route_name' => 'app.menu-digital', 'active_pattern' => 'app.menu-digital*',
+            'permission' => 'gestionar menu digital', 'sort_order' => 15,
+        ]);
         $this->item('restaurant.pos', [
             'parent_id' => $restaurant->id, 'label' => 'Punto de venta', 'type' => 'link',
             'icon' => 'bx-store-alt', 'route_name' => 'app.pos', 'permission' => 'usar punto de venta', 'sort_order' => 20,

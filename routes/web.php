@@ -12,6 +12,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use App\Livewire\Admin\BusinessSettingsManager;
+use App\Livewire\Admin\DigitalMenuManager;
 use App\Livewire\Admin\KioskSettings;
 use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Admin\UserList;
@@ -75,6 +76,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/kioscos/{terminal}/abrir', KioskLaunchController::class)->middleware('can:gestionar kioscos')->name('kioscos.open');
     Route::get('/configuracion-negocio', BusinessSettingsManager::class)->name('configuracion-negocio');
     Route::get('/configuracion-negocio/menu-items', BusinessSettingsManager::class)->name('configuracion-negocio.menu');
+    Route::get('/menu-digital', DigitalMenuManager::class)->middleware('can:gestionar menu digital')->name('menu-digital');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
     Route::get('/ordenes', OrderList::class)->middleware('can:ver ordenes')->name('ordenes');
     Route::get('/clientes', CustomerManager::class)->middleware('can:ver clientes')->name('clientes');

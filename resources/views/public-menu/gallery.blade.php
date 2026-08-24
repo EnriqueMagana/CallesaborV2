@@ -1,5 +1,6 @@
 <x-public-menu.info-layout
     :business="$business"
+    :menu-settings="$menuSettings"
     :opening-status="$openingStatus"
     title="Galería"
     subtitle="Conoce nuestros platillos, espacios y la experiencia del restaurante."

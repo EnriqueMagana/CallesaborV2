@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="{{ $business->primary_color ?? '#15803d' }}">
+    <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
     <meta name="description" content="Descubre el menú, reserva una mesa y conoce {{ $business->business_name }}.">
     <title>{{ $business->business_name }} | Menú y reservaciones</title>
     <link rel="icon"
@@ -23,7 +23,7 @@
     @livewireStyles
 </head>
 
-<body class="public-home" style="--menu-primary: {{ $business->primary_color ?? '#15803d' }}">
+<body class="public-home" style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
     <a class="menu-skip-link" href="#experiencia">Saltar al contenido</a>
     <div class="home-preloader" data-home-preloader role="status" aria-live="polite"
         aria-label="Cargando {{ $business->business_name }}">
@@ -70,7 +70,9 @@
             <nav class="home-hero__links" aria-label="Accesos principales">
                 <a href="{{ route('public.menu') }}">Menú</a>
                 <a href="#reservar">Reservaciones</a>
-                <a href="#galeria">Galería</a>
+                @if ($menuSettings->show_gallery)
+                    <a href="#galeria">Galería</a>
+                @endif
                 <a href="#contacto">Contacto</a>
             </nav>
             <div class="home-hero__utilities">
@@ -88,6 +90,9 @@
 
         <div class="menu-container home-hero__content">
             <div class="home-hero__copy">
+                @if ($business->home_badge)
+                    <span class="home-hero__badge"><i class="bx bx-star" aria-hidden="true"></i>{{ $business->home_badge }}</span>
+                @endif
                 <h1>{{ $business->home_headline ?: 'Sabores que convierten una comida en un recuerdo.' }}</h1>
                 <p>{{ $business->home_description ?: 'Descubre una carta preparada con ingredientes frescos, recetas con identidad y la hospitalidad que hace especial cada visita.' }}
                 </p>
@@ -113,7 +118,9 @@
             <a href="{{ route('public.menu') }}"><i class="bx bx-food-menu" aria-hidden="true"></i>Menú</a>
             <a href="#reservar"><i class="bx bx-calendar-check" aria-hidden="true"></i>Reservar</a>
             <a href="#horarios"><i class="bx bx-time-five" aria-hidden="true"></i>Horarios</a>
-            <a href="#galeria"><i class="bx bx-images" aria-hidden="true"></i>Galería</a>
+            @if ($menuSettings->show_gallery)
+                <a href="#galeria"><i class="bx bx-images" aria-hidden="true"></i>Galería</a>
+            @endif
             <a href="#contacto"><i class="bx bx-message-rounded-dots" aria-hidden="true"></i>Contacto</a>
         </div>
     </nav>
@@ -172,7 +179,7 @@
             </div>
         </section>
 
-        @if ($categories->isNotEmpty())
+        @if ($menuSettings->show_categories && $categories->isNotEmpty())
             <section class="home-categories" aria-labelledby="home-categories-title" data-home-reveal>
                 <div class="menu-container">
                     <div class="section-heading">
@@ -186,7 +193,7 @@
                             @php($preview = $category->products->first())
                             <a href="{{ route('public.menu') }}#category-{{ $category->id }}"
                                 class="home-category-card"
-                                style="--category-color: {{ $category->color ?: $business->primary_color }}">
+                                style="--category-color: {{ $category->color ?: $menuSettings->primary_color }}">
                                 <div class="home-category-card__media">
                                     @if ($preview?->image)
                                         <img src="{{ Storage::url($preview->image) }}" alt="{{ $category->name }}"
@@ -224,6 +231,7 @@
             </div>
         </section>
 
+        @if ($menuSettings->show_gallery)
         <section class="home-gallery" id="galeria" aria-labelledby="home-gallery-title" data-home-reveal>
             <div class="menu-container">
                 <div class="section-heading">
@@ -259,6 +267,7 @@
                 @endif
             </div>
         </section>
+        @endif
 
         <section class="home-visit" id="horarios" aria-labelledby="home-hours-title" data-home-reveal>
             <div class="menu-container home-visit__grid">
@@ -338,7 +347,7 @@
         </section>
     </main>
 
-    <x-public-menu.footer :business="$business" />
+    <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
     @livewireScripts
     <script src="{{ asset('assets/js/public-home.js') }}?v={{ filemtime(public_path('assets/js/public-home.js')) }}"
         defer></script>

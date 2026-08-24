@@ -107,7 +107,7 @@
                                 class="pos-btn pos-btn-primary"
                                 data-ui="xui-1g8aqme">
                             <span wire:loading wire:target="markKitchenReady({{ $order->id }})" class="pos-btn-spinner"></span>
-                            <i wire:loading.remove wire:target="markKitchenReady({{ $order->id }})" class="bx {{ $order->status === 'pendiente' ? 'bx-bowl-hot' : 'bx-check-circle' }} me-1"></i>
+                            <i wire:loading.remove wire:target="markKitchenReady({{ $order->id }})" class="bx {{ $order->status === 'pendiente' ? 'bx-restaurant' : 'bx-check-circle' }} me-1"></i>
                             <span wire:loading.remove wire:target="markKitchenReady({{ $order->id }})">{{ $order->status === 'pendiente' ? 'Iniciar preparación' : 'Marcar como listo' }}</span>
                             <span wire:loading wire:target="markKitchenReady({{ $order->id }})">Actualizando…</span>
                         </button>

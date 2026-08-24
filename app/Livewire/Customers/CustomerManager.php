@@ -28,6 +28,8 @@ class CustomerManager extends Component
 
     public string $address = '';
 
+    public string $neighborhood = '';
+
     public string $references = '';
 
     protected string $paginationTheme = 'bootstrap';
@@ -77,6 +79,7 @@ class CustomerManager extends Component
         $this->phone = $customer->phone ?? '';
         $this->email = $customer->email ?? '';
         $this->address = $customer->address ?? '';
+        $this->neighborhood = $customer->neighborhood ?? '';
         $this->references = $customer->references ?? '';
         $this->modalMode = 'edit';
         $this->showModal = true;
@@ -102,6 +105,7 @@ class CustomerManager extends Component
             'phone' => trim($validated['phone']),
             'email' => filled($validated['email'] ?? null) ? mb_strtolower(trim($validated['email'])) : null,
             'address' => filled($validated['address'] ?? null) ? trim($validated['address']) : null,
+            'neighborhood' => trim($validated['neighborhood']),
             'references' => filled($validated['references'] ?? null) ? trim($validated['references']) : null,
         ];
 
@@ -176,7 +180,8 @@ class CustomerManager extends Component
                     $search->where('name', 'like', "%{$term}%")
                         ->orWhere('phone', 'like', "%{$term}%")
                         ->orWhere('email', 'like', "%{$term}%")
-                        ->orWhere('address', 'like', "%{$term}%");
+                        ->orWhere('address', 'like', "%{$term}%")
+                        ->orWhere('neighborhood', 'like', "%{$term}%");
                 });
             })
             ->orderByDesc('created_at')
@@ -223,6 +228,7 @@ class CustomerManager extends Component
             'phone' => ['required', 'string', 'min:7', 'max:30', 'regex:/^[0-9+()\\s.-]+$/'],
             'email' => ['nullable', 'email:rfc', 'max:160'],
             'address' => ['nullable', 'string', 'max:255'],
+            'neighborhood' => ['required', 'string', 'max:120'],
             'references' => ['nullable', 'string', 'max:500'],
         ];
     }
@@ -239,13 +245,15 @@ class CustomerManager extends Component
             'email.email' => 'Escribe un correo válido, por ejemplo cliente@correo.com.',
             'email.max' => 'El correo no puede superar 160 caracteres.',
             'address.max' => 'La dirección no puede superar 255 caracteres.',
+            'neighborhood.required' => 'Escribe la colonia o zona del cliente.',
+            'neighborhood.max' => 'La colonia o zona no puede superar 120 caracteres.',
             'references.max' => 'Las referencias no pueden superar 500 caracteres.',
         ];
     }
 
     private function resetForm(): void
     {
-        $this->reset('name', 'phone', 'email', 'address', 'references');
+        $this->reset('name', 'phone', 'email', 'address', 'neighborhood', 'references');
         $this->resetValidation();
     }
 

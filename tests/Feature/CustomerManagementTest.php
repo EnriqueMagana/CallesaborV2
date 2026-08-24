@@ -74,16 +74,19 @@ class CustomerManagementTest extends TestCase
         Livewire::actingAs($creator)
             ->test(CustomerManager::class)
             ->call('openCreate')
+            ->assertSee('Colonia o zona')
             ->set('name', 'Cliente Nuevo')
             ->set('phone', '+52 999 555 1122')
             ->set('email', 'NUEVO@EXAMPLE.COM')
             ->set('address', 'Calle Principal 25')
+            ->set('neighborhood', 'Centro')
             ->set('references', 'Frente al parque')
             ->call('save')
             ->assertHasNoErrors();
 
         $customer = Customer::where('phone', '+52 999 555 1122')->firstOrFail();
         $this->assertSame('nuevo@example.com', $customer->email);
+        $this->assertSame('Centro', $customer->neighborhood);
 
         Livewire::actingAs($creator)
             ->test(CustomerManager::class)
@@ -222,8 +225,9 @@ class CustomerManagementTest extends TestCase
             ->set('phone', 'abcdefgh')
             ->set('email', 'correo-invalido')
             ->call('save')
-            ->assertHasErrors(['name', 'phone', 'email'])
+            ->assertHasErrors(['name', 'phone', 'email', 'neighborhood'])
             ->assertSee('Escribe el nombre del cliente.')
+            ->assertSee('Escribe la colonia o zona del cliente.')
             ->assertSee('Usa únicamente números');
     }
 

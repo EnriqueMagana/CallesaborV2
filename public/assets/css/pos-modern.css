@@ -448,6 +448,16 @@ html.dark-style .pay-btn.active {
     background: rgba(155, 140, 255, .14);
 }
 
+html.dark-style .prod-card-cta {
+    color: #fff;
+    background: var(--pos-accent);
+}
+
+html.dark-style .prod-card.in-cart .prod-card-cta {
+    color: #d8d1ff;
+    background: rgba(155, 140, 255, .2);
+}
+
 html.dark-style .prod-img,
 html.dark-style .cart-item-image,
 html.dark-style .pos-option-image,
@@ -1053,25 +1063,29 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
 
 .prod-card {
     display: flex;
-    min-height: 172px;
+    min-height: 196px;
     width: 100%;
     min-width: 0;
     padding: 0;
     align-self: start;
     flex-direction: column;
     color: inherit;
-    border-radius: 16px;
+    border: 1px solid var(--pos-border);
+    border-radius: 18px;
     background: var(--pos-card);
     box-shadow: var(--pos-shadow-sm);
     text-align: left;
     font: inherit;
-    transition: transform var(--pos-motion), border-color var(--pos-motion), box-shadow var(--pos-motion);
+    isolation: isolate;
+    transition: transform var(--pos-motion), border-color var(--pos-motion), box-shadow var(--pos-motion), background-color var(--pos-motion);
 }
 
-.prod-card:hover {
-    border-color: rgba(105, 86, 232, .48);
-    box-shadow: var(--pos-shadow-md);
-    transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+    .prod-card:hover {
+        border-color: rgba(105, 86, 232, .52);
+        box-shadow: 0 12px 28px rgba(49, 40, 92, .13);
+        transform: translateY(-3px);
+    }
 }
 
 .prod-card:active {
@@ -1084,10 +1098,30 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
     box-shadow: 0 0 0 2px rgba(105, 86, 232, .09), var(--pos-shadow-sm);
 }
 
+.prod-card:focus-visible {
+    outline: 3px solid rgba(105, 86, 232, .32);
+    outline-offset: 3px;
+    border-color: var(--pos-accent);
+}
+
+.prod-card:disabled {
+    cursor: wait;
+    opacity: .7;
+}
+
 .prod-img {
-    height: 98px;
-    flex: 0 0 98px;
+    height: 112px;
+    flex: 0 0 112px;
     background: linear-gradient(145deg, #f0eef5, #e8e5ee);
+}
+
+.prod-img::after {
+    position: absolute;
+    inset: auto 0 0;
+    height: 34%;
+    background: linear-gradient(to top, rgba(22, 18, 38, .2), transparent);
+    content: '';
+    pointer-events: none;
 }
 
 .prod-img .no-img {
@@ -1095,9 +1129,38 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
     font-size: 2rem;
 }
 
+.prod-badge-qty {
+    z-index: 1;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border: 2px solid rgba(255, 255, 255, .92);
+    box-shadow: 0 4px 10px rgba(34, 25, 72, .2);
+    font-size: .72rem;
+}
+
+.prod-badge-addon {
+    z-index: 1;
+    top: 8px;
+    left: 8px;
+    display: inline-flex;
+    min-height: 24px;
+    padding: 4px 8px;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(255, 255, 255, .72);
+    border-radius: 999px;
+    color: #43350b;
+    background: rgba(255, 221, 108, .94);
+    box-shadow: 0 4px 10px rgba(34, 25, 72, .13);
+    font-size: .64rem;
+    line-height: 1;
+}
+
 .prod-info {
     display: flex;
-    min-height: 74px;
+    min-height: 84px;
     padding: 12px 13px 14px;
     flex: 1;
     flex-direction: column;
@@ -1116,11 +1179,44 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
 
 .prod-price {
     display: block;
-    margin-top: auto;
-    padding-top: 7px;
     color: var(--pos-accent-strong);
-    font-size: .9rem;
+    font-size: .95rem;
     font-variant-numeric: tabular-nums;
+}
+
+.prod-card-footer {
+    display: flex;
+    min-width: 0;
+    margin-top: auto;
+    padding-top: 10px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.prod-card-cta {
+    display: inline-flex;
+    min-height: 32px;
+    padding: 6px 9px;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 10px;
+    color: #fff;
+    background: var(--pos-accent);
+    font-size: .68rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.prod-card-cta i {
+    font-size: .95rem;
+}
+
+.prod-card.in-cart .prod-card-cta {
+    color: var(--pos-accent-strong);
+    background: rgba(105, 86, 232, .12);
 }
 
 .pos-cart-fixed {
@@ -1286,14 +1382,27 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
         padding: 12px 12px 96px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .prod-card { min-height: 160px; }
-    .prod-img { height: 88px; flex-basis: 88px; }
+    .prod-card { min-height: 184px; border-radius: 16px; }
+    .prod-img { height: 96px; flex-basis: 96px; }
     .prod-info { padding: 10px 11px 12px; }
+    .prod-card-footer { padding-top: 8px; }
+    .prod-card-cta { min-height: 32px; padding-inline: 8px; }
     .pos-root .pos-modal { border-radius: 24px 24px 0 0; }
     .pos-root .modal-header-pos { min-height: 72px; padding: 13px 15px; }
     .pos-root .modal-body-pos { padding: 16px; }
     .pos-root .modal-footer-pos { min-height: auto; padding: 12px 15px max(12px, env(safe-area-inset-bottom)); }
     .pos-root .modal-footer-pos > .pos-btn { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 390px) {
+    .catalog-grid { gap: 8px; padding-inline: 9px; }
+    .prod-card-cta {
+        width: 32px;
+        min-width: 32px;
+        padding-inline: 0;
+        border-radius: 50%;
+    }
+    .prod-card-cta span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

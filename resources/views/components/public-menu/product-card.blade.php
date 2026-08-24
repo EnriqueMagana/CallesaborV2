@@ -1,4 +1,4 @@
-@props(['product', 'featured' => false])
+@props(['product', 'featured' => false, 'rank' => null])
 
 @php
     $modalProduct = [
@@ -33,7 +33,7 @@
 @endphp
 
 <article
-    {{ $attributes->class(['product-card', 'product-card--featured' => $featured]) }}
+    {{ $attributes->class(['product-card', 'product-card--featured' => $featured, 'product-card--ranked' => $rank]) }}
     data-menu-product
     data-search="{{ \Illuminate\Support\Str::lower($product->name.' '.$product->description.' '.$product->category?->name) }}"
 >
@@ -45,6 +45,9 @@
         data-product-detail="{{ json_encode($modalProduct, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
     ></button>
     <div class="product-card__media">
+        @if($rank)
+            <span class="product-card__rank" aria-label="Favorito número {{ $rank }}">{{ $rank }}</span>
+        @endif
         @if($product->image)
             <img
                 src="{{ Storage::url($product->image) }}"
@@ -55,7 +58,7 @@
                 decoding="async"
             >
         @else
-            <span class="product-card__placeholder" aria-hidden="true"><i class="bx bx-bowl-rice"></i></span>
+            <span class="product-card__placeholder" aria-hidden="true"><i class="bx bx-dish"></i></span>
         @endif
         @if($featured)
             <span class="product-card__badge"><i class="bx bx-star" aria-hidden="true"></i> Destacado</span>
@@ -73,5 +76,6 @@
             <p>{{ $product->description }}</p>
         @endif
         <span class="product-card__detail">Ver detalle <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
+        <span class="product-card__action" aria-hidden="true"><i class="bx bx-plus"></i></span>
     </div>
 </article>

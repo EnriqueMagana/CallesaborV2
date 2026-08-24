@@ -55,6 +55,8 @@ class PointOfSale extends Component
 
     public string $customerAddress = '';
 
+    public string $customerNeighborhood = '';
+
     public string $customerReferences = '';
 
     public string $customerSearch = '';
@@ -69,6 +71,8 @@ class PointOfSale extends Component
     public string $newCustomerEmail = '';
 
     public string $newCustomerAddress = '';
+
+    public string $newCustomerNeighborhood = '';
 
     public string $newCustomerReferences = '';
 
@@ -217,6 +221,10 @@ class PointOfSale extends Component
     public bool $tableTrackingLoaded = false;
 
     public ?string $tableTrackingRefreshedAt = null;
+
+    public bool $tablesBillingLoaded = false;
+
+    public bool $deliveryPanelLoaded = false;
 
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -507,6 +515,32 @@ class PointOfSale extends Component
         unset($this->tableTrackingServices);
     }
 
+    public function openTablesBilling(): void
+    {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+        $this->tablesBillingLoaded = true;
+        unset($this->mesasPendientes);
+    }
+
+    public function closeTablesBilling(): void
+    {
+        $this->tablesBillingLoaded = false;
+        unset($this->mesasPendientes);
+    }
+
+    public function openDeliveryPanel(): void
+    {
+        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        $this->deliveryPanelLoaded = true;
+        unset($this->deliveryOrders);
+    }
+
+    public function closeDeliveryPanel(): void
+    {
+        $this->deliveryPanelLoaded = false;
+        unset($this->deliveryOrders);
+    }
+
     public function refreshTableTracking(): void
     {
         $this->tableTrackingLoaded = true;
@@ -553,6 +587,10 @@ class PointOfSale extends Component
     #[Computed]
     public function deliveryOrders()
     {
+        if (! $this->deliveryPanelLoaded) {
+            return collect();
+        }
+
         $search = $this->deliverySearch;
         $cashRegisterId = $this->activeCashRegister?->id;
 
@@ -600,6 +638,10 @@ class PointOfSale extends Component
     #[Computed]
     public function mesasPendientes()
     {
+        if (! $this->tablesBillingLoaded) {
+            return collect();
+        }
+
         $cashRegisterId = $this->activeCashRegister?->id;
 
         if (! $cashRegisterId) {
@@ -609,8 +651,6 @@ class PointOfSale extends Component
         $serviceMesas = MesaService::query()
             ->where('cash_register_id', $cashRegisterId)
             ->where('status', 'en_cuenta')
-            ->whereHas('orders', fn ($query) => $query
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
             ->with([
                 'primaryMesa.area',
                 'primaryMesa.currentAssignment.waiter',
@@ -647,6 +687,13 @@ class PointOfSale extends Component
             ->filter()
             ->values();
 
+        $activeServiceMemberIds = DB::table('mesa_service_mesa')
+            ->join('mesa_services', 'mesa_services.id', '=', 'mesa_service_mesa.mesa_service_id')
+            ->whereIn('mesa_services.status', MesaService::ACTIVE_STATUSES)
+            ->pluck('mesa_service_mesa.mesa_id')
+            ->unique()
+            ->all();
+
         // Compatibilidad con órdenes creadas antes de la migración o desde
         // integraciones que aún no envían mesa_service_id.
         $legacyMesas = Mesa::with([
@@ -663,10 +710,15 @@ class PointOfSale extends Component
                 ->latest('id'),
         ])
             ->where('status', 'en_cuenta')
-            ->whereHas('orders', fn ($query) => $query
-                ->where('cash_register_id', $cashRegisterId)
-                ->whereNull('mesa_service_id')
-                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
+            ->when($activeServiceMemberIds, fn ($query) => $query->whereNotIn('id', $activeServiceMemberIds))
+            ->where(function ($query) use ($cashRegisterId) {
+                $query->whereHas('orders', fn ($orders) => $orders
+                    ->where('cash_register_id', $cashRegisterId)
+                    ->whereNull('mesa_service_id')
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']))
+                    ->orWhereDoesntHave('orders', fn ($orders) => $orders
+                        ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']));
+            })
             ->orderBy('number')
             ->get()
             ->map(function (Mesa $mesa) {
@@ -1290,6 +1342,7 @@ class PointOfSale extends Component
         $this->customerName = $customer->name;
         $this->customerPhone = $customer->phone ?? '';
         $this->customerAddress = $customer->address ?? '';
+        $this->customerNeighborhood = $customer->neighborhood ?? '';
         $this->customerReferences = $customer->references ?? '';
         $this->customerSearch = '';
         unset($this->customerSearchResults);
@@ -1301,6 +1354,7 @@ class PointOfSale extends Component
         $this->customerName = '';
         $this->customerPhone = '';
         $this->customerAddress = '';
+        $this->customerNeighborhood = '';
         $this->customerReferences = '';
     }
 
@@ -1315,6 +1369,7 @@ class PointOfSale extends Component
         $this->newCustomerPhone = '';
         $this->newCustomerEmail = '';
         $this->newCustomerAddress = '';
+        $this->newCustomerNeighborhood = '';
         $this->newCustomerReferences = '';
         $this->showAddCustomerModal = true;
         $this->resetErrorBag();
@@ -1327,6 +1382,10 @@ class PointOfSale extends Component
             'newCustomerName' => 'required|string|max:120',
             'newCustomerPhone' => 'required|string|max:30',
             'newCustomerEmail' => 'nullable|email:rfc|max:160',
+            'newCustomerNeighborhood' => 'required|string|max:120',
+        ], [
+            'newCustomerNeighborhood.required' => 'Escribe la colonia o zona del cliente.',
+            'newCustomerNeighborhood.max' => 'La colonia o zona no puede superar 120 caracteres.',
         ]);
 
         $customer = Customer::create([
@@ -1334,6 +1393,7 @@ class PointOfSale extends Component
             'phone' => $this->newCustomerPhone,
             'email' => $this->newCustomerEmail ?: null,
             'address' => $this->newCustomerAddress ?: null,
+            'neighborhood' => trim($this->newCustomerNeighborhood),
             'references' => $this->newCustomerReferences ?: null,
         ]);
 
@@ -1450,7 +1510,17 @@ class PointOfSale extends Component
             return;
         }
 
+        if ($this->orderType === 'delivery' && blank($this->customerNeighborhood)) {
+            $this->addError('customerNeighborhood', 'La colonia o zona es requerida para delivery.');
+
+            return;
+        }
+
         $order = DB::transaction(function () use ($isContraEntrega) {
+            if ($this->orderType === 'delivery') {
+                $this->rememberMissingCustomerDeliveryData();
+            }
+
             $order = $this->persistOrder($this->orderType, $isContraEntrega ? 'pendiente' : 'pagada');
 
             if (! $isContraEntrega && $this->payments !== []) {
@@ -1655,6 +1725,7 @@ class PointOfSale extends Component
             $this->customerName = $quotation->customer?->name ?? '';
             $this->customerPhone = $quotation->customer?->phone ?? '';
             $this->customerAddress = $quotation->customer?->address ?? '';
+            $this->customerNeighborhood = $quotation->customer?->neighborhood ?? '';
             $this->customerReferences = $quotation->customer?->references ?? '';
         } elseif ($quotation->customer_name) {
             $this->customerName = $quotation->customer_name;
@@ -1873,18 +1944,57 @@ class PointOfSale extends Component
 
     public function reopenMesa(int $mesaId): void
     {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+
         $mesa = Mesa::with('orders')->find($mesaId);
         if (! $mesa || $mesa->status !== 'en_cuenta') {
             return;
         }
 
-        $service = $this->activeCashRegister
-            ? app(MesaServiceManager::class)->reopen($mesa, $this->activeCashRegister->id)
-            : null;
+        $cashRegisterId = $this->activeCashRegister?->id;
+        if (! $cashRegisterId) {
+            $this->dispatch('notify', type: 'warning', message: 'No hay una caja abierta para reabrir la mesa.');
+
+            return;
+        }
+
+        $manager = app(MesaServiceManager::class);
+        $service = $manager->findActiveForMesa($mesa, $cashRegisterId);
+
+        $split = MesaSplit::query()
+            ->where('mesa_id', $mesa->id)
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->when(
+                $service,
+                fn ($query) => $query->where('mesa_service_id', $service->id),
+                fn ($query) => $query->whereNull('mesa_service_id')
+            )
+            ->latest('id')
+            ->first();
+
+        if ($split && collect($split->split_data ?? [])->contains(fn ($account) => (bool) ($account['paid'] ?? false))) {
+            $this->dispatch('notify', type: 'warning', message: 'No puedes reabrir una cuenta dividida que ya tiene pagos. Cobra las subcuentas pendientes para liberar la mesa.');
+
+            return;
+        }
+
+        DB::transaction(function () use ($split, $manager, $mesa, $cashRegisterId): void {
+            $split?->delete();
+            if ($cashRegisterId) {
+                $manager->reopen($mesa, $cashRegisterId);
+            }
+        });
+
         $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
         Mesa::whereIn('id', $memberIds)->update(['status' => 'ocupada']);
-        unset($this->mesasPendientes, $this->tableTrackingServices);
-        $this->dispatch('notify', type: 'success', message: "Mesa {$mesa->display_name} reabierta.");
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+        $this->dispatch(
+            'notify',
+            type: 'success',
+            message: $split
+                ? "Mesa {$mesa->display_name} reabierta; la división sin pagos fue cancelada y los pedidos siguen en la cuenta."
+                : "Mesa {$mesa->display_name} reabierta."
+        );
     }
 
     public function discardEmptyMesaAccount(int $mesaId): void
@@ -1951,27 +2061,66 @@ class PointOfSale extends Component
             return;
         }
 
-        $hasActiveOrders = Order::query()
-            ->where('mesa_id', $mesa->id)
-            ->where('cash_register_id', $cashRegisterId)
-            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-            ->exists();
-        if ($hasActiveOrders) {
+        $result = DB::transaction(function () use ($mesa, $service, $manager, $cashRegisterId): string {
+            $lockedMesa = Mesa::query()->lockForUpdate()->find($mesa->id);
+            if (! $lockedMesa || $lockedMesa->status !== 'en_cuenta') {
+                return 'unavailable';
+            }
+
+            $lockedService = $service
+                ? MesaService::query()
+                    ->whereKey($service->id)
+                    ->where('cash_register_id', $cashRegisterId)
+                    ->where('status', 'en_cuenta')
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
+            if ($service && ! $lockedService) {
+                return 'unavailable';
+            }
+
+            $memberIds = $lockedService?->mesas()->pluck('mesas.id')->all()
+                ?: ($lockedMesa->mesa_group_id
+                    ? Mesa::where('mesa_group_id', $lockedMesa->mesa_group_id)->pluck('id')->all()
+                    : [$lockedMesa->id]);
+            $hasActiveOrders = Order::query()
+                ->where('cash_register_id', $cashRegisterId)
+                ->when(
+                    $lockedService,
+                    fn ($query) => $query->where('mesa_service_id', $lockedService->id),
+                    fn ($query) => $query->whereNull('mesa_service_id')->whereIn('mesa_id', $memberIds)
+                )
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->exists();
+
+            if ($hasActiveOrders) {
+                return 'orders';
+            }
+
+            $reason = 'Servicio sin consumo cancelado desde POS';
+            if ($lockedService) {
+                $manager->releaseWithoutPayment($lockedService, auth()->id(), $reason);
+            }
+            $this->releaseMesa($lockedMesa, $lockedService, $reason);
+
+            return 'discarded';
+        });
+
+        if ($result !== 'discarded') {
             $this->dispatch('notify', type: 'warning', message: 'Solo se pueden descartar cuentas en cero y sin órdenes activas.');
 
             return;
         }
 
-        if ($service) {
-            $manager->releaseWithoutPayment($service, auth()->id(), 'Cuenta vacía descartada desde POS');
-        }
-        $this->releaseMesa($mesa, $service);
         unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
-        $this->dispatch('notify', type: 'success', message: "Cuenta vacía de {$mesa->display_name} eliminada; mesa disponible.");
+        $this->dispatch('notify', type: 'success', message: "Servicio sin consumo de {$mesa->display_name} cancelado; mesa disponible.");
     }
 
     public function requestDiscardEmptyMesaAccount(int $mesaId): void
     {
+        abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+
         $mesa = Mesa::find($mesaId);
         if (! $mesa || $mesa->status !== 'en_cuenta') {
             return;
@@ -1979,11 +2128,11 @@ class PointOfSale extends Component
 
         $this->dispatch('open-confirm',
             type: 'danger',
-            title: 'Eliminar cuenta vacía',
-            message: "La subcuenta pendiente de <strong>{$mesa->display_name}</strong> está en $0.00. Se conservarán los pagos y el histórico; la mesa quedará disponible sin generar otro movimiento de caja.",
+            title: 'Cancelar servicio sin consumo',
+            message: "La cuenta pendiente de <strong>{$mesa->display_name}</strong> está en $0.00. Se conservará el historial del servicio y la mesa quedará disponible sin generar una venta ni un movimiento de caja.",
             action: 'discardEmptyMesaAccount',
             params: ['mesaId' => $mesaId],
-            confirmText: 'Eliminar cuenta',
+            confirmText: 'Cancelar servicio',
             cancelText: 'Conservar',
         );
     }
@@ -2378,8 +2527,11 @@ class PointOfSale extends Component
         $this->releaseMesa($mesa, $service);
     }
 
-    private function releaseMesa(Mesa $mesa, ?MesaService $service = null): void
-    {
+    private function releaseMesa(
+        Mesa $mesa,
+        ?MesaService $service = null,
+        string $releaseReason = 'Cobrado desde POS'
+    ): void {
         $groupId = $mesa->mesa_group_id ?: $service?->mesa_group_id;
         $memberIds = $service?->mesas()->pluck('mesas.id')->all()
             ?: ($groupId
@@ -2391,7 +2543,7 @@ class PointOfSale extends Component
             ->update([
                 'released_by' => auth()->id(),
                 'released_at' => now(),
-                'release_reason' => 'Cobrado desde POS',
+                'release_reason' => $releaseReason,
             ]);
 
         Mesa::whereIn('id', $memberIds)
@@ -3173,6 +3325,43 @@ HTML;
         return true;
     }
 
+    private function formattedCustomerDeliveryAddress(): ?string
+    {
+        $parts = array_filter([
+            trim($this->customerAddress),
+            trim($this->customerNeighborhood),
+        ], fn (string $part) => $part !== '');
+
+        return $parts === [] ? null : implode(', ', $parts);
+    }
+
+    private function rememberMissingCustomerDeliveryData(): void
+    {
+        if (! $this->customerId) {
+            return;
+        }
+
+        $customer = Customer::query()->lockForUpdate()->find($this->customerId);
+        if (! $customer) {
+            return;
+        }
+
+        $updates = [];
+        if (blank($customer->address) && filled($this->customerAddress)) {
+            $updates['address'] = trim($this->customerAddress);
+        }
+        if (blank($customer->neighborhood) && filled($this->customerNeighborhood)) {
+            $updates['neighborhood'] = trim($this->customerNeighborhood);
+        }
+        if (blank($customer->references) && filled($this->customerReferences)) {
+            $updates['references'] = trim($this->customerReferences);
+        }
+
+        if ($updates !== []) {
+            $customer->update($updates);
+        }
+    }
+
     private function persistOrder(string $type, string $status): Order
     {
         $cash = $this->activeCashRegister;
@@ -3184,7 +3373,7 @@ HTML;
                 'customer_id' => $this->customerId,
                 'customer_name' => $this->customerName ?: null,
                 'customer_phone' => $this->customerPhone ?: null,
-                'customer_address' => $type === 'delivery' ? ($this->customerAddress ?: null) : null,
+                'customer_address' => $type === 'delivery' ? $this->formattedCustomerDeliveryAddress() : null,
                 'customer_references' => $type === 'delivery' ? ($this->customerReferences ?: null) : null,
                 'served_by' => auth()->id(),
                 'type' => $type,
@@ -3285,6 +3474,7 @@ HTML;
         $this->customerName = '';
         $this->customerPhone = '';
         $this->customerAddress = '';
+        $this->customerNeighborhood = '';
         $this->customerReferences = '';
         $this->customerSearch = '';
         $this->payments = [];
