@@ -158,6 +158,25 @@
                 @endif
             @endforeach
 
+            @if($this->cashIncomes->isNotEmpty())
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-transparent border-0 pb-0 d-flex align-items-center justify-content-between">
+                    <h6 class="fw-bold mb-0">Ingresos adicionales</h6>
+                    <span class="fw-bold text-success" style="font-size:.82rem">+${{ number_format($cut->total_cash_income, 2) }} en efectivo</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0" style="font-size:.82rem">
+                        <thead class="table-light"><tr><th class="ps-3">Concepto</th><th>Categoría</th><th class="text-end pe-3">Monto</th></tr></thead>
+                        <tbody>
+                            @foreach($this->cashIncomes as $income)
+                                <tr><td class="ps-3">{{ $income->description }}</td><td class="text-muted">{{ $income->category_label }}</td><td class="text-end pe-3 text-success">+${{ number_format($income->amount, 2) }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
             {{-- Gastos --}}
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-transparent border-0 pb-0 d-flex align-items-center justify-content-between">
@@ -222,6 +241,10 @@
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted">+ Ventas en efectivo</span>
                             <span class="fw-semibold text-success">+${{ number_format($cut->total_cash_in,2) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">+ Ingresos adicionales</span>
+                            <span class="fw-semibold text-success">+${{ number_format($cut->total_cash_income,2) }}</span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted">- Gastos en efectivo</span>

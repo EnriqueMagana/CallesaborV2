@@ -46,7 +46,19 @@
                                     <small>{{ $service->status === 'liberada' ? 'Liberada sin cobro' : 'Servicio pagado' }} · {{ $service->opened_at->format('H:i') }}–{{ $service->closed_at?->format('H:i') }} · {{ $service->opener_name_snapshot ?: 'Sin responsable' }}</small>
                                 </div>
                             </div>
-                            <strong>${{ number_format((float) $service->total_snapshot, 2) }}</strong>
+                            <div class="pos-reprint-table-group__summary">
+                                <strong>${{ number_format((float) $service->total_snapshot, 2) }}</strong>
+                                <button type="button"
+                                        wire:click="openMesaServiceHistoryTicket({{ $service->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="openMesaServiceHistoryTicket({{ $service->id }})"
+                                        @click="panels.reprint = false"
+                                        class="pos-btn pos-btn-primary pos-reprint-table-action"
+                                        aria-label="{{ $service->status === 'liberada' ? 'Ver auditoría de '.$service->service_label : 'Ver y reimprimir ticket de '.$service->service_label }}">
+                                    <i class="bx {{ $service->status === 'liberada' ? 'bx-search-alt' : 'bx-printer' }}" aria-hidden="true"></i>
+                                    <span>{{ $service->status === 'liberada' ? 'Ver auditoría' : 'Ver y reimprimir' }}</span>
+                                </button>
+                            </div>
                         </header>
                         <div class="pos-history-meta">
                             <span><i class="bx bx-receipt"></i>{{ $service->orders->count() }} órdenes</span>
@@ -60,11 +72,6 @@
                             @if ($service->status === 'liberada')
                                 <span class="is-audit-reason"><i class="bx bx-note"></i>{{ $service->close_reason }}</span>
                             @endif
-                        </div>
-                        <div class="pos-reprint-actions">
-                            <button type="button" wire:click="openMesaServiceHistoryTicket({{ $service->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-primary">
-                                <i class="bx bx-receipt"></i>{{ $service->status === 'liberada' ? 'Ver auditoría' : 'Ticket consolidado' }}
-                            </button>
                         </div>
                     </article>
                 @empty

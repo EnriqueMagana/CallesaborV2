@@ -70,7 +70,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->assertSee($service->opened_at->format('g:i A'))
             ->assertSee('18min activa')
             ->assertSee('Reimprimir cocina')
-            ->assertDontSee('Lista para cobrar')
+            ->assertSee('Cuenta lista para cobrar')
             ->call('openMesaPayModal', $first->id)
             ->set('mesaPayAmount', '150')
             ->set('mesaPayReceived', '150')
@@ -78,7 +78,10 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->call('confirmMesaPayment')
             ->set('reprintType', 'mesas')
             ->assertSee('Servicio pagado')
-            ->assertSee('Grupo Terraza');
+            ->assertSee('Grupo Terraza')
+            ->assertSee('Ver y reimprimir')
+            ->call('openMesaServiceHistoryTicket', $service->id)
+            ->assertDispatched('pos-reprint-show');
 
         $this->assertDatabaseHas('mesa_services', [
             'id' => $service->id,
@@ -112,14 +115,68 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->call('openTableTracking')
             ->assertSeeHtml('class="panel-body pos-area-panel__body pos-tracking-accordion"')
             ->assertSeeHtml('class="pos-tracking-service__toggle"')
-            ->assertSeeHtml('wire:loading.flex wire:target="openTableTracking"')
-            ->assertDontSeeHtml('wire:target="openTableTracking,refreshTableTracking,markKitchenReady"')
-            ->assertSeeHtml('aria-controls="tracking-service-content-')
+            ->assertSeeHtml('wire:loading.flex wire:target="openTableWorkspace,openTableTracking,openTablesBilling,refreshTableWorkspace,setTableWorkspaceFilter"')
+            ->assertSeeHtml('aria-controls="workspace-service-content-')
             ->assertSeeHtml('x-show="openService ===');
 
         foreach (range(10, 21) as $number) {
             $component->assertSee('Mesa '.$number);
         }
+    }
+
+    public function test_table_reprint_actions_remain_reachable_with_many_services(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/pos/partials/panels/reprint.blade.php'));
+        $css = file_get_contents(public_path('assets/css/pos-modern.css'));
+
+        $this->assertIsString($view);
+        $this->assertIsString($css);
+        $this->assertStringContainsString('pos-reprint-table-action', $view);
+        $this->assertStringContainsString('Ver y reimprimir', $view);
+        $this->assertMatchesRegularExpression(
+            '/\.pos-reprint-results\s*\{[^}]*grid-auto-rows:\s*max-content;[^}]*overflow-y:\s*auto;/s',
+            $css,
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.pos-reprint-table-action\s*\{[^}]*min-height:\s*44px;/s',
+            $css,
+        );
+    }
+
+    public function test_open_service_moves_from_tracking_to_checkout_in_the_unified_workspace(): void
+    {
+        [$user, $register, , $first, $second] = $this->context();
+        $first->update(['status' => 'ocupada']);
+        $second->update(['status' => 'ocupada']);
+        $service = app(MesaServiceManager::class)->resolveOrCreate($first, $register, $user->id);
+        Order::create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $first->id,
+            'mesa_service_id' => $service->id,
+            'served_by' => $user->id,
+            'type' => 'mesa',
+            'status' => 'en_preparacion',
+            'subtotal' => 90,
+            'total' => 90,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openTableWorkspace')
+            ->assertSet('tableWorkspaceFilter', 'all')
+            ->assertSee('Grupo Terraza')
+            ->assertSee('Solicitar cuenta')
+            ->call('sendTableServiceToBilling', $service->id)
+            ->assertSet('tableWorkspaceFilter', 'billing')
+            ->assertSee('Esperando comandas')
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseHas('mesa_services', [
+            'id' => $service->id,
+            'status' => 'en_cuenta',
+        ]);
+        $this->assertDatabaseHas('mesas', ['id' => $first->id, 'status' => 'en_cuenta']);
+        $this->assertDatabaseHas('mesas', ['id' => $second->id, 'status' => 'en_cuenta']);
     }
 
     public function test_grouped_table_payment_uses_the_complete_service_total(): void
@@ -152,7 +209,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
         Livewire::actingAs($user)
             ->test(PointOfSale::class)
             ->call('openTablesBilling')
-            ->assertSeeHtml('class="pos-table-billing-toggle"')
+            ->assertSeeHtml('class="pos-tracking-service__toggle"')
             ->call('openMesaPayModal', $first->id)
             ->assertSee('$200.00')
             ->set('mesaPayAmount', '200')

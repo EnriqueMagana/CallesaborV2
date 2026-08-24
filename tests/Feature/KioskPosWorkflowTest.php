@@ -67,6 +67,8 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertDatabaseHas('order_payments', ['order_id' => $pickup->id, 'method' => 'efectivo', 'amount' => 100]);
 
         $component->call('reprintKitchenOrder', $delivery->id);
+        $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'pendiente']);
+        $component->call('markKitchenReady', $delivery->id);
         $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'en_preparacion']);
 
         $component->call('markKitchenReady', $dineIn->id);
@@ -155,13 +157,12 @@ class KioskPosWorkflowTest extends TestCase
 
         $pos = Livewire::actingAs($user)->test(PointOfSale::class)
             ->assertSet('tablesBillingLoaded', false)
-            ->assertSee('Cobrar mesas');
+            ->assertSee('Mesas y comandas');
 
-        $this->assertFalse(collect($queries)->contains(
-            fn (string $sql) => str_contains($sql, 'from "mesa_services"')
-                || str_contains($sql, 'from `mesa_services`')
-                || str_contains($sql, 'mesa_service_mesa')
-        ));
+        $initialTableQueries = collect($queries)->filter(fn (string $sql) => str_contains($sql, 'mesa_services'));
+        $this->assertTrue($initialTableQueries->contains(fn (string $sql) => str_contains($sql, 'count(')));
+        $this->assertFalse(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'mesa_service_mesa')));
+        $this->assertFalse($initialTableQueries->contains(fn (string $sql) => str_contains($sql, 'select *')));
 
         $queries = [];
         $pos->call('openTablesBilling')
@@ -176,10 +177,42 @@ class KioskPosWorkflowTest extends TestCase
         $queries = [];
         $pos->set('productSearch', 'hamburguesa');
 
+        $this->assertFalse(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'mesa_service_mesa')));
         $this->assertFalse(collect($queries)->contains(
-            fn (string $sql) => str_contains($sql, 'mesa_services')
-                || str_contains($sql, 'mesa_service_mesa')
+            fn (string $sql) => str_contains($sql, 'mesa_services') && str_contains($sql, 'select *')
         ));
+    }
+
+    public function test_toolbar_badges_are_available_before_operational_panels_are_opened(): void
+    {
+        [$user, $register, $terminal, $mesa] = $this->posContext();
+        app(MesaServiceManager::class)->resolveOrCreate($mesa, $register, $user->id);
+        $this->kioskOrder($register->id, $user->id, $terminal->id, 'Pedido para recoger', 'takeaway');
+        $this->kioskOrder($register->id, $user->id, $terminal->id, 'Pedido para entregar', 'delivery');
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->assertSet('tableWorkspaceLoaded', false)
+            ->assertSet('deliveryPanelLoaded', false)
+            ->assertSeeHtml('aria-label="1 pedidos pendientes"')
+            ->assertSeeHtml('aria-label="1 servicios de mesa pendientes"')
+            ->assertSeeHtml('aria-label="1 entregas pendientes"');
+    }
+
+    public function test_desktop_pos_keeps_checkout_visible_and_exposes_the_f2_shortcut(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/pos/point-of-sale.blade.php'));
+        $cart = file_get_contents(resource_path('views/livewire/pos/partials/cart.blade.php'));
+        $css = file_get_contents(public_path('assets/css/pos-modern.css'));
+
+        $this->assertIsString($view);
+        $this->assertIsString($cart);
+        $this->assertIsString($css);
+        $this->assertStringContainsString('@keydown.f2.window="checkoutWithKeyboard($event)"', $view);
+        $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
+        $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
+        $this->assertMatchesRegularExpression('/\.pos-cart-fixed \.cart-items,[^{]*\{[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s', $css);
+        $this->assertMatchesRegularExpression('/@media \(min-width:\s*1025px\) and \(max-height:\s*760px\)/', $css);
     }
 
     public function test_kiosk_cash_on_delivery_is_visible_but_cannot_be_charged_early_in_pos(): void
@@ -360,7 +393,7 @@ class KioskPosWorkflowTest extends TestCase
         Livewire::test(PointOfSale::class)
             ->call('openTablesBilling')
             ->assertDontSee('Mesa '.$mesa->number)
-            ->assertSee('No hay cuentas pendientes');
+            ->assertSee('No hay servicios en esta etapa');
     }
 
     public function test_reopening_an_unpaid_split_keeps_orders_and_includes_new_items_on_the_next_split(): void
@@ -627,7 +660,7 @@ class KioskPosWorkflowTest extends TestCase
             ->assertSee('class="pos-reprint-results"', false)
             ->assertSee('Resultados disponibles para reimpresión')
             ->assertSee('Guardados')
-            ->assertSee('Comandas')
+            ->assertSee('Mesas y comandas')
             ->assertSeeHtml('wire:loading.remove');
     }
 

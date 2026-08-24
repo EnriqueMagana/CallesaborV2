@@ -206,6 +206,30 @@
 
         <div class="cash-cut-layout">
             <main class="cash-cut-content">
+                @if($this->cashIncomes->isNotEmpty())
+                <section class="app-card cash-cut-card">
+                    <header class="cash-cut-card__header">
+                        <div><span class="cash-cut-card__icon cash-cut-card__icon--success"><i class="bx bx-trending-up"></i></span><div><h2>Ingresos adicionales</h2><p>Efectivo agregado manualmente durante el turno.</p></div></div>
+                        <span class="app-count-pill">{{ $this->cashIncomes->count() }} registros</span>
+                    </header>
+                    <div class="table-responsive">
+                        <table class="table app-table cash-cut-table">
+                            <thead><tr><th>Concepto</th><th>Categoría</th><th class="text-end">Monto</th></tr></thead>
+                            <tbody>
+                                @foreach($this->cashIncomes as $income)
+                                    <tr>
+                                        <td><strong>{{ $income->description }}</strong></td>
+                                        <td>{{ $income->category_label }}</td>
+                                        <td class="text-end cash-cut-positive">+${{ number_format($income->amount, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot><tr><th colspan="2">Total agregado a caja</th><th class="text-end cash-cut-positive">+${{ number_format($this->totalCashIncome, 2) }}</th></tr></tfoot>
+                        </table>
+                    </div>
+                </section>
+                @endif
+
                 <section class="app-card cash-cut-card">
                     <header class="cash-cut-card__header">
                         <div><span class="cash-cut-card__icon"><i class="bx bx-bar-chart-alt-2"></i></span><div><h2>Ventas por área</h2><p>Desglose por canal y método de pago.</p></div></div>
@@ -339,6 +363,7 @@
                 <div class="cash-cut-equation">
                     <div><span>Fondo inicial</span><strong>${{ number_format($reg->initial_amount, 2) }}</strong></div>
                     <div><span><i class="bx bx-plus"></i> Ventas en efectivo</span><strong class="cash-cut-positive">+${{ number_format($this->totalCashIn, 2) }}</strong></div>
+                    <div><span><i class="bx bx-plus"></i> Ingresos adicionales</span><strong class="cash-cut-positive">+${{ number_format($this->totalCashIncome, 2) }}</strong></div>
                     <div><span><i class="bx bx-minus"></i> Gastos en efectivo</span><strong class="cash-cut-negative">-${{ number_format($this->totalExpensesCash, 2) }}</strong></div>
                     <div class="cash-cut-equation__total"><span>Efectivo esperado</span><strong>${{ number_format($this->expectedCash, 2) }}</strong></div>
                 </div>

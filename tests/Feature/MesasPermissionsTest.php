@@ -266,6 +266,27 @@ class MesasPermissionsTest extends TestCase
             ->assertDontSee('wire:click="openDetail('.$otherMesa->id.')"', false);
     }
 
+    public function test_viewing_all_active_tables_requires_its_own_permission(): void
+    {
+        $area = $this->area();
+        $this->mesa($area, status: 'ocupada');
+
+        $viewer = $this->employee(['ver mesas']);
+        Livewire::actingAs($viewer)
+            ->test(GestionMesas::class)
+            ->assertDontSee('Todas las Mesas')
+            ->call('setTab', 'todas')
+            ->assertForbidden();
+
+        $supervisor = $this->employee(['ver mesas', 'ver todas las mesas']);
+        Livewire::actingAs($supervisor)
+            ->test(GestionMesas::class)
+            ->assertSee('Todas las Mesas')
+            ->call('setTab', 'todas')
+            ->assertSet('tab', 'todas')
+            ->assertHasNoErrors();
+    }
+
     public function test_close_table_button_opens_a_choice_and_supports_full_or_split_checkout(): void
     {
         $area = $this->area();

@@ -151,6 +151,10 @@ class GestionMesas extends Component
     {
         $user = auth()->user();
 
+        if ($this->tab === 'todas') {
+            $this->authorizeViewAllTables();
+        }
+
         $query = Mesa::with([
             'area',
             'group',
@@ -286,6 +290,9 @@ class GestionMesas extends Component
         abort_unless(in_array($tab, ['disponibles', 'mis_mesas', 'kiosko', 'todas'], true), 404);
         if ($tab === 'kiosko') {
             abort_unless(auth()->user()?->can('ver mesas'), 403);
+        }
+        if ($tab === 'todas') {
+            $this->authorizeViewAllTables();
         }
         $this->tab = $tab;
         $this->resetFilters();
@@ -931,6 +938,16 @@ class GestionMesas extends Component
 
         abort_unless(
             $user && ($user->can($permission) || ($fallback && $user->can($fallback))),
+            403
+        );
+    }
+
+    private function authorizeViewAllTables(): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user && ($user->can('ver todas las mesas') || $user->can('gestionar mesas')),
             403
         );
     }

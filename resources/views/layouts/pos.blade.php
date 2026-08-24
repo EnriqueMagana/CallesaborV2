@@ -9,7 +9,7 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>POS — {{ $businessSettings?->platform_name ?? config('app.name') }}</title>
 
-<link rel="icon" href="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}"/>
+@include('partials.favicon')
 
 {{-- Reserva la geometría esencial antes de cargar las hojas completas. --}}
 <style>

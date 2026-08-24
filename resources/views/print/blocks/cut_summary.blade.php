@@ -13,6 +13,7 @@
     <hr>
     <div class="ticket-row"><span>Fondo inicial</span><span>${{ number_format($cut->initial_amount, 2) }}</span></div>
     <div class="ticket-row"><span>Ventas efectivo</span><span>${{ number_format($cut->total_cash_in, 2) }}</span></div>
+    <div class="ticket-row"><span>Ingresos adicionales</span><span>+${{ number_format($cut->total_cash_income ?? 0, 2) }}</span></div>
     <div class="ticket-row"><span>Gastos efectivo</span><span>-${{ number_format($cut->total_expenses_cash, 2) }}</span></div>
     <div class="ticket-row ticket-total"><strong>Efectivo esperado</strong><strong>${{ number_format($cut->expected_cash, 2) }}</strong></div>
     <div class="ticket-row"><span>Efectivo declarado</span><span>${{ number_format($cut->declared_cash, 2) }}</span></div>

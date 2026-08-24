@@ -2,8 +2,23 @@
 <div x-data="{
     showCart: false,
     showSaved: false,
-    panels: { mesas: false, tracking: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false }
-}" class="pos-root">
+    panels: { tables: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false },
+    checkoutWithKeyboard(event) {
+        if (!window.matchMedia('(min-width: 1025px)').matches || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+
+        const focused = document.activeElement;
+        if (focused && (focused.matches('input, textarea, select, [contenteditable=true]') || focused.closest('[role=dialog]'))) return;
+        if (document.querySelector('.pos-modal-wrap.is-open, .pos-overlay-panel.show, dialog[open]')) return;
+
+        const checkout = Array.from(document.querySelectorAll('[data-pos-checkout]'))
+            .find(button => button.offsetParent !== null && !button.disabled);
+        if (!checkout) return;
+
+        event.preventDefault();
+        checkout.focus({ preventScroll: true });
+        checkout.click();
+    }
+}" @keydown.f2.window="checkoutWithKeyboard($event)" class="pos-root">
 
 {{-- Toast --}}
 <div x-data="{ show: false, msg: '', type: 'success' }"
@@ -56,8 +71,7 @@
 </div>
 
 {{-- Panels laterales --}}
-@include('livewire.pos.partials.panels.mesas')
-@include('livewire.pos.partials.panels.table-tracking')
+@include('livewire.pos.partials.panels.table-services')
 @include('livewire.pos.partials.panels.pickup')
 @include('livewire.pos.partials.panels.delivery')
 @include('livewire.pos.partials.panels.kitchen')

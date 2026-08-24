@@ -21,6 +21,7 @@
         $canDeleteMesas = $canLegacyManageMesas || $mesaUser?->can('eliminar mesas');
         $canChangeMesaStatus = $canLegacyManageMesas || $mesaUser?->can('cambiar estado mesas');
         $canManageGroups = $canLegacyManageMesas || $mesaUser?->can('gestionar grupos');
+        $canViewAllMesas = $canLegacyManageMesas || $mesaUser?->can('ver todas las mesas');
     @endphp
 
     {{-- Flash --}}
@@ -78,11 +79,13 @@
                 <span>Kiosko</span>
                 <span class="mesas-tab-badge badge-purple">{{ $this->kioskCount }}</span>
             </button>
-            <button class="mesas-tab {{ $tab === 'todas' ? 'active' : '' }}"
-                    wire:click="setTab('todas')" wire:loading.attr="disabled" wire:target="setTab">
-                <i class="bx bx-grid-alt"></i>
-                <span>Todas las Mesas</span>
-            </button>
+            @if($canViewAllMesas)
+                <button class="mesas-tab {{ $tab === 'todas' ? 'active' : '' }}"
+                        wire:click="setTab('todas')" wire:loading.attr="disabled" wire:target="setTab">
+                    <i class="bx bx-grid-alt"></i>
+                    <span>Todas las Mesas</span>
+                </button>
+            @endif
         </div>
 
         {{-- Search bar --}}
@@ -591,11 +594,13 @@
                 <i class="bx bx-desktop"></i>
                 Kiosko
             </button>
-            <button class="mbn-item {{ $tab === 'todas' ? 'active' : '' }}"
-                    wire:click="setTab('todas')" wire:loading.attr="disabled" wire:target="setTab">
-                <i class="bx bx-grid-alt"></i>
-                Todas
-            </button>
+            @if($canViewAllMesas)
+                <button class="mbn-item {{ $tab === 'todas' ? 'active' : '' }}"
+                        wire:click="setTab('todas')" wire:loading.attr="disabled" wire:target="setTab">
+                    <i class="bx bx-grid-alt"></i>
+                    Todas
+                </button>
+            @endif
         </div>
     </div>
 

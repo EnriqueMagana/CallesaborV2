@@ -8,6 +8,7 @@ use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
 use App\Livewire\Pos\PointOfSale;
 use App\Models\CashRegister;
+use App\Models\InventoryItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
@@ -231,6 +232,85 @@ class OperationalPermissionsTest extends TestCase
         $this->assertDatabaseHas('expenses', [
             'created_by' => $employee->id,
             'description' => 'Compra urgente',
+        ]);
+    }
+
+    public function test_cash_income_is_audited_and_added_to_expected_cash(): void
+    {
+        $employee = $this->employee(['registrar movimientos de caja', 'cerrar caja']);
+        $register = $this->register($employee);
+        $register->update(['initial_amount' => 100]);
+
+        Livewire::actingAs($employee)
+            ->test(PointOfSale::class)
+            ->set('operationType', 'income')
+            ->set('expenseAmount', '75.50')
+            ->set('expenseCategory', 'fondo')
+            ->set('expenseDescription', 'Cambio adicional para el turno')
+            ->call('saveOperation')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('expenses', [
+            'cash_register_id' => $register->id,
+            'created_by' => $employee->id,
+            'type' => 'income',
+            'amount' => 75.50,
+            'payment_method' => 'cash',
+        ]);
+
+        Livewire::actingAs($employee)
+            ->test(CorteDeCaja::class)
+            ->assertSet('totalCashIncome', 75.50)
+            ->assertSet('expectedCash', 175.50);
+    }
+
+    public function test_pos_exposes_the_unified_movements_center_in_the_bottom_toolbar(): void
+    {
+        $employee = $this->employee(['registrar movimientos de caja', 'registrar salida de insumos']);
+        $this->register($employee);
+
+        Livewire::actingAs($employee)
+            ->test(PointOfSale::class)
+            ->assertSee('Movimientos')
+            ->assertSee('Caja e insumos')
+            ->assertDontSee('Registrar gasto')
+            ->call('openOperationsModal', 'expense')
+            ->assertSet('showExpenseModal', true)
+            ->assertSee('Salida de caja')
+            ->assertSee('Ingreso de caja')
+            ->assertSee('Salida de insumos');
+    }
+
+    public function test_pos_supply_outflow_updates_stock_and_keeps_an_audit_movement(): void
+    {
+        $employee = $this->employee(['registrar salida de insumos']);
+        $this->register($employee);
+        $item = InventoryItem::create([
+            'name' => 'Aceite vegetal',
+            'unit' => 'liter',
+            'current_stock' => 10,
+            'minimum_stock' => 2,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($employee)
+            ->test(PointOfSale::class)
+            ->set('operationType', 'inventory_out')
+            ->set('inventoryItemId', $item->id)
+            ->set('adjustQuantity', '2.5')
+            ->set('inventoryReason', 'Consumo interno')
+            ->call('saveOperation')
+            ->assertHasNoErrors();
+
+        $this->assertEquals(7.5, (float) $item->fresh()->current_stock);
+        $this->assertDatabaseHas('inventory_movements', [
+            'inventory_item_id' => $item->id,
+            'user_id' => $employee->id,
+            'type' => 'pos_supply_outflow',
+            'quantity' => -2.5,
+            'stock_before' => 10,
+            'stock_after' => 7.5,
+            'reason' => 'Consumo interno',
         ]);
     }
 

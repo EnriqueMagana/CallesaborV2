@@ -21,6 +21,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'eliminar items de ordenes', 'eliminar ordenes', 'cerrar ordenes', 'reimprimir tickets'],
             'mesas' => [
                 'ver mesas',
+                'ver todas las mesas',
                 'asignar mesas',       // asignarse a una mesa disponible
                 'ordenar mesas',       // crear órdenes desde una mesa (mesero)
                 'cerrar mesas',        // cerrar cuenta (mesero solicita cobro)
@@ -39,7 +40,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'cambiar estado mesas',
                 'cancelar divisiones mesas',
             ],
-            'caja' => ['ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'anular pagos', 'registrar gastos'],
+            'caja' => ['ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'anular pagos', 'registrar gastos', 'registrar movimientos de caja'],
             'reportes' => ['ver reportes', 'exportar reportes', 'ver reportes financieros'],
             'configuracion' => [
                 'ver configuracion', 'editar configuracion', 'gestionar configuracion negocio',
@@ -57,6 +58,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'editar compras inventario',
                 'eliminar compras inventario',
                 'recepcionar compras inventario',
+                'registrar salida de insumos',
             ],
         ];
 
@@ -95,19 +97,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
             'ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'cerrar ordenes', 'reimprimir tickets',
-            'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
+            'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'gestionar mesas', 'gestionar grupos',
             'crear areas de mesas', 'editar areas de mesas', 'eliminar areas de mesas',
             'crear mesas', 'editar mesas', 'eliminar mesas', 'cambiar estado mesas',
             'cancelar divisiones mesas',
-            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos',
+            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos', 'registrar movimientos de caja',
             'ver reportes', 'exportar reportes',
             'ver delivery', 'gestionar delivery',
             'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
             'ver inventario', 'gestionar insumos', 'ajustar inventario',
             'generar compras inventario', 'recepcionar compras inventario',
             'editar compras inventario', 'eliminar compras inventario',
+            'registrar salida de insumos',
         ]);
 
         // Cajero
@@ -116,10 +119,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'usar punto de venta',
             'ver clientes', 'crear clientes', 'editar clientes',
             'ver ordenes', 'crear ordenes', 'cerrar ordenes', 'reimprimir tickets',
-            'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
+            'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'cancelar divisiones mesas',
-            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos',
+            'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos', 'registrar movimientos de caja',
+            'registrar salida de insumos',
             'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
         ]);
 

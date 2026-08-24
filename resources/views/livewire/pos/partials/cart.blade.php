@@ -83,10 +83,13 @@
                         wire:click="$set('showSaveQuotationModal',true)">
                     <i class="bx bx-save"></i>
                 </button>
-                <button class="btn-checkout cart-cta-checkout" wire:click="openCheckoutModal" wire:loading.attr="disabled" wire:target="openCheckoutModal">
+                <button type="button" class="btn-checkout cart-cta-checkout" data-pos-checkout
+                        aria-keyshortcuts="F2" title="Cobrar pedido (F2)"
+                        wire:click="openCheckoutModal" wire:loading.attr="disabled" wire:target="openCheckoutModal">
                     <span wire:loading wire:target="openCheckoutModal" class="pos-btn-spinner"></span>
                     <i wire:loading.remove wire:target="openCheckoutModal" class="bx bx-credit-card"></i>
                     Cobrar pedido
+                    <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>
                 </button>
             </div>
         @else

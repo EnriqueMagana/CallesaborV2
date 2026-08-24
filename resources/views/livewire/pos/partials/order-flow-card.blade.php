@@ -61,6 +61,7 @@
     @if ($showKitchenActions)
     <div class="pos-flow-card__actions">
         @if ($flowOrder->status === 'pendiente')
+            @can('editar ordenes')
             <button type="button" wire:click="markKitchenReady({{ $flowOrder->id }})" wire:loading.attr="disabled"
                 wire:target="markKitchenReady({{ $flowOrder->id }})" class="pos-btn pos-btn-primary">
                 <i class="bx bx-printer"></i> Imprimir cocina
@@ -70,42 +71,57 @@
                     class="pos-btn pos-btn-secondary pos-btn-convert-delivery"><i class="bx bx-cycling"></i> Enviar a
                     delivery</button>
             @endif
+            @endcan
         @elseif ($flowOrder->status === 'en_preparacion')
+            @can('editar ordenes')
             <button type="button" wire:click="markKitchenReady({{ $flowOrder->id }})" wire:loading.attr="disabled"
                 wire:target="markKitchenReady({{ $flowOrder->id }})" class="pos-btn pos-btn-primary">
                 <i class="bx bx-check-circle"></i> Marcar listo
             </button>
+            @endcan
+            @can('reimprimir tickets')
             <button type="button" wire:click="reprintKitchenOrder({{ $flowOrder->id }})"
                 class="pos-btn pos-btn-secondary" aria-label="Reimprimir orden {{ $flowOrder->id }} para cocina">
                 <i class="bx bx-printer"></i> Cocina
             </button>
+            @endcan
+            @can('editar ordenes')
             @if ($canConvertToDelivery)
                 <button type="button" wire:click="openConvertDeliveryModal({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-secondary pos-btn-convert-delivery"><i class="bx bx-cycling"></i> Enviar a
                     delivery</button>
             @endif
+            @endcan
         @else
             @if (($allowOrderPayment ?? true) === false)
+                @can('reimprimir tickets')
                 <button type="button" wire:click="reprintKitchenOrder({{ $flowOrder->id }})"
                     wire:loading.attr="disabled" wire:target="reprintKitchenOrder({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-secondary"
                     aria-label="Reimprimir orden {{ $flowOrder->display_folio }} para cocina">
                     <i class="bx bx-printer"></i> Reimprimir cocina
                 </button>
+                @endcan
             @else
+                @can('cerrar ordenes')
                 <button type="button" wire:click="openPickupPayModal({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-primary">
                     <i class="bx bx-dollar-circle"></i> Cobrar ahora
                 </button>
+                @endcan
+                @can('reimprimir tickets')
                 <button type="button" wire:click="reprintKitchenOrder({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-secondary" aria-label="Reimprimir orden {{ $flowOrder->id }} para cocina">
                     <i class="bx bx-printer"></i> Cocina
                 </button>
+                @endcan
+                @can('editar ordenes')
                 @if ($canConvertToDelivery)
                     <button type="button" wire:click="openConvertDeliveryModal({{ $flowOrder->id }})"
                         class="pos-btn pos-btn-secondary pos-btn-convert-delivery"><i class="bx bx-cycling"></i> Enviar
                         a delivery</button>
                 @endif
+                @endcan
             @endif
         @endif
     </div>
