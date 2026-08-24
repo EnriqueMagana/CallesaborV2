@@ -91,6 +91,26 @@ class PublicLandingPagesTest extends TestCase
         $this->assertStringContainsString('initializePreloader', $javascript);
     }
 
+    public function test_home_fills_the_viewport_and_keeps_reservation_forms_above_every_section(): void
+    {
+        $response = $this->get(route('public.home'));
+        $css = file_get_contents(public_path('assets/css/public-home.css'));
+
+        $response->assertOk()
+            ->assertSee('class="public-home"', false)
+            ->assertSee('class="reservation-modal"', false)
+            ->assertSee("document.body.classList.toggle('has-reservation-modal', open)", false);
+
+        $this->assertStringContainsString('body.public-home {', $css);
+        $this->assertStringContainsString('min-width: 100%;', $css);
+        $this->assertStringContainsString('.public-home .home-reservation[data-home-reveal] {', $css);
+        $this->assertStringContainsString('transform: none !important;', $css);
+        $this->assertStringContainsString('.public-home .reservation-modal {', $css);
+        $this->assertStringContainsString('z-index: 10000;', $css);
+        $this->assertStringContainsString('min-height: 100dvh;', $css);
+        $this->assertStringContainsString('font-size: clamp(2.3rem, 11.5vw, 3.25rem);', $css);
+    }
+
     public function test_every_static_home_icon_exists_in_the_installed_boxicons_font(): void
     {
         $boxicons = file_get_contents(public_path('assets/vendor/fonts/boxicons.css'));
