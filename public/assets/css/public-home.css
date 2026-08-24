@@ -1113,3 +1113,129 @@
     .home-primary-action:hover,
     .home-secondary-action:hover { transform: none; }
 }
+
+/* Viewport and overlay hardening for the public home. */
+html {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+body.public-home {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+    html,
+    body.public-home { overflow-x: clip; }
+}
+
+.public-home .menu-container,
+.home-hero__topbar,
+.home-hero__content,
+.home-hero__copy,
+.home-hero__actions,
+.public-home main,
+.public-home main > section {
+    min-width: 0;
+}
+
+.home-hero,
+.home-nav,
+.public-home main,
+.public-home footer {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Keep the fixed reservation layer attached to the viewport, not the animated section. */
+.public-home .home-reservation[data-home-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+.public-home .home-reservation.home-section--white-divider { isolation: auto; }
+body.has-reservation-modal { overflow: hidden; overscroll-behavior: none; }
+
+.public-home .reservation-modal {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 100dvh;
+    position: fixed;
+    z-index: 10000;
+    inset: 0;
+    margin: 0;
+    isolation: isolate;
+}
+
+.public-home .reservation-modal__scrim { z-index: 0; }
+.public-home .reservation-modal__sheet { z-index: 1; }
+
+@media (max-width: 760px) {
+    .public-home .menu-container {
+        width: min(calc(100% - 28px), 1240px);
+        max-width: 1240px;
+    }
+
+    .home-hero__content {
+        width: min(calc(100% - 28px), 1240px);
+        max-width: 1240px;
+        margin-inline: auto;
+        padding-inline: 0;
+    }
+
+    .home-hero__copy {
+        width: 100%;
+        max-width: 100%;
+        padding-inline: 0;
+    }
+
+    .home-hero h1 {
+        width: 100%;
+        max-width: 100%;
+        overflow-wrap: break-word;
+        font-size: clamp(2.3rem, 11.5vw, 3.25rem);
+        line-height: 1.02;
+    }
+
+    .home-hero__copy > p {
+        width: 100%;
+        max-width: 42rem;
+        overflow-wrap: break-word;
+    }
+
+    .home-hero__actions,
+    .home-hero__primary,
+    .home-hero__secondary { width: 100%; }
+
+    .home-nav .menu-container {
+        width: 100%;
+        max-width: 100%;
+        justify-content: flex-start;
+        margin-inline: 0;
+        padding-inline: 14px;
+    }
+
+    .public-home .reservation-modal {
+        width: 100%;
+        height: 100dvh;
+        min-height: 100dvh;
+        padding: 0;
+    }
+
+    .public-home .reservation-modal__sheet {
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100dvh - env(safe-area-inset-top));
+    }
+}
+
+@media (max-width: 390px) {
+    .public-home .menu-container,
+    .home-hero__content { width: min(calc(100% - 22px), 1240px); }
+    .home-hero h1 { font-size: clamp(2.15rem, 11vw, 2.75rem); }
+}
