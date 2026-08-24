@@ -79,9 +79,11 @@
                 </div>
             </div>
             <div class="cart-cta">
-                <button class="pos-btn pos-btn-secondary cart-cta-save" title="Guardar cotización"
+                <button class="pos-btn pos-btn-secondary cart-cta-save" data-pos-save-cart
+                        aria-keyshortcuts="F5" aria-label="Guardar pedido" title="Guardar pedido (F5)"
                         wire:click="$set('showSaveQuotationModal',true)">
                     <i class="bx bx-save"></i>
+                    <kbd class="pos-control-shortcut" aria-hidden="true">F5</kbd>
                 </button>
                 <button type="button" class="btn-checkout cart-cta-checkout" data-pos-checkout
                         aria-keyshortcuts="F2" title="Cobrar pedido (F2)"

@@ -3,22 +3,50 @@
     showCart: false,
     showSaved: false,
     panels: { tables: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false },
-    checkoutWithKeyboard(event) {
+    visibleShortcutTarget(selector) {
+        return Array.from(document.querySelectorAll(selector))
+            .find(element => element.offsetParent !== null && !element.disabled);
+    },
+    hasBlockingLayer() {
+        return Boolean(document.querySelector('.pos-modal-wrap.is-open, .pos-modal-wrap.show, .pos-overlay-panel.show, dialog[open]'));
+    },
+    handleKeyboardShortcut(event) {
         if (!window.matchMedia('(min-width: 1025px)').matches || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+
+        const shortcuts = {
+            F2: '[data-pos-checkout]',
+            F4: '[data-pos-saved]',
+            F5: '[data-pos-save-cart]',
+            F6: '[data-pos-panel=pickup]',
+            F7: '[data-pos-panel=tables]',
+            F8: '[data-pos-panel=delivery]',
+            F9: '[data-pos-panel=reprint]',
+            F11: '[data-pos-operations]'
+        };
+        const key = event.key.toUpperCase();
+        const isSearchShortcut = key === 'F3' || key === 'F10';
+        if (!isSearchShortcut && !shortcuts[key]) return;
+
+        event.preventDefault();
+        if (this.hasBlockingLayer()) return;
+
+        if (isSearchShortcut) {
+            const search = this.visibleShortcutTarget('[data-pos-catalog-search]');
+            if (!search) return;
+            search.focus({ preventScroll: false });
+            search.select();
+            return;
+        }
 
         const focused = document.activeElement;
         if (focused && (focused.matches('input, textarea, select, [contenteditable=true]') || focused.closest('[role=dialog]'))) return;
-        if (document.querySelector('.pos-modal-wrap.is-open, .pos-overlay-panel.show, dialog[open]')) return;
 
-        const checkout = Array.from(document.querySelectorAll('[data-pos-checkout]'))
-            .find(button => button.offsetParent !== null && !button.disabled);
-        if (!checkout) return;
-
-        event.preventDefault();
-        checkout.focus({ preventScroll: true });
-        checkout.click();
+        const target = this.visibleShortcutTarget(shortcuts[key]);
+        if (!target) return;
+        target.focus({ preventScroll: true });
+        target.click();
     }
-}" @keydown.f2.window="checkoutWithKeyboard($event)" class="pos-root">
+}" @keydown.window="handleKeyboardShortcut($event)" class="pos-root">
 
 {{-- Toast --}}
 <div x-data="{ show: false, msg: '', type: 'success' }"

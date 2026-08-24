@@ -20,9 +20,11 @@
         @canany(['crear ordenes', 'editar ordenes'])
             <button type="button" class="btn-header-action btn-header-saved"
                 @click="showSaved = true; $wire.$set('showQuotationsModal', true)"
-                aria-label="Abrir pedidos guardados para retomarlos" title="Retomar pedidos guardados">
+                data-pos-saved aria-keyshortcuts="F4"
+                aria-label="Abrir pedidos guardados para retomarlos" title="Retomar pedidos guardados (F4)">
                 <i class="bx bx-bookmark"></i>
                 <span>Guardados</span>
+                <kbd class="pos-control-shortcut" aria-hidden="true">F4</kbd>
             </button>
         @endcanany
         <div data-ui="xui-h2y0md">

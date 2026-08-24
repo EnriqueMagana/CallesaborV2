@@ -361,15 +361,6 @@
                                             </div>
                                         @endif
 
-                                        @if ($firstMesa->status === 'ocupada' && $mesaUser?->can('cerrar mesas'))
-                                            <button type="button" class="btn-cerrar-mesa"
-                                                wire:click="openCloseMesa({{ $firstMesa->id }})"
-                                                wire:loading.attr="disabled" wire:target="openCloseMesa"
-                                                aria-label="Cerrar {{ $firstMesa->display_name }}">
-                                                <i class="bx bx-lock-alt"></i><span>Cerrar mesa</span>
-                                            </button>
-                                        @endif
-
                                         <div class="mesa-card-actions" @click.outside="open = false">
                                             <button type="button" class="mesa-action-trigger"
                                                 @click.stop="open = !open" :aria-expanded="open.toString()"
@@ -538,15 +529,6 @@
                                             </div>
                                         @endif
 
-                                        @if ($mesa->status === 'ocupada' && $mesaUser?->can('cerrar mesas'))
-                                            <button type="button" class="btn-cerrar-mesa"
-                                                wire:click="openCloseMesa({{ $mesa->id }})"
-                                                wire:loading.attr="disabled" wire:target="openCloseMesa"
-                                                aria-label="Cerrar {{ $mesa->display_name }}">
-                                                <i class="bx bx-lock-alt"></i><span>Cerrar mesa</span>
-                                            </button>
-                                        @endif
-
                                         <div class="mesa-card-actions" @click.outside="open = false">
                                             <button type="button" class="mesa-action-trigger"
                                                 @click.stop="open = !open" :aria-expanded="open.toString()"
@@ -661,9 +643,6 @@
         <div class="mesas-bottom-nav-inner">
             <button class="mbn-item {{ $tab === 'disponibles' ? 'active' : '' }}" wire:click="setTab('disponibles')"
                 wire:loading.attr="disabled" wire:target="setTab">
-                @if ($this->availableCount > 0)
-                    <span class="mbn-badge">{{ $this->availableCount }}</span>
-                @endif
                 <i class="bx bx-check-circle"></i>
                 Libres
             </button>
