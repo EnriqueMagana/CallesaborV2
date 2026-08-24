@@ -21,14 +21,14 @@ class PermissionSeederCoverageTest extends TestCase
             'mesas' => [
                 'crear areas de mesas', 'editar areas de mesas', 'eliminar areas de mesas',
                 'crear mesas', 'editar mesas', 'eliminar mesas', 'cambiar estado mesas',
-                'cancelar divisiones mesas',
+                'cancelar divisiones mesas', 'ver todas las mesas',
             ],
             'reservas' => [
                 'ver reservas', 'crear reservas', 'editar reservas',
                 'cambiar estado reservas', 'cancelar reservas',
             ],
-            'inventario' => ['editar compras inventario', 'eliminar compras inventario'],
-            'caja' => ['registrar gastos'],
+            'inventario' => ['editar compras inventario', 'eliminar compras inventario', 'registrar salida de insumos'],
+            'caja' => ['registrar gastos', 'registrar movimientos de caja'],
             'ordenes' => ['reimprimir tickets'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
         ];
@@ -50,6 +50,9 @@ class PermissionSeederCoverageTest extends TestCase
 
         $this->assertTrue(Role::findByName('gerente')->hasPermissionTo('editar compras inventario'));
         $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('registrar gastos'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('registrar movimientos de caja'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('registrar salida de insumos'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('ver todas las mesas'));
         $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('editar clientes'));
         $this->assertFalse(Role::findByName('cajero')->hasPermissionTo('eliminar clientes'));
         $this->assertTrue(Role::findByName('cocinero')->hasPermissionTo('reimprimir tickets'));
@@ -61,6 +64,7 @@ class PermissionSeederCoverageTest extends TestCase
         $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('gestionar grupos'));
         $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('usar punto de venta'));
         $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('registrar gastos'));
+        $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('ver todas las mesas'));
         $this->assertFalse(Role::findByName('repartidor')->hasPermissionTo('editar mesas'));
     }
 

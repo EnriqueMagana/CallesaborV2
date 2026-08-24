@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Caja;
 
+use App\Models\CashMovement;
 use App\Models\CashRegisterCut;
 use App\Models\Expense;
 use App\Models\Order;
@@ -44,13 +45,24 @@ class CorteDetalle extends Component
     }
 
     #[Computed]
+    public function cashIncomes()
+    {
+        return CashMovement::query()
+            ->where('cash_register_id', $this->cut->cash_register_id)
+            ->income()
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    #[Computed]
     public function ordersByArea(): array
     {
         $all = $this->orders;
+
         return [
-            'ventanilla' => $all->filter(fn($o) => in_array($o->type, ['ventanilla', 'pick_up'])),
-            'mesas'      => $all->filter(fn($o) => $o->type === 'mesa'),
-            'delivery'   => $all->filter(fn($o) => $o->type === 'delivery'),
+            'ventanilla' => $all->filter(fn ($o) => in_array($o->type, ['ventanilla', 'pick_up'])),
+            'mesas' => $all->filter(fn ($o) => $o->type === 'mesa'),
+            'delivery' => $all->filter(fn ($o) => $o->type === 'delivery'),
         ];
     }
 

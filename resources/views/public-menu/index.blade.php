@@ -7,8 +7,7 @@
     <meta name="theme-color" content="{{ $business->primary_color ?? '#15803d' }}">
     <meta name="description" content="Consulta el menú, horarios y datos de {{ $business->business_name }}.">
     <title>Menú | {{ $business->business_name }}</title>
-    <link rel="icon"
-        href="{{ $business->logo_path ? Storage::url($business->logo_path) : asset('assets/img/favicon/favicon.ico') }}">
+    @include('partials.favicon')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"

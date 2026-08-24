@@ -2,10 +2,11 @@
 
 namespace App\Livewire\Pos;
 
+use App\Models\CashMovement;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Customer;
-use App\Models\Expense;
+use App\Models\InventoryItem;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaGroup;
@@ -21,6 +22,7 @@ use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\QuotationItemAddon;
 use App\Models\QuotationItemIngredient;
+use App\Services\InventoryService;
 use App\Services\MesaServiceManager;
 use App\Services\ThermalTicketRenderer;
 use Illuminate\Support\Facades\DB;
@@ -178,8 +180,10 @@ class PointOfSale extends Component
 
     public ?string $lastOrderType = null;
 
-    // ─── Gastos ────────────────────────────────────────────────────────────────
+    // ─── Movimientos operativos ───────────────────────────────────────────────
     public bool $showExpenseModal = false;
+
+    public string $operationType = 'expense';
 
     public string $expenseAmount = '';
 
@@ -190,6 +194,12 @@ class PointOfSale extends Component
     public string $expensePaymentMethod = 'cash';
 
     public string $expenseNotes = '';
+
+    public ?int $inventoryItemId = null;
+
+    public string $adjustQuantity = '';
+
+    public string $inventoryReason = '';
 
     // ─── Pickup panel ──────────────────────────────────────────────────────────
     public string $pickupSearch = '';
@@ -224,6 +234,10 @@ class PointOfSale extends Component
 
     public bool $tablesBillingLoaded = false;
 
+    public bool $tableWorkspaceLoaded = false;
+
+    public string $tableWorkspaceFilter = 'all';
+
     public bool $deliveryPanelLoaded = false;
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -232,6 +246,15 @@ class PointOfSale extends Component
     public function activeCashRegister(): ?CashRegister
     {
         return CashRegister::where('is_open', true)->latest('opened_at')->first();
+    }
+
+    #[Computed]
+    public function operationInventoryItems()
+    {
+        return InventoryItem::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'unit', 'current_stock', 'minimum_stock']);
     }
 
     #[Computed(persist: true, seconds: 60)]
@@ -450,9 +473,15 @@ class PointOfSale extends Component
     #[Computed]
     public function tableTrackingServices()
     {
+        return $this->tableWorkspaceAllServices;
+    }
+
+    #[Computed]
+    public function tableWorkspaceAllServices()
+    {
         $cashRegisterId = $this->activeCashRegister?->id;
 
-        if (! $cashRegisterId || ! $this->tableTrackingLoaded) {
+        if (! $cashRegisterId || ! $this->tableWorkspaceLoaded) {
             return collect();
         }
 
@@ -462,13 +491,103 @@ class PointOfSale extends Component
             ->with([
                 'mesas.area',
                 'primaryMesa.area',
+                'primaryMesa.currentAssignment.waiter',
                 'orders' => fn ($query) => $query
                     ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                    ->with(['items.addons', 'items.ingredients'])
+                    ->with(['items.addons', 'items.ingredients', 'payments'])
                     ->oldest('created_at'),
+                'splits' => fn ($query) => $query
+                    ->whereIn('status', ['pendiente', 'parcial'])
+                    ->latest('id'),
             ])
             ->oldest('opened_at')
             ->get();
+    }
+
+    #[Computed]
+    public function tableWorkspaceServices()
+    {
+        return $this->tableWorkspaceAllServices
+            ->filter(function (MesaService $service): bool {
+                $orders = $service->orders;
+
+                return match ($this->tableWorkspaceFilter) {
+                    'service' => $service->status === 'abierta',
+                    'kitchen' => $orders->contains(fn (Order $order) => in_array($order->status, ['pendiente', 'en_preparacion'], true)),
+                    'ready' => $orders->isNotEmpty()
+                        && $orders->every(fn (Order $order) => in_array($order->status, ['lista', 'entregada'], true)),
+                    'billing' => $service->status === 'en_cuenta',
+                    default => true,
+                };
+            })
+            ->values();
+    }
+
+    #[Computed]
+    public function tableWorkspaceCounts(): array
+    {
+        $services = $this->tableWorkspaceAllServices;
+
+        return [
+            'all' => $services->count(),
+            'service' => $services->where('status', 'abierta')->count(),
+            'kitchen' => $services->filter(fn (MesaService $service) => $service->orders
+                ->contains(fn (Order $order) => in_array($order->status, ['pendiente', 'en_preparacion'], true)))->count(),
+            'ready' => $services->filter(fn (MesaService $service) => $service->orders->isNotEmpty()
+                && $service->orders->every(fn (Order $order) => in_array($order->status, ['lista', 'entregada'], true)))->count(),
+            'billing' => $services->where('status', 'en_cuenta')->count(),
+        ];
+    }
+
+    #[Computed]
+    public function toolbarPendingCounts(): array
+    {
+        $cashRegisterId = $this->activeCashRegister?->id;
+
+        if (! $cashRegisterId) {
+            return ['pickup' => 0, 'tables' => 0, 'delivery' => 0];
+        }
+
+        $activeStatuses = ['pendiente', 'en_preparacion', 'lista'];
+        $pickup = Order::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->whereDoesntHave('payments')
+            ->where(function ($query) use ($activeStatuses) {
+                $query->where(function ($kiosk) use ($activeStatuses) {
+                    $kiosk->where('source', 'kiosk')
+                        ->where('fulfillment', 'takeaway')
+                        ->whereIn('status', $activeStatuses);
+                })->orWhere(function ($counter) use ($activeStatuses) {
+                    $counter->whereIn('type', ['pick_up', 'ventanilla'])
+                        ->where(fn ($source) => $source->whereNull('source')->orWhere('source', '!=', 'kiosk'))
+                        ->whereIn('status', $activeStatuses);
+                });
+            })
+            ->count();
+
+        $delivery = Order::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->where('type', 'delivery')
+            ->whereIn('status', $activeStatuses)
+            ->count();
+
+        $tables = MesaService::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->active()
+            ->count();
+        $legacyTables = Order::query()
+            ->where('cash_register_id', $cashRegisterId)
+            ->whereNull('mesa_service_id')
+            ->whereNotNull('mesa_id')
+            ->whereIn('status', $activeStatuses)
+            ->distinct()
+            ->count('mesa_id');
+
+        return [
+            'pickup' => $pickup,
+            'tables' => $tables + $legacyTables,
+            'delivery' => $delivery,
+        ];
     }
 
     #[Computed]
@@ -505,27 +624,70 @@ class PointOfSale extends Component
 
     public function openTableTracking(): void
     {
-        $this->tableTrackingLoaded = true;
-        $this->refreshTableTracking();
+        $this->openTableWorkspace('all');
     }
 
     public function closeTableTracking(): void
     {
-        $this->tableTrackingLoaded = false;
-        unset($this->tableTrackingServices);
+        $this->closeTableWorkspace();
     }
 
     public function openTablesBilling(): void
     {
         abort_unless(auth()->user()?->can('cobrar mesas'), 403);
-        $this->tablesBillingLoaded = true;
-        unset($this->mesasPendientes);
+        $this->openTableWorkspace('billing');
     }
 
     public function closeTablesBilling(): void
     {
+        $this->closeTableWorkspace();
+    }
+
+    public function openTableWorkspace(string $filter = 'all'): void
+    {
+        abort_unless(auth()->user()?->canAny(['cobrar mesas', 'editar ordenes', 'reimprimir tickets']), 403);
+        $this->tableWorkspaceLoaded = true;
+        $this->tableTrackingLoaded = true;
+        $this->tablesBillingLoaded = auth()->user()?->can('cobrar mesas') ?? false;
+        $this->setTableWorkspaceFilter($filter);
+        $this->refreshTableWorkspace();
+    }
+
+    public function closeTableWorkspace(): void
+    {
+        $this->tableWorkspaceLoaded = false;
+        $this->tableTrackingLoaded = false;
         $this->tablesBillingLoaded = false;
-        unset($this->mesasPendientes);
+        unset(
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
+            $this->tableTrackingServices,
+            $this->mesasPendientes,
+        );
+    }
+
+    public function setTableWorkspaceFilter(string $filter): void
+    {
+        abort_unless(in_array($filter, ['all', 'service', 'kitchen', 'ready', 'billing'], true), 422);
+        if ($filter === 'billing') {
+            abort_unless(auth()->user()?->can('cobrar mesas'), 403);
+        }
+
+        $this->tableWorkspaceFilter = $filter;
+        unset($this->tableWorkspaceServices);
+    }
+
+    public function refreshTableWorkspace(): void
+    {
+        $this->tableTrackingRefreshedAt = now()->format('g:i:s A');
+        unset(
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
+            $this->tableTrackingServices,
+            $this->mesasPendientes,
+        );
     }
 
     public function openDeliveryPanel(): void
@@ -543,9 +705,9 @@ class PointOfSale extends Component
 
     public function refreshTableTracking(): void
     {
+        $this->tableWorkspaceLoaded = true;
         $this->tableTrackingLoaded = true;
-        $this->tableTrackingRefreshedAt = now()->format('g:i:s A');
-        unset($this->tableTrackingServices);
+        $this->refreshTableWorkspace();
     }
 
     #[Computed]
@@ -1772,40 +1934,175 @@ class PointOfSale extends Component
         unset($this->recentOrders, $this->mesaServiceHistory);
     }
 
-    // ─── Gastos ────────────────────────────────────────────────────────────────
+    // ─── Movimientos operativos ───────────────────────────────────────────────
 
-    public function openExpenseModal(): void
+    public function openOperationsModal(string $type = 'expense'): void
     {
-        abort_unless(auth()->user()?->can('registrar gastos'), 403);
-        $this->expenseAmount = '';
-        $this->expenseCategory = 'otro';
-        $this->expenseDescription = '';
-        $this->expensePaymentMethod = 'cash';
-        $this->expenseNotes = '';
-        $this->resetErrorBag();
+        abort_unless(in_array($type, ['expense', 'income', 'inventory_out'], true), 404);
+
+        if ($type === 'inventory_out') {
+            $this->authorizeInventoryOutflow();
+        } else {
+            $this->authorizeCashMovement();
+        }
+
+        $this->resetOperationForm();
+        $this->operationType = $type;
         $this->showExpenseModal = true;
     }
 
+    /** Backwards-compatible entry point used by existing integrations. */
+    public function openExpenseModal(): void
+    {
+        $this->openOperationsModal('expense');
+    }
+
+    public function updatedOperationType(string $type): void
+    {
+        abort_unless(in_array($type, ['expense', 'income', 'inventory_out'], true), 404);
+
+        if ($type === 'inventory_out') {
+            $this->authorizeInventoryOutflow();
+        } else {
+            $this->authorizeCashMovement();
+        }
+
+        $this->resetErrorBag();
+        $this->expenseCategory = $type === 'income' ? 'fondo' : 'otro';
+        $this->expensePaymentMethod = 'cash';
+    }
+
+    public function saveOperation(InventoryService $inventoryService): void
+    {
+        if ($this->operationType === 'inventory_out') {
+            $this->saveInventoryOutflow($inventoryService);
+
+            return;
+        }
+
+        abort_unless(in_array($this->operationType, ['expense', 'income'], true), 422);
+        $this->saveCashMovement($this->operationType);
+    }
+
+    /** Backwards-compatible action used by existing tests and callers. */
     public function saveExpense(): void
     {
-        abort_unless(auth()->user()?->can('registrar gastos'), 403);
-        $this->validate([
-            'expenseAmount' => 'required|numeric|min:0.01',
-            'expenseDescription' => 'required|string|max:255',
+        $this->operationType = 'expense';
+        $this->saveCashMovement('expense');
+    }
+
+    private function saveCashMovement(string $type): void
+    {
+        $this->authorizeCashMovement();
+        $register = $this->activeCashRegister;
+        abort_unless($register, 409, 'Abre una caja antes de registrar movimientos.');
+
+        $categories = $type === 'income'
+            ? 'fondo,devolucion,otro_ingreso'
+            : 'insumos,operativo,personal,otro';
+
+        $validated = $this->validate([
+            'expenseAmount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
+            'expenseCategory' => ['required', 'in:'.$categories],
+            'expenseDescription' => ['required', 'string', 'max:255'],
+            'expensePaymentMethod' => ['required', 'in:cash,card,transfer'],
+            'expenseNotes' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'expenseAmount.required' => 'Ingresa el monto del movimiento.',
+            'expenseAmount.min' => 'El monto debe ser mayor a cero.',
+            'expenseDescription.required' => 'Describe el motivo del movimiento.',
         ]);
 
-        Expense::create([
-            'cash_register_id' => $this->activeCashRegister?->id,
-            'created_by' => auth()->id(),
-            'amount' => $this->expenseAmount,
-            'category' => $this->expenseCategory,
-            'description' => $this->expenseDescription,
-            'payment_method' => $this->expensePaymentMethod,
-            'notes' => $this->expenseNotes ?: null,
-        ]);
+        $paymentMethod = $type === 'income' ? 'cash' : $validated['expensePaymentMethod'];
+
+        DB::transaction(function () use ($register, $type, $validated, $paymentMethod): void {
+            CashRegister::query()
+                ->whereKey($register->id)
+                ->where('is_open', true)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            CashMovement::create([
+                'cash_register_id' => $register->id,
+                'created_by' => auth()->id(),
+                'type' => $type,
+                'amount' => round((float) $validated['expenseAmount'], 2),
+                'category' => $validated['expenseCategory'],
+                'description' => trim($validated['expenseDescription']),
+                'payment_method' => $paymentMethod,
+                'notes' => filled($validated['expenseNotes']) ? trim($validated['expenseNotes']) : null,
+            ]);
+        });
 
         $this->showExpenseModal = false;
-        $this->dispatch('notify', type: 'success', message: 'Gasto registrado.');
+        $label = $type === 'income' ? 'Ingreso de caja' : 'Gasto de caja';
+        $this->dispatch('notify', type: 'success', message: $label.' registrado.');
+    }
+
+    private function saveInventoryOutflow(InventoryService $inventoryService): void
+    {
+        $this->authorizeInventoryOutflow();
+
+        $validated = $this->validate([
+            'inventoryItemId' => ['required', 'integer', 'exists:inventory_items,id'],
+            'adjustQuantity' => ['required', 'numeric', 'min:0.001', 'max:999999999'],
+            'inventoryReason' => ['required', 'string', 'max:255'],
+        ], [
+            'inventoryItemId.required' => 'Selecciona el insumo que saldrá del inventario.',
+            'adjustQuantity.required' => 'Ingresa la cantidad que saldrá.',
+            'adjustQuantity.min' => 'La cantidad debe ser mayor a cero.',
+            'inventoryReason.required' => 'Explica el motivo de la salida.',
+        ]);
+
+        $item = InventoryItem::query()
+            ->where('is_active', true)
+            ->findOrFail($validated['inventoryItemId']);
+
+        $inventoryService->adjust(
+            $item,
+            'out',
+            (float) $validated['adjustQuantity'],
+            trim($validated['inventoryReason']),
+            auth()->user(),
+            'pos_supply_outflow',
+        );
+
+        unset($this->operationInventoryItems);
+        $this->showExpenseModal = false;
+        $this->dispatch('notify', type: 'success', message: 'Salida de insumo registrada y existencia actualizada.');
+    }
+
+    private function authorizeCashMovement(): void
+    {
+        abort_unless(
+            auth()->user()?->can('registrar movimientos de caja')
+                || auth()->user()?->can('registrar gastos'),
+            403,
+        );
+    }
+
+    private function authorizeInventoryOutflow(): void
+    {
+        abort_unless(
+            auth()->user()?->can('registrar salida de insumos')
+                || auth()->user()?->can('ajustar inventario'),
+            403,
+        );
+    }
+
+    private function resetOperationForm(): void
+    {
+        $this->reset(
+            'expenseAmount',
+            'expenseDescription',
+            'expenseNotes',
+            'inventoryItemId',
+            'adjustQuantity',
+            'inventoryReason',
+        );
+        $this->expenseCategory = 'otro';
+        $this->expensePaymentMethod = 'cash';
+        $this->resetErrorBag();
     }
 
     // ─── Pickup panel ──────────────────────────────────────────────────────────
@@ -1942,6 +2239,55 @@ class PointOfSale extends Component
         unset($this->mesaPaymentContext);
     }
 
+    public function sendTableServiceToBilling(int $serviceId): void
+    {
+        abort_unless(auth()->user()?->can('cerrar mesas'), 403);
+
+        $cashRegisterId = $this->activeCashRegister?->id;
+        if (! $cashRegisterId) {
+            $this->dispatch('notify', type: 'warning', message: 'No hay una caja abierta para solicitar la cuenta.');
+
+            return;
+        }
+
+        $service = DB::transaction(function () use ($serviceId, $cashRegisterId): ?MesaService {
+            $service = MesaService::query()
+                ->where('cash_register_id', $cashRegisterId)
+                ->where('status', 'abierta')
+                ->lockForUpdate()
+                ->find($serviceId);
+
+            if (! $service) {
+                return null;
+            }
+
+            if ($service->splits()->whereIn('status', ['pendiente', 'parcial'])->exists()) {
+                return null;
+            }
+
+            $service->update([
+                'status' => 'en_cuenta',
+                'in_account_at' => $service->in_account_at ?? now(),
+            ]);
+
+            $memberIds = $service->mesas()->pluck('mesas.id')->all();
+            Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
+
+            return $service;
+        }, 3);
+
+        if (! $service) {
+            $this->dispatch('notify', type: 'warning', message: 'El servicio cambió o ya tiene una división activa. Actualiza el panel.');
+            $this->refreshTableWorkspace();
+
+            return;
+        }
+
+        $this->tableWorkspaceFilter = 'billing';
+        $this->refreshTableWorkspace();
+        $this->dispatch('notify', type: 'success', message: "{$service->service_label} quedó lista para cobro.");
+    }
+
     public function reopenMesa(int $mesaId): void
     {
         abort_unless(auth()->user()?->can('cobrar mesas'), 403);
@@ -1987,7 +2333,7 @@ class PointOfSale extends Component
 
         $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
         Mesa::whereIn('id', $memberIds)->update(['status' => 'ocupada']);
-        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
         $this->dispatch(
             'notify',
             type: 'success',
@@ -2054,7 +2400,7 @@ class PointOfSale extends Component
                 $this->completeMesaSplit($split, $mesa, $service, $cashRegisterId);
             });
 
-            unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+            unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
             $this->dispatch('mesa-payment-completed', mesaId: $mesa->id, released: true);
             $this->dispatch('notify', type: 'success', message: "Subcuenta sin consumo eliminada; {$mesa->display_name} quedó disponible.");
 
@@ -2113,7 +2459,7 @@ class PointOfSale extends Component
             return;
         }
 
-        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
         $this->dispatch('notify', type: 'success', message: "Servicio sin consumo de {$mesa->display_name} cancelado; mesa disponible.");
     }
 
@@ -2278,6 +2624,36 @@ class PointOfSale extends Component
 
     private function confirmFullMesaPayment(): void
     {
+        DB::transaction(function (): void {
+            $cashRegisterId = $this->activeCashRegister?->id;
+            $mesa = Mesa::query()->lockForUpdate()->find($this->mesaPayId);
+            if (! $mesa || ! $cashRegisterId) {
+                return;
+            }
+
+            $service = app(MesaServiceManager::class)->findActiveForMesa($mesa, $cashRegisterId);
+            if ($service) {
+                MesaService::query()->whereKey($service->id)->lockForUpdate()->first();
+                Order::query()
+                    ->where('mesa_service_id', $service->id)
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->lockForUpdate()
+                    ->get();
+            } else {
+                Order::query()
+                    ->where('mesa_id', $mesa->id)
+                    ->where('cash_register_id', $cashRegisterId)
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->lockForUpdate()
+                    ->get();
+            }
+
+            $this->performFullMesaPayment();
+        }, 3);
+    }
+
+    private function performFullMesaPayment(): void
+    {
         $cashRegisterId = $this->activeCashRegister?->id;
         $mesa = Mesa::with(['area', 'currentAssignment.waiter'])->find($this->mesaPayId);
         if (! $mesa) {
@@ -2296,6 +2672,11 @@ class PointOfSale extends Component
                 ->with('items')
                 ->get();
         if ($orders->isEmpty()) {
+            return;
+        }
+        if ($orders->contains(fn (Order $order) => ! in_array($order->status, ['lista', 'entregada'], true))) {
+            $this->dispatch('notify', type: 'warning', message: 'Todas las comandas deben estar listas antes de cobrar.');
+
             return;
         }
         $mesaTotal = (float) $orders->sum('total');
@@ -2358,12 +2739,38 @@ class PointOfSale extends Component
         $this->showMesaPayModal = false;
         $this->mesaPayId = null;
         $this->mesaPayments = [];
-        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
         $label = $service?->service_label ?? $mesa->display_name;
         $this->dispatch('notify', type: 'success', message: "{$label} cobrado y liberado.");
     }
 
     private function confirmSplitAccountPayment(): void
+    {
+        DB::transaction(function (): void {
+            $cashRegisterId = $this->activeCashRegister?->id;
+            $split = MesaSplit::query()
+                ->whereHas('mesaService', fn ($query) => $query
+                    ->where('cash_register_id', $cashRegisterId)
+                    ->active())
+                ->lockForUpdate()
+                ->find($this->mesaSplitId);
+
+            if (! $split) {
+                return;
+            }
+
+            Mesa::query()->whereKey($split->mesa_id)->lockForUpdate()->first();
+            Order::query()
+                ->where('mesa_service_id', $split->mesa_service_id)
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->lockForUpdate()
+                ->get();
+
+            $this->performSplitAccountPayment();
+        }, 3);
+    }
+
+    private function performSplitAccountPayment(): void
     {
         $cashRegisterId = $this->activeCashRegister?->id;
         $split = MesaSplit::with([
@@ -2378,6 +2785,20 @@ class PointOfSale extends Component
         $service = $split->mesa_service_id
             ? MesaService::find($split->mesa_service_id)
             : app(MesaServiceManager::class)->findActiveForMesa($mesa, $cashRegisterId);
+        $ordersReady = Order::query()
+            ->when(
+                $service,
+                fn ($query) => $query->where('mesa_service_id', $service->id),
+                fn ($query) => $query->where('mesa_id', $mesa->id)->where('cash_register_id', $cashRegisterId)
+            )
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->get()
+            ->every(fn (Order $order) => in_array($order->status, ['lista', 'entregada'], true));
+        if (! $ordersReady) {
+            $this->dispatch('notify', type: 'warning', message: 'Todas las comandas deben estar listas antes de cobrar.');
+
+            return;
+        }
         $splitData = $split->split_data;
         $account = $splitData[$this->mesaSplitAccountIdx] ?? null;
         if (! $account || ($account['paid'] ?? false)) {
@@ -2483,7 +2904,7 @@ class PointOfSale extends Component
         $this->mesaSplitAccountIdx = null;
         $this->mesaPayId = null;
         $this->mesaPayments = [];
-        unset($this->mesasPendientes, $this->tableTrackingServices, $this->mesaServiceHistory);
+        unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
         $this->dispatch('mesa-payment-completed', mesaId: $mesa->id, released: $allPaid);
 
         $msg = $allPaid
@@ -2576,7 +2997,7 @@ class PointOfSale extends Component
             app(MesaServiceManager::class)->completePaid($service, auth()->id());
         }
         $this->releaseMesa($mesa, $service);
-        unset($this->tableTrackingServices, $this->mesaServiceHistory);
+        unset($this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
 
         return true;
     }
@@ -2801,6 +3222,9 @@ HTML;
             $this->recentOrders,
             $this->reprintMesaGroups,
             $this->tableTrackingServices,
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
         );
         $message = $mesaWasReleased
             ? "Orden #{$order->id} cobrada. Era la última nota y la mesa quedó disponible."
@@ -2905,6 +3329,10 @@ HTML;
             $this->mesasPendientes,
             $this->recentOrders,
             $this->reprintMesaGroups,
+            $this->tableTrackingServices,
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
         );
 
         if ($nextStatus === 'en_preparacion') {
@@ -2932,22 +3360,6 @@ HTML;
 
         if (! $order) {
             return;
-        }
-
-        if ($order->status === 'pendiente') {
-            abort_unless(auth()->user()?->can('editar ordenes'), 403);
-            $order->update(['status' => 'en_preparacion']);
-            unset(
-                $this->kitchenOrders,
-                $this->kitchenPendingCount,
-                $this->pickupOrders,
-                $this->deliveryOrders,
-                $this->kioskDineInOrders,
-                $this->mesasPendientes,
-                $this->recentOrders,
-                $this->reprintMesaGroups,
-            );
-            $this->dispatch('notify', type: 'success', message: "Orden #{$order->id} impresa y enviada a preparación.");
         }
 
         $this->dispatch('pos-reprint-show-cocina',

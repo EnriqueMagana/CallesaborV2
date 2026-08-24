@@ -45,6 +45,11 @@ class CashRegister extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function movements(): HasMany
+    {
+        return $this->hasMany(CashMovement::class);
+    }
+
     public function cuts(): HasMany
     {
         return $this->hasMany(CashRegisterCut::class);

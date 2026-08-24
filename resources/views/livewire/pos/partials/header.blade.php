@@ -1,9 +1,10 @@
 <div class="pos-header">
     <div class="pos-header-left">
         <div class="pos-logo">
-            <img class="pos-logo-img" src="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}" alt="Logo de {{ $businessSettings?->business_name ?? config('app.name') }}"
-                 width="42" height="42"
-                 onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+            <img class="pos-logo-img"
+                src="{{ $businessSettings?->logo_path ? Storage::url($businessSettings->logo_path) : asset('assets/img/favicon/favicon.ico') }}"
+                alt="Logo de {{ $businessSettings?->business_name ?? config('app.name') }}" width="42" height="42"
+                onerror="this.hidden=true;this.nextElementSibling.hidden=false">
             <i class="bx bx-restaurant" data-ui="xui-1v6ktfg" hidden></i>
         </div>
         <div class="pos-header-info">
@@ -16,16 +17,6 @@
             <i class="bx bx-home-alt"></i>
             <span>Dashboard</span>
         </a>
-        <a href="{{ route('app.caja') }}" class="btn-header-action">
-            <i class="bx bx-calculator"></i>
-            <span>Caja</span>
-        </a>
-        @can('registrar gastos')
-            <button type="button" class="btn-header-action btn-header-expense" wire:click="openExpenseModal" aria-label="Registrar un gasto">
-                <i class="bx bx-wallet"></i>
-                <span>Registrar gasto</span>
-            </button>
-        @endcan
         @canany(['crear ordenes', 'editar ordenes'])
             <button type="button" class="btn-header-action btn-header-saved"
                 @click="showSaved = true; $wire.$set('showQuotationsModal', true)"
@@ -39,9 +30,9 @@
             <span>{{ $this->activeCashRegister->name }}</span>
         </div>
         <button type="button" class="btn-cart-toggle" @click="showCart = !showCart" :class="showCart ? 'active' : ''"
-                aria-label="Abrir carrito" :aria-expanded="showCart.toString()">
+            aria-label="Abrir carrito" :aria-expanded="showCart.toString()">
             <i class="bx bx-cart"></i>
-            @if(!empty($cart))
+            @if (!empty($cart))
                 <span class="cart-count">{{ $this->cartCount }}</span>
             @endif
             <span>Carrito</span>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Caja;
 
+use App\Models\CashMovement;
 use App\Models\CashRegister;
 use App\Models\CashRegisterCut;
 use App\Models\DeliverySettlement;
@@ -66,6 +67,16 @@ class CorteDeCaja extends Component
     public function expenses(): Collection
     {
         return Expense::where('cash_register_id', $this->registerId)->get();
+    }
+
+    #[Computed]
+    public function cashIncomes(): Collection
+    {
+        return CashMovement::query()
+            ->where('cash_register_id', $this->registerId)
+            ->income()
+            ->orderBy('created_at')
+            ->get();
     }
 
     #[Computed]
@@ -173,10 +184,19 @@ class CorteDeCaja extends Component
     }
 
     #[Computed]
+    public function totalCashIncome(): float
+    {
+        return (float) $this->cashIncomes
+            ->where('payment_method', 'cash')
+            ->sum('amount');
+    }
+
+    #[Computed]
     public function expectedCash(): float
     {
         return (float) $this->register->initial_amount
              + $this->totalCashIn
+             + $this->totalCashIncome
              - $this->totalExpensesCash;
     }
 
@@ -250,6 +270,7 @@ class CorteDeCaja extends Component
                 'd_transfer' => $t['d']['transfer'],
                 'initial_amount' => $register->initial_amount,
                 'total_cash_in' => $this->totalCashIn,
+                'total_cash_income' => $this->totalCashIncome,
                 'total_expenses_cash' => $this->totalExpensesCash,
                 'expected_cash' => $this->expectedCash,
                 'declared_cash' => (float) $this->declaredCash,
@@ -261,6 +282,7 @@ class CorteDeCaja extends Component
                     'operators' => $this->operatorTotals,
                     'delivery_settlements' => $this->deliverySettlements->toArray(),
                     'expenses' => $this->expenses->toArray(),
+                    'cash_incomes' => $this->cashIncomes->toArray(),
                 ],
                 'generated_at' => now(),
             ]);
@@ -281,7 +303,7 @@ class CorteDeCaja extends Component
         $this->showConfirm = false;
         $this->cutDone = true;
         $this->cutId = $cut->id;
-        unset($this->register, $this->orders, $this->expenses, $this->totals, $this->deliverySettlements, $this->closingBlockers);
+        unset($this->register, $this->orders, $this->expenses, $this->cashIncomes, $this->totals, $this->deliverySettlements, $this->closingBlockers);
     }
 
     public function render()

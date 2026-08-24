@@ -1996,8 +1996,6 @@
         grid-template-columns: 1fr;
     }
 }
-.btn-header-expense { color: #8b4d16; border-color: #f2d4a0; background: #fff8e8; }
-.btn-header-expense:hover { color: #74400e; border-color: #e8b861; background: #ffefc7; }
 /* Layout y pantalla de carga extraídos de layouts/pos.blade.php */
 html, body { height: 100%; overflow: hidden; margin: 0; }
 
