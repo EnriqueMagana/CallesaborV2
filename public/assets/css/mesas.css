@@ -531,11 +531,6 @@
     min-height: 44px;
     padding: 8px 12px;
   }
-  .mesa-card-footer > .btn-cerrar-mesa {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 104px;
-  }
   .mesa-card-footer > .mesa-card-actions {
     flex: 0 0 44px;
     width: 44px;
@@ -617,28 +612,6 @@
 .btn-asignarme i { font-size: .9rem; }
 .btn-asignarme--kiosk { color: #5746cf; border-color: rgba(105, 86, 232, .28); background: #f0edff; }
 .btn-asignarme--kiosk:hover { color: #fff; border-color: #5746cf; background: #5746cf; }
-.btn-cerrar-mesa {
-  box-sizing: border-box;
-  min-height: 44px;
-  padding: 8px 11px;
-  border: 1.5px solid rgba(217,119,6,.42);
-  border-radius: 9px;
-  background: rgba(245,158,11,.1);
-  color: #9a5b05;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: .75rem;
-  font-weight: 750;
-  line-height: 1.1;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: var(--mesa-transition);
-}
-.btn-cerrar-mesa:hover { color: #fff; border-color: #b96b05; background: #b96b05; box-shadow: 0 3px 10px rgba(185,107,5,.25); }
-.btn-cerrar-mesa:focus-visible { outline: 3px solid rgba(105,108,255,.3); outline-offset: 2px; }
-.btn-cerrar-mesa:disabled { opacity: .55; cursor: wait; }
 .mesas-tab--kiosk { color: #5746cf; }
 .mesas-tab--kiosk.active { color: #5746cf; background: #f0edff; }
 .mesas-tab-badge.badge-purple { color: #5746cf; background: #e9e4ff; }
@@ -1592,10 +1565,21 @@
   .mesa-card { padding: 0; }
   .mesa-card-topbar { padding: 7px 10px 4px; gap: 4px; }
   .mesa-card-body { padding: 6px 10px 8px; }
-  .mesa-card-footer { padding: 7px 10px 8px; }
-  .mesa-card-footer { flex-wrap: wrap; }
-  .btn-cerrar-mesa { flex: 1 1 auto; padding-inline: 8px; font-size: .7rem; }
-
+  .mesa-card-footer {
+    padding: 7px 10px 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 8px;
+  }
+  .mesa-card-footer > :is(.mesa-waiter, .btn-asignarme) {
+    width: 100%;
+    min-width: 0;
+  }
+  .mesa-card-footer > .mesa-card-actions {
+    width: 44px;
+    min-width: 44px;
+  }
   /* Smaller number on mobile */
   .mesa-number { font-size: 2.2rem; }
   .mesa-num-chip { font-size: 1.4rem; padding: 3px 8px; }
@@ -1614,10 +1598,41 @@
   .mesa-orders-info { font-size: .72rem; padding: 2px 7px; }
 
   /* Action trigger: always visible on mobile (no hover needed) */
-  .mesa-action-trigger { opacity: 1; }
+  .mesa-action-trigger {
+    width: 44px;
+    height: 44px;
+    opacity: 1;
+  }
+  .mesa-card.menu-open {
+    z-index: 1050;
+    transform: none;
+  }
+  .mesa-action-menu {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    min-width: 0;
+    max-height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px;
+    border-radius: 16px;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, .24);
+    z-index: 1060;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mesa-action-menu button,
+  .mesa-action-menu .mesa-action-link {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: .875rem;
+    touch-action: manipulation;
+  }
 
   /* Btn-asignarme: full footer on mobile */
-  .btn-asignarme { font-size: .72rem; padding: 5px 8px; }
+  .btn-asignarme { min-height: 44px; font-size: .72rem; padding: 5px 6px; }
 
   /* Group card: always full width on mobile */
   .mesa-card-group { grid-column: 1 / -1; }
@@ -1653,5 +1668,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mesas-modal, .mesas-close-option, .btn-cerrar-mesa { animation:none; transition:none; }
+  .mesas-modal, .mesas-close-option { animation:none; transition:none; }
 }

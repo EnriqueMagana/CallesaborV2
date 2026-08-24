@@ -568,7 +568,7 @@ class PointOfSale extends Component
         $delivery = Order::query()
             ->where('cash_register_id', $cashRegisterId)
             ->where('type', 'delivery')
-            ->whereIn('status', $activeStatuses)
+            ->where('status', 'pendiente')
             ->count();
 
         $tables = MesaService::query()

@@ -189,6 +189,8 @@ class KioskPosWorkflowTest extends TestCase
         app(MesaServiceManager::class)->resolveOrCreate($mesa, $register, $user->id);
         $this->kioskOrder($register->id, $user->id, $terminal->id, 'Pedido para recoger', 'takeaway');
         $this->kioskOrder($register->id, $user->id, $terminal->id, 'Pedido para entregar', 'delivery');
+        $this->kioskOrder($register->id, $user->id, $terminal->id, 'Delivery preparando', 'delivery', status: 'en_preparacion');
+        $this->kioskOrder($register->id, $user->id, $terminal->id, 'Delivery listo', 'delivery', status: 'lista');
 
         Livewire::actingAs($user)
             ->test(PointOfSale::class)
@@ -196,21 +198,36 @@ class KioskPosWorkflowTest extends TestCase
             ->assertSet('deliveryPanelLoaded', false)
             ->assertSeeHtml('aria-label="1 pedidos pendientes"')
             ->assertSeeHtml('aria-label="1 servicios de mesa pendientes"')
-            ->assertSeeHtml('aria-label="1 entregas pendientes"');
+            ->assertSeeHtml('aria-label="1 entregas nuevas sin enviar a cocina"');
     }
 
-    public function test_desktop_pos_keeps_checkout_visible_and_exposes_the_f2_shortcut(): void
+    public function test_desktop_pos_keeps_checkout_visible_and_exposes_operational_shortcuts(): void
     {
         $view = file_get_contents(resource_path('views/livewire/pos/point-of-sale.blade.php'));
         $cart = file_get_contents(resource_path('views/livewire/pos/partials/cart.blade.php'));
+        $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
+        $header = file_get_contents(resource_path('views/livewire/pos/partials/header.blade.php'));
+        $toolbar = file_get_contents(resource_path('views/livewire/pos/partials/toolbar.blade.php'));
         $css = file_get_contents(public_path('assets/css/pos-modern.css'));
 
         $this->assertIsString($view);
         $this->assertIsString($cart);
+        $this->assertIsString($catalog);
+        $this->assertIsString($header);
+        $this->assertIsString($toolbar);
         $this->assertIsString($css);
-        $this->assertStringContainsString('@keydown.f2.window="checkoutWithKeyboard($event)"', $view);
+        $this->assertStringContainsString('@keydown.window="handleKeyboardShortcut($event)"', $view);
         $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
         $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
+        $this->assertStringContainsString('data-pos-save-cart', $cart);
+        $this->assertStringContainsString('aria-keyshortcuts="F3 F10"', $catalog);
+        $this->assertStringContainsString('pos-search-shortcut', $catalog);
+        $this->assertStringContainsString('data-pos-saved', $header);
+        $this->assertStringContainsString('>F4</kbd>', $header);
+        $this->assertStringContainsString('>F5</kbd>', $cart);
+        foreach (['F6', 'F7', 'F8', 'F9', 'F11'] as $shortcut) {
+            $this->assertStringContainsString('aria-keyshortcuts="'.$shortcut.'"', $toolbar);
+        }
         $this->assertMatchesRegularExpression('/\.pos-cart-fixed \.cart-items,[^{]*\{[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s', $css);
         $this->assertMatchesRegularExpression('/@media \(min-width:\s*1025px\) and \(max-height:\s*760px\)/', $css);
     }

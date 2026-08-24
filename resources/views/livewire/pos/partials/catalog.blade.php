@@ -11,10 +11,12 @@
         }
      }">
     <div class="catalog-search-bar">
-        <div class="search-wrap">
+        <div class="search-wrap" :class="{ 'has-query': query }">
             <i class="bx bx-search si-icon" aria-hidden="true"></i>
             <input type="search" x-model.debounce.120ms="query" aria-label="Buscar platillo"
-                   class="pos-input" placeholder="Buscar platillo..." autocomplete="off">
+                   class="pos-input" placeholder="Buscar platillo..." autocomplete="off"
+                   data-pos-catalog-search aria-keyshortcuts="F3 F10" title="Buscar platillo (F3 o F10)">
+            <kbd class="pos-control-shortcut pos-search-shortcut" aria-hidden="true">F3 · F10</kbd>
             <button type="button" class="pos-search-clear" x-show="query" x-cloak
                     @click="query = ''" aria-label="Limpiar búsqueda">
                 <i class="bx bx-x"></i>
