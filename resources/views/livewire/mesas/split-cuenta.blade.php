@@ -16,7 +16,7 @@
             <a href="{{ route('app.mesas') }}" class="btn btn-icon btn-outline-secondary me-2" wire:navigate aria-label="Volver a mesas">
                 <i class="bx bx-arrow-back"></i>
             </a>
-            <i class="bx bx-split mesas-page-icon" style="color:#696cff"></i>
+            <i class="bx bx-git-branch mesas-page-icon" style="color:#696cff"></i>
             <div>
                 <h4>Dividir Cuenta · {{ $this->mesa->display_name }}</h4>
                 <p>
@@ -45,9 +45,15 @@
                 <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" wire:click="requestCancelConfirm">
                     <i class="bx bx-edit me-1"></i> Editar split
                 </button>
+                @else
+                <span class="split-pay-waiting ms-auto" role="status"><i class="bx bx-lock-alt"></i><span>Bloqueado por pagos</span></span>
                 @endif
                 @endcanany
             </div>
+
+            @error('split')
+                <div class="alert alert-danger" role="alert">{{ $message }}</div>
+            @enderror
 
             @foreach($accounts as $idx => $account)
             <div class="split-pay-card {{ $account['paid'] ? 'is-paid' : '' }}">

@@ -1,6 +1,7 @@
 <x-pos.area-panel panel="mesas" title="Cobrar mesas" title-id="pos-tables-title"
     eyebrow="Área de cobro" description="Consulta consumos, retoma la mesa si hace falta y cobra la cuenta completa o dividida."
-    icon="bx-table" tone="tables" panel-class="pos-tables-panel" close-label="Cerrar Mesas">
+    icon="bx-table" tone="tables" panel-class="pos-tables-panel" close-label="Cerrar Mesas"
+    close-action="panels.mesas = false; $wire.closeTablesBilling()">
         <x-slot:tools>
             <div class="pos-area-guidance"><i class="bx bx-credit-card"></i>
                 <span>Selecciona la cuenta que vas a cobrar. La última cuenta pagada libera las mesas del servicio.</span>
@@ -8,8 +9,18 @@
             <div class="pos-area-summary"><strong>{{ $this->mesasPendientes->count() }}</strong><span>mesas por cobrar</span></div>
         </x-slot:tools>
 
+        <x-slot:beforeBody>
+        <div wire:loading.flex wire:target="openTablesBilling"
+            class="pos-skeleton-list" aria-label="Consultando cuentas de mesas">
+            @for ($s = 0; $s < 2; $s++)
+                <div class="pos-table-skeleton"><span></span><div><i></i><i></i><i></i></div></div>
+            @endfor
+        </div>
+        </x-slot:beforeBody>
+
         <x-slot:body>
-        <div class="panel-body pos-area-panel__body pos-tables-accordion"
+        <div class="panel-body pos-area-panel__body pos-tables-accordion" wire:loading.remove
+            wire:target="openTablesBilling"
             x-data="{ openMesa: @js($this->mesasPendientes->first()?->id) }">
             @forelse ($this->mesasPendientes as $mesa)
                 @php
@@ -56,7 +67,7 @@
                     @if ($mesa->active_split && (float) $mesa->mesa_total > 0.009)
                         <section class="pos-table-split-list pos-table-split-list--primary" aria-label="Subcuentas pendientes de {{ $mesa->display_name }}">
                             <div class="pos-table-split-list__title">
-                                <span><i class="bx bx-split"></i> Cobrar cuenta dividida</span>
+                                <span><i class="bx bx-git-branch"></i> Cobrar cuenta dividida</span>
                                 <small>{{ collect($mesa->active_split->split_data)->filter(fn ($account) => !($account['paid'] ?? false))->count() }} pendientes</small>
                             </div>
                             @foreach ($mesa->active_split->split_data as $idx => $account)
@@ -109,15 +120,15 @@
                     <footer class="pos-table-group__footer">
                         @if ((float) $mesa->mesa_total <= 0.009)
                             <div class="pos-table-group__close-copy">
-                                <strong>Cuenta en cero</strong>
-                                <small>No genera movimiento de caja.</small>
+                                <strong>Servicio sin consumo</strong>
+                                <small>Puede cancelarse sin generar venta ni movimiento de caja.</small>
                             </div>
                             <div class="pos-table-group__footer-actions">
                                 <button type="button" wire:click="reopenMesa({{ $mesa->id }})" class="pos-btn pos-btn-secondary">
                                     <i class="bx bx-lock-open-alt"></i> Reabrir mesa
                                 </button>
                                 <button type="button" wire:click="requestDiscardEmptyMesaAccount({{ $mesa->id }})" class="pos-btn pos-btn-danger">
-                                    <i class="bx bx-trash"></i> Eliminar cuenta
+                                    <i class="bx bx-x-circle"></i> Cancelar servicio
                                 </button>
                             </div>
                         @else
@@ -141,8 +152,8 @@
             @empty
                 <div class="pos-area-empty">
                     <span><i class="bx bx-check-circle"></i></span>
-                    <h3>No hay mesas abiertas</h3>
-                    <p>Los pedidos de mesa, incluidos los del kiosco, aparecerán agrupados aquí.</p>
+                    <h3>No hay cuentas pendientes</h3>
+                    <p>Las mesas enviadas a cobro, incluso las que no tuvieron consumo, aparecerán aquí.</p>
                 </div>
             @endforelse
         </div>

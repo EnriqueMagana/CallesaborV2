@@ -46,11 +46,8 @@
         'contact' => ['02', 'bx-map', 'Contacto y ubicación', 'Canales y domicilio'],
         'hours' => ['03', 'bx-time-five', 'Horarios', 'Apertura por día'],
         'social' => ['04', 'bx-share-alt', 'Redes sociales', 'Instagram, Facebook y TikTok'],
-        'visual' => ['05', 'bx-image', 'Identidad visual', 'Logos y banner'],
-        'appearance' => ['06', 'bx-palette', 'Color del menú', 'Acento principal público'],
-        'homepage' => ['07', 'bx-layout', 'Página principal', 'Titulares y presentación'],
-        'gallery' => ['08', 'bx-images', 'Galería', 'Fotos del negocio'],
-        'featured' => ['09', 'bx-star', 'Destacados', 'Favoritos de la casa'],
+        'visual' => ['05', 'bx-image', 'Identidad visual', 'Logos de la sucursal'],
+        'homepage' => ['06', 'bx-layout', 'Página principal', 'Titulares y presentación'],
     ] as $sectionKey => $section)
                     <button type="button" wire:click="setBusinessSection('{{ $sectionKey }}')"
                         class="{{ $businessSection === $sectionKey ? 'is-active' : '' }}"
@@ -230,18 +227,13 @@
                         <x-business.media-upload title="Logo para tickets"
                             description="Recomendado: monocromático y alto contraste." model="ticketLogoUpload"
                             :path="$ticketLogoPath" :upload="$ticketLogoUpload" />
-                        <x-business.media-upload title="Banner del menú"
-                            description="Horizontal, recomendado 1600 × 720 px." model="bannerUpload"
-                            :path="$bannerPath" :upload="$bannerUpload" />
                     </div>
-                    @foreach (['logoUpload', 'ticketLogoUpload', 'bannerUpload'] as $uploadError)
+                    @foreach (['logoUpload', 'ticketLogoUpload'] as $uploadError)
                         @error($uploadError)
                             <p class="biz-form-error" role="alert">{{ $message }}</p>
                         @enderror
                     @endforeach
-                    <div class="business-section-note"><i class="bx bx-image-alt"></i><span><strong>La vista previa
-                                aparece antes de guardar</strong><small>Mientras el navegador procesa el archivo verás
-                                un skeleton. El espacio queda reservado para evitar saltos visuales.</small></span>
+                    <div class="business-section-note"><i class="bx bx-image-alt"></i><span><strong>Los banners ahora se administran en Menú digital</strong><small>Este apartado conserva únicamente los logos de identidad y de impresión.</small></span>
                     </div>
                 @elseif($businessSection === 'appearance')
                     <div class="biz-section-heading">
@@ -268,7 +260,7 @@
                             <code id="primary-color-value">{{ strtoupper($primaryColor) }}</code>
                         </div>
                     </div>
-                    <div class="business-section-note"><i class="bx bx-universal-access"></i><span><strong>La interfaz
+                    <div class="business-section-note"><i class="bx bx-accessibility"></i><span><strong>La interfaz
                                 mantiene fondo blanco y texto oscuro</strong><small>El color se usa como acento para
                                 conservar claridad y una lectura cómoda.</small></span></div>
                 @elseif($businessSection === 'homepage')
@@ -416,7 +408,7 @@
                                 <span class="business-featured-products__image">
                                     @if ($product->image)
                                     <img src="{{ Storage::url($product->image) }}" alt="">@else<i
-                                            class="bx bx-bowl-rice"></i>
+                                            class="bx bx-dish"></i>
                                     @endif
                                 </span>
                                 <span><strong>{{ $product->name }}</strong><small>{{ $product->category?->name ?? 'Sin categoría' }}

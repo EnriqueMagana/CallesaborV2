@@ -1,18 +1,85 @@
 (() => {
+    document.querySelectorAll('[data-menu-banner-carousel]').forEach((carousel) => {
+        const slides = [...carousel.querySelectorAll('[data-menu-banner-slide]')];
+        const dots = [...carousel.querySelectorAll('[data-banner-dot]')];
+        const previous = carousel.querySelector('[data-banner-previous]');
+        const next = carousel.querySelector('[data-banner-next]');
+        const pause = carousel.querySelector('[data-banner-pause]');
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const interval = Math.max(3000, Number(carousel.dataset.interval) || 5000);
+        const canAutoplay = carousel.dataset.autoplay === 'true' && !prefersReducedMotion;
+        let activeIndex = 0;
+        let paused = false;
+        let timer = null;
+
+        const stop = () => {
+            window.clearTimeout(timer);
+            timer = null;
+        };
+
+        const schedule = () => {
+            stop();
+            if (canAutoplay && !paused && !document.hidden) {
+                timer = window.setTimeout(() => show(activeIndex + 1), interval);
+            }
+        };
+
+        const show = (requestedIndex) => {
+            activeIndex = (requestedIndex + slides.length) % slides.length;
+            slides.forEach((slide, index) => {
+                const isActive = index === activeIndex;
+                slide.classList.toggle('is-active', isActive);
+                slide.setAttribute('aria-hidden', String(!isActive));
+            });
+            dots.forEach((dot, index) => {
+                const isActive = index === activeIndex;
+                dot.classList.toggle('is-active', isActive);
+                dot.setAttribute('aria-selected', String(isActive));
+            });
+            schedule();
+        };
+
+        previous?.addEventListener('click', () => show(activeIndex - 1));
+        next?.addEventListener('click', () => show(activeIndex + 1));
+        dots.forEach((dot, index) => dot.addEventListener('click', () => show(index)));
+        pause?.addEventListener('click', () => {
+            paused = !paused;
+            pause.setAttribute('aria-pressed', String(paused));
+            pause.setAttribute('aria-label', paused ? 'Reanudar carrusel' : 'Pausar carrusel');
+            pause.querySelector('i')?.classList.toggle('bx-pause', !paused);
+            pause.querySelector('i')?.classList.toggle('bx-play', paused);
+            schedule();
+        });
+        carousel.addEventListener('mouseenter', stop);
+        carousel.addEventListener('mouseleave', schedule);
+        carousel.addEventListener('focusin', stop);
+        carousel.addEventListener('focusout', schedule);
+        document.addEventListener('visibilitychange', schedule);
+        schedule();
+    });
+
     const input = document.getElementById('menu-search-input');
     const clear = document.getElementById('menu-search-clear');
     const status = document.getElementById('menu-search-status');
     const empty = document.getElementById('menu-no-results');
+    const form = document.getElementById('menu-search-form');
     const cards = [...document.querySelectorAll('.menu-catalog [data-menu-product]')];
     const sections = [...document.querySelectorAll('[data-menu-section]')];
 
     if (input) {
+        const normalizeSearch = (value) => value
+            .toLocaleLowerCase('es')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
         const filterMenu = () => {
-            const query = input.value.trim().toLocaleLowerCase('es');
+            const query = normalizeSearch(input.value.trim());
+            const terms = query.split(/\s+/).filter(Boolean);
             let visible = 0;
 
             cards.forEach((card) => {
-                const matches = !query || card.dataset.search.includes(query);
+                const searchableText = normalizeSearch(card.dataset.search || '');
+                const matches = terms.length === 0 || terms.every((term) => searchableText.includes(term));
                 card.hidden = !matches;
                 if (matches) visible += 1;
             });
@@ -27,6 +94,12 @@
         };
 
         input.addEventListener('input', filterMenu);
+        form?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            filterMenu();
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            document.getElementById('catalog-title')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        });
         clear.addEventListener('click', () => {
             input.value = '';
             filterMenu();
@@ -36,10 +109,12 @@
 
     if ('IntersectionObserver' in window) {
         const links = [...document.querySelectorAll('[data-category-link]')];
+        const allLink = document.querySelector('[data-category-all]');
         const observer = new IntersectionObserver((entries) => {
             const current = entries.find((entry) => entry.isIntersecting);
             if (!current) return;
             links.forEach((link) => link.classList.toggle('is-active', link.dataset.categoryLink === current.target.id));
+            allLink?.classList.remove('is-active');
         }, { rootMargin: '-35% 0px -55% 0px', threshold: 0 });
 
         sections.forEach((section) => observer.observe(section));

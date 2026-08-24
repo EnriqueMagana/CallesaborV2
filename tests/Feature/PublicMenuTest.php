@@ -6,6 +6,7 @@ use App\Models\Addon;
 use App\Models\AddonGroup;
 use App\Models\BusinessSetting;
 use App\Models\Category;
+use App\Models\DigitalMenuSetting;
 use App\Models\Ingredient;
 use App\Models\Product;
 use Carbon\Carbon;
@@ -25,6 +26,11 @@ class PublicMenuTest extends TestCase
             'banner_path' => 'business/banner-menu.webp',
             'primary_color' => '#166534',
             'instagram_url' => 'https://instagram.com/cocinaverde',
+            'featured_product_ids' => [],
+        ]);
+        DigitalMenuSetting::current()->update([
+            'primary_color' => '#166534',
+            'banner_paths' => [['path' => 'business/banner-menu.webp', 'alt' => 'Banner de Cocina Verde']],
             'featured_product_ids' => [],
         ]);
 
@@ -55,6 +61,10 @@ class PublicMenuTest extends TestCase
         $this->get(route('public.menu'))
             ->assertOk()
             ->assertSee('Cocina Verde')
+            ->assertSee('id="menu-search-form"', false)
+            ->assertSee('Buscar platillo o ingrediente')
+            ->assertSee('data-category-all', false)
+            ->assertSee('product-card__action', false)
             ->assertSee('menu-cover__topbar', false)
             ->assertSee('menu-identity', false)
             ->assertSee('menu-footer__brand', false)
@@ -68,12 +78,93 @@ class PublicMenuTest extends TestCase
             ->assertDontSee('Hacer pedido');
     }
 
+    public function test_long_descriptions_are_clamped_in_cards_and_remain_complete_in_the_detail(): void
+    {
+        $description = 'Una descripción deliberadamente extensa con ingredientes, preparación artesanal, recomendaciones de servicio y notas de sabor que deben conservarse completas para el detalle del producto.';
+
+        Product::create([
+            'name' => 'Especialidad con descripción extensa',
+            'description' => $description,
+            'price' => 120,
+            'is_active' => true,
+        ]);
+
+        $this->get(route('public.menu'))
+            ->assertOk()
+            ->assertSee($description)
+            ->assertSee('data-product-detail=', false);
+
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+
+        $this->assertIsString($css);
+        $this->assertStringContainsString('.product-card p{margin-top:7px;-webkit-line-clamp:2}', $css);
+        $this->assertStringContainsString('@media(max-width:390px)', $css);
+    }
+
+    public function test_menu_uses_a_responsive_card_grid_without_compressing_the_mobile_intro(): void
+    {
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+
+        $this->assertIsString($css);
+        $this->assertStringContainsString(
+            '.product-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}',
+            $css
+        );
+        $this->assertStringContainsString('@media(max-width:1199px)', $css);
+        $this->assertStringContainsString(
+            '.product-grid{grid-template-columns:repeat(4,minmax(0,1fr))}',
+            $css
+        );
+        $this->assertStringContainsString(
+            '.product-grid{grid-template-columns:repeat(3,minmax(0,1fr))}',
+            $css
+        );
+        $this->assertStringContainsString(
+            '.product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}',
+            $css
+        );
+        $this->assertStringContainsString('.menu-search__status{grid-column:1}', $css);
+        $this->assertStringContainsString('.menu-discovery .menu-search__clear{grid-column:3}', $css);
+        $this->assertStringContainsString(
+            '.menu-discovery .menu-search__submit{width:48px;height:48px;grid-column:4;justify-self:end;margin-right:2px',
+            $css
+        );
+        $this->assertStringContainsString(
+            '.product-card:not(.product-card--featured){height:100%;display:flex;flex-direction:column}',
+            $css
+        );
+        $this->assertStringContainsString(
+            '.product-card:not(.product-card--featured) .product-card__content{min-height:166px}',
+            $css
+        );
+    }
+
+    public function test_every_static_public_menu_icon_exists_in_boxicons(): void
+    {
+        $boxicons = file_get_contents(public_path('assets/vendor/fonts/boxicons.css'));
+        $views = [
+            resource_path('views/public-menu/index.blade.php'),
+            resource_path('views/components/public-menu/product-card.blade.php'),
+            resource_path('views/components/public-menu/brand-header.blade.php'),
+        ];
+        $icons = [];
+
+        foreach ($views as $view) {
+            preg_match_all('/\bbx-[a-z0-9-]+\b/', file_get_contents($view), $matches);
+            $icons = array_merge($icons, $matches[0]);
+        }
+
+        foreach (array_unique($icons) as $icon) {
+            $this->assertStringContainsString(".{$icon}:before", $boxicons, "El icono {$icon} no existe en Boxicons.");
+        }
+    }
+
     public function test_featured_products_follow_the_order_configured_in_the_panel(): void
     {
         $first = Product::create(['name' => 'Primero', 'price' => 20, 'is_active' => true]);
         $second = Product::create(['name' => 'Segundo', 'price' => 30, 'is_active' => true]);
 
-        BusinessSetting::current()->update([
+        DigitalMenuSetting::current()->update([
             'featured_product_ids' => [$second->id, $first->id],
         ]);
 
@@ -145,15 +236,23 @@ class PublicMenuTest extends TestCase
                 ['path' => 'business/gallery/missing.jpg', 'caption' => 'No debe aparecer'],
             ],
         ]);
+        DigitalMenuSetting::current()->update([
+            'banner_paths' => [['path' => 'business/banner.jpg', 'alt' => 'Banner principal']],
+            'gallery_paths' => [
+                ['path' => 'business/gallery/local.jpg', 'caption' => 'Terraza principal'],
+                ['path' => 'business/gallery/missing.jpg', 'caption' => 'No debe aparecer'],
+            ],
+        ]);
 
-        $this->get('/')
+        $homeResponse = $this->get('/')
             ->assertOk()
             ->assertSee('Reservar una mesa')
             ->assertSee(route('public.menu'), false)
             ->assertSee(route('public.hours'), false)
             ->assertSee(route('public.gallery'), false)
-            ->assertSee(route('public.contact'), false)
-            ->assertSee('1 fotografía');
+            ->assertSee(route('public.contact'), false);
+
+        $this->assertMatchesRegularExpression('/Ver\s+1\s+fotografía/u', $homeResponse->getContent());
 
         $this->get(route('public.hours'))
             ->assertOk()

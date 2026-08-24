@@ -83,7 +83,7 @@
                             <div class="mo-orden-addons">
                                 @foreach($item->ingredients as $ing)
                                     <span class="mo-addon-chip mo-addon-chip--ing">
-                                        <i class="bx bx-leaf"></i>
+                                        <i class="bx bx-list-ul"></i>
                                         {{ $ing->ingredient_name }}
                                         @if($ing->quantity > 1)×{{ $ing->quantity }}@endif
                                         @if($ing->extra_price > 0)

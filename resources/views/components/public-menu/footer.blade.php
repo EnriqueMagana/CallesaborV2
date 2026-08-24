@@ -1,4 +1,4 @@
-@props(['business'])
+@props(['business', 'menuSettings' => null])
 
 <footer class="menu-footer menu-footer--restaurant" id="pie-de-pagina">
     <div class="menu-container menu-footer__top">
@@ -25,7 +25,9 @@
             <ul>
                 <li><a href="{{ route('public.home') }}"><i class="bx bx-chevron-right" aria-hidden="true"></i>Inicio</a></li>
                 <li><a href="{{ route('public.menu') }}"><i class="bx bx-chevron-right" aria-hidden="true"></i>Nuestro menú</a></li>
-                <li><a href="{{ route('public.gallery') }}"><i class="bx bx-chevron-right" aria-hidden="true"></i>Galería</a></li>
+                @if(! $menuSettings || $menuSettings->show_gallery)
+                    <li><a href="{{ route('public.gallery') }}"><i class="bx bx-chevron-right" aria-hidden="true"></i>Galería</a></li>
+                @endif
                 <li><a href="{{ route('public.contact') }}"><i class="bx bx-chevron-right" aria-hidden="true"></i>Contáctanos</a></li>
                 @if($business->whatsapp)
                     <li><a href="https://wa.me/{{ preg_replace('/\D/', '', $business->whatsapp) }}" target="_blank" rel="noopener noreferrer"><i class="bx bxl-whatsapp" aria-hidden="true"></i>Escríbenos por WhatsApp</a></li>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="{{ $business->primary_color ?? '#15803d' }}">
+    <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
     <meta name="description" content="Consulta el menú, horarios y datos de {{ $business->business_name }}.">
     <title>Menú | {{ $business->business_name }}</title>
     <link rel="icon" href="{{ $business->logo_path ? Storage::url($business->logo_path) : asset('assets/img/favicon/favicon.ico') }}">
@@ -13,10 +13,11 @@
     <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
 </head>
-<body style="--menu-primary: {{ $business->primary_color ?? '#15803d' }}">
+<body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header
         :business="$business"
+        :menu-settings="$menuSettings"
         :opening-status="$openingStatus"
         action-label="Volver al inicio"
         :action-href="route('public.home')"
@@ -25,38 +26,61 @@
 
     <main>
         <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
-            <div class="menu-container">
-                <div class="menu-search">
-                    <label for="menu-search-input"><i class="bx bx-search" aria-hidden="true"></i><span class="sr-only">Buscar en el menú</span></label>
-                    <input id="menu-search-input" type="search" placeholder="Buscar platillo o ingrediente…" autocomplete="off">
-                    <button type="button" id="menu-search-clear" aria-label="Limpiar búsqueda" hidden><i class="bx bx-x" aria-hidden="true"></i></button>
+            <div class="menu-container menu-discovery__intro">
+                <div class="menu-discovery__heading">
+                    <span class="menu-kicker">Menú del restaurante</span>
+                    <h1>¿Qué se te antoja hoy?</h1>
+                    <p>Explora {{ $totalProducts }} {{ $totalProducts === 1 ? 'platillo' : 'platillos' }} de {{ $business->business_name }}.</p>
                 </div>
+                <form class="menu-search" role="search" id="menu-search-form">
+                    <label for="menu-search-input"><span class="sr-only">Buscar platillos en el menú</span></label>
+                    <i class="bx bx-search menu-search__icon" aria-hidden="true"></i>
+                    <input id="menu-search-input" type="search" placeholder="Buscar platillo o ingrediente" autocomplete="off" enterkeyhint="search">
+                    <button class="menu-search__clear" type="button" id="menu-search-clear" aria-label="Limpiar búsqueda" hidden><i class="bx bx-x" aria-hidden="true"></i></button>
+                    <button class="menu-search__submit" type="submit" aria-label="Buscar en el menú"><i class="bx bx-search" aria-hidden="true"></i></button>
+                </form>
                 <p class="menu-search__status" id="menu-search-status" aria-live="polite"></p>
             </div>
 
-            <nav class="category-nav" aria-label="Categorías del menú">
+            @if ($menuSettings->show_categories)
+            <nav class="category-nav category-nav--{{ $menuSettings->category_style }}" aria-label="Categorías del menú">
                 <div class="menu-container category-nav__scroll">
+                    <a href="#catalog-title" class="category-nav__item is-active" data-category-all>
+                        <span class="category-nav__icon"><i class="bx bx-grid-alt" aria-hidden="true"></i></span>
+                        <span><strong>Todo</strong><small>{{ $totalProducts }} opciones</small></span>
+                    </a>
                     @foreach($categories as $category)
-                        <a href="#category-{{ $category->id }}" data-category-link="category-{{ $category->id }}">
-                            <i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i>
-                            {{ $category->name }}
+                        @php($categoryImage = $category->products->first(fn ($product) => filled($product->image))?->image)
+                        <a href="#category-{{ $category->id }}" class="category-nav__item" data-category-link="category-{{ $category->id }}">
+                            <span class="category-nav__icon" style="--category-color: {{ $category->color ?: $menuSettings->primary_color }}">
+                                @if($menuSettings->category_style === 'circles' && $categoryImage)
+                                    <img src="{{ Storage::url($categoryImage) }}" alt="" width="72" height="72" loading="lazy">
+                                @else
+                                    <i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i>
+                                @endif
+                            </span>
+                            <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }} {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
                         </a>
                     @endforeach
                     @if($uncategorized->isNotEmpty())
-                        <a href="#category-other" data-category-link="category-other"><i class="bx bx-dish" aria-hidden="true"></i>Otros</a>
+                        <a href="#category-other" class="category-nav__item" data-category-link="category-other">
+                            <span class="category-nav__icon"><i class="bx bx-dish" aria-hidden="true"></i></span>
+                            <span><strong>Otros</strong><small>{{ $uncategorized->count() }} opciones</small></span>
+                        </a>
                     @endif
                 </div>
             </nav>
+            @endif
 
             @if($featured->isNotEmpty())
                 <section class="featured-menu menu-container" aria-labelledby="featured-title">
                     <div class="section-heading">
                         <div><span class="menu-kicker">Recomendados</span><h2 id="featured-title">Favoritos de la casa</h2></div>
-                        <p>Una selección especial para descubrir nuestros sabores.</p>
+                        <p>Desliza para descubrir una selección especial del restaurante.</p>
                     </div>
                     <div class="featured-menu__rail" role="list">
                         @foreach($featured as $product)
-                            <x-public-menu.product-card :product="$product" featured role="listitem" />
+                            <x-public-menu.product-card :product="$product" featured :rank="$loop->iteration" role="listitem" />
                         @endforeach
                     </div>
                 </section>
@@ -64,14 +88,14 @@
 
             <div class="menu-catalog menu-container">
                 <div class="section-heading section-heading--catalog">
-                    <div><span class="menu-kicker">Todo el sabor</span><h2 id="catalog-title">Nuestro menú</h2></div>
-                    <p>Precios e ingredientes disponibles para consultar antes de tu visita.</p>
+                    <div><span class="menu-kicker">Carta completa</span><h2 id="catalog-title">Explora por categoría</h2></div>
+                    <p>Selecciona cualquier platillo para consultar su descripción completa, ingredientes y complementos.</p>
                 </div>
 
                 @forelse($categories as $category)
                     <section class="menu-category" id="category-{{ $category->id }}" data-menu-section>
                         <header class="menu-category__header">
-                            <span class="menu-category__icon" style="--category-color: {{ $category->color ?: $business->primary_color }}"><i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i></span>
+                            <span class="menu-category__icon" style="--category-color: {{ $category->color ?: $menuSettings->primary_color }}"><i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i></span>
                             <div>
                                 <h2>{{ $category->name }}</h2>
                                 @if($category->description)<p>{{ $category->description }}</p>@endif
@@ -134,6 +158,7 @@
                         <span><small>Antes de visitarnos</small><strong>Horarios</strong><span>{{ $openingStatus['label'] }} · {{ $openingStatus['detail'] }}</span></span>
                         <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
                     </a>
+                    @if($menuSettings->show_gallery)
                     <a href="{{ route('public.gallery') }}" class="menu-info-card menu-info-card--gallery">
                         @if($galleryImages->isNotEmpty())
                             <img src="{{ Storage::url($galleryImages->first()['path']) }}" alt="" width="520" height="320" loading="lazy">
@@ -143,6 +168,7 @@
                         <span><small>Nuestros espacios</small><strong>Galería</strong><span>{{ $galleryImages->count() ? $galleryImages->count().' '.($galleryImages->count() === 1 ? 'fotografía' : 'fotografías') : 'Próximamente' }}</span></span>
                         <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
                     </a>
+                    @endif
                     <a href="{{ route('public.contact') }}" class="menu-info-card menu-info-card--contact">
                         <span class="menu-info-card__icon"><i class="bx bx-message-rounded-dots" aria-hidden="true"></i></span>
                         <span><small>Canales oficiales</small><strong>Contacto y redes</strong><span>{{ $business->phone ?: 'Conoce cómo encontrarnos' }}</span></span>
@@ -153,7 +179,7 @@
         </section>
     </main>
 
-    <x-public-menu.footer :business="$business" />
+    <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
 
     <dialog class="product-modal" id="product-detail-modal" aria-labelledby="product-modal-title">
         <div class="product-modal__shell">
@@ -161,7 +187,7 @@
             <div class="product-modal__layout">
                 <div class="product-modal__media">
                     <img src="" alt="" width="720" height="640" data-modal-image>
-                    <span class="product-modal__placeholder" data-modal-placeholder aria-hidden="true"><i class="bx bx-bowl-rice"></i></span>
+                    <span class="product-modal__placeholder" data-modal-placeholder aria-hidden="true"><i class="bx bx-dish"></i></span>
                     <span class="product-modal__category" data-modal-category></span>
                 </div>
                 <div class="product-modal__content">
@@ -173,7 +199,7 @@
                     </div>
                     <div class="product-modal__limits" data-modal-limits></div>
                     <section class="product-modal__section" data-modal-ingredients-section hidden>
-                        <div><i class="bx bx-leaf" aria-hidden="true"></i><span><h3>Ingredientes disponibles</h3><p data-modal-ingredients-help></p></span></div>
+                        <div><i class="bx bx-list-ul" aria-hidden="true"></i><span><h3>Ingredientes disponibles</h3><p data-modal-ingredients-help></p></span></div>
                         <ul data-modal-ingredients></ul>
                     </section>
                     <div class="product-modal__groups" data-modal-groups></div>

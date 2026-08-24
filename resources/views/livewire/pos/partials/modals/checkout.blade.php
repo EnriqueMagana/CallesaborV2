@@ -118,13 +118,22 @@
                 @endif
 
                 @if ($orderType === 'delivery')
-                    <div class="co-grid full">
+                    <div class="co-grid">
                         <div>
                             <label class="co-label"><i class="bx bx-map me-1"></i>Dirección <span
                                     class="req">*</span></label>
                             <input type="text" wire:model="customerAddress" class="co-input"
-                                placeholder="Calle, número, colonia">
+                                autocomplete="street-address" placeholder="Calle y número">
                             @error('customerAddress')
+                                <div data-ui="xui-1bwpvep">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="co-label"><i class="bx bx-map-pin me-1"></i>Colonia o zona <span
+                                    class="req">*</span></label>
+                            <input type="text" wire:model="customerNeighborhood" class="co-input"
+                                autocomplete="address-level3" maxlength="120" placeholder="Ej. Centro">
+                            @error('customerNeighborhood')
                                 <div data-ui="xui-1bwpvep">{{ $message }}</div>
                             @enderror
                         </div>

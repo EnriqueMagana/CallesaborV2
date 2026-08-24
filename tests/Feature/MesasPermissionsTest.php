@@ -194,6 +194,7 @@ class MesasPermissionsTest extends TestCase
         $this->assertSame('bloqueada', $mesa->fresh()->status);
 
         $mesa->update(['status' => 'ocupada']);
+        $this->openRegister($statusOperator);
         Livewire::actingAs($viewer)
             ->test(GestionMesas::class)
             ->call('closeMesa', $mesa->id)
@@ -247,6 +248,55 @@ class MesasPermissionsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_waiter_lands_on_their_assigned_tables(): void
+    {
+        $area = $this->area();
+        $waiter = $this->employee(['ver mesas']);
+        $waiter->assignRole('mesero');
+        $other = $this->employee(['ver mesas']);
+        $ownMesa = $this->mesa($area, status: 'ocupada');
+        $otherMesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($ownMesa, $waiter);
+        $this->assign($otherMesa, $other);
+
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->assertSet('tab', 'mis_mesas')
+            ->assertSee('wire:click="openDetail('.$ownMesa->id.')"', false)
+            ->assertDontSee('wire:click="openDetail('.$otherMesa->id.')"', false);
+    }
+
+    public function test_close_table_button_opens_a_choice_and_supports_full_or_split_checkout(): void
+    {
+        $area = $this->area();
+        $waiter = $this->employee(['ver mesas', 'cerrar mesas', 'dividir mesas']);
+        $waiter->assignRole('mesero');
+        $this->openRegister($waiter);
+
+        $fullMesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($fullMesa, $waiter);
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->call('openCloseMesa', $fullMesa->id)
+            ->assertSet('showCloseModal', true)
+            ->assertSee('Cuenta completa')
+            ->assertSee('Dividir cuenta')
+            ->call('confirmCloseMesa', 'full')
+            ->assertSet('showCloseModal', false);
+
+        $this->assertSame('en_cuenta', $fullMesa->fresh()->status);
+
+        $splitMesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($splitMesa, $waiter);
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->call('openCloseMesa', $splitMesa->id)
+            ->call('confirmCloseMesa', 'split')
+            ->assertRedirect(route('app.mesas.split', $splitMesa));
+
+        $this->assertSame('en_cuenta', $splitMesa->fresh()->status);
+    }
+
     public function test_table_order_accepts_more_than_two_different_products(): void
     {
         $area = $this->area();
@@ -254,7 +304,7 @@ class MesasPermissionsTest extends TestCase
         $mesa = $this->mesa($area, status: 'ocupada');
         $this->assign($mesa, $operator);
         $category = Category::create(['name' => 'Pruebas', 'is_active' => true]);
-        $products = collect(range(1, 4))->map(fn($number) => Product::create([
+        $products = collect(range(1, 4))->map(fn ($number) => Product::create([
             'category_id' => $category->id,
             'name' => "Producto {$number}",
             'price' => 20 + $number,
@@ -361,12 +411,12 @@ class MesasPermissionsTest extends TestCase
             'max_selections' => 3,
             'is_active' => true,
         ]);
-        $addons = collect(range(1, 3))->map(fn($number) => Addon::create([
+        $addons = collect(range(1, 3))->map(fn ($number) => Addon::create([
             'addon_group_id' => $group->id,
             'name' => "Complemento {$number}",
             'is_active' => true,
         ]));
-        $ingredients = collect(range(1, 3))->map(fn($number) => Ingredient::create([
+        $ingredients = collect(range(1, 3))->map(fn ($number) => Ingredient::create([
             'name' => "Ingrediente {$number}",
             'is_active' => true,
         ]));
@@ -459,16 +509,16 @@ class MesasPermissionsTest extends TestCase
 
         $queries = collect(DB::getQueryLog())
             ->pluck('query')
-            ->map(fn($query) => mb_strtolower($query));
+            ->map(fn ($query) => mb_strtolower($query));
 
         $this->assertLessThanOrEqual(
             2,
-            $queries->filter(fn($query) => str_contains($query, 'addon_groups'))->count(),
+            $queries->filter(fn ($query) => str_contains($query, 'addon_groups'))->count(),
             'El catálogo volvió a consultar los complementos por cada producto.',
         );
         $this->assertLessThanOrEqual(
             2,
-            $queries->filter(fn($query) => str_contains($query, 'product_ingredient'))->count(),
+            $queries->filter(fn ($query) => str_contains($query, 'product_ingredient'))->count(),
             'El catálogo volvió a consultar los ingredientes por cada producto.',
         );
     }
@@ -477,7 +527,7 @@ class MesasPermissionsTest extends TestCase
     {
         $area = $this->area();
         $divider = $this->employee(['ver mesas', 'dividir mesas']);
-        $mesa = $this->mesa($area, status: 'ocupada');
+        $mesa = $this->mesa($area, status: 'en_cuenta');
         $register = $this->openRegister($divider);
         $order = Order::create([
             'cash_register_id' => $register->id,

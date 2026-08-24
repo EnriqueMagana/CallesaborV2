@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BusinessSetting;
+use App\Models\DigitalMenuSetting;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -15,7 +16,10 @@ class PublicInfoController extends Controller
 
     public function gallery(): View
     {
-        return view('public-menu.gallery', $this->sharedData());
+        $data = $this->sharedData();
+        abort_unless($data['menuSettings']->show_gallery, 404);
+
+        return view('public-menu.gallery', $data);
     }
 
     public function contact(): View
@@ -26,11 +30,13 @@ class PublicInfoController extends Controller
     private function sharedData(): array
     {
         $business = BusinessSetting::current();
+        $menuSettings = DigitalMenuSetting::current();
 
         return [
             'business' => $business,
+            'menuSettings' => $menuSettings,
             'openingStatus' => $business->openingStatus(),
-            'galleryImages' => collect($business->galleryItems())
+            'galleryImages' => collect($menuSettings->show_gallery ? $menuSettings->galleryItems() : [])
                 ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
                 ->values(),
         ];

@@ -232,7 +232,7 @@
                         </div>
                         @if($r->occasion)
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bx bx-party text-muted"></i>
+                                <i class="bx bx-calendar-star text-muted"></i>
                                 <span>{{ $r->occasion }}</span>
                             </div>
                         @endif

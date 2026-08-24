@@ -317,6 +317,15 @@
                                     </div>
                                 @endif
 
+                                @if($firstMesa->status === 'ocupada' && $mesaUser?->can('cerrar mesas'))
+                                    <button type="button" class="btn-cerrar-mesa"
+                                            wire:click="openCloseMesa({{ $firstMesa->id }})"
+                                            wire:loading.attr="disabled" wire:target="openCloseMesa"
+                                            aria-label="Cerrar {{ $firstMesa->display_name }}">
+                                        <i class="bx bx-lock-alt"></i><span>Cerrar mesa</span>
+                                    </button>
+                                @endif
+
                                 <div class="mesa-card-actions" @click.outside="open = false">
                                     <button class="mesa-action-trigger" @click.stop="open = !open">
                                         <i class="bx bx-dots-vertical-rounded"></i>
@@ -332,8 +341,8 @@
                                             </button>
                                             @endcan
                                             @can('cerrar mesas')
-                                            <button type="button" wire:click="closeMesa({{ $firstMesa->id }})" wire:loading.attr="disabled" wire:target="closeMesa" @click="open=false" aria-label="Cerrar mesa y dividir la cuenta">
-                                                <i class="bx bx-split"></i> Cerrar y dividir cuenta
+                                            <button type="button" wire:click="openCloseMesa({{ $firstMesa->id }})" wire:loading.attr="disabled" wire:target="openCloseMesa" @click="open=false" aria-label="Cerrar mesa">
+                                                <i class="bx bx-lock-alt"></i> Cerrar mesa
                                             </button>
                                             @endcan
                                         @endif
@@ -349,7 +358,7 @@
                                             </button>
                                         @elseif($firstMesa->status === 'en_cuenta')
                                             <button wire:click="goToSplit({{ $firstMesa->id }})" @click="open=false">
-                                                <i class="bx bx-split"></i> Dividir cuenta
+                                                <i class="bx bx-git-branch"></i> Dividir cuenta
                                             </button>
                                         @endif
                                         @endcan
@@ -361,13 +370,13 @@
                                         @endif
                                         @endcan
                                         @can('liberar mesas')
-                                        @if($firstMesa->currentAssignment)
+                                        @if($firstMesa->currentAssignment && $groupMesas->flatMap->activeOrders->isEmpty() && ! $activeSplit)
                                             <button wire:click="openRelease({{ $firstMesa->id }})" @click="open=false" class="danger">
                                                 <i class="bx bx-user-minus"></i> Liberar
                                             </button>
                                         @endif
                                         @endcan
-                                        @if($canManageGroups)
+                                        @if($canManageGroups && $groupMesas->every(fn($member) => $member->status === 'disponible' && ! $member->currentAssignment && $member->activeOrders->isEmpty()))
                                             <div class="mesa-action-divider"></div>
                                             <button wire:click="openUngroup({{ $firstMesa->id }})" @click="open=false">
                                                 <i class="bx bx-unlink"></i> Desagrupar
@@ -459,6 +468,15 @@
                                     </div>
                                 @endif
 
+                                @if($mesa->status === 'ocupada' && $mesaUser?->can('cerrar mesas'))
+                                    <button type="button" class="btn-cerrar-mesa"
+                                            wire:click="openCloseMesa({{ $mesa->id }})"
+                                            wire:loading.attr="disabled" wire:target="openCloseMesa"
+                                            aria-label="Cerrar {{ $mesa->display_name }}">
+                                        <i class="bx bx-lock-alt"></i><span>Cerrar mesa</span>
+                                    </button>
+                                @endif
+
                                 <div class="mesa-card-actions" @click.outside="open = false">
                                     <button class="mesa-action-trigger" @click.stop="open = !open"
                                             aria-label="Acciones de mesa {{ $mesa->number }}">
@@ -475,8 +493,8 @@
                                             </button>
                                             @endcan
                                             @can('cerrar mesas')
-                                            <button type="button" wire:click="closeMesa({{ $mesa->id }})" wire:loading.attr="disabled" wire:target="closeMesa" @click="open=false" aria-label="Cerrar mesa y dividir la cuenta">
-                                                <i class="bx bx-split"></i> Cerrar y dividir cuenta
+                                            <button type="button" wire:click="openCloseMesa({{ $mesa->id }})" wire:loading.attr="disabled" wire:target="openCloseMesa" @click="open=false" aria-label="Cerrar mesa">
+                                                <i class="bx bx-lock-alt"></i> Cerrar mesa
                                             </button>
                                             @endcan
                                         @endif
@@ -492,7 +510,7 @@
                                             </button>
                                         @elseif($mesa->status === 'en_cuenta')
                                             <button wire:click="goToSplit({{ $mesa->id }})" @click="open=false">
-                                                <i class="bx bx-split"></i> Dividir cuenta
+                                                <i class="bx bx-git-branch"></i> Dividir cuenta
                                             </button>
                                         @endif
                                         @endcan
@@ -504,7 +522,7 @@
                                         @endif
                                         @endcan
                                         @can('liberar mesas')
-                                        @if($mesa->currentAssignment)
+                                        @if($mesa->currentAssignment && $mesa->activeOrders->isEmpty() && ! $activeSplit)
                                             <button wire:click="openRelease({{ $mesa->id }})" @click="open=false" class="danger">
                                                 <i class="bx bx-user-minus"></i> Liberar mesa
                                             </button>
@@ -512,7 +530,7 @@
                                         @endcan
                                         @if($canChangeMesaStatus || $canEditMesas || $canDeleteMesas)
                                             <div class="mesa-action-divider"></div>
-                                            @if($canChangeMesaStatus)
+                                            @if($canChangeMesaStatus && ! $mesa->currentAssignment && $mesa->activeOrders->isEmpty() && ! $activeSplit)
                                             @foreach(['disponible','ocupada','reservada','en_cuenta','bloqueada'] as $st)
                                                 @if($st !== $mesa->status)
                                                     <button wire:click="openStatusChange({{ $mesa->id }}, '{{ $st }}')" @click="open=false">
@@ -673,6 +691,54 @@
     </div>
     @endif
 
+    {{-- ── Close account choice modal ── --}}
+    @if($showCloseModal && $this->closingMesa)
+    <div class="mesas-modal-backdrop" wire:click.self="closeCloseModal"
+         x-data x-init="$nextTick(() => $refs.closeCancel.focus())"
+         @keydown.escape.window="$wire.closeCloseModal()">
+        <section class="mesas-modal mesas-modal--close-choice" role="dialog" aria-modal="true"
+                 aria-labelledby="close-mesa-title" aria-describedby="close-mesa-description">
+            <div class="mesas-modal-header">
+                <div>
+                    <span class="mesas-modal-eyebrow">Enviar cuenta a caja</span>
+                    <h5 id="close-mesa-title">Cerrar {{ $this->closingMesa->display_name }}</h5>
+                </div>
+                <button type="button" class="mesas-modal-close" wire:click="closeCloseModal" aria-label="Cancelar cierre de mesa">
+                    <i class="bx bx-x"></i>
+                </button>
+            </div>
+            <div class="mesas-modal-body">
+                <p id="close-mesa-description" class="text-muted mb-3">
+                    Elige cómo se cobrará esta cuenta. Después del cierre no se podrán agregar pedidos hasta reabrir la mesa.
+                </p>
+                <div class="mesas-close-options">
+                    <button type="button" class="mesas-close-option"
+                            wire:click="confirmCloseMesa('full')" wire:loading.attr="disabled" wire:target="confirmCloseMesa">
+                        <span class="mesas-close-option__icon" aria-hidden="true"><i class="bx bx-receipt"></i></span>
+                        <span><strong>Cuenta completa</strong><small>Cobrar todo junto en el POS.</small></span>
+                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                    </button>
+                    @can('dividir mesas')
+                    <button type="button" class="mesas-close-option mesas-close-option--split"
+                            wire:click="confirmCloseMesa('split')" wire:loading.attr="disabled" wire:target="confirmCloseMesa">
+                        <span class="mesas-close-option__icon" aria-hidden="true"><i class="bx bx-git-branch"></i></span>
+                        <span><strong>Dividir cuenta</strong><small>Asignar productos o partes a subcuentas.</small></span>
+                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                    </button>
+                    @endcan
+                </div>
+                <div class="mesas-close-warning" role="note">
+                    <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                    <span>Si una subcuenta ya fue pagada, la división quedará bloqueada y no podrá reabrirse.</span>
+                </div>
+            </div>
+            <div class="mesas-modal-actions">
+                <button type="button" class="btn btn-outline-secondary" wire:click="closeCloseModal" x-ref="closeCancel">Cancelar</button>
+            </div>
+        </section>
+    </div>
+    @endif
+
     {{-- ── Release modal ── --}}
     @if($showReleaseModal)
     <div class="mesas-modal-backdrop" wire:click.self="$set('showReleaseModal', false)">
@@ -821,7 +887,7 @@
                     <div class="col-6">
                         <label class="form-label fw-semibold">Ícono (Boxicon)</label>
                         <input type="text" class="form-control" wire:model="areaIcon" placeholder="bx-map-pin">
-                        <small class="text-muted">Ej: bx-map-pin, bx-home, bx-tree</small>
+                        <small class="text-muted">Ej: bx-map-pin, bx-home, bx-store</small>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -975,7 +1041,7 @@
                     </button>
                     @if($dm->splits->isNotEmpty())
                         <button class="mesas-inner-tab" :class="{ active: tab === 'split' }" @click="tab = 'split'" aria-label="Ver cuentas divididas">
-                            <i class="bx bx-split"></i> Cuenta dividida
+                            <i class="bx bx-git-branch"></i> Cuenta dividida
                         </button>
                     @endif
                 </div>
@@ -1116,7 +1182,7 @@
                         <div class="detail-orders-list" aria-label="Resumen de la cuenta dividida">
                             <div class="detail-order-row">
                                 <div class="detail-order-header">
-                                    <span class="fw-semibold"><i class="bx bx-split me-1"></i>Split enviado a caja</span>
+                                    <span class="fw-semibold"><i class="bx bx-git-branch me-1"></i>Split enviado a caja</span>
                                     <span class="badge bg-label-warning">{{ $detailSplit->status_label }}</span>
                                 </div>
                                 <p class="text-muted small mb-3">Caja cobrará cada subcuenta individualmente. La mesa se libera al pagar la última.</p>
@@ -1144,8 +1210,8 @@
                 <button class="btn btn-outline-secondary" wire:click="$set('showDetailModal', false)">Cerrar</button>
                 @if($dm->status === 'ocupada')
                     @can('cerrar mesas')
-                    <button type="button" class="btn btn-outline-warning" wire:click="closeMesa({{ $dm->id }})" wire:loading.attr="disabled" wire:target="closeMesa" aria-label="Cerrar mesa y dividir la cuenta">
-                        <i class="bx bx-split me-1"></i> Cerrar y dividir cuenta
+                    <button type="button" class="btn btn-outline-warning" wire:click="openCloseMesa({{ $dm->id }})" wire:loading.attr="disabled" wire:target="openCloseMesa" aria-label="Cerrar mesa">
+                        <i class="bx bx-lock-alt me-1"></i> Cerrar mesa
                     </button>
                     @endcan
                     @can('ordenar mesas')
@@ -1161,7 +1227,7 @@
                     </button>
                 @elseif($dm->status === 'en_cuenta')
                     <button class="btn btn-primary" wire:click="goToSplit({{ $dm->id }})">
-                        <i class="bx bx-split me-1"></i> Dividir cuenta
+                        <i class="bx bx-git-branch me-1"></i> Dividir cuenta
                     </button>
                 @endif
                 @endcan

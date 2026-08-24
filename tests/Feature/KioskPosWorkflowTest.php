@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Mesas\GestionMesas;
 use App\Livewire\Mesas\SplitCuenta;
 use App\Livewire\Pos\PointOfSale;
 use App\Models\Area;
@@ -17,8 +18,10 @@ use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\TicketTemplate;
 use App\Models\User;
+use App\Services\MesaServiceManager;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -44,7 +47,9 @@ class KioskPosWorkflowTest extends TestCase
 
         $component = Livewire::test(PointOfSale::class)
             ->assertSee('Cliente Pickup')
+            ->call('openDeliveryPanel')
             ->assertSee('Cliente Delivery')
+            ->call('openTablesBilling')
             ->assertSee('Cliente Mesa')
             ->assertSee('Mesa '.$mesa->number)
             ->call('openPickupPayModal', $pickup->id)
@@ -101,6 +106,7 @@ class KioskPosWorkflowTest extends TestCase
 
         $pos = Livewire::actingAs($user)
             ->test(PointOfSale::class)
+            ->call('openDeliveryPanel')
             ->assertSee('Delivery transferencia')
             ->assertSee('Imprimir cocina')
             ->call('markKitchenReady', $delivery->id)
@@ -109,6 +115,96 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'en_preparacion']);
 
         $pos->call('markKitchenReady', $delivery->id)->assertHasNoErrors();
+        $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'lista']);
+    }
+
+    public function test_pos_requires_and_prefills_the_customer_neighborhood(): void
+    {
+        [$user] = $this->posContext();
+
+        $component = Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openAddCustomerModal')
+            ->set('newCustomerName', 'Cliente Zona')
+            ->set('newCustomerPhone', '5511122233')
+            ->call('saveNewCustomer')
+            ->assertHasErrors('newCustomerNeighborhood')
+            ->set('newCustomerNeighborhood', 'Roma Norte')
+            ->call('saveNewCustomer')
+            ->assertHasNoErrors()
+            ->assertSet('customerNeighborhood', 'Roma Norte');
+
+        $this->assertDatabaseHas('customers', [
+            'name' => 'Cliente Zona',
+            'phone' => '5511122233',
+            'neighborhood' => 'Roma Norte',
+        ]);
+    }
+
+    public function test_table_billing_queries_are_deferred_until_the_panel_is_opened(): void
+    {
+        [$user, $register, , $mesa] = $this->posContext();
+        app(MesaServiceManager::class)
+            ->resolveOrCreate($mesa, $register, $user->id)
+            ->update(['status' => 'en_cuenta', 'in_account_at' => now()]);
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = strtolower($query->sql);
+        });
+
+        $pos = Livewire::actingAs($user)->test(PointOfSale::class)
+            ->assertSet('tablesBillingLoaded', false)
+            ->assertSee('Cobrar mesas');
+
+        $this->assertFalse(collect($queries)->contains(
+            fn (string $sql) => str_contains($sql, 'from "mesa_services"')
+                || str_contains($sql, 'from `mesa_services`')
+                || str_contains($sql, 'mesa_service_mesa')
+        ));
+
+        $queries = [];
+        $pos->call('openTablesBilling')
+            ->assertSet('tablesBillingLoaded', true)
+            ->assertSee('Mesa '.$mesa->number);
+
+        $this->assertTrue(collect($queries)->contains(
+            fn (string $sql) => str_contains($sql, 'mesa_services')
+        ));
+
+        $pos->call('closeTablesBilling')->assertSet('tablesBillingLoaded', false);
+        $queries = [];
+        $pos->set('productSearch', 'hamburguesa');
+
+        $this->assertFalse(collect($queries)->contains(
+            fn (string $sql) => str_contains($sql, 'mesa_services')
+                || str_contains($sql, 'mesa_service_mesa')
+        ));
+    }
+
+    public function test_kiosk_cash_on_delivery_is_visible_but_cannot_be_charged_early_in_pos(): void
+    {
+        [$user, $register, $terminal] = $this->posContext();
+        $delivery = $this->kioskOrder(
+            $register->id,
+            $user->id,
+            $terminal->id,
+            'Domicilio contra entrega',
+            'delivery',
+            status: 'lista',
+        );
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->assertSee('Delivery')
+            ->assertSee('Contra entrega')
+            ->call('openDeliveryPanel')
+            ->assertSet('deliveryPanelLoaded', true)
+            ->assertSee('Domicilio contra entrega')
+            ->assertSee('Gestionar reparto')
+            ->assertDontSee('Cobrar ahora');
+
+        $this->assertDatabaseMissing('order_payments', ['order_id' => $delivery->id]);
         $this->assertDatabaseHas('orders', ['id' => $delivery->id, 'status' => 'lista']);
     }
 
@@ -224,6 +320,7 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertDatabaseHas('mesa_splits', ['mesa_id' => $mesa->id, 'status' => 'pendiente']);
         $split = MesaSplit::where('mesa_id', $mesa->id)->latest('id')->firstOrFail();
         $pos = Livewire::test(PointOfSale::class)
+            ->call('openTablesBilling')
             ->assertSee('Cobrar cuenta dividida')
             ->assertSee('Cuenta 1')
             ->assertSee('Cuenta 2')
@@ -261,8 +358,110 @@ class KioskPosWorkflowTest extends TestCase
         // mesa que ya fue liberada y cuyas órdenes están pagadas.
         $split->update(['status' => 'pendiente']);
         Livewire::test(PointOfSale::class)
+            ->call('openTablesBilling')
             ->assertDontSee('Mesa '.$mesa->number)
-            ->assertSee('No hay mesas abiertas');
+            ->assertSee('No hay cuentas pendientes');
+    }
+
+    public function test_reopening_an_unpaid_split_keeps_orders_and_includes_new_items_on_the_next_split(): void
+    {
+        [$user, $register, $terminal, $mesa] = $this->posContext();
+        $order = $this->kioskOrder($register->id, $user->id, $terminal->id, 'Cuenta reabierta', 'dine_in', $mesa->id, 'lista');
+        $oldItem = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Pedido antes de reabrir',
+            'product_price' => 60,
+            'quantity' => 1,
+            'subtotal' => 60,
+        ]);
+
+        $this->actingAs($user);
+        Livewire::test(SplitCuenta::class, ['mesa' => $mesa])
+            ->call('assignItem', $oldItem->id, 0)
+            ->call('confirm');
+
+        $split = MesaSplit::where('mesa_id', $mesa->id)->latest('id')->firstOrFail();
+        $serviceId = $split->mesa_service_id;
+
+        Livewire::test(PointOfSale::class)
+            ->call('reopenMesa', $mesa->id)
+            ->assertDispatched('notify');
+
+        $this->assertSame('ocupada', $mesa->fresh()->status);
+        $this->assertDatabaseMissing('mesa_splits', ['id' => $split->id]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'lista', 'mesa_service_id' => $serviceId]);
+
+        $newOrder = Order::create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $mesa->id,
+            'mesa_service_id' => $serviceId,
+            'served_by' => $user->id,
+            'type' => 'mesa',
+            'status' => 'pendiente',
+            'subtotal' => 40,
+            'total' => 40,
+        ]);
+        OrderItem::create([
+            'order_id' => $newOrder->id,
+            'product_name' => 'Pedido después de reabrir',
+            'product_price' => 40,
+            'quantity' => 1,
+            'subtotal' => 40,
+        ]);
+
+        Livewire::test(GestionMesas::class)
+            ->call('closeMesa', $mesa->id, true)
+            ->assertRedirect(route('app.mesas.split', $mesa));
+
+        Livewire::test(SplitCuenta::class, ['mesa' => $mesa])
+            ->assertSee('Pedido antes de reabrir')
+            ->assertSee('Pedido después de reabrir');
+    }
+
+    public function test_partial_split_cannot_be_reopened_or_edited_after_a_payment(): void
+    {
+        [$user, $register, $terminal, $mesa] = $this->posContext();
+        $order = $this->kioskOrder($register->id, $user->id, $terminal->id, 'Cuenta parcial', 'dine_in', $mesa->id, 'lista');
+        $first = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Cuenta ya pagada',
+            'product_price' => 70,
+            'quantity' => 1,
+            'subtotal' => 70,
+        ]);
+        $second = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Cuenta pendiente',
+            'product_price' => 30,
+            'quantity' => 1,
+            'subtotal' => 30,
+        ]);
+
+        $this->actingAs($user);
+        Livewire::test(SplitCuenta::class, ['mesa' => $mesa])
+            ->call('assignItem', $first->id, 0)
+            ->call('assignItem', $second->id, 1)
+            ->call('confirm');
+        $split = MesaSplit::where('mesa_id', $mesa->id)->latest('id')->firstOrFail();
+
+        Livewire::test(PointOfSale::class)
+            ->call('openMesaSplitPayModal', $split->id, 0)
+            ->set('mesaPayAmount', '70')
+            ->set('mesaPayReceived', '70')
+            ->call('addMesaPayment')
+            ->call('confirmMesaPayment')
+            ->call('reopenMesa', $mesa->id)
+            ->assertDispatched('notify');
+
+        $this->assertSame('en_cuenta', $mesa->fresh()->status);
+        $this->assertDatabaseHas('mesa_splits', ['id' => $split->id, 'status' => 'parcial']);
+
+        Livewire::test(SplitCuenta::class, ['mesa' => $mesa])
+            ->call('requestCancelConfirm')
+            ->call('cancelConfirm')
+            ->assertHasErrors('split');
+
+        $this->assertDatabaseHas('mesa_splits', ['id' => $split->id, 'status' => 'parcial']);
     }
 
     public function test_zero_balance_split_does_not_repeat_the_original_order_total(): void
@@ -303,6 +502,7 @@ class KioskPosWorkflowTest extends TestCase
 
         $pos = Livewire::actingAs($user)
             ->test(PointOfSale::class)
+            ->call('openTablesBilling')
             ->assertSee('$0.00')
             ->assertSee('1 subcuenta pendiente')
             ->assertSee('Subcuenta restante sin consumo')
@@ -323,6 +523,49 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'pagada']);
         $this->assertSame(2, OrderPayment::where('order_id', $order->id)->count());
         $this->assertSame(375.0, (float) OrderPayment::where('order_id', $order->id)->sum('amount'));
+    }
+
+    public function test_empty_table_sent_to_checkout_is_visible_and_can_be_cancelled_without_a_sale(): void
+    {
+        [$user, $register, , $mesa] = $this->posContext();
+        $service = app(MesaServiceManager::class)->resolveOrCreate($mesa, $register, $user->id);
+        $service->update(['status' => 'en_cuenta', 'in_account_at' => now()]);
+
+        $pos = Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openTablesBilling')
+            ->assertSee('Mesa '.$mesa->number)
+            ->assertSee('Servicio sin consumo')
+            ->assertSee('Cancelar servicio');
+
+        $pos->call('discardEmptyMesaAccount', $mesa->id)
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseHas('mesa_services', [
+            'id' => $service->id,
+            'status' => 'liberada',
+            'total_snapshot' => 0,
+        ]);
+        $this->assertDatabaseHas('mesas', ['id' => $mesa->id, 'status' => 'disponible']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_payments', 0);
+    }
+
+    public function test_legacy_empty_table_without_a_service_can_be_recovered_from_checkout(): void
+    {
+        [$user, , , $mesa] = $this->posContext();
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openTablesBilling')
+            ->assertSee('Mesa '.$mesa->number)
+            ->assertSee('Servicio sin consumo')
+            ->call('discardEmptyMesaAccount', $mesa->id)
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseHas('mesas', ['id' => $mesa->id, 'status' => 'disponible']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_payments', 0);
     }
 
     public function test_saving_an_order_persists_it_and_clears_the_cart_and_session(): void
@@ -430,6 +673,7 @@ class KioskPosWorkflowTest extends TestCase
         $this->actingAs($user);
         Livewire::test(PointOfSale::class)
             ->assertSee('Pedido caja vigente')
+            ->call('openTablesBilling')
             ->assertDontSee('Pedido caja anterior')
             ->assertDontSee('Mesa de caja anterior')
             ->assertDontSee('Mesa 99');
@@ -555,6 +799,7 @@ class KioskPosWorkflowTest extends TestCase
             'served_by' => $userId,
             'type' => $mesaId ? 'mesa' : ($fulfillment === 'delivery' ? 'delivery' : 'ventanilla'),
             'mesa_id' => $mesaId,
+            'delivery_method' => $fulfillment === 'delivery' ? 'contra_entrega' : null,
             'source' => 'kiosk',
             'fulfillment' => $fulfillment,
             'status' => $status,

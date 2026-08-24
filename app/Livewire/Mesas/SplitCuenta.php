@@ -4,33 +4,51 @@ namespace App\Livewire\Mesas;
 
 use App\Models\CashRegister;
 use App\Models\Mesa;
-use App\Models\MesaAssignment;
-use App\Models\MesaGroup;
 use App\Models\MesaSplit;
 use App\Models\OrderItem;
 use App\Services\MesaServiceManager;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class SplitCuenta extends Component
 {
-    public int    $mesaId;
-    public string $mode       = 'manual'; // manual | igual
-    public int    $equalParts = 2;
-    public array  $accounts   = []; // [['label' => 'Cuenta 1', 'item_ids' => []]]
-    public ?int   $confirmed  = null; // split id after save
-    public bool   $showCancelConfirm = false;
+    public int $mesaId;
+
+    public ?int $mesaServiceId = null;
+
+    public string $mode = 'manual'; // manual | igual
+
+    public int $equalParts = 2;
+
+    public array $accounts = []; // [['label' => 'Cuenta 1', 'item_ids' => []]]
+
+    public ?int $confirmed = null; // split id after save
+
+    public bool $showCancelConfirm = false;
 
     public function mount(Mesa $mesa): void
     {
         $this->requirePermission('dividir mesas');
         $this->mesaId = $mesa->id;
 
+        if ($mesa->status !== 'en_cuenta') {
+            session()->flash('error', 'Primero cierra la mesa y elige dividir la cuenta.');
+            $this->redirect(route('app.mesas'));
+
+            return;
+        }
+
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->findActiveForMesa($mesa, $register->id)
+            : null;
+        $this->mesaServiceId = $service?->id;
+
         // Si la mesa ya tiene una división pendiente (por ejemplo, al volver
         // desde POS o tras recargar la pantalla), retomamos esa división en
         // lugar de crear subcuentas duplicadas.
-        $existing = MesaSplit::where('mesa_id', $mesa->id)
-            ->whereIn('status', ['pendiente', 'parcial'])
+        $existing = $this->activeSplitQuery()
             ->latest('id')
             ->first();
 
@@ -62,22 +80,29 @@ class SplitCuenta extends Component
     }
 
     #[Computed]
-    public function allItems(): \Illuminate\Support\Collection
+    public function allItems(): Collection
     {
         return OrderItem::whereHas('order', function ($q) {
-                $q->where('mesa_id', $this->mesaId)
-                  // Las órdenes del kiosko pueden llegar a split ya listas.
-                  // Solo excluimos las que ya fueron cobradas o canceladas.
-                  ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']);
-            })
+            $q->when(
+                $this->mesaServiceId,
+                fn ($orders) => $orders->where('mesa_service_id', $this->mesaServiceId),
+                fn ($orders) => $orders->where('mesa_id', $this->mesaId)
+                    ->where('cash_register_id', CashRegister::where('is_open', true)->latest('id')->value('id'))
+                    ->whereNull('mesa_service_id')
+            )
+                // Las órdenes del kiosko pueden llegar a split ya listas.
+                // Solo excluimos las que ya fueron cobradas o canceladas.
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']);
+        })
             ->with(['order', 'addons'])
             ->get();
     }
 
     #[Computed]
-    public function unassignedItems(): \Illuminate\Support\Collection
+    public function unassignedItems(): Collection
     {
-        $assigned = collect($this->accounts)->flatMap(fn($a) => $a['item_ids'])->toArray();
+        $assigned = collect($this->accounts)->flatMap(fn ($a) => $a['item_ids'])->toArray();
+
         return $this->allItems->whereNotIn('id', $assigned)->values();
     }
 
@@ -98,11 +123,14 @@ class SplitCuenta extends Component
             } else {
                 foreach ($account['item_ids'] as $itemId) {
                     $item = $this->allItems->firstWhere('id', $itemId);
-                    if ($item) $sum += (float) $item->subtotal;
+                    if ($item) {
+                        $sum += (float) $item->subtotal;
+                    }
                 }
             }
             $totals[$idx] = round($sum, 2);
         }
+
         return $totals;
     }
 
@@ -110,13 +138,17 @@ class SplitCuenta extends Component
 
     public function addAccount(): void
     {
+        $this->ensureEditable();
         $n = count($this->accounts) + 1;
         $this->accounts[] = ['label' => "Cuenta {$n}", 'item_ids' => [], 'paid' => false];
     }
 
     public function removeAccount(int $idx): void
     {
-        if (count($this->accounts) <= 2) return;
+        $this->ensureEditable();
+        if (count($this->accounts) <= 2) {
+            return;
+        }
 
         // Return items to unassigned
         unset($this->accounts[$idx]);
@@ -126,6 +158,7 @@ class SplitCuenta extends Component
 
     public function updateAccountLabel(int $idx, string $label): void
     {
+        $this->ensureEditable();
         if (isset($this->accounts[$idx])) {
             $this->accounts[$idx]['label'] = $label;
         }
@@ -135,10 +168,11 @@ class SplitCuenta extends Component
 
     public function assignItem(int $itemId, int $accountIdx): void
     {
+        $this->ensureEditable();
         // Remove from all accounts first
         foreach ($this->accounts as &$account) {
             $account['item_ids'] = array_values(
-                array_filter($account['item_ids'], fn($id) => $id !== $itemId)
+                array_filter($account['item_ids'], fn ($id) => $id !== $itemId)
             );
         }
         unset($account);
@@ -153,9 +187,10 @@ class SplitCuenta extends Component
 
     public function unassignItem(int $itemId): void
     {
+        $this->ensureEditable();
         foreach ($this->accounts as &$account) {
             $account['item_ids'] = array_values(
-                array_filter($account['item_ids'], fn($id) => $id !== $itemId)
+                array_filter($account['item_ids'], fn ($id) => $id !== $itemId)
             );
         }
         unset($account);
@@ -164,6 +199,7 @@ class SplitCuenta extends Component
 
     public function assignAll(int $accountIdx): void
     {
+        $this->ensureEditable();
         $unassigned = $this->unassignedItems->pluck('id')->toArray();
         foreach ($unassigned as $id) {
             $this->accounts[$accountIdx]['item_ids'][] = $id;
@@ -175,12 +211,15 @@ class SplitCuenta extends Component
 
     public function setMode(string $mode): void
     {
+        $this->ensureEditable();
+        abort_unless(in_array($mode, ['manual', 'igual'], true), 422);
         $this->mode = $mode;
         unset($this->accountTotals);
     }
 
     public function setEqualParts(int $parts): void
     {
+        $this->ensureEditable();
         $this->equalParts = max(2, $parts);
         // Sync accounts array to match parts
         while (count($this->accounts) < $this->equalParts) {
@@ -198,43 +237,6 @@ class SplitCuenta extends Component
     public function markPaid(int $idx): void
     {
         abort(403, 'El cobro de cuentas divididas se realiza únicamente desde el POS.');
-
-        if (isset($this->accounts[$idx])) {
-            $this->accounts[$idx]['paid'] = true;
-        }
-
-        // Check if all paid
-        $allPaid = collect($this->accounts)->every(fn($a) => $a['paid']);
-        if ($allPaid && $this->confirmed) {
-            MesaSplit::find($this->confirmed)?->update(['status' => 'completado']);
-
-            $mesa    = $this->mesa;
-            $groupId = $mesa->mesa_group_id;
-
-            // Release assignment
-            MesaAssignment::where('mesa_id', $this->mesaId)
-                ->whereNull('released_at')
-                ->update([
-                    'released_by'    => auth()->id(),
-                    'released_at'    => now(),
-                    'release_reason' => 'Split completado',
-                ]);
-
-            // Release mesa and ungroup
-            $mesa->update(['status' => 'disponible', 'mesa_group_id' => null]);
-            if ($groupId) {
-                $remaining = Mesa::where('mesa_group_id', $groupId)->count();
-                if ($remaining <= 1) {
-                    Mesa::where('mesa_group_id', $groupId)->update(['mesa_group_id' => null]);
-                    MesaGroup::destroy($groupId);
-                }
-            }
-
-            session()->flash('success', 'Todas las cuentas cobradas. Mesa liberada.');
-            $this->redirect(route('app.mesas'));
-        }
-
-        unset($this->mesa);
     }
 
     // ── Confirm split ──
@@ -242,26 +244,42 @@ class SplitCuenta extends Component
     public function confirm(): void
     {
         $this->requirePermission('dividir mesas');
+        $this->ensureEditable();
+
+        if ($this->mesa->status !== 'en_cuenta') {
+            $this->addError('split', 'La mesa debe estar cerrada antes de confirmar la división.');
+
+            return;
+        }
+
+        $existing = $this->activeSplitQuery()->latest('id')->first();
+        if ($existing) {
+            $this->confirmed = $existing->id;
+            $this->addError('split', 'La cuenta ya fue dividida. Reabre la mesa para crear una división nueva.');
+
+            return;
+        }
 
         // Validation: in manual mode, all items must be assigned
         if ($this->mode === 'manual') {
             $unassigned = $this->unassignedItems->count();
             if ($unassigned > 0) {
                 $this->addError('split', "Hay {$unassigned} producto(s) sin asignar a ninguna cuenta.");
+
                 return;
             }
         }
 
         $splitData = [];
-        $totals    = $this->accountTotals;
+        $totals = $this->accountTotals;
 
         foreach ($this->accounts as $idx => $account) {
             $items = [];
             if ($this->mode === 'igual') {
-                $items = $this->allItems->map(fn($i) => [
-                    'id'       => $i->id,
-                    'name'     => $i->product_name,
-                    'qty'      => $i->quantity,
+                $items = $this->allItems->map(fn ($i) => [
+                    'id' => $i->id,
+                    'name' => $i->product_name,
+                    'qty' => $i->quantity,
                     'subtotal' => round((float) $i->subtotal / $this->equalParts, 2),
                 ])->toArray();
             } else {
@@ -269,9 +287,9 @@ class SplitCuenta extends Component
                     $item = $this->allItems->firstWhere('id', $itemId);
                     if ($item) {
                         $items[] = [
-                            'id'       => $item->id,
-                            'name'     => $item->product_name,
-                            'qty'      => $item->quantity,
+                            'id' => $item->id,
+                            'name' => $item->product_name,
+                            'qty' => $item->quantity,
                             'subtotal' => (float) $item->subtotal,
                         ];
                     }
@@ -279,10 +297,10 @@ class SplitCuenta extends Component
             }
 
             $splitData[] = [
-                'label'   => $account['label'],
-                'items'   => $items,
-                'total'   => $totals[$idx],
-                'paid'    => false,
+                'label' => $account['label'],
+                'items' => $items,
+                'total' => $totals[$idx],
+                'paid' => false,
             ];
         }
 
@@ -292,12 +310,12 @@ class SplitCuenta extends Component
             : null;
 
         $split = MesaSplit::create([
-            'mesa_id'    => $this->mesaId,
+            'mesa_id' => $this->mesaId,
             'mesa_service_id' => $service?->id,
             'created_by' => auth()->id(),
             'split_data' => $splitData,
-            'status'     => 'pendiente',
-            'total'      => $this->grandTotal,
+            'status' => 'pendiente',
+            'total' => $this->grandTotal,
         ]);
 
         $this->confirmed = $split->id;
@@ -315,9 +333,29 @@ class SplitCuenta extends Component
     {
         $this->requirePermission('cancelar divisiones mesas', 'gestionar mesas');
 
-        if (!$this->confirmed) return;
-        // Delete the MesaSplit record and reset status back to ocupada
-        MesaSplit::destroy($this->confirmed);
+        if (! $this->confirmed) {
+            return;
+        }
+
+        $split = MesaSplit::whereKey($this->confirmed)
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->first();
+        if (! $split) {
+            $this->showCancelConfirm = false;
+
+            return;
+        }
+
+        if (collect($split->split_data ?? [])->contains(fn ($account) => (bool) ($account['paid'] ?? false))) {
+            $this->showCancelConfirm = false;
+            $this->addError('split', 'No puedes reabrir ni editar una división que ya tiene pagos. Cobra las subcuentas restantes.');
+
+            return;
+        }
+
+        // Reabrir invalida únicamente un split sin pagos; los splits parciales
+        // permanecen bloqueados para conservar el historial financiero.
+        $split->delete();
         $this->confirmed = null;
         $this->showCancelConfirm = false;
         $register = CashRegister::where('is_open', true)->latest('id')->first();
@@ -336,13 +374,32 @@ class SplitCuenta extends Component
     {
         $this->requirePermission('cancelar divisiones mesas', 'gestionar mesas');
 
-        if (! $this->confirmed) return;
+        if (! $this->confirmed) {
+            return;
+        }
         $this->showCancelConfirm = true;
     }
 
     public function closeCancelConfirm(): void
     {
         $this->showCancelConfirm = false;
+    }
+
+    private function ensureEditable(): void
+    {
+        abort_if($this->confirmed !== null, 409, 'La división ya fue confirmada. Reabre la mesa antes de modificarla.');
+    }
+
+    private function activeSplitQuery()
+    {
+        return MesaSplit::query()
+            ->where('mesa_id', $this->mesaId)
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->when(
+                $this->mesaServiceId,
+                fn ($query) => $query->where('mesa_service_id', $this->mesaServiceId),
+                fn ($query) => $query->whereNull('mesa_service_id')
+            );
     }
 
     private function requirePermission(string $permission, ?string $fallback = null): void

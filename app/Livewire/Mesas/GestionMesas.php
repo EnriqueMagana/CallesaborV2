@@ -7,6 +7,8 @@ use App\Models\CashRegister;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaGroup;
+use App\Models\MesaSplit;
+use App\Models\Order;
 use App\Models\User;
 use App\Services\MesaServiceManager;
 use Livewire\Attributes\Computed;
@@ -17,6 +19,11 @@ class GestionMesas extends Component
     public function mount(): void
     {
         $this->requirePermission('ver mesas');
+
+        $user = auth()->user();
+        if ($user?->hasRole('mesero') && ! $user->hasAnyRole(['cajero', 'gerente', 'admin', 'super-admin'])) {
+            $this->tab = 'mis_mesas';
+        }
     }
 
     // ── UI State ──
@@ -27,6 +34,11 @@ class GestionMesas extends Component
     public ?int $areaFilter = null;
 
     public string $statusFilter = '';
+
+    // ── Close account choice modal ──
+    public bool $showCloseModal = false;
+
+    public ?int $closeMesaId = null;
 
     public function applySearch(): void
     {
@@ -238,6 +250,12 @@ class GestionMesas extends Component
     }
 
     #[Computed]
+    public function closingMesa(): ?Mesa
+    {
+        return $this->closeMesaId ? Mesa::with('group')->find($this->closeMesaId) : null;
+    }
+
+    #[Computed]
     public function myActiveMesaCount(): int
     {
         return MesaAssignment::where('user_id', auth()->id())
@@ -433,6 +451,22 @@ class GestionMesas extends Component
             : null;
         $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
 
+        $hasActiveOrders = $service
+            ? $service->orders()->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])->exists()
+            : Order::whereIn('mesa_id', $memberIds)
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->exists();
+        $hasActiveSplit = $service
+            ? $service->splits()->whereIn('status', ['pendiente', 'parcial'])->exists()
+            : MesaSplit::whereIn('mesa_id', $memberIds)->whereIn('status', ['pendiente', 'parcial'])->exists();
+
+        if ($hasActiveOrders || $hasActiveSplit) {
+            $this->showReleaseModal = false;
+            $this->dispatch('notify', type: 'warning', message: 'No puedes liberar una mesa con pedidos o subcuentas pendientes. Cierra y cobra la cuenta primero.');
+
+            return;
+        }
+
         MesaAssignment::whereIn('mesa_id', $memberIds)
             ->whereNull('released_at')
             ->update([
@@ -460,26 +494,81 @@ class GestionMesas extends Component
 
     // ── Close mesa (waiter requests bill) ──
 
-    public function closeMesa(int $mesaId): void
+    public function openCloseMesa(int $mesaId): void
     {
         $this->requirePermission('cerrar mesas');
-        $mesa = Mesa::find($mesaId);
+        $mesa = Mesa::with('currentAssignment')->find($mesaId);
+        if (! $mesa || $mesa->status !== 'ocupada') {
+            $this->dispatch('notify', type: 'warning', message: 'La mesa ya no está disponible para cerrar.');
+
+            return;
+        }
+
+        $this->authorizeWaiterMesa($mesa);
+        $this->closeMesaId = $mesa->id;
+        $this->showCloseModal = true;
+        unset($this->closingMesa);
+    }
+
+    public function closeCloseModal(): void
+    {
+        $this->showCloseModal = false;
+        $this->closeMesaId = null;
+        unset($this->closingMesa);
+    }
+
+    public function confirmCloseMesa(string $mode): void
+    {
+        abort_unless(in_array($mode, ['full', 'split'], true), 422);
+        abort_unless($this->closeMesaId, 422);
+
+        if ($mode === 'split') {
+            $this->requirePermission('dividir mesas');
+        }
+
+        $mesaId = $this->closeMesaId;
+        $this->closeCloseModal();
+        $this->closeMesa($mesaId, $mode === 'split');
+    }
+
+    public function closeMesa(int $mesaId, bool $divide = false): void
+    {
+        $this->requirePermission('cerrar mesas');
+        $mesa = Mesa::with('currentAssignment')->find($mesaId);
         if (! $mesa || $mesa->status !== 'ocupada') {
             return;
         }
 
+        $this->authorizeWaiterMesa($mesa);
+
         $register = CashRegister::where('is_open', true)->latest('id')->first();
-        $service = $register
-            ? app(MesaServiceManager::class)->markInAccount($mesa, $register->id)
-            : null;
+        if (! $register) {
+            $this->dispatch('notify', type: 'warning', message: 'No hay una caja abierta para cerrar la mesa.');
+
+            return;
+        }
+
+        $manager = app(MesaServiceManager::class);
+        $service = $manager->resolveOrCreate($mesa, $register, auth()->id());
+        $activeSplit = $service->splits()->whereIn('status', ['pendiente', 'parcial'])->exists();
+        if ($activeSplit) {
+            $this->dispatch('notify', type: 'warning', message: 'Esta mesa ya tiene una cuenta dividida pendiente.');
+
+            return;
+        }
+
+        $service = $manager->markInAccount($mesa, $register->id);
         $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$mesa->id];
         Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
         unset($this->mesas);
 
-        session()->flash('success', "Mesa {$mesa->number} cerrada. Divide la cuenta antes de enviarla a caja.");
-        // Cerrar mesa no cobra ni libera: abre siempre el flujo de split para
-        // que cada producto quede asignado a una subcuenta antes del POS.
-        $this->redirect(route('app.mesas.split', $mesa->id));
+        session()->flash('success', $divide
+            ? "Mesa {$mesa->number} cerrada. Divide la cuenta y envíala a caja."
+            : "Mesa {$mesa->number} cerrada y enviada a caja para cobro conjunto.");
+
+        if ($divide) {
+            $this->redirect(route('app.mesas.split', $mesa->id));
+        }
     }
 
     // ── Shared: release + ungroup helper ──
@@ -524,6 +613,17 @@ class GestionMesas extends Component
         abort_unless(in_array($this->newStatus, ['disponible', 'ocupada', 'reservada', 'en_cuenta', 'bloqueada'], true), 422);
         $mesa = Mesa::find($this->statusMesaId);
         if (! $mesa) {
+            return;
+        }
+
+        $hasOperationalState = $mesa->currentAssignment()->exists()
+            || $mesa->activeOrders()->exists()
+            || $mesa->splits()->whereIn('status', ['pendiente', 'parcial'])->exists();
+        if ($hasOperationalState) {
+            $this->showStatusModal = false;
+            $this->statusMesaId = null;
+            $this->dispatch('notify', type: 'warning', message: 'No puedes cambiar manualmente el estado de una mesa con servicio activo. Usa cerrar, reabrir o cobrar.');
+
             return;
         }
 
@@ -614,6 +714,13 @@ class GestionMesas extends Component
     public function openUngroup(int $mesaId): void
     {
         $this->requirePermission('gestionar grupos');
+        $mesa = Mesa::find($mesaId);
+        if (! $mesa || ! $mesa->mesa_group_id || ! $this->groupCanBeModified($mesa->mesa_group_id)) {
+            $this->dispatch('notify', type: 'warning', message: 'No puedes desagrupar mesas mientras el grupo tenga un servicio activo.');
+
+            return;
+        }
+
         $this->ungroupMesaId = $mesaId;
         $this->showUngroupModal = true;
     }
@@ -627,6 +734,14 @@ class GestionMesas extends Component
         }
 
         $groupId = $mesa->mesa_group_id;
+        if (! $this->groupCanBeModified($groupId)) {
+            $this->showUngroupModal = false;
+            $this->ungroupMesaId = null;
+            $this->dispatch('notify', type: 'warning', message: 'No puedes desagrupar mesas mientras el grupo tenga un servicio activo.');
+
+            return;
+        }
+
         $groupMesas = Mesa::where('mesa_group_id', $groupId)->get();
 
         // If only 1 remaining after ungroup (meaning just this one), delete group
@@ -780,7 +895,34 @@ class GestionMesas extends Component
     public function goToSplit(int $mesaId): void
     {
         $this->requirePermission('dividir mesas');
+        $mesa = Mesa::find($mesaId);
+        if (! $mesa || $mesa->status !== 'en_cuenta') {
+            $this->dispatch('notify', type: 'warning', message: 'Primero cierra la mesa y elige dividir la cuenta.');
+
+            return;
+        }
+
         $this->redirect(route('app.mesas.split', $mesaId));
+    }
+
+    private function authorizeWaiterMesa(Mesa $mesa): void
+    {
+        $user = auth()->user();
+        if ($user?->hasRole('mesero') && ! $user->hasAnyRole(['cajero', 'gerente', 'admin', 'super-admin'])) {
+            abort_unless($mesa->currentAssignment?->user_id === $user->id, 403);
+        }
+    }
+
+    private function groupCanBeModified(int $groupId): bool
+    {
+        $memberIds = Mesa::where('mesa_group_id', $groupId)->pluck('id');
+
+        return ! Mesa::whereIn('id', $memberIds)->where('status', '!=', 'disponible')->exists()
+            && ! MesaAssignment::whereIn('mesa_id', $memberIds)->whereNull('released_at')->exists()
+            && ! Order::whereIn('mesa_id', $memberIds)
+                ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                ->exists()
+            && ! MesaSplit::whereIn('mesa_id', $memberIds)->whereIn('status', ['pendiente', 'parcial'])->exists();
     }
 
     private function requirePermission(string $permission, ?string $fallback = null): void

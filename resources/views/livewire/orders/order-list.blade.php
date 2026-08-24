@@ -26,7 +26,7 @@
     <section class="orders-stats" aria-label="Resumen del turno">
         @foreach([
             ['bx-time-five', 'Pendientes', $this->statusCounts['pending'], 'warning'],
-            ['bx-bowl-hot', 'En preparación', $this->statusCounts['preparing'], 'info'],
+            ['bx-restaurant', 'En preparación', $this->statusCounts['preparing'], 'info'],
             ['bx-check-circle', 'Listas', $this->statusCounts['ready'], 'success'],
             ['bx-check-double', 'Completadas', $this->statusCounts['completed'], 'primary'],
         ] as $stat)

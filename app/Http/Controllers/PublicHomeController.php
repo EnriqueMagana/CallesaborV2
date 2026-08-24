@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessSetting;
 use App\Models\Category;
+use App\Models\DigitalMenuSetting;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -12,6 +13,7 @@ class PublicHomeController extends Controller
     public function __invoke(): View
     {
         $business = BusinessSetting::current();
+        $menuSettings = DigitalMenuSetting::current();
         $categories = Category::query()
             ->where('is_active', true)
             ->whereHas('products', fn ($query) => $query->where('is_active', true))
@@ -21,12 +23,13 @@ class PublicHomeController extends Controller
             ->orderBy('name')
             ->get();
 
-        $galleryImages = collect($business->galleryItems())
+        $galleryImages = collect($menuSettings->show_gallery ? $menuSettings->galleryItems() : [])
             ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
             ->values();
 
         return view('public-home.index', [
             'business' => $business,
+            'menuSettings' => $menuSettings,
             'categories' => $categories,
             'galleryImages' => $galleryImages,
             'openingStatus' => $business->openingStatus(),

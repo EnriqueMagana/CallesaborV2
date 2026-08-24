@@ -9,6 +9,7 @@ use App\Models\AddonGroup;
 use App\Models\Area;
 use App\Models\CashRegister;
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\KioskProductPromotion;
 use App\Models\KioskTerminal;
 use App\Models\Mesa;
@@ -136,7 +137,14 @@ class KioskOrderTest extends TestCase
             ->set('deliveryReferences', 'Portón negro frente al parque')
             ->call('placeOrder')
             ->assertHasNoErrors()
-            ->assertSet('step', 6);
+            ->assertSet('step', 6)
+            ->assertSee('kiosk-success-shell', false)
+            ->assertSee('Seguimiento en vivo')
+            ->assertSee('Siguiente cliente')
+            ->call('startAgain')
+            ->assertSet('step', 1)
+            ->assertSet('selectedCustomerId', null)
+            ->assertSet('customerLookup', '');
 
         $this->assertDatabaseHas('orders', [
             'kiosk_terminal_id' => $terminal->id,
@@ -147,6 +155,12 @@ class KioskOrderTest extends TestCase
             'customer_phone' => '5512345678',
             'customer_address' => 'Av. Reforma 120, interior 3, Centro',
             'customer_references' => 'Portón negro frente al parque',
+        ]);
+        $this->assertDatabaseHas('customers', [
+            'name' => 'María',
+            'phone' => '5512345678',
+            'address' => 'Av. Reforma 120, interior 3',
+            'neighborhood' => 'Centro',
         ]);
     }
 
@@ -189,6 +203,89 @@ class KioskOrderTest extends TestCase
         ]);
     }
 
+    public function test_returning_customer_can_search_by_name_verify_phone_and_prefill_delivery_data(): void
+    {
+        [$token, $terminal, $user] = $this->terminal(['allow_delivery' => true]);
+        CashRegister::create([
+            'name' => 'Caja principal',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $product = Product::create(['name' => 'Pedido habitual', 'price' => 120, 'is_active' => true]);
+        $customer = Customer::create([
+            'name' => 'Ana Recurrente',
+            'phone' => '5512345678',
+            'address' => 'Calle Privada 918, interior 3, Centro',
+            'references' => 'Portón negro',
+        ]);
+
+        Livewire::test(OrderWizard::class, ['token' => $token])
+            ->call('chooseFulfillment', 'delivery')
+            ->call('openProduct', $product->id)
+            ->call('reviewOrder')
+            ->set('customerLookup', 'Ana Rec')
+            ->assertSee('Ana Recurrente')
+            ->assertSee('••••••5678')
+            ->assertDontSee('5512345678')
+            ->assertDontSee('Calle Privada 918')
+            ->call('chooseCustomerLookupResult', $customer->id)
+            ->assertSet('pendingCustomerId', $customer->id)
+            ->assertSee('Confirma que eres tú')
+            ->set('customerVerificationDigits', '0000')
+            ->call('confirmCustomerLookup')
+            ->assertHasErrors('customerVerificationDigits')
+            ->set('customerVerificationDigits', '5678')
+            ->call('confirmCustomerLookup')
+            ->assertHasNoErrors('customerVerificationDigits')
+            ->assertSet('selectedCustomerId', $customer->id)
+            ->assertSet('customerName', 'Ana Recurrente')
+            ->assertSet('customerPhone', '5512345678')
+            ->assertSet('deliveryStreet', 'Calle Privada 918, interior 3')
+            ->assertSet('deliveryNeighborhood', 'Centro')
+            ->assertSet('deliveryReferences', 'Portón negro')
+            ->call('placeOrder')
+            ->assertHasNoErrors()
+            ->assertSet('step', 6);
+
+        $this->assertDatabaseHas('orders', [
+            'kiosk_terminal_id' => $terminal->id,
+            'customer_id' => $customer->id,
+            'customer_name' => 'Ana Recurrente',
+            'customer_phone' => '5512345678',
+            'customer_address' => 'Calle Privada 918, interior 3, Centro',
+            'customer_references' => 'Portón negro',
+        ]);
+        $this->assertDatabaseHas('customers', [
+            'id' => $customer->id,
+            'neighborhood' => 'Centro',
+        ]);
+    }
+
+    public function test_exact_customer_phone_prefills_data_without_an_extra_verification_step(): void
+    {
+        [$token] = $this->terminal(['allow_delivery' => true]);
+        $customer = Customer::create([
+            'name' => 'Luis Frecuente',
+            'phone' => '5598765432',
+            'address' => 'Calle Uno 10, Roma',
+        ]);
+
+        Livewire::test(OrderWizard::class, ['token' => $token])
+            ->call('chooseFulfillment', 'delivery')
+            ->set('step', 5)
+            ->set('customerLookup', '5598765432')
+            ->assertSee('Luis Frecuente')
+            ->call('chooseCustomerLookupResult', $customer->id)
+            ->assertSet('selectedCustomerId', $customer->id)
+            ->assertSet('pendingCustomerId', null)
+            ->assertSet('customerName', 'Luis Frecuente')
+            ->assertSet('customerPhone', '5598765432')
+            ->assertSet('deliveryStreet', 'Calle Uno 10')
+            ->assertSet('deliveryNeighborhood', 'Roma');
+    }
+
     public function test_customer_can_create_a_server_priced_kiosk_order(): void
     {
         [$token, $terminal, $user] = $this->terminal();
@@ -216,7 +313,7 @@ class KioskOrderTest extends TestCase
             ->call('placeOrder')
             ->assertSet('step', 6)
             ->assertSet('completedOrderId', 1)
-            ->assertSee('Preparar para el siguiente cliente')
+            ->assertSee('Siguiente cliente')
             ->assertDontSee('Ver seguimiento');
 
         $order = Order::with('items')->firstOrFail();

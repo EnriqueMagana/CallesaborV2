@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessSetting;
 use App\Models\Category;
+use App\Models\DigitalMenuSetting;
 use App\Models\Product;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,7 @@ class PublicMenuController extends Controller
     public function __invoke(): View
     {
         $business = BusinessSetting::current();
+        $menuSettings = DigitalMenuSetting::current();
         $categories = Category::query()
             ->where('is_active', true)
             ->whereHas('products', fn ($query) => $query->where('is_active', true))
@@ -34,41 +36,39 @@ class PublicMenuController extends Controller
             ->orderBy('name')
             ->get();
 
-        $featured = $this->featuredProducts($business);
-        $galleryImages = collect($business->galleryItems())
+        $catalogProducts = $categories
+            ->flatMap(fn (Category $category) => $category->products)
+            ->concat($uncategorized)
+            ->unique('id')
+            ->values();
+        $featured = $menuSettings->show_featured
+            ? $this->featuredProducts($menuSettings, $catalogProducts)
+            : collect();
+        $galleryImages = collect($menuSettings->show_gallery ? $menuSettings->galleryItems() : [])
             ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
             ->values();
 
         return view('public-menu.index', [
             'business' => $business,
+            'menuSettings' => $menuSettings,
             'categories' => $categories,
             'uncategorized' => $uncategorized,
             'featured' => $featured,
             'galleryImages' => $galleryImages,
             'openingStatus' => $business->openingStatus(),
+            'totalProducts' => $catalogProducts->count(),
         ]);
     }
 
-    private function featuredProducts(BusinessSetting $business): Collection
+    private function featuredProducts(DigitalMenuSetting $menuSettings, Collection $catalogProducts): Collection
     {
-        $ids = collect($business->featured_product_ids)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $ids = collect($menuSettings->featured_product_ids)->filter()->map(fn ($id) => (int) $id)->unique()->values();
 
-        if ($ids->isEmpty()) {
-            return Product::query()
-                ->where('is_active', true)
-                ->whereNotNull('image')
-                ->with($this->productDetails())
-                ->orderBy('sort_order')
-                ->limit(6)
-                ->get();
-        }
+        $productsById = $catalogProducts->keyBy('id');
 
-        return Product::query()
-            ->where('is_active', true)
-            ->whereIn('id', $ids)
-            ->with($this->productDetails())
-            ->get()
-            ->sortBy(fn (Product $product) => $ids->search($product->id))
+        return $ids
+            ->map(fn (int $id) => $productsById->get($id))
+            ->filter()
             ->values();
     }
 

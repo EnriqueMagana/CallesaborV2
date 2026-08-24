@@ -278,7 +278,7 @@
                                                      alt="Imagen de {{ $ingredient->name }}" width="64" height="64"
                                                      loading="lazy" decoding="async">
                                             @else
-                                                <i class="bx bx-leaf" aria-hidden="true"></i>
+                                                <i class="bx bx-list-ul" aria-hidden="true"></i>
                                             @endif
                                         </span>
                                         <span class="pos-ingredient-card__details">
@@ -352,7 +352,7 @@
                     <button type="button" @click="submit($wire)" :disabled="!isValid() || submitting"
                             class="pos-btn pos-btn-primary pos-btn-lg">
                         <span class="pos-btn-spinner" x-show="submitting" x-cloak></span>
-                        <i class="bx bx-cart-add" x-show="!submitting"></i>
+                        <i class="bx bx-cart" x-show="!submitting"></i>
                         <span x-text="submitting ? 'Guardando...' : @js($editingCartId ? 'Actualizar producto' : 'Agregar al carrito')"></span>
                     </button>
                 </div>

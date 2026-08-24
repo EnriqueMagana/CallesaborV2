@@ -41,7 +41,7 @@ class OrderPayment extends Model
             'tarjeta'        => 'bx-credit-card',
             'transferencia'  => 'bx-transfer',
             'contra_entrega' => 'bx-cycling',
-            default          => 'bx-payment',
+            default          => 'bx-credit-card',
         };
     }
 }

@@ -11,6 +11,7 @@ class CashRegisterModuleAccess
         'app.caja',
         'app.configuracion-negocio',
         'app.configuracion-negocio.menu',
+        'app.menu-digital',
         'profile',
     ];
 

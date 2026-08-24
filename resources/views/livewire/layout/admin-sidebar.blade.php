@@ -5,7 +5,7 @@
                 @if($businessSettings?->logo_path)
                     <img src="{{ Storage::url($businessSettings->logo_path) }}" alt="Logo de {{ $businessSettings->business_name }}" class="biz-sidebar-logo">
                 @else
-                    <span class="biz-sidebar-logo-fallback"><i class="bx bx-bowl-hot"></i></span>
+                    <span class="biz-sidebar-logo-fallback"><i class="bx bx-restaurant"></i></span>
                 @endif
             </span>
             <span class="app-brand-text demo menu-text fw-bolder ms-2">{{ $businessSettings?->platform_name ?? config('app.name') }}</span>

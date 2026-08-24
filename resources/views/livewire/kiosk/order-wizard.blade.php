@@ -592,7 +592,7 @@
                                                 @if ($ingredient->image)
                                                     <img x-ref="image" src="{{ route('kiosk.media', ['path' => $ingredient->image]) }}"
                                                         alt="Imagen de {{ $ingredient->name }}" width="56"
-                                                    height="56" loading="lazy">@else<i class="bx bx-leaf"></i>
+                                                    height="56" loading="lazy">@else<i class="bx bx-list-ul"></i>
                                                 @endif
                                             </span>
                                             <span>
@@ -668,6 +668,86 @@
                             <p>Solo pedimos lo necesario para entregar tu orden.</p>
                         </div>
                     </div>
+                    <section class="kiosk-customer-lookup" aria-labelledby="kiosk-customer-lookup-title">
+                        @if ($selectedCustomerId)
+                            <div class="kiosk-customer-selected" role="status">
+                                <span class="kiosk-customer-selected__icon"><i class="bx bx-check"></i></span>
+                                <div>
+                                    <strong id="kiosk-customer-lookup-title">Datos encontrados</strong>
+                                    <small>{{ $customerName }} · {{ $customerPhone }}</small>
+                                </div>
+                                <button type="button" wire:click="clearSelectedCustomer"
+                                    wire:loading.attr="disabled" wire:target="clearSelectedCustomer">
+                                    Cambiar
+                                </button>
+                            </div>
+                        @else
+                            <label class="kiosk-field kiosk-customer-search-field" for="kiosk-customer-search">
+                                <span id="kiosk-customer-lookup-title">¿Ya has pedido antes? <small>Opcional</small></span>
+                                <span class="kiosk-customer-search-control">
+                                    <i class="bx bx-search" aria-hidden="true"></i>
+                                    <input id="kiosk-customer-search" type="search"
+                                        wire:model.live.debounce.500ms="customerLookup" maxlength="120"
+                                        autocomplete="off" inputmode="search"
+                                        aria-describedby="kiosk-customer-search-help"
+                                        aria-controls="kiosk-customer-results"
+                                        placeholder="Busca tu nombre o teléfono">
+                                    <i class="bx bx-loader-alt bx-spin" wire:loading
+                                        wire:target="customerLookup" aria-label="Buscando"></i>
+                                </span>
+                            </label>
+                            <p id="kiosk-customer-search-help" class="kiosk-field-help">
+                                Si ya estás registrado, escribe 3 letras de tu nombre o los primeros 4 números de tu teléfono.
+                            </p>
+
+                            @if ($pendingCustomerId)
+                                <div class="kiosk-customer-verification" role="group"
+                                    aria-labelledby="kiosk-customer-verification-title">
+                                    <span><i class="bx bx-lock-alt"></i></span>
+                                    <div>
+                                        <strong id="kiosk-customer-verification-title">Confirma que eres tú</strong>
+                                        <small>Escribe solo los últimos 4 números de tu teléfono.</small>
+                                        <input type="text" wire:model="customerVerificationDigits"
+                                            inputmode="numeric" pattern="[0-9]*" maxlength="4"
+                                            autocomplete="off" aria-label="Últimos 4 números del teléfono">
+                                        @error('customerVerificationDigits')
+                                            <p class="kiosk-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>
+                                        @enderror
+                                        <div class="kiosk-customer-verification__actions">
+                                            <button type="button" class="is-secondary"
+                                                wire:click="cancelCustomerLookupVerification">Volver</button>
+                                            <button type="button" wire:click="confirmCustomerLookup"
+                                                wire:loading.attr="disabled" wire:target="confirmCustomerLookup">
+                                                <span wire:loading.remove wire:target="confirmCustomerLookup">Usar mis datos</span>
+                                                <span wire:loading wire:target="confirmCustomerLookup">Comprobando…</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @elseif (trim($customerLookup) !== '')
+                                <div id="kiosk-customer-results" class="kiosk-customer-results"
+                                    aria-live="polite" aria-label="Clientes encontrados">
+                                    @forelse ($this->customerLookupResults as $customerResult)
+                                        <button type="button"
+                                            wire:key="kiosk-customer-result-{{ $customerResult['id'] }}"
+                                            wire:click="chooseCustomerLookupResult({{ $customerResult['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="chooseCustomerLookupResult({{ $customerResult['id'] }})">
+                                            <span>{{ mb_strtoupper(mb_substr($customerResult['name'], 0, 1)) }}</span>
+                                            <span>
+                                                <strong>{{ $customerResult['name'] }}</strong>
+                                                <small>Tel. {{ $customerResult['phone_hint'] }}</small>
+                                            </span>
+                                            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    @empty
+                                        <p><i class="bx bx-info-circle"></i> Sigue escribiendo o completa tus datos abajo.</p>
+                                    @endforelse
+                                </div>
+                            @endif
+                        @endif
+                    </section>
+
                     <label class="kiosk-field"><span>Nombre para llamar</span><input type="text"
                             wire:model="customerName" maxlength="120" autocomplete="name"
                             placeholder="Escribe tu nombre"></label>
@@ -807,28 +887,48 @@
         </section>
     @elseif($step === 6)
         <section class="kiosk-success" x-data x-init="setTimeout(() => $wire.startAgain(), {{ $this->terminal->auto_reset_seconds * 1000 }})">
-            <div class="kiosk-success-icon"><i class="bx bx-check"></i></div>
-            <span class="kiosk-eyebrow">Pedido recibido</span>
-            <h1>¡Listo, {{ $customerName }}!</h1>
-            <p>Tu número de pedido es</p>
-            <strong class="kiosk-order-number">#{{ $completedOrderId }}</strong>
-            <p>{{ $this->terminal->success_message }}</p>
-            <div class="kiosk-qr-card">
-                @if ($this->qrDataUri)
-                    <img src="{{ $this->qrDataUri }}" alt="Código QR para seguir el pedido">
-                @endif
-                <div>
-                    <h2>Escanea para seguir tu pedido</h2>
-                    <p>Guarda este QR y consulta el estado desde tu teléfono.</p>
+            <div class="kiosk-success-shell">
+                <div class="kiosk-success-main">
+                    <div class="kiosk-success-status">
+                        <span class="kiosk-success-icon"><i class="bx bx-check" aria-hidden="true"></i></span>
+                        <span><small>Pedido recibido</small><strong>Enviado correctamente</strong></span>
+                    </div>
+                    <div class="kiosk-success-copy">
+                        <span class="kiosk-eyebrow">Gracias por tu pedido</span>
+                        <h1>¡Listo, {{ $customerName }}!</h1>
+                        <p>{{ $this->terminal->success_message }}</p>
+                    </div>
+                    <div class="kiosk-order-ticket" aria-label="Número de pedido {{ $completedOrderId }}">
+                        <span><small>Tu turno</small><strong>#{{ $completedOrderId }}</strong></span>
+                        <span><i class="bx {{ $fulfillment === 'delivery' ? 'bx-cycling' : ($fulfillment === 'dine_in' ? 'bx-chair' : 'bx-store-alt') }}" aria-hidden="true"></i>{{ match ($fulfillment) {'delivery' => 'Entrega a domicilio','dine_in' => 'Servicio en mesa',default => 'Pedido para llevar'} }}</span>
+                    </div>
+                    <ol class="kiosk-success-progress" aria-label="Progreso inicial del pedido">
+                        <li class="is-active"><span><i class="bx bx-check" aria-hidden="true"></i></span><strong>Recibido</strong></li>
+                        <li><span><i class="bx bx-time-five" aria-hidden="true"></i></span><strong>Preparación</strong></li>
+                        <li><span><i class="bx {{ $fulfillment === 'delivery' ? 'bx-cycling' : 'bx-package' }}" aria-hidden="true"></i></span><strong>{{ $fulfillment === 'delivery' ? 'En camino' : 'Listo' }}</strong></li>
+                    </ol>
                 </div>
+
+                <aside class="kiosk-qr-card" aria-labelledby="kiosk-qr-title">
+                    @if ($this->qrDataUri)
+                        <span class="kiosk-qr-card__code"><img src="{{ $this->qrDataUri }}" alt="Código QR para seguir el pedido" width="180" height="180"></span>
+                    @endif
+                    <div>
+                        <span class="kiosk-qr-card__eyebrow"><i class="bx bx-mobile-alt" aria-hidden="true"></i> Seguimiento en vivo</span>
+                        <h2 id="kiosk-qr-title">Lleva el estado contigo</h2>
+                        <p>Escanea el código para consultar desde tu teléfono cuándo estará listo.</p>
+                    </div>
+                </aside>
             </div>
-            <div class="kiosk-success-actions">
-                <button class="kiosk-primary-button" type="button" wire:click="startAgain"><i
-                        class="bx bx-user-plus"></i> Preparar para el siguiente cliente</button>
-            </div>
-            <p class="kiosk-timeout-hint"><i class="bx bx-info-circle"></i>
-                {{ $fulfillment === 'delivery' ? 'Mantén tu teléfono disponible para la entrega.' : $this->terminal->payment_instructions }}
-                Esta pantalla volverá al inicio en {{ $this->terminal->auto_reset_seconds }} segundos.</p>
+            <footer class="kiosk-success-footer">
+                <p class="kiosk-timeout-hint"><i class="bx bx-info-circle" aria-hidden="true"></i><span>
+                    {{ $fulfillment === 'delivery' ? 'Mantén tu teléfono disponible para la entrega.' : $this->terminal->payment_instructions }}
+                    Reinicio automático en {{ $this->terminal->auto_reset_seconds }} segundos.</span></p>
+                <div class="kiosk-success-actions">
+                    <button class="kiosk-primary-button" type="button" wire:click="startAgain"><i
+                            class="bx bx-user-plus" aria-hidden="true"></i> Siguiente cliente</button>
+                </div>
+            </footer>
         </section>
     @endif
 </main>

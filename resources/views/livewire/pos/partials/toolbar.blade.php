@@ -10,16 +10,25 @@
 
     @can('cobrar mesas')
     <button type="button" class="tb-btn tb-btn--tables" :class="panels.mesas ? 'is-active' : ''"
-        @click="panels.mesas = true; $wire.$refresh()" aria-label="Abrir cobro de mesas">
+        @click="panels.mesas = true; $wire.openTablesBilling()" aria-label="Abrir cobro de mesas">
         <span class="tb-btn__icon"><i class="bx bx-table"></i></span>
         <span class="tb-btn__copy"><strong>Cobrar mesas</strong><small>Cuentas cerradas</small></span>
-        @if ($this->mesasPendientes->count() > 0)<span class="tb-btn__badge">{{ $this->mesasPendientes->count() }}</span>@endif
+        @if ($tablesBillingLoaded && $this->mesasPendientes->count() > 0)<span class="tb-btn__badge">{{ $this->mesasPendientes->count() }}</span>@endif
     </button>
 
     <button type="button" class="tb-btn tb-btn--tracking" :class="panels.tracking ? 'is-active' : ''"
         @click="panels.tracking = true; $wire.openTableTracking()" aria-label="Abrir seguimiento operativo de mesas">
         <span class="tb-btn__icon"><i class="bx bx-radar"></i></span>
         <span class="tb-btn__copy"><strong>Comandas</strong><small>Cocina de mesas</small></span>
+    </button>
+    @endcan
+
+    @can('cerrar ordenes')
+    <button type="button" class="tb-btn tb-btn--delivery" :class="panels.delivery ? 'is-active' : ''"
+        @click="panels.delivery = true; $wire.openDeliveryPanel()" aria-label="Abrir pedidos para entrega a domicilio">
+        <span class="tb-btn__icon"><i class="bx bx-cycling"></i></span>
+        <span class="tb-btn__copy"><strong>Delivery</strong><small>Contra entrega</small></span>
+        @if ($deliveryPanelLoaded && $this->deliveryOrders->count() > 0)<span class="tb-btn__badge">{{ $this->deliveryOrders->count() }}</span>@endif
     </button>
     @endcan
 

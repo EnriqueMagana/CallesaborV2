@@ -28,10 +28,10 @@
             </div>
         </div>
         @if($this->mesa->status === 'ocupada')
-            <button type="button" class="btn btn-outline-warning btn-sm mo-close-table-btn" wire:click="closeMesa" wire:loading.attr="disabled">
+            <button type="button" class="btn btn-outline-warning btn-sm mo-close-table-btn" wire:click="openCloseMesa" wire:loading.attr="disabled" wire:target="openCloseMesa">
                 <i class="bx bx-receipt me-1"></i>
-                <span wire:loading.remove wire:target="closeMesa">Cerrar cuenta</span>
-                <span wire:loading wire:target="closeMesa">Cerrando…</span>
+                <span wire:loading.remove wire:target="openCloseMesa">Cerrar cuenta</span>
+                <span wire:loading wire:target="openCloseMesa">Abriendo…</span>
             </button>
         @endif
     </div>
@@ -417,7 +417,7 @@
                                      width="48" height="48" loading="lazy" decoding="async">
                             @else
                                 <span class="mo-option-image mo-option-image--empty" aria-hidden="true">
-                                    <i class="bx bx-leaf"></i>
+                                    <i class="bx bx-list-ul"></i>
                                 </span>
                             @endif
                             <span class="mo-addon-copy">
@@ -484,7 +484,7 @@
                 <button type="button" class="mo-send-btn mo-confirm-btn" x-on:click="submit($wire)"
                         :disabled="submitting">
                     <span x-show="!submitting">
-                        <i class="bx bx-cart-add" aria-hidden="true"></i>
+                        <i class="bx bx-cart" aria-hidden="true"></i>
                         {{ $editingCartId ? 'Actualizar producto' : 'Agregar al pedido' }}
                     </span>
                     <span x-show="submitting" x-cloak>
@@ -494,6 +494,43 @@
                 </button>
             </div>
         </div>
+    </div>
+    @endif
+
+    @if($showCloseModal)
+    <div class="mesas-modal-backdrop" wire:click.self="closeCloseModal"
+         x-data x-init="$nextTick(() => $refs.orderCloseCancel.focus())"
+         @keydown.escape.window="$wire.closeCloseModal()">
+        <section class="mesas-modal mesas-modal--close-choice" role="dialog" aria-modal="true"
+                 aria-labelledby="order-close-title" aria-describedby="order-close-description">
+            <div class="mesas-modal-header">
+                <div>
+                    <span class="mesas-modal-eyebrow">Enviar cuenta a caja</span>
+                    <h5 id="order-close-title">Cerrar {{ $this->mesa->display_name }}</h5>
+                </div>
+                <button type="button" class="mesas-modal-close" wire:click="closeCloseModal" aria-label="Cancelar cierre de mesa"><i class="bx bx-x" aria-hidden="true"></i></button>
+            </div>
+            <div class="mesas-modal-body">
+                <p id="order-close-description" class="text-muted mb-3">Elige cómo se cobrará. Para agregar más pedidos después tendrás que reabrir la mesa.</p>
+                <div class="mesas-close-options">
+                    <button type="button" class="mesas-close-option" wire:click="confirmCloseMesa('full')" wire:loading.attr="disabled" wire:target="confirmCloseMesa">
+                        <span class="mesas-close-option__icon" aria-hidden="true"><i class="bx bx-receipt"></i></span>
+                        <span><strong>Cuenta completa</strong><small>Cobrar todo junto en el POS.</small></span>
+                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                    </button>
+                    @can('dividir mesas')
+                    <button type="button" class="mesas-close-option mesas-close-option--split" wire:click="confirmCloseMesa('split')" wire:loading.attr="disabled" wire:target="confirmCloseMesa">
+                        <span class="mesas-close-option__icon" aria-hidden="true"><i class="bx bx-git-branch"></i></span>
+                        <span><strong>Dividir cuenta</strong><small>Asignar productos o partes a subcuentas.</small></span>
+                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                    </button>
+                    @endcan
+                </div>
+            </div>
+            <div class="mesas-modal-actions">
+                <button type="button" class="btn btn-outline-secondary" wire:click="closeCloseModal" x-ref="orderCloseCancel">Cancelar</button>
+            </div>
+        </section>
     </div>
     @endif
 

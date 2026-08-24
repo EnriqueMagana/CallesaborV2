@@ -4,6 +4,7 @@ namespace App\Livewire\Kiosk;
 
 use App\Models\CashRegister;
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\KioskProductPromotion;
 use App\Models\KioskTerminal;
 use App\Models\Mesa;
@@ -21,6 +22,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 #[Layout('layouts.kiosk')]
@@ -63,6 +65,16 @@ class OrderWizard extends Component
     public string $customerName = '';
 
     public string $customerPhone = '';
+
+    public string $customerLookup = '';
+
+    #[Locked]
+    public ?int $selectedCustomerId = null;
+
+    #[Locked]
+    public ?int $pendingCustomerId = null;
+
+    public string $customerVerificationDigits = '';
 
     public string $deliveryStreet = '';
 
@@ -246,6 +258,137 @@ class OrderWizard extends Component
     }
 
     #[Computed]
+    public function customerLookupResults()
+    {
+        if ($this->step !== 5 || $this->selectedCustomerId) {
+            return collect();
+        }
+
+        $query = trim($this->customerLookup);
+        $digits = preg_replace('/\D+/', '', $query) ?? '';
+        $isPhoneLookup = $digits !== '' && preg_match('/^[\d\s()+.-]+$/', $query) === 1;
+
+        if (($isPhoneLookup && strlen($digits) < 4) || (! $isPhoneLookup && mb_strlen($query) < 3)) {
+            return collect();
+        }
+
+        $escapedQuery = addcslashes($query, '\\%_');
+
+        return Customer::query()
+            ->select(['id', 'name', 'phone'])
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->where(function ($customers) use ($digits, $escapedQuery, $isPhoneLookup) {
+                if ($isPhoneLookup) {
+                    $customers->where('phone', 'like', $digits.'%');
+
+                    return;
+                }
+
+                $customers->where('name', 'like', '%'.$escapedQuery.'%');
+            })
+            ->orderBy('name')
+            ->limit(5)
+            ->get()
+            ->map(function (Customer $customer): array {
+                $phone = preg_replace('/\D+/', '', (string) $customer->phone) ?? '';
+
+                return [
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'phone_hint' => '••••••'.substr($phone, -4),
+                ];
+            });
+    }
+
+    public function updatedCustomerLookup(): void
+    {
+        $this->pendingCustomerId = null;
+        $this->customerVerificationDigits = '';
+        $this->resetErrorBag(['customerLookup', 'customerVerificationDigits']);
+        unset($this->customerLookupResults);
+    }
+
+    public function chooseCustomerLookupResult(int $customerId): void
+    {
+        $allowedIds = $this->customerLookupResults->pluck('id')->map(fn ($id) => (int) $id);
+        abort_unless($allowedIds->contains($customerId), 404);
+
+        $customer = Customer::query()->findOrFail($customerId);
+        $lookupPhone = preg_replace('/\D+/', '', $this->customerLookup) ?? '';
+        $customerPhone = preg_replace('/\D+/', '', (string) $customer->phone) ?? '';
+        $customerPhone = strlen($customerPhone) > 10 ? substr($customerPhone, -10) : $customerPhone;
+
+        if (strlen($lookupPhone) === 10 && hash_equals($customerPhone, $lookupPhone)) {
+            $this->applyCustomer($customer);
+
+            return;
+        }
+
+        $this->pendingCustomerId = $customer->id;
+        $this->customerVerificationDigits = '';
+        $this->resetErrorBag('customerVerificationDigits');
+    }
+
+    public function confirmCustomerLookup(): void
+    {
+        if (! $this->pendingCustomerId) {
+            return;
+        }
+
+        $this->validate([
+            'customerVerificationDigits' => ['required', 'digits:4'],
+        ], [
+            'customerVerificationDigits.required' => 'Escribe los últimos 4 números del teléfono.',
+            'customerVerificationDigits.digits' => 'Deben ser exactamente 4 números.',
+        ]);
+
+        $rateKey = 'kiosk-customer-verify:'.hash('sha256', $this->terminalToken).':'.request()->ip();
+        if (RateLimiter::tooManyAttempts($rateKey, 8)) {
+            $this->addError('customerVerificationDigits', 'Demasiados intentos. Espera un minuto y vuelve a intentarlo.');
+
+            return;
+        }
+        RateLimiter::hit($rateKey, 60);
+
+        $customer = Customer::query()->findOrFail($this->pendingCustomerId);
+        $phone = preg_replace('/\D+/', '', (string) $customer->phone) ?? '';
+
+        if ($phone === '' || ! hash_equals(substr($phone, -4), $this->customerVerificationDigits)) {
+            $this->addError('customerVerificationDigits', 'Los números no coinciden. Revisa el teléfono e inténtalo otra vez.');
+
+            return;
+        }
+
+        $this->applyCustomer($customer);
+    }
+
+    public function cancelCustomerLookupVerification(): void
+    {
+        $this->pendingCustomerId = null;
+        $this->customerVerificationDigits = '';
+        $this->resetErrorBag('customerVerificationDigits');
+    }
+
+    public function clearSelectedCustomer(): void
+    {
+        $this->selectedCustomerId = null;
+        $this->pendingCustomerId = null;
+        $this->customerLookup = '';
+        $this->customerVerificationDigits = '';
+        $this->customerName = '';
+        $this->customerPhone = '';
+        $this->deliveryStreet = '';
+        $this->deliveryNeighborhood = '';
+        $this->deliveryReferences = '';
+        $this->resetErrorBag([
+            'customerLookup', 'customerVerificationDigits', 'customerName', 'customerPhone',
+            'deliveryStreet', 'deliveryNeighborhood', 'deliveryReferences',
+        ]);
+        unset($this->customerLookupResults);
+    }
+
+    #[Computed]
     public function qrDataUri(): ?string
     {
         if (! $this->publicToken) {
@@ -426,8 +569,7 @@ class OrderWizard extends Component
         ?array $ingredientQuantities = null,
         ?int $quantity = null,
         ?string $notes = null
-    ): void
-    {
+    ): void {
         $product = $this->product;
         if (! $product) {
             return;
@@ -585,6 +727,39 @@ class OrderWizard extends Component
                     throw ValidationException::withMessages(['order' => 'El kiosco está pausado porque no hay una caja abierta.']);
                 }
 
+                $isDelivery = $this->fulfillment === 'delivery';
+                $customer = $this->selectedCustomerId
+                    ? Customer::query()->whereKey($this->selectedCustomerId)->lockForUpdate()->first()
+                    : null;
+
+                if ($isDelivery) {
+                    $customer ??= Customer::query()
+                        ->where('phone', trim($this->customerPhone))
+                        ->lockForUpdate()
+                        ->first();
+
+                    $customerData = [
+                        'name' => trim($this->customerName),
+                        'phone' => trim($this->customerPhone),
+                        'address' => trim($this->deliveryStreet),
+                        'neighborhood' => trim($this->deliveryNeighborhood),
+                        'references' => trim($this->deliveryReferences) ?: null,
+                    ];
+
+                    if ($customer) {
+                        $missingData = collect($customerData)
+                            ->filter(fn (mixed $value, string $field) => blank($customer->{$field}) && filled($value))
+                            ->all();
+
+                        if ($missingData !== []) {
+                            $customer->update($missingData);
+                        }
+                    } else {
+                        $customer = Customer::query()->create($customerData);
+                    }
+                }
+
+                $customerId = $customer?->id;
                 $responsibleUserId = $terminal->user_id ?: $cash->opened_by;
                 if (! $responsibleUserId) {
                     throw ValidationException::withMessages(['order' => 'El terminal no tiene un responsable configurado.']);
@@ -594,7 +769,6 @@ class OrderWizard extends Component
                 $total = round((float) $lines->sum('subtotal'), 2);
                 $publicToken = Str::random(64);
 
-                $isDelivery = $this->fulfillment === 'delivery';
                 $mesa = null;
                 if ($this->fulfillment === 'dine_in') {
                     $mesa = Mesa::query()
@@ -637,6 +811,7 @@ class OrderWizard extends Component
                 $order = Order::create([
                     'cash_register_id' => $cash->id,
                     'kiosk_terminal_id' => $terminal->id,
+                    'customer_id' => $customerId,
                     'public_token' => $publicToken,
                     'customer_name' => trim($this->customerName),
                     'customer_phone' => trim($this->customerPhone) ?: null,
@@ -715,7 +890,8 @@ class OrderWizard extends Component
         $this->reset([
             'fulfillment', 'selectedMesaId', 'categoryFilter', 'recommendationName', 'featuredProductIntent', 'cart', 'customizingProduct',
             'selectedAddons', 'addonQuantities', 'selectedIngredients', 'itemNotes', 'customerName',
-            'customerPhone', 'deliveryStreet', 'deliveryNeighborhood', 'deliveryReferences',
+            'customerPhone', 'customerLookup', 'selectedCustomerId', 'pendingCustomerId',
+            'customerVerificationDigits', 'deliveryStreet', 'deliveryNeighborhood', 'deliveryReferences',
             'orderNotes', 'completedOrderId', 'publicToken', 'submitting',
         ]);
         $this->step = 1;
@@ -733,6 +909,33 @@ class OrderWizard extends Component
 
         $this->accessState = $terminal ? 'paused' : 'invalid';
         $this->unavailableTerminalName = $terminal?->name;
+    }
+
+    private function applyCustomer(Customer $customer): void
+    {
+        $address = trim((string) $customer->address);
+        $parts = array_values(array_filter(array_map('trim', explode(',', $address)), fn ($part) => $part !== ''));
+        $storedNeighborhood = trim((string) $customer->neighborhood);
+
+        $this->selectedCustomerId = $customer->id;
+        $this->pendingCustomerId = null;
+        $this->customerLookup = '';
+        $this->customerVerificationDigits = '';
+        $this->customerName = $customer->name;
+        $phone = preg_replace('/\D+/', '', (string) $customer->phone) ?? '';
+        $this->customerPhone = strlen($phone) > 10 ? substr($phone, -10) : $phone;
+        $this->deliveryStreet = $storedNeighborhood !== ''
+            ? $address
+            : (count($parts) > 1 ? implode(', ', array_slice($parts, 0, -1)) : $address);
+        $this->deliveryNeighborhood = $storedNeighborhood !== ''
+            ? $storedNeighborhood
+            : (count($parts) > 1 ? (string) end($parts) : '');
+        $this->deliveryReferences = (string) ($customer->references ?? '');
+        $this->resetErrorBag([
+            'customerLookup', 'customerVerificationDigits', 'customerName', 'customerPhone',
+            'deliveryStreet', 'deliveryNeighborhood', 'deliveryReferences',
+        ]);
+        unset($this->customerLookupResults);
     }
 
     private function addLine(Product $product, array $addonQuantities, array $ingredients, string $notes, int $quantity): void

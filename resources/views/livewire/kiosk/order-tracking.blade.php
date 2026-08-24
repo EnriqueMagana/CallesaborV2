@@ -50,7 +50,7 @@
                 <p>{{ $isDelivery ? 'En breve un repartidor tomará tu entrega.' : $order->customer_name . ', acércate al mostrador con tu número.' }}
                 </p>
             @elseif($effectiveStatus === 'en_preparacion')
-                <div class="kiosk-tracking-icon"><i class="bx bx-bowl-hot"></i></div>
+                <div class="kiosk-tracking-icon"><i class="bx bx-restaurant"></i></div>
                 <h1>Estamos preparando tu pedido</h1>
                 <p>En cocina están trabajando para tenerlo listo muy pronto.</p>
             @else
@@ -66,14 +66,14 @@
                     $timeline = $isDelivery
                         ? [
                             1 => ['bx-receipt', 'Recibido'],
-                            2 => ['bx bx-dish', 'Preparando'],
+                            2 => ['bx-dish', 'Preparando'],
                             3 => ['bx-check', 'Listo'],
                             4 => ['bx-cycling', 'En camino'],
                             5 => ['bx-home-heart', 'Entregado'],
                         ]
                         : [
                             1 => ['bx-receipt', 'Recibido'],
-                            2 => ['bx bx-dish', 'Preparando'],
+                            2 => ['bx-dish', 'Preparando'],
                             3 => ['bx-check', 'Listo'],
                         ];
                 @endphp
@@ -123,8 +123,7 @@
         <div class="kiosk-manual-refresh">
             <button type="button" class="kiosk-primary-button" wire:click="refreshStatus" wire:loading.attr="disabled"
                 wire:target="refreshStatus">
-                <span wire:loading.remove wire:target="refreshStatus"><i class="bx bx-refresh"></i> Actualizar
-                    estado</span>
+                <span wire:loading.remove wire:target="refreshStatus"><i class="bx bx-refresh"></i> Actualizar estado</span>
                 <span wire:loading wire:target="refreshStatus">Consultando estado…</span>
             </button>
         </div>

@@ -55,7 +55,7 @@
                                 $paidAccounts = $service->splits->flatMap(fn ($split) => collect($split->split_data ?? [])->filter(fn ($account) => $account['paid'] ?? false));
                             @endphp
                             @if ($paidAccounts->isNotEmpty())
-                                <span><i class="bx bx-split"></i>{{ $paidAccounts->count() }} subcuentas cobradas</span>
+                                <span><i class="bx bx-git-branch"></i>{{ $paidAccounts->count() }} subcuentas cobradas</span>
                             @endif
                             @if ($service->status === 'liberada')
                                 <span class="is-audit-reason"><i class="bx bx-note"></i>{{ $service->close_reason }}</span>

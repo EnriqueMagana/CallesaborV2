@@ -23,7 +23,12 @@
             </div>
             <div data-ui="xui-n3c866">
                 <label class="co-label">Dirección <span data-ui="xui-b1shr1">(opcional)</span></label>
-                <input type="text" wire:model="newCustomerAddress" class="co-input" placeholder="Calle, número, colonia">
+                <input type="text" wire:model="newCustomerAddress" class="co-input" autocomplete="street-address" placeholder="Calle y número">
+            </div>
+            <div data-ui="xui-n3c866">
+                <label class="co-label">Colonia o zona <span class="req">*</span></label>
+                <input type="text" wire:model="newCustomerNeighborhood" class="co-input" autocomplete="address-level3" maxlength="120" placeholder="Ej. Centro">
+                @error('newCustomerNeighborhood')<div data-ui="xui-1bwpvep">{{ $message }}</div>@enderror
             </div>
             <div>
                 <label class="co-label">Referencias <span data-ui="xui-b1shr1">(opcional)</span></label>
