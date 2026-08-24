@@ -213,6 +213,22 @@ class PosCustomizationTest extends TestCase
         );
     }
 
+    public function test_catalog_product_action_uses_only_the_add_or_customize_icon(): void
+    {
+        $css = file_get_contents(public_path('assets/css/pos-modern.css'));
+        $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
+
+        $this->assertIsString($css);
+        $this->assertIsString($catalog);
+        $this->assertMatchesRegularExpression(
+            '/\.prod-card-cta\s*\{[^}]*width:\s*32px;[^}]*min-width:\s*32px;[^}]*padding:\s*0;[^}]*border-radius:\s*50%;/s',
+            $css,
+        );
+        $this->assertSame(2, substr_count($catalog, "<i class=\"bx {{ \$hasOptions ? 'bx-slider-alt' : 'bx-plus' }}\"></i>"));
+        $this->assertStringNotContainsString("'En pedido'", $catalog);
+        $this->assertStringNotContainsString("'Elegir'", $catalog);
+    }
+
     private function customizableProduct(int $optionCount): array
     {
         $product = Product::create([

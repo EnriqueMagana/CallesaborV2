@@ -67,8 +67,7 @@
                         <span class="prod-card-footer">
                             <strong class="prod-price">${{ number_format($product->price, 2) }}</strong>
                             <span class="prod-card-cta" aria-hidden="true">
-                                <i class="bx {{ $inCart ? 'bx-check' : ($hasOptions ? 'bx-slider-alt' : 'bx-plus') }}"></i>
-                                <span>{{ $inCart ? 'En pedido' : ($hasOptions ? 'Elegir' : 'Agregar') }}</span>
+                                <i class="bx {{ $hasOptions ? 'bx-slider-alt' : 'bx-plus' }}"></i>
                             </span>
                         </span>
                     </div>
@@ -104,8 +103,7 @@
                     <span class="prod-card-footer">
                         <strong class="prod-price">${{ number_format($product->price, 2) }}</strong>
                         <span class="prod-card-cta" aria-hidden="true">
-                            <i class="bx {{ $inCart ? 'bx-check' : ($hasOptions ? 'bx-slider-alt' : 'bx-plus') }}"></i>
-                            <span>{{ $inCart ? 'En pedido' : ($hasOptions ? 'Elegir' : 'Agregar') }}</span>
+                            <i class="bx {{ $hasOptions ? 'bx-slider-alt' : 'bx-plus' }}"></i>
                         </span>
                     </span>
                 </div>

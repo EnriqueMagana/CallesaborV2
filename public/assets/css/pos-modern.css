@@ -1195,13 +1195,14 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
 }
 
 .prod-card-cta {
+    width: 32px;
+    min-width: 32px;
     display: inline-flex;
     min-height: 32px;
-    padding: 6px 9px;
+    padding: 0;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    border-radius: 10px;
+    border-radius: 50%;
     color: #fff;
     background: var(--pos-accent);
     font-size: .68rem;
@@ -1396,13 +1397,6 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
 
 @media (max-width: 390px) {
     .catalog-grid { gap: 8px; padding-inline: 9px; }
-    .prod-card-cta {
-        width: 32px;
-        min-width: 32px;
-        padding-inline: 0;
-        border-radius: 50%;
-    }
-    .prod-card-cta span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

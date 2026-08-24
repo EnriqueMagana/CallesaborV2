@@ -102,7 +102,12 @@
                     <span>03</span><div><h2>Favoritos con ranking</h2><p>El primer producto mostrará el número 1; usa las flechas para decidir 2, 3 y siguientes.</p></div>
                     <strong>{{ count($featuredProductIds) }}/{{ $this->maxFeatured }}</strong>
                 </header>
-                <label class="digital-menu-section-switch"><input type="checkbox" wire:model.live="showFeatured"><span><strong>Mostrar favoritos</strong><small>Oculta o publica toda la sección sin perder el orden.</small></span><span class="digital-menu-switch"></span></label>
+                <label class="digital-menu-section-switch">
+                    <input type="checkbox" wire:model.live="showFeatured">
+                    <span class="digital-menu-section-switch__icon" aria-hidden="true"><i class="bx bx-star"></i></span>
+                    <span class="digital-menu-section-switch__copy"><strong>Mostrar favoritos</strong><small>Oculta o publica toda la sección sin perder el orden.</small></span>
+                    <span class="digital-menu-switch" aria-hidden="true"></span>
+                </label>
                 <div class="digital-menu-ranking" aria-label="Orden actual de favoritos">
                     @forelse ($this->selectedProducts as $index => $product)
                         <article wire:key="ranked-product-{{ $product->id }}">
@@ -133,7 +138,12 @@
                 <header class="digital-menu-section-heading">
                     <span>04</span><div><h2>Presentación de categorías</h2><p>El catálogo conserva sus categorías; aquí decides cómo se navegan.</p></div>
                 </header>
-                <label class="digital-menu-section-switch"><input type="checkbox" wire:model.live="showCategories"><span><strong>Mostrar accesos de categorías</strong><small>Permite saltar rápidamente a cada grupo de productos.</small></span><span class="digital-menu-switch"></span></label>
+                <label class="digital-menu-section-switch">
+                    <input type="checkbox" wire:model.live="showCategories">
+                    <span class="digital-menu-section-switch__icon" aria-hidden="true"><i class="bx bx-category"></i></span>
+                    <span class="digital-menu-section-switch__copy"><strong>Mostrar accesos de categorías</strong><small>Permite saltar rápidamente a cada grupo de productos.</small></span>
+                    <span class="digital-menu-switch" aria-hidden="true"></span>
+                </label>
                 <fieldset class="digital-menu-style-options">
                     <legend>Estilo de categorías</legend>
                     <label class="{{ $categoryStyle === 'cards' ? 'is-selected' : '' }}">
@@ -148,7 +158,12 @@
                     <span>05</span><div><h2>Galería pública</h2><p>Publica fotografías y decide si la sección aparece para los clientes.</p></div>
                     <strong>{{ count($galleryPaths) + count($galleryUploads) }}/{{ $this->maxGalleryImages }}</strong>
                 </header>
-                <label class="digital-menu-section-switch"><input type="checkbox" wire:model.live="showGallery"><span><strong>Galería activa</strong><small>Controla portada, menú, pie de página y página de galería.</small></span><span class="digital-menu-switch"></span></label>
+                <label class="digital-menu-section-switch">
+                    <input type="checkbox" wire:model.live="showGallery">
+                    <span class="digital-menu-section-switch__icon" aria-hidden="true"><i class="bx bx-images"></i></span>
+                    <span class="digital-menu-section-switch__copy"><strong>Galería activa</strong><small>Controla portada, menú, pie de página y página de galería.</small></span>
+                    <span class="digital-menu-switch" aria-hidden="true"></span>
+                </label>
                 <div class="digital-menu-media-list digital-menu-media-list--gallery">
                     @foreach ($galleryPaths as $index => $item)
                         <article wire:key="digital-gallery-{{ $index }}">
