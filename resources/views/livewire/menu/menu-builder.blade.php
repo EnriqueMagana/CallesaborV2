@@ -149,7 +149,9 @@
                 </tbody>
             </table>
         </div>
-        <div class="px-4 py-3">{{ $this->products->links() }}</div>
+        <div class="menu-builder-pagination px-4 py-3">
+            {{ $this->products->links('pagination::bootstrap-5') }}
+        </div>
         @endif
     </div>
 </div>

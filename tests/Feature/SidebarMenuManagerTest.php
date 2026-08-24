@@ -93,6 +93,24 @@ class SidebarMenuManagerTest extends TestCase
         $this->assertFalse($labels->contains('Punto de venta'));
     }
 
+    public function test_sidebar_seed_registers_the_digital_menu_route(): void
+    {
+        $this->assertTrue(app('router')->has('app.menu-digital'));
+        $this->assertDatabaseHas('sidebar_menu_items', [
+            'system_key' => 'restaurant.digital-menu',
+            'route_name' => 'app.menu-digital',
+            'permission' => 'gestionar menu digital',
+        ]);
+    }
+
+    public function test_menu_builder_uses_the_bootstrap_paginator(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/menu/menu-builder.blade.php'));
+
+        $this->assertStringContainsString("links('pagination::bootstrap-5')", $view);
+        $this->assertStringNotContainsString('products->links()', $view);
+    }
+
     public function test_sidebar_parent_modules_use_accessible_livewire_safe_buttons(): void
     {
         $owner = User::factory()->create();
@@ -265,7 +283,7 @@ class SidebarMenuManagerTest extends TestCase
         $orderedIds = SidebarMenuItem::where('parent_id', $restaurant->id)
             ->orderBy('sort_order')->orderBy('id')->pluck('id')->all();
         $this->assertLessThan(array_search($pos->id, $orderedIds, true), array_search($operations->id, $orderedIds, true));
-        $this->assertSame([10, 20, 30, 40], SidebarMenuItem::where('parent_id', $restaurant->id)->orderBy('sort_order')->pluck('sort_order')->all());
+        $this->assertSame([10, 20, 30, 40, 50], SidebarMenuItem::where('parent_id', $restaurant->id)->orderBy('sort_order')->pluck('sort_order')->all());
     }
 
     public function test_same_internal_route_cannot_be_registered_twice(): void

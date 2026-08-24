@@ -65,6 +65,104 @@
     const form = document.getElementById('menu-search-form');
     const cards = [...document.querySelectorAll('.menu-catalog [data-menu-product]')];
     const sections = [...document.querySelectorAll('[data-menu-section]')];
+    const categoryNav = document.querySelector('.category-nav');
+    const categoryRail = document.querySelector('[data-category-rail]');
+    const categoryScroll = document.querySelector('[data-category-scroll]');
+    const categoryLinks = [...document.querySelectorAll('[data-category-link]')];
+    const allCategoriesLink = document.querySelector('[data-category-all]');
+    const previousCategories = document.querySelector('[data-category-previous]');
+    const nextCategories = document.querySelector('[data-category-next]');
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let activeCategoryId = null;
+    let categoryFrame = null;
+
+    const updateCategoryControls = () => {
+        if (!categoryScroll || !categoryRail) return;
+
+        const hasOverflow = categoryScroll.scrollWidth > categoryScroll.clientWidth + 2;
+        const atStart = categoryScroll.scrollLeft <= 2;
+        const atEnd = categoryScroll.scrollLeft + categoryScroll.clientWidth >= categoryScroll.scrollWidth - 2;
+
+        categoryRail.classList.toggle('has-overflow', hasOverflow);
+        previousCategories?.toggleAttribute('hidden', !hasOverflow);
+        nextCategories?.toggleAttribute('hidden', !hasOverflow);
+        if (previousCategories) previousCategories.disabled = atStart;
+        if (nextCategories) nextCategories.disabled = atEnd;
+    };
+
+    const keepCategoryVisible = (link) => {
+        if (!categoryScroll || !link) return;
+
+        const targetLeft = link.offsetLeft - ((categoryScroll.clientWidth - link.offsetWidth) / 2);
+        const maximumLeft = Math.max(0, categoryScroll.scrollWidth - categoryScroll.clientWidth);
+        categoryScroll.scrollTo({
+            left: Math.max(0, Math.min(targetLeft, maximumLeft)),
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        });
+    };
+
+    const setActiveCategory = (categoryId, keepVisible = true) => {
+        if (activeCategoryId === categoryId) return;
+        activeCategoryId = categoryId;
+
+        const activeLink = categoryId
+            ? categoryLinks.find((link) => link.dataset.categoryLink === categoryId)
+            : allCategoriesLink;
+
+        [...categoryLinks, allCategoriesLink].filter(Boolean).forEach((link) => {
+            const isActive = link === activeLink;
+            link.classList.toggle('is-active', isActive);
+            link.toggleAttribute('aria-current', isActive);
+            if (isActive) link.setAttribute('aria-current', 'location');
+        });
+
+        if (keepVisible) keepCategoryVisible(activeLink);
+    };
+
+    const syncActiveCategory = () => {
+        if (!categoryNav || sections.length === 0) return;
+
+        const marker = categoryNav.getBoundingClientRect().bottom + 24;
+        let currentCategory = null;
+
+        sections.forEach((section) => {
+            if (!section.hidden && section.getBoundingClientRect().top <= marker) {
+                currentCategory = section.id;
+            }
+        });
+
+        setActiveCategory(currentCategory);
+    };
+
+    const requestCategorySync = () => {
+        if (categoryFrame !== null) return;
+        categoryFrame = window.requestAnimationFrame(() => {
+            categoryFrame = null;
+            syncActiveCategory();
+            updateCategoryControls();
+        });
+    };
+
+    const moveCategories = (direction) => {
+        if (!categoryScroll) return;
+        categoryScroll.scrollBy({
+            left: direction * Math.max(240, categoryScroll.clientWidth * 0.72),
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        });
+    };
+
+    previousCategories?.addEventListener('click', () => moveCategories(-1));
+    nextCategories?.addEventListener('click', () => moveCategories(1));
+    categoryScroll?.addEventListener('scroll', requestCategorySync, { passive: true });
+    window.addEventListener('scroll', requestCategorySync, { passive: true });
+    window.addEventListener('resize', requestCategorySync);
+    allCategoriesLink?.addEventListener('click', () => setActiveCategory(null));
+    categoryLinks.forEach((link) => {
+        link.addEventListener('click', () => setActiveCategory(link.dataset.categoryLink));
+    });
+
+    updateCategoryControls();
+    syncActiveCategory();
 
     if (input) {
         const normalizeSearch = (value) => value
@@ -91,6 +189,7 @@
             clear.hidden = !query;
             empty.hidden = visible > 0;
             status.textContent = query ? `${visible} ${visible === 1 ? 'resultado' : 'resultados'} para “${input.value.trim()}”` : '';
+            requestCategorySync();
         };
 
         input.addEventListener('input', filterMenu);
@@ -105,19 +204,6 @@
             filterMenu();
             input.focus();
         });
-    }
-
-    if ('IntersectionObserver' in window) {
-        const links = [...document.querySelectorAll('[data-category-link]')];
-        const allLink = document.querySelector('[data-category-all]');
-        const observer = new IntersectionObserver((entries) => {
-            const current = entries.find((entry) => entry.isIntersecting);
-            if (!current) return;
-            links.forEach((link) => link.classList.toggle('is-active', link.dataset.categoryLink === current.target.id));
-            allLink?.classList.remove('is-active');
-        }, { rootMargin: '-35% 0px -55% 0px', threshold: 0 });
-
-        sections.forEach((section) => observer.observe(section));
     }
 
     const modal = document.getElementById('product-detail-modal');

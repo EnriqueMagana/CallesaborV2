@@ -139,6 +139,51 @@ class PublicMenuTest extends TestCase
         );
     }
 
+    public function test_category_navigation_tracks_the_visible_section_and_exposes_desktop_controls(): void
+    {
+        $response = $this->get(route('public.menu'));
+        $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+
+        $response->assertOk()
+            ->assertSee('data-category-scroll', false)
+            ->assertSee('data-category-previous', false)
+            ->assertSee('data-category-next', false)
+            ->assertSee('aria-controls="category-nav-scroll"', false);
+
+        $this->assertStringContainsString('const syncActiveCategory = () =>', $javascript);
+        $this->assertStringContainsString('window.requestAnimationFrame', $javascript);
+        $this->assertStringContainsString('keepCategoryVisible(activeLink)', $javascript);
+        $this->assertStringContainsString("link.setAttribute('aria-current', 'location')", $javascript);
+        $this->assertStringContainsString('.category-nav__rail.has-overflow{grid-template-columns:44px minmax(0,1fr) 44px}', $css);
+        $this->assertStringContainsString('@media(min-width:681px)', $css);
+    }
+
+    public function test_restaurant_footer_stacks_its_brand_content_on_desktop_and_mobile(): void
+    {
+        $business = BusinessSetting::current();
+        $business->update([
+            'business_name' => 'Calle Sabor',
+            'whatsapp' => '5512345678',
+        ]);
+
+        $this->get(route('public.home'))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'menu-footer__logo',
+                'footer-brand-title',
+                'Sabores aut',
+                'menu-socials',
+            ], false);
+
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+
+        $this->assertIsString($css);
+        $this->assertStringContainsString('.menu-footer--restaurant .menu-footer__brand {', $css);
+        $this->assertStringContainsString('display: block;', $css);
+        $this->assertStringContainsString('.menu-footer--restaurant .menu-socials { flex-wrap:wrap; margin-top:20px; }', $css);
+    }
+
     public function test_every_static_public_menu_icon_exists_in_boxicons(): void
     {
         $boxicons = file_get_contents(public_path('assets/vendor/fonts/boxicons.css'));

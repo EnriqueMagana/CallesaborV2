@@ -75,6 +75,10 @@ class PublicLandingPagesTest extends TestCase
         $this->assertStringContainsString('pattern.png', $css);
         $this->assertStringContainsString('pattern2.png', $css);
         $this->assertStringContainsString('background-color: transparent;', $css);
+        $this->assertStringContainsString('height: 100dvh;', $css);
+        $this->assertStringContainsString('align-items: center;', $css);
+        $this->assertStringContainsString('justify-content: center;', $css);
+        $this->assertStringContainsString('flex-direction: column;', $css);
         $this->assertFileExists(public_path('assets/img/restaurant/pattern.png'));
         $this->assertFileExists(public_path('assets/img/restaurant/pattern2.png'));
         $this->assertStringContainsString('min-height: 56px;', $css);

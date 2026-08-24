@@ -116,4 +116,15 @@ class DigitalMenuSettingsTest extends TestCase
             $this->assertStringContainsString(".{$icon}:before", $boxicons, "El icono {$icon} no existe en Boxicons.");
         }
     }
+
+    public function test_section_switches_keep_a_responsive_three_part_layout(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/admin/digital-menu-manager.blade.php'));
+        $styles = file_get_contents(public_path('assets/css/business-settings.css'));
+
+        $this->assertSame(3, substr_count($view, 'class="digital-menu-section-switch__icon"'));
+        $this->assertSame(3, substr_count($view, 'class="digital-menu-section-switch__copy"'));
+        $this->assertStringContainsString('.digital-menu-section-switch__copy{min-width:0;display:grid;gap:3px}', $styles);
+        $this->assertStringContainsString('.digital-menu-toggle,.digital-menu-section-switch{grid-template-columns:42px minmax(0,1fr) 44px', $styles);
+    }
 }
