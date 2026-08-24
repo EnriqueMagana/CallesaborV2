@@ -92,6 +92,42 @@ class DigitalMenuSettingsTest extends TestCase
         $this->get(route('public.gallery'))->assertNotFound();
     }
 
+    public function test_category_style_and_gallery_visibility_apply_to_every_public_entry_point(): void
+    {
+        $category = \App\Models\Category::create([
+            'name' => 'Especiales',
+            'icon' => 'bx-dish',
+            'color' => '#15803d',
+            'is_active' => true,
+        ]);
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'Platillo especial',
+            'price' => 150,
+            'is_active' => true,
+        ]);
+        DigitalMenuSetting::current()->update([
+            'category_style' => 'circles',
+            'show_categories' => true,
+            'show_gallery' => false,
+        ]);
+
+        $this->get(route('public.home'))
+            ->assertOk()
+            ->assertSee('home-categories--circles', false)
+            ->assertSee('home-category-card--circle', false)
+            ->assertDontSee('href="#galeria"', false);
+
+        $this->get(route('public.menu'))
+            ->assertOk()
+            ->assertSee('category-nav--circles', false)
+            ->assertSee('menu-info-links__grid--without-gallery', false)
+            ->assertDontSee('menu-info-card--gallery', false)
+            ->assertDontSee('<i class="bx bx-chevron-right" aria-hidden="true"></i>Galería', false);
+
+        $this->get(route('public.gallery'))->assertNotFound();
+    }
+
     public function test_owner_can_open_every_digital_menu_section_without_render_errors(): void
     {
         $owner = User::factory()->create();

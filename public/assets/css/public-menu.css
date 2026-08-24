@@ -535,3 +535,7 @@ body.has-product-modal{overflow:hidden}
     .category-nav__scroll{scroll-behavior:auto}
     .category-nav a.category-nav__item,.category-nav__control,.menu-cover__slide{transition:none}
 }
+
+.menu-info-links__grid--without-gallery{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:980px){.menu-info-links__grid--without-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.menu-info-links__grid--without-gallery{grid-template-columns:1fr}}
