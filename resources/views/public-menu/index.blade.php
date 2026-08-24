@@ -55,38 +55,38 @@
                         <i class="bx bx-chevron-left" aria-hidden="true"></i>
                     </button>
                     <div class="category-nav__scroll" id="category-nav-scroll" data-category-scroll tabindex="0">
-                    <a href="#catalog-title" class="category-nav__item is-active" data-category-all
-                        aria-current="location">
-                        <span class="category-nav__icon"><i class="bx bx-grid-alt" aria-hidden="true"></i></span>
-                        <span><strong>Todo</strong><small>{{ $totalProducts }} opciones</small></span>
-                    </a>
-                    @foreach ($categories as $category)
-                        @php($categoryPreview = $category->products->first(fn ($product) => filled($product->image)))
-                        <a href="#category-{{ $category->id }}" class="category-nav__item"
-                            data-category-link="category-{{ $category->id }}">
-                            <span class="category-nav__icon"
-                                style="--category-color: {{ $category->color ?: $business->primary_color }}">
-                                @if ($menuSettings->category_style === 'circles' && $categoryPreview)
-                                    <img src="{{ Storage::url($categoryPreview->image) }}" alt="" width="64" height="64"
-                                        loading="lazy" decoding="async">
-                                @else
-                                    <i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i>
-                                @endif
-                            </span>
-                            <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
-                                    {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
+                        <a href="#catalog-title" class="category-nav__item is-active" data-category-all
+                            aria-current="location">
+                            <span class="category-nav__icon"><i class="bx bx-grid-alt" aria-hidden="true"></i></span>
+                            <span><strong>Todo</strong><small>{{ $totalProducts }} opciones</small></span>
                         </a>
-                    @endforeach
-                    @if ($uncategorized->isNotEmpty())
-                        <a href="#category-other" class="category-nav__item" data-category-link="category-other">
-                            <span class="category-nav__icon"><i class="bx bx-dish" aria-hidden="true"></i></span>
-                            <span><strong>Otros</strong><small>{{ $uncategorized->count() }} opciones</small></span>
-                        </a>
-                    @endif
+                        @foreach ($categories as $category)
+                            @php($categoryPreview = $category->products->first(fn($product) => filled($product->image)))
+                            <a href="#category-{{ $category->id }}" class="category-nav__item"
+                                data-category-link="category-{{ $category->id }}">
+                                <span class="category-nav__icon"
+                                    style="--category-color: {{ $category->color ?: $business->primary_color }}">
+                                    @if ($menuSettings->category_style === 'circles' && $categoryPreview)
+                                        <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
+                                            width="64" height="64" loading="lazy" decoding="async">
+                                    @else
+                                        <i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i>
+                                    @endif
+                                </span>
+                                <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
+                                        {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
+                            </a>
+                        @endforeach
+                        @if ($uncategorized->isNotEmpty())
+                            <a href="#category-other" class="category-nav__item" data-category-link="category-other">
+                                <span class="category-nav__icon"><i class="bx bx-dish" aria-hidden="true"></i></span>
+                                <span><strong>Otros</strong><small>{{ $uncategorized->count() }}
+                                        opciones</small></span>
+                            </a>
+                        @endif
                     </div>
-                    <button class="category-nav__control category-nav__control--next" type="button"
-                        data-category-next aria-label="Ver más categorías"
-                        aria-controls="category-nav-scroll" hidden>
+                    <button class="category-nav__control category-nav__control--next" type="button" data-category-next
+                        aria-label="Ver más categorías" aria-controls="category-nav-scroll" hidden>
                         <i class="bx bx-chevron-right" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -113,8 +113,6 @@
                     <div><span class="menu-kicker">Carta completa</span>
                         <h2 id="catalog-title">Explora por categoría</h2>
                     </div>
-                    <p>Selecciona cualquier platillo para consultar su descripción completa, ingredientes y
-                        complementos.</p>
                 </div>
 
                 @forelse($categories as $category)
@@ -181,11 +179,12 @@
                     <div><span class="menu-kicker">Conoce el restaurante</span>
                         <h2 id="restaurant-info-title">Información útil</h2>
                     </div>
-                    <p>{{ $menuSettings->show_gallery ? 'Consulta nuestros horarios, fotografías y canales oficiales.' : 'Consulta nuestros horarios y canales oficiales.' }}</p>
+                    <p>{{ $menuSettings->show_gallery ? 'Consulta nuestros horarios, fotografías y canales oficiales.' : 'Consulta nuestros horarios y canales oficiales.' }}
+                    </p>
                 </div>
                 <div @class([
                     'menu-info-links__grid',
-                    'menu-info-links__grid--without-gallery' => ! $menuSettings->show_gallery,
+                    'menu-info-links__grid--without-gallery' => !$menuSettings->show_gallery,
                 ])>
                     <a href="{{ route('public.home') }}#reservar" class="menu-info-card menu-info-card--reservation">
                         <span class="menu-info-card__icon"><i class="bx bx-calendar-check"

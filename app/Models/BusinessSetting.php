@@ -83,7 +83,7 @@ class BusinessSetting extends Model
     public function openingStatus(?CarbonInterface $moment = null): array
     {
         $now = $moment?->copy() ?? now();
-        $hours = collect($this->business_hours ?: self::DEFAULT_HOURS)->keyBy('key');
+        $hours = collect($this->weeklySchedule($now))->keyBy('key');
 
         for ($offset = -1; $offset <= 7; $offset++) {
             $date = $now->copy()->startOfDay()->addDays($offset);
@@ -105,6 +105,10 @@ class BusinessSetting extends Model
                     'is_open' => true,
                     'label' => 'Abierto ahora',
                     'detail' => 'Cierra a las '.$closes->format('H:i'),
+                    'opens_at' => $opens->format('H:i'),
+                    'closes_at' => $closes->format('H:i'),
+                    'day_label' => $day['label'],
+                    'closes_next_day' => ! $opens->isSameDay($closes),
                 ];
             }
 
@@ -113,11 +117,45 @@ class BusinessSetting extends Model
                     'is_open' => false,
                     'label' => 'Cerrado ahora',
                     'detail' => ($opens->isToday() ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('H:i'),
+                    'opens_at' => $opens->format('H:i'),
+                    'closes_at' => $closes->format('H:i'),
+                    'day_label' => $day['label'],
+                    'closes_next_day' => ! $opens->isSameDay($closes),
                 ];
             }
         }
 
-        return ['is_open' => false, 'label' => 'Horario no disponible', 'detail' => 'Consulta nuestros horarios'];
+        return [
+            'is_open' => false,
+            'label' => 'Horario no disponible',
+            'detail' => 'Consulta nuestros horarios',
+            'opens_at' => null,
+            'closes_at' => null,
+            'day_label' => null,
+            'closes_next_day' => false,
+        ];
+    }
+
+    /**
+     * Return the administrator-configured schedule in a stable Monday-Sunday order.
+     */
+    public function weeklySchedule(?CarbonInterface $moment = null): array
+    {
+        $todayKey = strtolower(($moment?->copy() ?? now())->englishDayOfWeek);
+        $configured = collect($this->business_hours ?: self::DEFAULT_HOURS)->keyBy('key');
+
+        return collect(self::DEFAULT_HOURS)
+            ->map(function (array $default) use ($configured, $todayKey): array {
+                $saved = $configured->get($default['key'], []);
+                $day = array_merge($default, is_array($saved) ? $saved : []);
+                $day['enabled'] = (bool) ($day['enabled'] ?? false);
+                $day['is_today'] = $day['key'] === $todayKey;
+                $day['is_overnight'] = $day['enabled'] && $day['closes'] <= $day['opens'];
+
+                return $day;
+            })
+            ->values()
+            ->all();
     }
 
     public function reservationSlots(CarbonInterface|string $date, int $intervalMinutes = 30): array

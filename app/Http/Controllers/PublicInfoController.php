@@ -36,6 +36,7 @@ class PublicInfoController extends Controller
             'business' => $business,
             'menuSettings' => $menuSettings,
             'openingStatus' => $business->openingStatus(),
+            'weeklySchedule' => $business->weeklySchedule(),
             'galleryImages' => collect($menuSettings->show_gallery ? $menuSettings->galleryItems() : [])
                 ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
                 ->values(),

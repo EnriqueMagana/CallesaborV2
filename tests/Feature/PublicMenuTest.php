@@ -332,5 +332,28 @@ class PublicMenuTest extends TestCase
         $this->assertTrue($status['is_open']);
         $this->assertSame('Abierto ahora', $status['label']);
         $this->assertSame('Cierra a las 02:00', $status['detail']);
+        $this->assertSame('18:00', $status['opens_at']);
+        $this->assertSame('02:00', $status['closes_at']);
+        $this->assertTrue($status['closes_next_day']);
+    }
+
+    public function test_hours_page_displays_the_administrator_configured_opening_and_closing_times(): void
+    {
+        Carbon::setTestNow('2026-08-24 10:00:00');
+        $business = BusinessSetting::current();
+        $hours = BusinessSetting::DEFAULT_HOURS;
+        $hours[0] = ['key' => 'monday', 'label' => 'Lunes', 'enabled' => true, 'opens' => '12:15', 'closes' => '21:45'];
+        $business->update(['business_hours' => $hours]);
+
+        $this->get(route('public.hours'))
+            ->assertOk()
+            ->assertSee('Horario actualizado desde la administración del restaurante.')
+            ->assertSee('Hoy')
+            ->assertSee('Abre')
+            ->assertSee('12:15')
+            ->assertSee('Cierra')
+            ->assertSee('21:45');
+
+        Carbon::setTestNow();
     }
 }
