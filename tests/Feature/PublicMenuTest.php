@@ -213,9 +213,29 @@ class PublicMenuTest extends TestCase
             'featured_product_ids' => [$second->id, $first->id],
         ]);
 
-        $this->get(route('public.menu'))
+        $response = $this->get(route('public.menu'));
+
+        $response
             ->assertOk()
-            ->assertSeeInOrder(['Favoritos de la casa', 'Segundo', 'Primero']);
+            ->assertSeeInOrder(['Favoritos de la casa', 'Segundo', 'Primero'])
+            ->assertSee('data-featured-carousel', false)
+            ->assertSee('data-featured-previous', false)
+            ->assertSee('data-featured-pause', false)
+            ->assertSee('data-featured-next', false)
+            ->assertSee('data-featured-item', false)
+            ->assertSee('carrusel horizontal');
+
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+        $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
+
+        $this->assertStringContainsString(
+            '.product-card--featured{min-height:168px;display:grid;grid-template-columns:156px minmax(0,1fr)',
+            $css
+        );
+        $this->assertStringContainsString('scroll-snap-type:x mandatory', $css);
+        $this->assertStringContainsString("document.querySelectorAll('[data-featured-carousel]')", $javascript);
+        $this->assertStringContainsString("timer = window.setTimeout(() => goTo(activeIndex + 1), interval)", $javascript);
+        $this->assertStringContainsString("event.key === 'ArrowLeft' || event.key === 'ArrowRight'", $javascript);
     }
 
     public function test_product_cards_expose_an_informational_modal_with_ingredients_and_options(): void

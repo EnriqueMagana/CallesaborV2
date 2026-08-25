@@ -396,6 +396,23 @@ class MesasPermissionsTest extends TestCase
             ->assertSet('cart.1.name', 'Pasta');
 
         $styles = file_get_contents(public_path('assets/css/mesa-orden.css'));
+        $view = file_get_contents(resource_path('views/livewire/mesas/mesa-orden.blade.php'));
+
+        $this->assertIsString($view);
+        $this->assertStringContainsString('mo-cart-header__identity', $view);
+        $this->assertStringContainsString('mo-cart-stepper', $view);
+        $this->assertStringContainsString('mo-order-note', $view);
+        $this->assertStringContainsString('Enviar orden a cocina', $view);
+        $this->assertMatchesRegularExpression(
+            '/\.mo-cart-container\s*\{[^}]*z-index:\s*1090;/s',
+            $styles,
+            'El carrito de mesas debe mostrarse sobre el navbar fijo.',
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.mo-modal-backdrop\s*\{[^}]*z-index:\s*1120;/s',
+            $styles,
+            'Los formularios de mesa deben cubrir navbar, sidebar y carrito.',
+        );
 
         $this->assertMatchesRegularExpression(
             '/\.mo-cart-container\s*\{[^}]*pointer-events:\s*none;/s',

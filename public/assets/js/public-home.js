@@ -58,6 +58,11 @@
         if (!hero) return;
 
         const slides = [...hero.querySelectorAll('[data-home-hero-slide]')];
+        const autoplay = hero.dataset.autoplay !== 'false';
+        const configuredInterval = Number.parseInt(hero.dataset.interval || '', 10);
+        const interval = Number.isFinite(configuredInterval)
+            ? Math.min(12000, Math.max(3000, configuredInterval))
+            : 6500;
         let current = 0;
         let timer = null;
         let interactionPaused = false;
@@ -83,12 +88,12 @@
 
         const schedule = () => {
             stopTimer();
-            if (reducedMotion || interactionPaused || document.hidden) return;
+            if (!autoplay || reducedMotion || interactionPaused || document.hidden) return;
 
             timer = window.setTimeout(() => {
                 show(current + 1);
                 schedule();
-            }, 6500);
+            }, interval);
         };
         hero.addEventListener('pointerenter', () => {
             interactionPaused = true;

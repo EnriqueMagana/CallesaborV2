@@ -220,6 +220,10 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
         $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
         $this->assertStringContainsString('data-pos-save-cart', $cart);
+        $this->assertStringContainsString('cart-header__meta', $cart);
+        $this->assertStringContainsString('cart-item__footer', $cart);
+        $this->assertStringContainsString('cart-mobile-close', $cart);
+        $this->assertStringContainsString('Nota para cocina', $cart);
         $this->assertStringContainsString('aria-keyshortcuts="F3 F10"', $catalog);
         $this->assertStringContainsString('pos-search-shortcut', $catalog);
         $this->assertStringContainsString('data-pos-saved', $header);
