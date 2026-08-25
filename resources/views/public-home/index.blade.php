@@ -33,21 +33,20 @@
         </div>
     </div>
     @php
-        $heroSlides = [
-            ['image' => 'banner1.jpg', 'alt' => 'Salón principal de ' . $business->business_name],
-            ['image' => 'banner5.jpg', 'alt' => 'Detalles decorativos del restaurante'],
-            ['image' => 'banner7.jpg', 'alt' => 'Entrada de ' . $business->business_name . ' al atardecer'],
-        ];
+        $heroSlides = collect($menuSettings->show_banners ? $menuSettings->bannerItems() : []);
     @endphp
 
     <header class="home-hero" id="inicio" data-home-hero role="region"
+        data-autoplay="{{ $menuSettings->autoplay_banners ? 'true' : 'false' }}"
+        data-interval="{{ ((int) $menuSettings->banner_interval_seconds) * 1000 }}"
         aria-label="Presentación de {{ $business->business_name }}">
         <div class="home-hero__slides" aria-live="off">
             @foreach ($heroSlides as $slide)
                 <figure class="home-hero__slide {{ $loop->first ? 'is-active' : '' }}" data-home-hero-slide
-                    role="group" aria-label="Imagen {{ $loop->iteration }} de {{ count($heroSlides) }}"
+                    role="group" aria-label="Imagen {{ $loop->iteration }} de {{ $heroSlides->count() }}"
                     aria-hidden="{{ $loop->first ? 'false' : 'true' }}">
-                    <img src="{{ asset('assets/img/restaurant/' . $slide['image']) }}" alt="{{ $slide['alt'] }}"
+                    <img src="{{ Storage::url($slide['path']) }}"
+                        alt="{{ $slide['alt'] ?: 'Ambiente de ' . $business->business_name }}"
                         width="1920" height="1080" loading="{{ $loop->first ? 'eager' : 'lazy' }}"
                         fetchpriority="{{ $loop->first ? 'high' : 'auto' }}" decoding="async">
                 </figure>

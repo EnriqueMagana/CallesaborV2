@@ -51,8 +51,6 @@
         </div>
         @if ($hasCarousel)
             <div class="menu-container menu-cover__carousel-controls">
-                <button type="button" data-banner-previous aria-label="Banner anterior"><i class="bx bx-chevron-left"
-                        aria-hidden="true"></i></button>
                 <div role="tablist" aria-label="Seleccionar banner">
                     @foreach ($bannerItems as $item)
                         <button type="button" data-banner-dot="{{ $loop->index }}"
@@ -61,10 +59,6 @@
                             aria-label="Mostrar banner {{ $loop->iteration }}"></button>
                     @endforeach
                 </div>
-                <button type="button" data-banner-next aria-label="Banner siguiente"><i class="bx bx-chevron-right"
-                        aria-hidden="true"></i></button>
-                <button type="button" data-banner-pause aria-label="Pausar carrusel" aria-pressed="false"><i
-                        class="bx bx-pause" aria-hidden="true"></i></button>
             </div>
         @endif
     </div>

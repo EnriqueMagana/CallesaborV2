@@ -58,6 +58,94 @@
         schedule();
     });
 
+    document.querySelectorAll('[data-featured-carousel]').forEach((carousel) => {
+        const rail = carousel.querySelector('.featured-menu__rail');
+        const items = [...carousel.querySelectorAll('[data-featured-item]')];
+        const previous = carousel.querySelector('[data-featured-previous]');
+        const next = carousel.querySelector('[data-featured-next]');
+        const pause = carousel.querySelector('[data-featured-pause]');
+        const status = carousel.querySelector('[data-featured-status]');
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const interval = Math.max(3000, Number(carousel.dataset.interval) || 5000);
+        const canAutoplay = carousel.dataset.autoplay === 'true' && !prefersReducedMotion && items.length > 1;
+        let activeIndex = 0;
+        let paused = false;
+        let timer = null;
+        let scrollFrame = null;
+
+        if (!rail || items.length < 2) return;
+
+        const stop = () => {
+            window.clearTimeout(timer);
+            timer = null;
+        };
+
+        const updateStatus = () => {
+            if (status) status.textContent = `${activeIndex + 1} / ${items.length}`;
+        };
+
+        const schedule = () => {
+            stop();
+            if (canAutoplay && !paused && !document.hidden) {
+                timer = window.setTimeout(() => goTo(activeIndex + 1), interval);
+            }
+        };
+
+        const goTo = (requestedIndex) => {
+            activeIndex = (requestedIndex + items.length) % items.length;
+            rail.scrollTo({
+                left: items[activeIndex].offsetLeft,
+                behavior: prefersReducedMotion ? 'auto' : 'smooth',
+            });
+            updateStatus();
+            schedule();
+        };
+
+        const syncFromScroll = () => {
+            if (scrollFrame !== null) return;
+            scrollFrame = window.requestAnimationFrame(() => {
+                scrollFrame = null;
+                const center = rail.scrollLeft + (rail.clientWidth / 2);
+                activeIndex = items.reduce((closest, item, index) => {
+                    const itemCenter = item.offsetLeft + (item.offsetWidth / 2);
+                    const closestCenter = items[closest].offsetLeft + (items[closest].offsetWidth / 2);
+                    return Math.abs(itemCenter - center) < Math.abs(closestCenter - center) ? index : closest;
+                }, 0);
+                updateStatus();
+            });
+        };
+
+        previous?.addEventListener('click', () => goTo(activeIndex - 1));
+        next?.addEventListener('click', () => goTo(activeIndex + 1));
+        pause?.addEventListener('click', () => {
+            paused = !paused;
+            pause.setAttribute('aria-pressed', String(paused));
+            pause.setAttribute('aria-label', paused ? 'Reanudar carrusel' : 'Pausar carrusel');
+            pause.querySelector('i')?.classList.toggle('bx-pause', !paused);
+            pause.querySelector('i')?.classList.toggle('bx-play', paused);
+            schedule();
+        });
+        pause?.toggleAttribute('hidden', !canAutoplay);
+        rail.addEventListener('scroll', syncFromScroll, { passive: true });
+        rail.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                goTo(activeIndex + (event.key === 'ArrowRight' ? 1 : -1));
+            }
+        });
+        carousel.addEventListener('mouseenter', stop);
+        carousel.addEventListener('mouseleave', schedule);
+        carousel.addEventListener('focusin', stop);
+        carousel.addEventListener('focusout', (event) => {
+            if (!carousel.contains(event.relatedTarget)) schedule();
+        });
+        rail.addEventListener('pointerdown', stop, { passive: true });
+        rail.addEventListener('pointerup', schedule, { passive: true });
+        document.addEventListener('visibilitychange', schedule);
+        updateStatus();
+        schedule();
+    });
+
     const input = document.getElementById('menu-search-input');
     const clear = document.getElementById('menu-search-clear');
     const status = document.getElementById('menu-search-status');

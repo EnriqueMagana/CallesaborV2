@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="{{ $business->primary_color ?? '#15803d' }}">
+    <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
     <meta name="description" content="Consulta el menú, horarios y datos de {{ $business->business_name }}.">
     <title>Menú | {{ $business->business_name }}</title>
     @include('partials.favicon')
@@ -17,10 +17,10 @@
         href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
 </head>
 
-<body style="--menu-primary: {{ $business->primary_color ?? '#15803d' }}">
+<body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
-    <x-public-menu.brand-header :business="$business" :opening-status="$openingStatus" action-label="Volver al inicio" :action-href="route('public.home')"
-        action-icon="bx-left-arrow-alt" />
+    <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus"
+        action-label="Volver al inicio" :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
 
     <main>
         <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
@@ -44,10 +44,11 @@
                 <p class="menu-search__status" id="menu-search-status" aria-live="polite"></p>
             </div>
 
-            <nav @class([
-                'category-nav',
-                'category-nav--circles' => $menuSettings->category_style === 'circles',
-            ]) aria-label="Categorías del menú">
+            @if ($menuSettings->show_categories)
+                <nav @class([
+                    'category-nav',
+                    'category-nav--circles' => $menuSettings->category_style === 'circles',
+                ]) aria-label="Categorías del menú">
                 <div class="menu-container category-nav__rail" data-category-rail>
                     <button class="category-nav__control category-nav__control--previous" type="button"
                         data-category-previous aria-label="Ver categorías anteriores"
@@ -90,19 +91,41 @@
                         <i class="bx bx-chevron-right" aria-hidden="true"></i>
                     </button>
                 </div>
-            </nav>
+                </nav>
+            @endif
 
             @if ($featured->isNotEmpty())
-                <section class="featured-menu menu-container" aria-labelledby="featured-title">
+                <section class="featured-menu menu-container" aria-labelledby="featured-title"
+                    data-featured-carousel data-autoplay="true"
+                    data-interval="{{ ((int) $menuSettings->banner_interval_seconds) * 1000 }}">
                     <div class="section-heading">
                         <div><span class="menu-kicker">Recomendados</span>
                             <h2 id="featured-title">Favoritos de la casa</h2>
                         </div>
-                        <p>Desliza para descubrir una selección especial del restaurante.</p>
+                        <div class="featured-menu__meta">
+                            <p>Desliza para descubrir una selección especial del restaurante.</p>
+                            @if ($featured->count() > 1)
+                                <div class="featured-menu__controls" aria-label="Controles de favoritos">
+                                    <button type="button" data-featured-previous aria-label="Ver favorito anterior">
+                                        <i class="bx bx-chevron-left" aria-hidden="true"></i>
+                                    </button>
+                                    <span data-featured-status aria-hidden="true">1 / {{ $featured->count() }}</span>
+                                    <button type="button" data-featured-pause aria-label="Pausar carrusel"
+                                        aria-pressed="false">
+                                        <i class="bx bx-pause" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button" data-featured-next aria-label="Ver siguiente favorito">
+                                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
-                    <div class="featured-menu__rail" role="list">
+                    <div class="featured-menu__rail" role="list" tabindex="0"
+                        aria-label="Favoritos de la casa, carrusel horizontal">
                         @foreach ($featured as $product)
-                            <x-public-menu.product-card :product="$product" featured role="listitem" />
+                            <x-public-menu.product-card :product="$product" :rank="$loop->iteration" featured
+                                role="listitem" data-featured-item />
                         @endforeach
                     </div>
                 </section>
@@ -258,7 +281,7 @@
                 </div>
             </div>
             <footer class="product-modal__footer">
-                <span><i class="bx bx-check-shield" aria-hidden="true"></i>Información del menú</span>
+                <span><i class="bx bx-check-shield" aria-hidden="true"></i>Esta vista es informativa</span>
                 <button type="button" data-modal-close>Cerrar detalle</button>
             </footer>
         </div>

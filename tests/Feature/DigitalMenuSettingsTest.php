@@ -81,6 +81,7 @@ class DigitalMenuSettingsTest extends TestCase
         $this->get(route('public.menu'))
             ->assertOk()
             ->assertSee('data-menu-banner-carousel', false)
+            ->assertSee(Storage::url($setting->bannerItems()[1]['path']), false)
             ->assertSee('category-nav--circles', false)
             ->assertSee('Favorito número 1')
             ->assertSeeInOrder(['Favoritos de la casa', 'Segundo', 'Primero'])
@@ -88,6 +89,9 @@ class DigitalMenuSettingsTest extends TestCase
 
         $this->get(route('public.home'))
             ->assertOk()
+            ->assertSee(Storage::url($setting->bannerItems()[0]['path']), false)
+            ->assertSee(Storage::url($setting->bannerItems()[1]['path']), false)
+            ->assertSee('data-interval="7000"', false)
             ->assertDontSee('href="#galeria"', false);
         $this->get(route('public.gallery'))->assertNotFound();
     }
@@ -126,6 +130,41 @@ class DigitalMenuSettingsTest extends TestCase
             ->assertDontSee('<i class="bx bx-chevron-right" aria-hidden="true"></i>Galería', false);
 
         $this->get(route('public.gallery'))->assertNotFound();
+    }
+
+    public function test_general_composition_hides_disabled_public_menu_sections(): void
+    {
+        $product = Product::create([
+            'name' => 'Favorito oculto',
+            'price' => 115,
+            'is_active' => true,
+        ]);
+
+        DigitalMenuSetting::current()->update([
+            'show_banners' => false,
+            'show_featured' => false,
+            'featured_product_ids' => [$product->id],
+            'show_categories' => false,
+            'show_gallery' => false,
+        ]);
+
+        $this->get(route('public.menu'))
+            ->assertOk()
+            ->assertDontSee('data-menu-banner-slide', false)
+            ->assertDontSee('Favoritos de la casa')
+            ->assertDontSee('class="category-nav', false)
+            ->assertDontSee('menu-info-card--gallery', false);
+
+        $this->get(route('public.home'))
+            ->assertOk()
+            ->assertDontSee('data-home-hero-slide', false)
+            ->assertDontSee('home-categories', false)
+            ->assertDontSee('href="#galeria"', false);
+    }
+
+    public function test_short_menu_url_redirects_to_the_canonical_public_menu(): void
+    {
+        $this->get('/men')->assertRedirect('/menu');
     }
 
     public function test_owner_can_open_every_digital_menu_section_without_render_errors(): void
