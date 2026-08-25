@@ -47,6 +47,7 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <link rel="stylesheet" href="{{ asset('assets/css/dark-theme.css') }}?v={{ filemtime(public_path('assets/css/dark-theme.css')) }}"/>
 --}}
 <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}"/>
 
 <!-- Helpers -->
 <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
@@ -74,6 +75,7 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <script src="{{ asset('assets/vendor/js/bootstrap.js') }}"></script>
 
 @livewireScripts
+<script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>
 @stack('scripts')
 
 <script>

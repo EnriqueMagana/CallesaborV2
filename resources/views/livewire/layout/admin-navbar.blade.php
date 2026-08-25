@@ -11,6 +11,9 @@
         </div>
 
         <ul class="navbar-nav flex-row align-items-center ms-auto">
+            <li class="nav-item me-1">
+                <livewire:layout.notification-center placement="navbar" />
+            </li>
             <li class="nav-item navbar-dropdown dropdown-user dropdown">
                 <button type="button" class="nav-link dropdown-toggle hide-arrow app-navbar-profile-trigger" data-bs-toggle="dropdown" aria-label="Abrir menú de usuario" aria-expanded="false">
                     <span class="avatar avatar-online app-navbar-avatar">

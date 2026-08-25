@@ -3,10 +3,15 @@
 namespace App\Providers;
 
 use App\Listeners\EnforceSingleSession;
-use App\Models\BusinessSetting;
 use App\Livewire\Layout\AdminNavbar;
 use App\Livewire\Layout\AdminSidebar;
+use App\Livewire\Layout\NotificationCenter;
 use App\Livewire\Ui\ConfirmModal;
+use App\Models\BusinessSetting;
+use App\Models\DeliveryAssignment;
+use App\Models\Order;
+use App\Observers\DeliveryAssignmentObserver;
+use App\Observers\OrderObserver;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -37,7 +42,11 @@ class AppServiceProvider extends ServiceProvider
 
         Livewire::component('layout.admin-sidebar', AdminSidebar::class);
         Livewire::component('layout.admin-navbar', AdminNavbar::class);
+        Livewire::component('layout.notification-center', NotificationCenter::class);
         Livewire::component('ui.confirm-modal', ConfirmModal::class);
+
+        Order::observe(OrderObserver::class);
+        DeliveryAssignment::observe(DeliveryAssignmentObserver::class);
 
         View::composer([
             'layouts.app',
