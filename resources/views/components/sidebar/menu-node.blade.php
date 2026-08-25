@@ -18,9 +18,9 @@
     </li>
 @elseif($item->type === 'link')
     @php
-        // El POS usa un layout y una hoja de estilos propios. Debe entrar con
-        // carga completa para evitar que Livewire conserve el menú del admin.
-        $usesStandaloneLayout = $item->route_name === 'app.pos';
+        // POS y Pulse usan layouts propios. Deben entrar con carga completa
+        // para evitar que Livewire conserve el menú del panel administrativo.
+        $usesStandaloneLayout = in_array($item->route_name, ['app.pos', 'pulse'], true);
     @endphp
     <li class="menu-item {{ $item->is_current ? 'active' : '' }} {{ $item->register_locked ? 'is-register-locked' : '' }}">
         @if($item->register_locked)

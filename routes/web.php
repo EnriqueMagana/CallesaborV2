@@ -37,6 +37,7 @@ use App\Livewire\Orders\OrderList;
 use App\Livewire\Orders\SalesHistory;
 use App\Livewire\Pos\PointOfSale;
 use App\Livewire\Reservas\CalendarioReservas;
+use App\Livewire\SuperAdmin\DeveloperConsole;
 use App\Models\CashRegisterCut;
 use App\Models\Order;
 use App\Models\Reservation;
@@ -81,6 +82,9 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/kioscos/{terminal}/abrir', KioskLaunchController::class)->middleware('can:gestionar kioscos')->name('kioscos.open');
     Route::get('/configuracion-negocio', BusinessSettingsManager::class)->name('configuracion-negocio');
     Route::get('/configuracion-negocio/menu-items', BusinessSettingsManager::class)->name('configuracion-negocio.menu');
+    Route::get('/super-admin', DeveloperConsole::class)
+        ->middleware('can:ver panel super admin')
+        ->name('super-admin');
     Route::get('/menu-digital', DigitalMenuManager::class)->middleware('can:gestionar menu digital')->name('menu-digital');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
     Route::get('/ordenes', OrderList::class)->middleware('can:ver ordenes')->name('ordenes');

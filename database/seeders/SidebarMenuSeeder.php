@@ -124,8 +124,23 @@ class SidebarMenuSeeder extends Seeder
             'permission' => 'cerrar caja', 'sort_order' => 20,
         ]);
 
+        $development = $this->item('section.development', [
+            'label' => 'Super Admin', 'type' => 'section', 'sort_order' => 40, 'is_system' => true,
+            'permission' => 'ver panel super admin',
+        ]);
+        $this->item('development.console', [
+            'parent_id' => $development->id, 'label' => 'Centro técnico', 'type' => 'link',
+            'icon' => 'bx-code-alt', 'route_name' => 'app.super-admin', 'active_pattern' => 'app.super-admin',
+            'permission' => 'ver panel super admin', 'sort_order' => 10, 'is_system' => true,
+        ]);
+        $this->item('development.pulse', [
+            'parent_id' => $development->id, 'label' => 'Laravel Pulse', 'type' => 'link',
+            'icon' => 'bx-pulse', 'route_name' => 'pulse',
+            'permission' => 'ver panel super admin', 'sort_order' => 20, 'is_system' => true,
+        ]);
+
         $account = $this->item('section.account', [
-            'label' => 'Mi cuenta', 'type' => 'section', 'sort_order' => 40, 'is_system' => true,
+            'label' => 'Mi cuenta', 'type' => 'section', 'sort_order' => 50, 'is_system' => true,
         ]);
         $this->item('account.profile', [
             'parent_id' => $account->id, 'label' => 'Mi perfil', 'type' => 'link',
