@@ -67,6 +67,17 @@
                     <div class="profile-card__body"><livewire:profile.two-factor-authentication-form /></div>
                 </section>
 
+                <section class="profile-card" aria-labelledby="notification-preferences-title">
+                    <div class="profile-card__header">
+                        <div class="section-icon" aria-hidden="true"><i class="bx bx-bell"></i></div>
+                        <div>
+                            <h2 id="notification-preferences-title" class="profile-section-title mb-0">Notificaciones</h2>
+                            <p class="profile-section-copy mb-0">Elige cómo recibir los avisos correspondientes a tus responsabilidades.</p>
+                        </div>
+                    </div>
+                    <div class="profile-card__body"><livewire:profile.notification-preferences-form /></div>
+                </section>
+
                 <section class="profile-card" aria-labelledby="password-title">
                     <div class="profile-card__header">
                         <div class="section-icon" aria-hidden="true"><i class="bx bx-key"></i></div>
@@ -97,5 +108,4 @@
         </div>
     </main>
 </x-app-layout>
-
 

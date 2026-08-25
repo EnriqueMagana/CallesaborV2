@@ -60,6 +60,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/customers-responsive.css') }}?v={{ filemtime(public_path('assets/css/customers-responsive.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/orders.css') }}?v={{ filemtime(public_path('assets/css/orders.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/role-permissions.css') }}?v={{ filemtime(public_path('assets/css/role-permissions.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}" />
 
     @stack('styles')
     {{-- Modo oscuro pausado temporalmente.
@@ -156,6 +157,7 @@
     @livewireScripts
 
     <script src="{{ asset('assets/js/dashboard.js') }}?v={{ filemtime(public_path('assets/js/dashboard.js')) }}" data-navigate-once></script>
+    <script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>
 
     @stack('scripts')
 </body>

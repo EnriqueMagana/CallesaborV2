@@ -13,6 +13,7 @@
         </div>
     </div>
     <div class="pos-header-right">
+        <livewire:layout.notification-center placement="pos" />
         <a href="{{ route('app.dashboard') }}" class="btn-header-action">
             <i class="bx bx-home-alt"></i>
             <span>Dashboard</span>
