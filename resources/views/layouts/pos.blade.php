@@ -7,6 +7,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="realtime-notification-session" content="{{ route('app.notifications.realtime-session') }}">
 <title>POS — {{ $businessSettings?->platform_name ?? config('app.name') }}</title>
 
 @include('partials.favicon')
@@ -75,6 +76,7 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <script src="{{ asset('assets/vendor/js/bootstrap.js') }}"></script>
 
 @livewireScripts
+@vite('resources/js/app.js')
 <script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>
 @stack('scripts')
 

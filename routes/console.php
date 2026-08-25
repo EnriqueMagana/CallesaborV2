@@ -19,3 +19,9 @@ Schedule::call(function (): void {
         ->where('created_at', '<', now()->subDays(30))
         ->delete();
 })->dailyAt('03:20')->name('notifications:prune')->withoutOverlapping();
+
+Schedule::command('notifications:clear-realtime')
+    ->dailyAt((string) config('firebase.realtime.cleanup_time', '23:59'))
+    ->timezone((string) config('firebase.realtime.cleanup_timezone', 'America/Mexico_City'))
+    ->name('notifications:clear-realtime')
+    ->withoutOverlapping();
