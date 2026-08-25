@@ -64,6 +64,7 @@ class BusinessSettingsTest extends TestCase
             ->call('setTab', 'tickets')
             ->set('paperWidth', 58)
             ->set('fontSize', 14)
+            ->set('logoWidthMm', 30)
             ->set('showQr', true)
             ->call('saveTemplate')
             ->assertHasNoErrors();
@@ -80,6 +81,7 @@ class BusinessSettingsTest extends TestCase
             'font_size' => 14,
             'show_qr' => true,
         ]);
+        $this->assertSame(30, TicketTemplate::current('customer')->options['logo_width_mm']);
     }
 
     public function test_renderer_uses_blocks_business_data_and_qr_without_inline_css(): void
@@ -119,6 +121,7 @@ class BusinessSettingsTest extends TestCase
         );
 
         $this->assertStringContainsString('Mesa 4', $preview);
+        $this->assertStringContainsString('ticket-items-font-courier ticket-items-size-18', $preview);
         $this->assertStringContainsString('Entregar todos los platillos juntos.', $preview);
         $this->assertStringContainsString('Sin cebolla; término medio.', $preview);
 
@@ -161,6 +164,84 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringContainsString('Terraza', $html);
         $this->assertStringContainsString('Servir todos los platillos al mismo tiempo.', $html);
         $this->assertStringContainsString('Sin cebolla y término medio.', $html);
+    }
+
+    public function test_kitchen_product_typography_and_logo_size_are_saved_independently(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->call('setTab', 'tickets')
+            ->call('selectType', 'kitchen_area')
+            ->set('logoWidthMm', 48)
+            ->set('itemFontFamily', 'arial')
+            ->set('itemFontSize', 24)
+            ->call('saveTemplate')
+            ->assertHasNoErrors();
+
+        $template = TicketTemplate::current('kitchen_area')->fresh();
+        $this->assertSame(48, $template->options['logo_width_mm']);
+        $this->assertSame('arial', $template->options['item_font_family']);
+        $this->assertSame(24, $template->options['item_font_size']);
+
+        $preview = app(ThermalTicketRenderer::class)->renderPreview('kitchen_area', $template, BusinessSetting::current());
+        $this->assertStringContainsString('ticket-logo-size-48', $preview);
+        $this->assertStringContainsString('ticket-items-font-arial ticket-items-size-24', $preview);
+    }
+
+    public function test_ticket_logo_width_is_not_cancelled_by_a_fixed_height_limit(): void
+    {
+        $css = file_get_contents(public_path('assets/css/ticket-print.css'));
+
+        $this->assertStringContainsString('.ticket-logo { display: block; max-width: 100%; height: auto;', $css);
+        $this->assertStringNotContainsString('max-height:', $css);
+        $this->assertStringContainsString('.ticket-logo-size-12 .ticket-logo { width: 12mm; }', $css);
+        $this->assertStringContainsString('.ticket-logo-size-54 .ticket-logo { width: 54mm; }', $css);
+    }
+
+    public function test_pos_orders_receive_a_public_tracking_token_and_render_a_qr(): void
+    {
+        $user = User::factory()->create();
+        $register = CashRegister::create([
+            'name' => 'Caja con seguimiento',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'served_by' => $user->id,
+            'customer_name' => 'Cliente POS',
+            'type' => 'ventanilla',
+            'source' => 'pos',
+            'status' => 'pendiente',
+            'subtotal' => 95,
+            'total' => 95,
+        ]);
+        $order->items()->create([
+            'product_name' => 'Producto con QR',
+            'product_price' => 95,
+            'quantity' => 1,
+            'subtotal' => 95,
+        ]);
+        $attributes = TicketTemplate::defaultsFor('counter');
+        $attributes['show_qr'] = true;
+        $attributes['blocks'] = collect($attributes['blocks'])->map(function (array $block): array {
+            if ($block['key'] === 'qr') {
+                $block['enabled'] = true;
+            }
+
+            return $block;
+        })->all();
+        TicketTemplate::current('counter')->update($attributes);
+        $html = app(ThermalTicketRenderer::class)->renderOrder($order, 'counter', autoPrint: false);
+
+        $this->assertSame(64, strlen($order->fresh()->public_token));
+        $this->assertStringContainsString('data:image/svg+xml;base64,', $html);
+        $this->get(route('kiosk.track', $order->public_token))->assertOk()->assertSee('Producto con QR');
     }
 
     public function test_cash_cut_ticket_has_editable_sections_and_a_complete_preview(): void

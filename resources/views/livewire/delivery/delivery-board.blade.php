@@ -60,6 +60,7 @@
 
 <main id="delivery-content" class="delivery-page delivery-bank" tabindex="-1" x-data="{
     tab: $wire.entangle('tab', false),
+    highlightOrderId: @js($highlightOrderId),
     query: '',
     toasts: [],
     searchIndex: @js($searchIndex),
@@ -74,9 +75,17 @@
         const toast = { id: Date.now(), type: detail.type || 'info', message: detail.message };
         this.toasts.push(toast);
         setTimeout(() => this.toasts = this.toasts.filter(item => item.id !== toast.id), 3800);
+    },
+    focusNotifiedOrder() {
+        if (!this.highlightOrderId) return;
+        this.$nextTick(() => {
+            const card = document.getElementById('delivery-order-' + this.highlightOrderId);
+            card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card?.focus({ preventScroll: true });
+        });
     }
 }"
-    x-on:notify.window="notify($event.detail)">
+    x-init="focusNotifiedOrder()" x-on:notify.window="notify($event.detail)">
     <a href="#delivery-orders" class="delivery-skip-link">Saltar al banco de pedidos</a>
 
     <header class="delivery-bank__topbar">
@@ -204,7 +213,8 @@
                     <div class="delivery-bank__grid">
                         @foreach ($panelOrders as $order)
                             <x-delivery.order-card :order="$order" :takeable="$panel === 'available'" :show-driver="in_array($panel, ['assigned', 'delivered'], true)"
-                                :can-take="$canTakeOrders" :can-complete="$canCompleteOrders" :can-manage-all="$canManageAll" />
+                                :can-take="$canTakeOrders" :can-complete="$canCompleteOrders" :can-manage-all="$canManageAll"
+                                :highlighted="$highlightOrderId === $order->id" />
                         @endforeach
                     </div>
 

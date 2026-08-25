@@ -15,13 +15,30 @@ body.ticket-document { margin: 0 auto; color: #000; background: #fff; font-famil
 .ticket-header, .ticket-business, .ticket-footer, .ticket-qr { text-align: center; }
 .ticket-header h1 { margin: 0 0 2px; font-size: 1.35em; }
 .ticket-header strong { display: block; font-size: .92em; }
-.ticket-logo { display: block; width: auto; max-width: 42mm; max-height: 18mm; margin: 0 auto 4px; object-fit: contain; filter: grayscale(1); }
+.ticket-logo { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; object-fit: contain; filter: grayscale(1); }
+.ticket-logo-size-12 .ticket-logo { width: 12mm; } .ticket-logo-size-18 .ticket-logo { width: 18mm; }
+.ticket-logo-size-24 .ticket-logo { width: 24mm; } .ticket-logo-size-30 .ticket-logo { width: 30mm; }
+.ticket-logo-size-36 .ticket-logo { width: 36mm; } .ticket-logo-size-42 .ticket-logo { width: 42mm; }
+.ticket-logo-size-48 .ticket-logo { width: 48mm; } .ticket-logo-size-54 .ticket-logo { width: 54mm; }
 hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
 .ticket-row > :last-child { text-align: right; }
 .ticket-note, .ticket-sub { padding-left: 8px; font-size: .9em; }
 .ticket-item { margin-bottom: 6px; }
 .ticket-item-main { font-size: 1.02em; }
+.ticket-items-font-courier .ticket-items { font-family: "Courier New", monospace; }
+.ticket-items-font-arial .ticket-items { font-family: Arial, sans-serif; }
+.ticket-items-font-verdana .ticket-items { font-family: Verdana, sans-serif; }
+.ticket-items-font-system .ticket-items { font-family: system-ui, sans-serif; }
+.ticket-items-size-12 .ticket-items { font-size: 12px; } .ticket-items-size-13 .ticket-items { font-size: 13px; }
+.ticket-items-size-14 .ticket-items { font-size: 14px; } .ticket-items-size-15 .ticket-items { font-size: 15px; }
+.ticket-items-size-16 .ticket-items { font-size: 16px; } .ticket-items-size-17 .ticket-items { font-size: 17px; }
+.ticket-items-size-18 .ticket-items { font-size: 18px; } .ticket-items-size-19 .ticket-items { font-size: 19px; }
+.ticket-items-size-20 .ticket-items { font-size: 20px; } .ticket-items-size-21 .ticket-items { font-size: 21px; }
+.ticket-items-size-22 .ticket-items { font-size: 22px; } .ticket-items-size-23 .ticket-items { font-size: 23px; }
+.ticket-items-size-24 .ticket-items { font-size: 24px; } .ticket-items-size-25 .ticket-items { font-size: 25px; }
+.ticket-items-size-26 .ticket-items { font-size: 26px; } .ticket-items-size-27 .ticket-items { font-size: 27px; }
+.ticket-items-size-28 .ticket-items { font-size: 28px; }
 .ticket-total { font-size: 1.18em; font-weight: 700; }
 .ticket-delivery { padding: 5px; border: 2px solid #000; }
 .ticket-delivery > strong { display: block; margin-bottom: 3px; }

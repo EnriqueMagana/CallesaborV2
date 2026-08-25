@@ -2,9 +2,14 @@
 
 namespace App\Livewire\SuperAdmin;
 
+use App\Mail\DeveloperTestMail;
 use App\Models\AppNotification;
 use App\Services\DeveloperDiagnosticsService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Component;
+use Throwable;
 
 class DeveloperConsole extends Component
 {
@@ -17,6 +22,8 @@ class DeveloperConsole extends Component
     /** @var array<string, mixed>|null */
     public ?array $lastAction = null;
 
+    public string $testEmailRecipient = '';
+
     public function mount(DeveloperDiagnosticsService $diagnostics): void
     {
         abort_unless(auth()->user()?->can('ver panel super admin'), 403);
@@ -27,7 +34,7 @@ class DeveloperConsole extends Component
     {
         $this->authorizeDiagnostics();
         $this->diagnostics = $diagnostics->snapshot();
-        $this->lastAction = ['ok' => true, 'message' => 'Diagnóstico actualizado sin modificar la operación.'];
+        $this->lastAction = ['ok' => true, 'message' => 'Diagnóstico actualizado con éxito.'];
     }
 
     public function runFirebaseProbe(DeveloperDiagnosticsService $diagnostics): void
@@ -70,6 +77,78 @@ class DeveloperConsole extends Component
         $diagnostics->recordPulseTest(auth()->user());
         $this->lastAction = ['ok' => true, 'message' => 'Evento developer_diagnostic enviado a Laravel Pulse.'];
         $this->diagnostics = $diagnostics->snapshot();
+    }
+
+    public function sendTestEmail(): void
+    {
+        $this->authorizeDiagnostics();
+
+        $validated = $this->validate([
+            'testEmailRecipient' => ['required', 'string', 'email:rfc', 'max:254'],
+        ], [
+            'testEmailRecipient.required' => 'Escribe el correo que recibirá la prueba.',
+            'testEmailRecipient.email' => 'Escribe una dirección de correo válida.',
+            'testEmailRecipient.max' => 'El correo no puede superar 254 caracteres.',
+        ]);
+
+        if (config('mail.default') !== 'resend') {
+            $this->emailConfigurationError('El transportador activo no es Resend. Configura MAIL_MAILER=resend.');
+
+            return;
+        }
+
+        if (blank(config('services.resend.key'))) {
+            $this->emailConfigurationError('RESEND_API_KEY no está configurada en el entorno.');
+
+            return;
+        }
+
+        if (str_ends_with(strtolower((string) config('mail.from.address')), '@example.com')) {
+            $this->emailConfigurationError('MAIL_FROM_ADDRESS todavía usa example.com. Configura un remitente autorizado por Resend.');
+
+            return;
+        }
+
+        $rateLimitKey = 'developer-email-test:'.auth()->id();
+
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            $this->addError('testEmailRecipient', "Alcanzaste el límite de pruebas. Intenta de nuevo en {$seconds} segundos.");
+            $this->lastAction = ['ok' => false, 'message' => 'La prueba no se envió por el límite temporal de seguridad.'];
+
+            return;
+        }
+
+        RateLimiter::hit($rateLimitKey, 60);
+
+        try {
+            Mail::to($validated['testEmailRecipient'])->send(new DeveloperTestMail(
+                testerName: auth()->user()?->name ?? 'Super Admin',
+                sentAt: now()->format('d/m/Y H:i:s T'),
+            ));
+
+            $this->resetErrorBag('testEmailRecipient');
+            $this->lastAction = [
+                'ok' => true,
+                'message' => "Correo de prueba enviado a {$validated['testEmailRecipient']}.",
+            ];
+        } catch (Throwable $exception) {
+            Log::warning('Falló el correo de prueba del Centro técnico.', [
+                'recipient' => $validated['testEmailRecipient'],
+                'mailer' => config('mail.default'),
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+            ]);
+
+            $this->addError('testEmailRecipient', 'Resend rechazó o no pudo completar el envío. Revisa el remitente, el dominio y el registro de Laravel.');
+            $this->lastAction = ['ok' => false, 'message' => 'No se pudo enviar el correo de prueba.'];
+        }
+    }
+
+    private function emailConfigurationError(string $message): void
+    {
+        $this->addError('testEmailRecipient', $message);
+        $this->lastAction = ['ok' => false, 'message' => $message];
     }
 
     private function authorizeDiagnostics(): void

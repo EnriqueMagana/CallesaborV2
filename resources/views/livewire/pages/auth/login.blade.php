@@ -92,12 +92,7 @@ new #[Layout('layouts.guest')] class extends Component {
         </div>
 
         <div class="auth-field {{ $errors->has('form.password') ? 'has-error' : '' }}">
-            <div class="auth-field__label-row">
-                <label for="password">Contraseña</label>
-                @if (Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" wire:navigate>¿Olvidaste tu contraseña?</a>
-                @endif
-            </div>
+            <label for="password">Contraseña</label>
             <div class="auth-input-wrap">
                 <i class="bx bx-lock-alt" aria-hidden="true"></i>
                 <input wire:model="form.password" id="password" x-bind:type="showPassword ? 'text' : 'password'"
@@ -128,6 +123,17 @@ new #[Layout('layouts.guest')] class extends Component {
                 Verificando acceso…</span>
         </button>
     </form>
+
+    @if (Route::has('password.request'))
+        <aside class="auth-recovery" aria-labelledby="auth-recovery-title">
+            <span class="auth-recovery__icon"><i class="bx bx-key" aria-hidden="true"></i></span>
+            <div>
+                <strong id="auth-recovery-title">¿No puedes acceder?</strong>
+                <span>Recibe por correo un enlace seguro para crear una nueva contraseña.</span>
+            </div>
+            <a href="{{ route('password.request') }}" wire:navigate>Recuperar contraseña</a>
+        </aside>
+    @endif
 
     <div class="auth-security-note">
         <i class="bx bx-rocket" aria-hidden="true"></i>

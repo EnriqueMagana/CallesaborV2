@@ -69,37 +69,74 @@ new #[Layout('layouts.guest')] class extends Component
     }
 }; ?>
 
-<div>
-    <form wire:submit="resetPassword">
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input wire:model="email" id="email" class="block mt-1 w-full" type="email" name="email" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+<div class="auth-login" x-data="{ showPassword: false, showConfirmation: false }">
+    <header class="auth-login__header">
+        <span class="auth-login__eyebrow">Enlace verificado</span>
+        <h2>Crea una nueva contraseña</h2>
+        <p>Utiliza una contraseña que no hayas usado anteriormente en esta cuenta.</p>
+    </header>
+
+    <form wire:submit="resetPassword" class="auth-form" novalidate>
+        <div class="auth-field {{ $errors->has('email') ? 'has-error' : '' }}">
+            <label for="email">Correo electrónico</label>
+            <div class="auth-input-wrap">
+                <i class="bx bx-envelope" aria-hidden="true"></i>
+                <input wire:model="email" id="email" type="email" name="email" required autofocus
+                    autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="reset-email-error">
+            </div>
+            @error('email')
+                <p id="reset-email-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle"
+                        aria-hidden="true"></i>{{ $message }}</p>
+            @enderror
         </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-            <x-text-input wire:model="password" id="password" class="block mt-1 w-full" type="password" name="password" required autocomplete="new-password" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        <div class="auth-field {{ $errors->has('password') ? 'has-error' : '' }}">
+            <label for="password">Nueva contraseña</label>
+            <div class="auth-input-wrap">
+                <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                <input wire:model="password" id="password" x-bind:type="showPassword ? 'text' : 'password'"
+                    name="password" required autocomplete="new-password" aria-describedby="new-password-help password-error">
+                <button type="button" class="auth-password-toggle" x-on:click="showPassword = !showPassword"
+                    x-bind:aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                    x-bind:aria-pressed="showPassword">
+                    <i class="bx" x-bind:class="showPassword ? 'bx-hide' : 'bx-show'" aria-hidden="true"></i>
+                </button>
+            </div>
+            <small id="new-password-help" class="auth-field__help">Usa al menos 8 caracteres.</small>
+            @error('password')
+                <p id="password-error" class="auth-field__error" role="alert"><i class="bx bx-error-circle"
+                        aria-hidden="true"></i>{{ $message }}</p>
+            @enderror
         </div>
 
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-
-            <x-text-input wire:model="password_confirmation" id="password_confirmation" class="block mt-1 w-full"
-                          type="password"
-                          name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+        <div class="auth-field {{ $errors->has('password_confirmation') ? 'has-error' : '' }}">
+            <label for="password_confirmation">Confirma la contraseña</label>
+            <div class="auth-input-wrap">
+                <i class="bx bx-lock-open-alt" aria-hidden="true"></i>
+                <input wire:model="password_confirmation" id="password_confirmation"
+                    x-bind:type="showConfirmation ? 'text' : 'password'" name="password_confirmation" required
+                    autocomplete="new-password" aria-describedby="password-confirmation-error">
+                <button type="button" class="auth-password-toggle"
+                    x-on:click="showConfirmation = !showConfirmation"
+                    x-bind:aria-label="showConfirmation ? 'Ocultar confirmación' : 'Mostrar confirmación'"
+                    x-bind:aria-pressed="showConfirmation">
+                    <i class="bx" x-bind:class="showConfirmation ? 'bx-hide' : 'bx-show'" aria-hidden="true"></i>
+                </button>
+            </div>
+            @error('password_confirmation')
+                <p id="password-confirmation-error" class="auth-field__error" role="alert"><i
+                        class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>
+            @enderror
         </div>
 
-        <div class="flex items-center justify-end mt-4">
-            <x-primary-button>
-                {{ __('Reset Password') }}
-            </x-primary-button>
-        </div>
+        <button type="submit" class="auth-submit" wire:loading.attr="disabled" wire:target="resetPassword">
+            <span wire:loading.remove wire:target="resetPassword">Guardar nueva contraseña <i
+                    class="bx bx-check-shield" aria-hidden="true"></i></span>
+            <span wire:loading.flex wire:target="resetPassword"><i class="bx bx-loader-alt bx-spin"
+                    aria-hidden="true"></i> Actualizando…</span>
+        </button>
     </form>
+
+    <a class="auth-back-link" href="{{ route('login') }}" wire:navigate><i class="bx bx-left-arrow-alt"
+            aria-hidden="true"></i> Volver al inicio de sesión</a>
 </div>

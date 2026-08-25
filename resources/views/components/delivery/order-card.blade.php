@@ -5,6 +5,7 @@
     'canTake' => false,
     'canComplete' => false,
     'canManageAll' => false,
+    'highlighted' => false,
 ])
 
 @php
@@ -33,7 +34,8 @@
     $expandId = 'delivery-card-details-'.$order->id;
 @endphp
 
-<article class="delivery-bank-card {{ $order->status === 'en_reparto' ? 'is-picked-up' : '' }}"
+<article id="delivery-order-{{ $order->id }}" tabindex="-1"
+    class="delivery-bank-card {{ $order->status === 'en_reparto' ? 'is-picked-up' : '' }} {{ $highlighted ? 'is-highlighted' : '' }}"
     wire:key="delivery-order-{{ $order->id }}" data-delivery-search="{{ $searchKey }}"
     x-data="{ expanded: false }" x-show="matches($el.dataset.deliverySearch)" x-transition.opacity
     aria-labelledby="delivery-order-title-{{ $order->id }}">

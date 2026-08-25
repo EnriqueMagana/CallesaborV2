@@ -93,7 +93,7 @@ class ThermalTicketRenderer
                 'references' => $order->customer_references ?: $order->customer?->references,
                 'method' => $order->delivery_method_label,
             ],
-            'tracking_url' => $order->public_token ? route('kiosk.track', $order->public_token) : null,
+            'tracking_url' => route('kiosk.track', $order->ensurePublicToken()),
         ];
     }
 

@@ -19,6 +19,13 @@ class BusinessSettingsManager extends Component
 
     public const MAX_GALLERY_IMAGES = 24;
 
+    public const KITCHEN_ITEM_FONTS = [
+        'courier' => 'Courier New',
+        'arial' => 'Arial',
+        'verdana' => 'Verdana',
+        'system' => 'Sistema',
+    ];
+
     public string $activeTab = 'business';
 
     public string $businessSection = 'identity';
@@ -100,6 +107,12 @@ class BusinessSettingsManager extends Component
     public int $fontSize = 12;
 
     public int $marginMm = 4;
+
+    public int $logoWidthMm = 42;
+
+    public string $itemFontFamily = 'courier';
+
+    public int $itemFontSize = 18;
 
     public bool $showLogo = false;
 
@@ -354,6 +367,9 @@ class BusinessSettingsManager extends Component
             'paperWidth' => 'required|in:58,80',
             'fontSize' => 'required|integer|min:9|max:16',
             'marginMm' => 'required|integer|min:2|max:6',
+            'logoWidthMm' => 'required|integer|in:12,18,24,30,36,42,48,54',
+            'itemFontFamily' => 'required|in:courier,arial,verdana,system',
+            'itemFontSize' => 'required|integer|min:12|max:28',
             'qrLabel' => 'nullable|string|max:120',
             'footerText' => 'nullable|string|max:240',
             'blocks' => 'required|array|min:1',
@@ -371,7 +387,14 @@ class BusinessSettingsManager extends Component
             'qr_label' => trim($this->qrLabel) ?: null,
             'footer_text' => trim($this->footerText) ?: null,
             'blocks' => array_values($this->blocks),
-            'options' => ['show_rfc' => $this->showRfc, 'show_phone' => $this->showPhone, 'show_address' => $this->showAddress],
+            'options' => [
+                'show_rfc' => $this->showRfc,
+                'show_phone' => $this->showPhone,
+                'show_address' => $this->showAddress,
+                'logo_width_mm' => $this->logoWidthMm,
+                'item_font_family' => $this->itemFontFamily,
+                'item_font_size' => $this->itemFontSize,
+            ],
             'updated_by' => auth()->id(),
         ]);
 
@@ -436,7 +459,14 @@ class BusinessSettingsManager extends Component
             'qr_label' => $this->qrLabel,
             'footer_text' => $this->footerText,
             'blocks' => $this->blocks,
-            'options' => ['show_rfc' => $this->showRfc, 'show_phone' => $this->showPhone, 'show_address' => $this->showAddress],
+            'options' => [
+                'show_rfc' => $this->showRfc,
+                'show_phone' => $this->showPhone,
+                'show_address' => $this->showAddress,
+                'logo_width_mm' => $this->logoWidthMm,
+                'item_font_family' => $this->itemFontFamily,
+                'item_font_size' => $this->itemFontSize,
+            ],
         ]);
         $business = clone BusinessSetting::current();
         $business->fill([
@@ -504,6 +534,9 @@ class BusinessSettingsManager extends Component
         $this->showRfc = (bool) ($template->options['show_rfc'] ?? true);
         $this->showPhone = (bool) ($template->options['show_phone'] ?? true);
         $this->showAddress = (bool) ($template->options['show_address'] ?? true);
+        $this->logoWidthMm = (int) ($template->options['logo_width_mm'] ?? 42);
+        $this->itemFontFamily = (string) ($template->options['item_font_family'] ?? 'courier');
+        $this->itemFontSize = (int) ($template->options['item_font_size'] ?? ($this->selectedType === 'kitchen_area' ? 18 : 12));
         $this->blocks = $template->blocks;
     }
 

@@ -43,6 +43,62 @@
         @endforeach
     </section>
 
+    @php
+        $mailFrom = (string) config('mail.from.address');
+        $usesPlaceholderSender = str_ends_with(strtolower($mailFrom), '@example.com');
+        $resendReady = config('mail.default') === 'resend' && filled(config('services.resend.key')) && ! $usesPlaceholderSender;
+        $usesResendSandbox = str_ends_with(strtolower($mailFrom), '@resend.dev');
+    @endphp
+    <section class="developer-panel developer-email-test">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div>
+                <span class="developer-panel__icon"><i class="bx bx-envelope" aria-hidden="true"></i></span>
+                <div><h2>Prueba de correo</h2><p>Envía un mensaje real para validar Resend, el remitente y la entrega.</p></div>
+            </div>
+            <span class="developer-state {{ $resendReady ? 'is-announced' : 'is-pending' }}">
+                {{ $resendReady ? 'Listo para probar' : 'Configuración incompleta' }}
+            </span>
+        </header>
+        <div class="developer-email-test__body">
+            <form wire:submit="sendTestEmail" class="developer-email-test__form" novalidate>
+                <label for="developer-test-email">Correo destinatario</label>
+                <div class="developer-email-test__control">
+                    <span aria-hidden="true"><i class="bx bx-at"></i></span>
+                    <input id="developer-test-email" type="email" wire:model="testEmailRecipient"
+                        autocomplete="email" inputmode="email" placeholder="nombre@dominio.com"
+                        aria-describedby="developer-test-email-help @error('testEmailRecipient') developer-test-email-error @enderror"
+                        @error('testEmailRecipient') aria-invalid="true" @enderror>
+                    <button type="submit" class="developer-button developer-button--primary"
+                        wire:loading.attr="disabled" wire:target="sendTestEmail">
+                        <i class="bx bx-send" aria-hidden="true"></i>
+                        <span wire:loading.remove wire:target="sendTestEmail">Enviar prueba</span>
+                        <span wire:loading wire:target="sendTestEmail">Enviando…</span>
+                    </button>
+                </div>
+                <small id="developer-test-email-help">Máximo 3 envíos por minuto para esta cuenta.</small>
+                @error('testEmailRecipient')
+                    <p id="developer-test-email-error" class="developer-email-test__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>
+                @enderror
+            </form>
+            <dl class="developer-email-test__status" aria-label="Configuración de correo">
+                <div><dt>Transportador</dt><dd>{{ config('mail.default') ?: 'Sin configurar' }}</dd></div>
+                <div><dt>Remitente</dt><dd>{{ $mailFrom ?: 'Sin configurar' }}</dd></div>
+                <div><dt>API key</dt><dd>{{ filled(config('services.resend.key')) ? 'Configurada' : 'No configurada' }}</dd></div>
+            </dl>
+        </div>
+        @if ($usesResendSandbox)
+            <div class="developer-email-test__notice" role="note">
+                <i class="bx bx-info-circle" aria-hidden="true"></i>
+                <span><strong>Remitente de prueba de Resend.</strong> Con <code>resend.dev</code> solo puedes enviar al correo propietario de la cuenta. Verifica un dominio para probar otros destinatarios.</span>
+            </div>
+        @elseif ($usesPlaceholderSender)
+            <div class="developer-email-test__notice" role="alert">
+                <i class="bx bx-error-circle" aria-hidden="true"></i>
+                <span><strong>El remitente todavía es un ejemplo.</strong> Sustituye <code>{{ $mailFrom }}</code> en <code>MAIL_FROM_ADDRESS</code> por una dirección de tu dominio verificado en Resend.</span>
+            </div>
+        @endif
+    </section>
+
     <div class="developer-console__columns">
         <section class="developer-panel">
             <header class="developer-panel__header">
