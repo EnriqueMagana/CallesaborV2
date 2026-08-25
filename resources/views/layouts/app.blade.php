@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="color-scheme" content="light">
+    <meta name="realtime-notification-session" content="{{ route('app.notifications.realtime-session') }}">
 
     <title>{{ $businessSettings?->platform_name ?? config('app.name', 'Laravel') }} - Admin</title>
 
@@ -155,6 +156,7 @@
     <script src="{{ asset('assets/js/main.js') }}?v={{ filemtime(public_path('assets/js/main.js')) }}" data-navigate-once></script>
 
     @livewireScripts
+    @vite('resources/js/app.js')
 
     <script src="{{ asset('assets/js/dashboard.js') }}?v={{ filemtime(public_path('assets/js/dashboard.js')) }}" data-navigate-once></script>
     <script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>

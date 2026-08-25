@@ -40,6 +40,8 @@ class AppServiceProvider extends ServiceProvider
             return $user->hasAnyRole(['owner', 'super-admin']) ? true : null;
         });
 
+        Gate::define('viewPulse', fn ($user) => $user->hasAnyRole(['owner', 'super-admin', 'admin', 'gerente']));
+
         Livewire::component('layout.admin-sidebar', AdminSidebar::class);
         Livewire::component('layout.admin-navbar', AdminNavbar::class);
         Livewire::component('layout.notification-center', NotificationCenter::class);

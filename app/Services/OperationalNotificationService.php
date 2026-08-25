@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Jobs\PublishRealtimeNotification;
+use App\Models\AppNotification;
 use App\Models\DeliveryAssignment;
 use App\Models\Order;
 use App\Models\User;
@@ -119,6 +121,11 @@ class OperationalNotificationService
 
         if ($rows !== []) {
             DB::table('notifications')->insertOrIgnore($rows);
+
+            AppNotification::query()
+                ->whereIn('id', collect($rows)->pluck('id'))
+                ->pluck('id')
+                ->each(fn (string $id) => PublishRealtimeNotification::dispatchAfterResponse($id));
         }
     }
 

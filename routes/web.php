@@ -6,6 +6,7 @@ use App\Http\Controllers\KioskMediaController;
 use App\Http\Controllers\PublicHomeController;
 use App\Http\Controllers\PublicInfoController;
 use App\Http\Controllers\PublicMenuController;
+use App\Http\Controllers\RealtimeNotificationSessionController;
 use App\Http\Middleware\EnforceSidebarModuleAccess;
 use App\Http\Middleware\EnsureOrderBelongsToCurrentRegister;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -69,6 +70,10 @@ Route::get('/pedido/{publicToken}', OrderTracking::class)->name('kiosk.track');
 
 // Admin panel - requires auth
 Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class, EnforceSidebarModuleAccess::class, RequireOpenCashRegisterForConfiguredModules::class, 'verified'])->prefix('app')->name('app.')->group(function () {
+    Route::get('/notifications/realtime-session', RealtimeNotificationSessionController::class)
+        ->withoutMiddleware([EnforceSidebarModuleAccess::class, RequireOpenCashRegisterForConfiguredModules::class])
+        ->middleware('throttle:20,1')
+        ->name('notifications.realtime-session');
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/usuarios', UserList::class)->middleware('can:ver usuarios')->name('usuarios');
     Route::get('/roles-permisos', RolePermissionManager::class)->name('roles-permisos');
