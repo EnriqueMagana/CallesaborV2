@@ -28,3 +28,4 @@ Thumbs.db
 firebaseconfig.txt
 /storage/app/firebase-service-account.json
 firebase-service-account*.json
+*-firebase-adminsdk-*.json
