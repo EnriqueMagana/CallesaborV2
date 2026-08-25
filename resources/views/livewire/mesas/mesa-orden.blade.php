@@ -119,16 +119,26 @@
         <div class="mo-cart-drawer" :class="{ 'open': cartOpen }" x-cloak>
             <div class="mo-cart-drawer-handle"></div>
 
-            <div class="mo-cart-header">
-                <span><i class="bx bx-cart me-1"></i> Orden nueva
-                    @if(!empty($cart))
-                        <span class="mo-cart-count ms-1">{{ $this->cartCount }}</span>
-                    @endif
-                </span>
+            <header class="mo-cart-header">
+                <div class="mo-cart-header__identity">
+                    <span class="mo-cart-header__icon" aria-hidden="true"><i class="bx bx-receipt"></i></span>
+                    <div>
+                        <h2>Orden para mesa {{ $this->mesa->number }}</h2>
+                        <p aria-live="polite">
+                            @if(!empty($cart))
+                                {{ count($cart) }} {{ count($cart) === 1 ? 'producto' : 'productos' }}
+                                <span aria-hidden="true">&middot;</span>
+                                {{ $this->cartCount }} {{ $this->cartCount === 1 ? 'unidad' : 'unidades' }}
+                            @else
+                                Lista para comenzar
+                            @endif
+                        </p>
+                    </div>
+                </div>
                 <button type="button" class="mo-cart-close" @click="cartOpen = false" aria-label="Cerrar carrito">
-                    <i class="bx bx-x"></i>
+                    <i class="bx bx-x" aria-hidden="true"></i>
                 </button>
-            </div>
+            </header>
 
             @error('cart')
                 <div class="alert alert-warning py-2 mx-3 mb-0 mt-2">
@@ -136,9 +146,9 @@
                 </div>
             @enderror
 
-            <div class="mo-cart-items">
+            <div class="mo-cart-items" role="list" aria-label="Productos de la nueva orden">
                 @forelse($cart as $line)
-                <div class="mo-cart-item" wire:key="cart-{{ $line['cart_id'] }}">
+                <article class="mo-cart-item" role="listitem" wire:key="cart-{{ $line['cart_id'] }}">
                     <div class="mo-cart-item-main">
                         @if(!empty($line['image']))
                             <img class="mo-cart-item-image" src="{{ Storage::url($line['image']) }}"
@@ -149,11 +159,14 @@
                             </span>
                         @endif
                         <div class="mo-cart-item-copy">
-                            <div class="mo-cart-item-name">{{ $line['name'] }}</div>
+                            <div class="mo-cart-item-heading">
+                                <div class="mo-cart-item-name">{{ $line['name'] }}</div>
+                                <strong class="mo-cart-item-price">${{ number_format($line['unit_total'] * $line['qty'], 2) }}</strong>
+                            </div>
                             @if(!empty($line['addons']))
                                 <div class="mo-cart-item-mods">
                                     @foreach($line['addons'] as $a)
-                                        <span class="mo-cart-mod-chip">+ {{ $a['addon_name'] }}</span>
+                                        <span class="mo-cart-mod-chip"><i class="bx bx-plus-circle" aria-hidden="true"></i>{{ $a['addon_name'] }}</span>
                                     @endforeach
                                 </div>
                             @endif
@@ -164,45 +177,67 @@
                                     @endforeach
                                 </div>
                             @endif
+                            @if(!empty($line['notes']))
+                                <div class="mo-cart-item-note">
+                                    <i class="bx bx-message-rounded-detail" aria-hidden="true"></i>
+                                    <span>{{ $line['notes'] }}</span>
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div class="mo-cart-item-controls">
+                        <div class="mo-cart-stepper" aria-label="Cantidad de {{ $line['name'] }}">
                         <button type="button" class="mo-qty-btn" wire:click="decrementQty('{{ $line['cart_id'] }}')" aria-label="Reducir {{ $line['name'] }}">
-                            <i class="bx bx-minus"></i>
+                            <i class="bx bx-minus" aria-hidden="true"></i>
                         </button>
-                        <span class="mo-qty-val">{{ $line['qty'] }}</span>
+                        <span class="mo-qty-val" aria-label="Cantidad {{ $line['qty'] }}">{{ $line['qty'] }}</span>
                         <button type="button" class="mo-qty-btn" wire:click="incrementQty('{{ $line['cart_id'] }}')" aria-label="Aumentar {{ $line['name'] }}">
-                            <i class="bx bx-plus"></i>
+                            <i class="bx bx-plus" aria-hidden="true"></i>
                         </button>
-                        <span class="mo-cart-item-price">${{ number_format($line['unit_total'] * $line['qty'], 2) }}</span>
-                        <button type="button" class="mo-cart-edit" wire:click="editCartItem('{{ $line['cart_id'] }}')" title="Editar" aria-label="Editar {{ $line['name'] }}">
-                            <i class="bx bx-edit"></i>
+                        </div>
+                        <div class="mo-cart-item-actions">
+                        <button type="button" class="mo-cart-edit" wire:click="editCartItem('{{ $line['cart_id'] }}')" title="Personalizar" aria-label="Personalizar {{ $line['name'] }}">
+                            <i class="bx bx-slider-alt" aria-hidden="true"></i><span>Editar</span>
                         </button>
                         <button type="button" class="mo-cart-remove" wire:click="removeFromCart('{{ $line['cart_id'] }}')" title="Eliminar" aria-label="Eliminar {{ $line['name'] }}">
-                            <i class="bx bx-x"></i>
+                            <i class="bx bx-trash" aria-hidden="true"></i>
                         </button>
+                        </div>
                     </div>
-                </div>
+                </article>
                 @empty
                 <div class="mo-cart-empty">
-                    <i class="bx bx-cart-alt"></i>
-                    <p>Toca un producto para agregarlo</p>
+                    <span class="mo-cart-empty__icon" aria-hidden="true"><i class="bx bx-basket"></i></span>
+                    <strong>La orden está vacía</strong>
+                    <p>Toca un producto del catálogo para comenzar.</p>
                 </div>
                 @endforelse
             </div>
 
             @if(!empty($cart))
             <div class="mo-cart-footer">
-                <input type="text" class="form-control form-control-sm"
-                       wire:model="orderNotes" placeholder="Nota para cocina (opcional)">
-                <div class="mo-cart-total">
-                    <span>Total</span>
-                    <strong>${{ number_format($this->cartTotal, 2) }}</strong>
+                <label class="mo-order-note">
+                    <span class="mo-order-note__icon" aria-hidden="true"><i class="bx bx-message-dots"></i></span>
+                    <span class="mo-order-note__content">
+                        <span class="mo-order-note__label">Nota general para cocina</span>
+                        <input type="text" wire:model="orderNotes" maxlength="500"
+                               placeholder="Ej. entregar todo junto">
+                    </span>
+                </label>
+                <div class="mo-cart-summary" aria-label="Resumen de la orden">
+                    <div class="mo-cart-summary__meta">
+                        <span>{{ $this->cartCount }} {{ $this->cartCount === 1 ? 'artículo' : 'artículos' }}</span>
+                        <span>Total estimado</span>
+                    </div>
+                    <div class="mo-cart-total">
+                        <span>Total</span>
+                        <strong>${{ number_format($this->cartTotal, 2) }}</strong>
+                    </div>
                 </div>
-                <button class="mo-send-btn" wire:click="placeOrder"
+                <button type="button" class="mo-send-btn" wire:click="placeOrder"
                         wire:loading.attr="disabled" wire:target="placeOrder">
                     <span wire:loading.remove wire:target="placeOrder">
-                        <i class="bx bx-send"></i> Mandar a cocina
+                        <i class="bx bx-send" aria-hidden="true"></i> Enviar orden a cocina
                     </span>
                     <span wire:loading wire:target="placeOrder">
                         <span class="spinner-border spinner-border-sm"></span> Enviando…
@@ -213,7 +248,8 @@
         </div>
 
         {{-- BOTTOM BAR (always visible) --}}
-        <button type="button" class="mo-bottom-bar" @click="cartOpen = !cartOpen" aria-label="Abrir resumen del pedido">
+        <button type="button" class="mo-bottom-bar" @click="cartOpen = !cartOpen"
+                :aria-expanded="cartOpen ? 'true' : 'false'" aria-label="Abrir resumen del pedido">
             <div class="mo-bb-icon-wrap">
                 <i class="bx bx-cart"></i>
                 @if($this->cartCount > 0)
@@ -222,9 +258,11 @@
             </div>
             <span class="mo-bb-label">
                 @if($this->cartCount > 0)
-                    {{ $this->cartCount }} {{ $this->cartCount === 1 ? 'item' : 'items' }}
+                    <strong>Ver orden</strong>
+                    <small>{{ $this->cartCount }} {{ $this->cartCount === 1 ? 'artículo' : 'artículos' }}</small>
                 @else
-                    Sin items en el carrito
+                    <strong>Nueva orden</strong>
+                    <small>Agrega productos del catálogo</small>
                 @endif
             </span>
             @if($this->cartCount > 0)
