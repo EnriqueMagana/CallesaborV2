@@ -60,6 +60,11 @@ class RolesAndPermissionsSeeder extends Seeder
                 'recepcionar compras inventario',
                 'registrar salida de insumos',
             ],
+            'desarrollo' => [
+                'ver panel super admin',
+                'ejecutar diagnosticos',
+                'probar notificaciones',
+            ],
         ];
 
         foreach ($permissions as $group => $perms) {
@@ -72,7 +77,8 @@ class RolesAndPermissionsSeeder extends Seeder
         }
 
         // Super Admin — bypasa todos los gates con Spatie
-        Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+        $superAdmin = Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+        $superAdmin->syncPermissions(Permission::all());
 
         // Owner — propietario del negocio, con bypass global desde AppServiceProvider.
         Role::firstOrCreate(['name' => 'owner', 'guard_name' => 'web']);
@@ -87,6 +93,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'editar menu sidebar',
             'eliminar menu sidebar',
             'gestionar bloqueos por caja',
+            'ver panel super admin',
+            'ejecutar diagnosticos',
+            'probar notificaciones',
         ])->get());
 
         // Gerente

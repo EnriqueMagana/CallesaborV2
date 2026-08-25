@@ -62,6 +62,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/orders.css') }}?v={{ filemtime(public_path('assets/css/orders.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/role-permissions.css') }}?v={{ filemtime(public_path('assets/css/role-permissions.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/developer-console.css') }}?v={{ filemtime(public_path('assets/css/developer-console.css')) }}" />
 
     @stack('styles')
     {{-- Modo oscuro pausado temporalmente.

@@ -1,0 +1,138 @@
+<div class="developer-console">
+    <header class="developer-console__hero">
+        <div>
+            <span class="developer-console__eyebrow"><i class="bx bx-code-alt" aria-hidden="true"></i> Super Admin</span>
+            <h1>Centro técnico</h1>
+            <p>Observabilidad, salud de servicios y pruebas controladas antes de producción.</p>
+        </div>
+        <div class="developer-console__hero-actions">
+            <a href="{{ route('pulse') }}" target="_blank" rel="noopener" class="developer-button developer-button--secondary">
+                <i class="bx bx-pulse" aria-hidden="true"></i> Abrir Laravel Pulse
+            </a>
+            <button type="button" class="developer-button developer-button--primary" wire:click="refreshDiagnostics"
+                wire:loading.attr="disabled" wire:target="refreshDiagnostics">
+                <i class="bx bx-refresh" aria-hidden="true"></i>
+                <span wire:loading.remove wire:target="refreshDiagnostics">Actualizar diagnóstico</span>
+                <span wire:loading wire:target="refreshDiagnostics">Comprobando…</span>
+            </button>
+        </div>
+    </header>
+
+    @if ($lastAction)
+        <div class="developer-alert developer-alert--{{ $lastAction['ok'] ? 'success' : 'warning' }}" role="status">
+            <i class="bx {{ $lastAction['ok'] ? 'bx-check-circle' : 'bx-error-circle' }}" aria-hidden="true"></i>
+            <div><strong>{{ $lastAction['ok'] ? 'Prueba completada' : 'Atención' }}</strong><span>{{ $lastAction['message'] }}</span></div>
+        </div>
+    @endif
+
+    <section class="developer-health-grid" aria-label="Estado general de servicios">
+        @php
+            $healthCards = [
+                ['label' => 'Base de datos', 'ok' => $diagnostics['database']['ok'], 'value' => $diagnostics['database']['connection'], 'meta' => $diagnostics['database']['latency_ms'].' ms', 'icon' => 'bx-data'],
+                ['label' => 'Firebase RTDB', 'ok' => $diagnostics['firebase']['ready'], 'value' => $diagnostics['firebase']['ready'] ? 'Operativo' : 'Fallback activo', 'meta' => $diagnostics['firebase']['database_host'] ?: 'Sin host', 'icon' => 'bx-broadcast'],
+                ['label' => 'Laravel Pulse', 'ok' => $diagnostics['pulse']['enabled'] && $diagnostics['pulse']['tables_ready'], 'value' => $diagnostics['pulse']['enabled'] ? 'Grabando' : 'Desactivado', 'meta' => number_format((int) ($diagnostics['pulse']['entries'] ?? 0)).' entradas', 'icon' => 'bx-pulse'],
+                ['label' => 'Cola', 'ok' => (int) ($diagnostics['queue']['failed'] ?? 0) === 0, 'value' => $diagnostics['queue']['connection'], 'meta' => (int) ($diagnostics['queue']['pending'] ?? 0).' pendientes · '.(int) ($diagnostics['queue']['failed'] ?? 0).' fallidos', 'icon' => 'bx-layer'],
+            ];
+        @endphp
+        @foreach ($healthCards as $card)
+            <article class="developer-health-card {{ $card['ok'] ? 'is-healthy' : 'needs-attention' }}">
+                <span class="developer-health-card__icon"><i class="bx {{ $card['icon'] }}" aria-hidden="true"></i></span>
+                <div><span>{{ $card['label'] }}</span><strong>{{ $card['value'] }}</strong><small>{{ $card['meta'] }}</small></div>
+                <span class="developer-status"><i class="bx {{ $card['ok'] ? 'bx-check' : 'bx-error' }}" aria-hidden="true"></i>{{ $card['ok'] ? 'OK' : 'Revisar' }}</span>
+            </article>
+        @endforeach
+    </section>
+
+    <div class="developer-console__columns">
+        <section class="developer-panel">
+            <header class="developer-panel__header">
+                <div><span class="developer-panel__icon"><i class="bx bx-bell" aria-hidden="true"></i></span><div><h2>Laboratorio de notificaciones</h2><p>Prueba cada ruta de entrega de forma independiente.</p></div></div>
+            </header>
+            <div class="developer-test-list">
+                <article class="developer-test-item">
+                    <div><strong>Fallback Livewire</strong><span>Guarda en MySQL y fuerza la actualización del centro actual.</span></div>
+                    <button type="button" wire:click="testLivewireNotification" wire:loading.attr="disabled" class="developer-button developer-button--secondary">Probar Livewire</button>
+                </article>
+                <article class="developer-test-item">
+                    <div><strong>Ciclo Firebase en tiempo real</strong><span>Publica una señal privada y espera que el listener actualice el centro.</span></div>
+                    <button type="button" wire:click="testRealtimeNotification" wire:loading.attr="disabled" class="developer-button developer-button--primary">Probar Firebase</button>
+                </article>
+                <article class="developer-test-item">
+                    <div><strong>Autenticación y reglas</strong><span>Valida token personalizado, lectura privada y latencia externa.</span></div>
+                    <button type="button" wire:click="runFirebaseProbe" wire:loading.attr="disabled" class="developer-button developer-button--secondary">Ejecutar validación</button>
+                </article>
+                <article class="developer-test-item">
+                    <div><strong>Registro personalizado Pulse</strong><span>Genera un evento técnico identificable como developer_diagnostic.</span></div>
+                    <button type="button" wire:click="testPulse" wire:loading.attr="disabled" class="developer-button developer-button--secondary">Enviar a Pulse</button>
+                </article>
+            </div>
+            @if ($firebaseProbe)
+                <div class="developer-probe {{ $firebaseProbe['ok'] ? 'is-success' : 'is-error' }}" role="status">
+                    <strong><i class="bx {{ $firebaseProbe['ok'] ? 'bx-check-shield' : 'bx-shield-x' }}" aria-hidden="true"></i>{{ $firebaseProbe['ok'] ? 'Firebase validado' : 'Validación fallida' }}</strong>
+                    <span>{{ $firebaseProbe['message'] }}</span>
+                    <small>
+                        {{ $firebaseProbe['latency_ms'] }} ms · {{ $firebaseProbe['checked_at'] }}
+                        {{ isset($firebaseProbe['signals']) ? ' · '.$firebaseProbe['signals'].' señales' : '' }}
+                    </small>
+                </div>
+            @endif
+        </section>
+
+        <aside class="developer-panel">
+            <header class="developer-panel__header">
+                <div><span class="developer-panel__icon"><i class="bx bx-cog" aria-hidden="true"></i></span><div><h2>Entorno</h2><p>Datos no sensibles de ejecución.</p></div></div>
+            </header>
+            <dl class="developer-definition-list">
+                <div><dt>Entorno</dt><dd>{{ $diagnostics['application']['environment'] }}</dd></div>
+                <div><dt>APP_DEBUG</dt><dd class="{{ $diagnostics['application']['debug'] ? 'text-danger' : '' }}">{{ $diagnostics['application']['debug'] ? 'Activo' : 'Desactivado' }}</dd></div>
+                <div><dt>Laravel</dt><dd>{{ $diagnostics['application']['laravel'] }}</dd></div>
+                <div><dt>PHP</dt><dd>{{ $diagnostics['application']['php'] }}</dd></div>
+                <div><dt>Dominio</dt><dd>{{ $diagnostics['application']['url_host'] }}</dd></div>
+                <div><dt>Limpieza RTDB</dt><dd>{{ $diagnostics['firebase']['cleanup'] }}</dd></div>
+                <div><dt>Fallos Firebase en Pulse</dt><dd>{{ (int) ($diagnostics['pulse']['firebase_failures'] ?? 0) }}</dd></div>
+                <div><dt>Actualizado</dt><dd>{{ $diagnostics['generated_at'] }}</dd></div>
+            </dl>
+        </aside>
+    </div>
+
+    <section class="developer-panel">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div><span class="developer-panel__icon"><i class="bx bx-git-branch" aria-hidden="true"></i></span><div><h2>Validación de responsabilidades</h2><p>Referencia rápida para evitar notificaciones dirigidas al rol incorrecto.</p></div></div>
+            <span class="developer-panel__counter">{{ count($responsibilityMatrix) }} eventos críticos</span>
+        </header>
+        <div class="developer-table-wrap">
+            <table class="developer-table">
+                <thead><tr><th>Evento</th><th>Clave</th><th>Destinatarios esperados</th></tr></thead>
+                <tbody>
+                    @foreach ($responsibilityMatrix as $row)
+                        <tr><td><strong>{{ $row['event'] }}</strong></td><td><code>{{ $row['key'] }}</code></td><td>{{ $row['recipients'] }}</td></tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="developer-panel">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div><span class="developer-panel__icon"><i class="bx bx-history" aria-hidden="true"></i></span><div><h2>Notificaciones recientes</h2><p>Últimos registros persistidos en MySQL.</p></div></div>
+            <span class="developer-panel__counter">{{ number_format((int) ($diagnostics['notifications']['total'] ?? 0)) }} totales</span>
+        </header>
+        <div class="developer-table-wrap">
+            <table class="developer-table">
+                <thead><tr><th>Evento</th><th>Usuario</th><th>Estado</th><th>Fecha</th></tr></thead>
+                <tbody>
+                    @forelse ($recentNotifications as $notification)
+                        <tr>
+                            <td><strong>{{ $notification->data['title'] ?? 'Notificación' }}</strong><small>{{ $notification->event_key }}</small></td>
+                            <td>{{ $notification->notifiable?->name ?? 'Usuario eliminado' }}</td>
+                            <td><span class="developer-state {{ $notification->announced_at ? 'is-announced' : 'is-pending' }}">{{ $notification->announced_at ? 'Anunciada' : 'Pendiente' }}</span></td>
+                            <td>{{ $notification->created_at?->format('d/m/Y H:i:s') }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="developer-table__empty">Todavía no existen notificaciones.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
