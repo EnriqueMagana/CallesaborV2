@@ -875,6 +875,11 @@ html.dark-style .delivery-detail__payment.is-paid { color: #91d9ad; background: 
     box-shadow: 0 12px 28px rgba(59, 43, 129, .09);
 }
 .delivery-bank-card.is-picked-up { border-color: #a9d2bb; }
+.delivery-bank-card.is-highlighted {
+    border-color: #6956e8;
+    box-shadow: 0 0 0 4px rgba(105, 86, 232, .17), 0 14px 32px rgba(59, 43, 129, .14);
+}
+.delivery-bank-card:focus-visible { outline: 3px solid rgba(105, 86, 232, .28); outline-offset: 3px; }
 .delivery-bank-card__header {
     padding: 15px 15px 11px;
     display: flex;

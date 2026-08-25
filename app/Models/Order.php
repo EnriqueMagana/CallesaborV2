@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Order extends Model
 {
@@ -31,6 +32,8 @@ class Order extends Model
     protected static function booted(): void
     {
         static::creating(function (Order $order): void {
+            $order->public_token ??= Str::random(64);
+
             if ($order->folio || ! $order->cash_register_id) {
                 return;
             }
@@ -39,6 +42,15 @@ class Order extends Model
                 ->where('cash_register_id', $order->cash_register_id)
                 ->max('folio')) + 1;
         });
+    }
+
+    public function ensurePublicToken(): string
+    {
+        if (! $this->public_token) {
+            $this->forceFill(['public_token' => Str::random(64)])->saveQuietly();
+        }
+
+        return $this->public_token;
     }
 
     public function cashRegister(): BelongsTo

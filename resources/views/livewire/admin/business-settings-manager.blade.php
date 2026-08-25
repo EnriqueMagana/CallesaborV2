@@ -462,7 +462,17 @@
                     </div><button type="button" wire:click="resetTemplate" class="biz-ghost-button"><i
                             class="bx bx-reset"></i>Restaurar</button>
                 </header>
-                @if ($selectedType === 'cash_cut')
+                @if ($selectedType === 'customer')
+                    <div class="ticket-context-note" role="note">
+                        <i class="bx bx-info-circle"></i>
+                        <span><strong>Cuenta del cliente</strong><small>Se usa para cuentas de mesa y documentos entregados al cliente. Las ventas directas del mostrador usan la plantilla Ventanilla.</small></span>
+                    </div>
+                @elseif($selectedType === 'counter')
+                    <div class="ticket-context-note" role="note">
+                        <i class="bx bx-info-circle"></i>
+                        <span><strong>Venta de ventanilla</strong><small>Se usa en ventas directas y pedidos para recoger cobrados o reimpresos desde el POS.</small></span>
+                    </div>
+                @elseif ($selectedType === 'cash_cut')
                     <div class="ticket-context-note" role="note">
                         <i class="bx bx-info-circle"></i>
                         <span><strong>Estructura completa del corte</strong><small>La vista previa usa datos de ejemplo.
@@ -517,6 +527,37 @@
                                 type="text" wire:model.live.debounce.300ms="qrLabel"
                                 placeholder="Escanea para consultar tu pedido" maxlength="120"></x-business.field>
                     @endif
+                    @if ($showLogo)
+                        <x-business.field label="Tamaño del logo" for="logo-width" hint="Se guarda de forma independiente para esta plantilla.">
+                            <select id="logo-width" wire:model.live="logoWidthMm">
+                                @foreach ([12, 18, 24, 30, 36, 42, 48, 54] as $width)
+                                    <option value="{{ $width }}">{{ $width }} mm</option>
+                                @endforeach
+                            </select>
+                        </x-business.field>
+                    @endif
+                    @if ($selectedType === 'kitchen_area')
+                        <div class="ticket-context-note" role="note">
+                            <i class="bx bx-font"></i>
+                            <span><strong>Lectura de productos en cocina</strong><small>Estos ajustes solo cambian productos, modificadores y notas; el resto de la comanda conserva la tipografía general.</small></span>
+                        </div>
+                        <div class="ticket-format-grid">
+                            <x-business.field label="Fuente de productos" for="item-font-family">
+                                <select id="item-font-family" wire:model.live="itemFontFamily">
+                                    @foreach (\App\Livewire\Admin\BusinessSettingsManager::KITCHEN_ITEM_FONTS as $fontKey => $fontLabel)
+                                        <option value="{{ $fontKey }}">{{ $fontLabel }}</option>
+                                    @endforeach
+                                </select>
+                            </x-business.field>
+                            <x-business.field label="Tamaño de productos" for="item-font-size">
+                                <select id="item-font-size" wire:model.live="itemFontSize">
+                                    @for ($size = 12; $size <= 28; $size++)
+                                        <option value="{{ $size }}">{{ $size }} px</option>
+                                    @endfor
+                                </select>
+                            </x-business.field>
+                        </div>
+                    @endif
                 </fieldset>
                 <fieldset class="ticket-settings-group">
                     <legend>Orden y visibilidad de bloques</legend>
@@ -562,7 +603,7 @@
                     </div><span class="ticket-live-chip"><i class="bx bx-radio-circle-marked"></i>En vivo</span>
                 </header>
                 <div class="ticket-preview-stage" wire:loading.class="is-loading"
-                    wire:target="selectType,toggleBlock,moveBlock,paperWidth,fontSize,marginMm,showLogo,showQr"><iframe
+                    wire:target="selectType,toggleBlock,moveBlock,paperWidth,fontSize,marginMm,showLogo,showQr,logoWidthMm,itemFontFamily,itemFontSize"><iframe
                         title="Vista previa de {{ $ticketTypes[$selectedType]['name'] }}"
                         srcdoc="{{ $this->previewHtml }}"></iframe></div>
             </aside>

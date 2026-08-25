@@ -6,7 +6,18 @@
     <title>{{ $template->name }}</title>
     <link rel="stylesheet" href="{{ asset('assets/css/ticket-print.css') }}?v={{ filemtime(public_path('assets/css/ticket-print.css')) }}">
 </head>
-<body class="ticket-document ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }}">
+@php
+    $configuredLogoWidth = (int) ($template->options['logo_width_mm'] ?? 42);
+    $logoWidth = in_array($configuredLogoWidth, [12, 18, 24, 30, 36, 42, 48, 54], true) ? $configuredLogoWidth : 42;
+    $configuredItemFont = $template->key === 'kitchen_area'
+        ? (string) ($template->options['item_font_family'] ?? 'courier')
+        : 'courier';
+    $itemFontFamily = in_array($configuredItemFont, ['courier', 'arial', 'verdana', 'system'], true) ? $configuredItemFont : 'courier';
+    $itemFontSize = $template->key === 'kitchen_area'
+        ? min(28, max(12, (int) ($template->options['item_font_size'] ?? 18)))
+        : (int) $template->font_size;
+@endphp
+<body class="ticket-document ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
     @foreach($payloads as $payload)
         @php $qrDataUri = null; @endphp
         <main class="ticket-sheet ticket-page">

@@ -3,8 +3,9 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Transport\ResendTransport;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
@@ -22,6 +23,15 @@ class PasswordResetTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_login_shows_a_dedicated_password_recovery_action(): void
+    {
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('¿No puedes acceder?')
+            ->assertSee('Recuperar contraseña')
+            ->assertSee(route('password.request'), false);
+    }
+
     public function test_reset_password_link_can_be_requested(): void
     {
         Notification::fake();
@@ -32,7 +42,40 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        Notification::assertSentTo($user, ResetPasswordNotification::class);
+    }
+
+    public function test_unknown_email_receives_the_same_neutral_response(): void
+    {
+        Notification::fake();
+
+        Volt::test('pages.auth.forgot-password')
+            ->set('email', 'no-existe@example.com')
+            ->call('sendPasswordResetLink')
+            ->assertHasNoErrors()
+            ->assertSee('Si existe una cuenta con ese correo');
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_password_reset_email_is_branded_and_uses_the_secure_route(): void
+    {
+        $user = User::factory()->create(['name' => 'María']);
+        $notification = new ResetPasswordNotification('token-seguro');
+        $mail = $notification->toMail($user);
+
+        $this->assertSame('Recupera el acceso a '.config('app.name'), $mail->subject);
+        $this->assertStringContainsString('/reset-password/token-seguro', $mail->actionUrl);
+        $this->assertStringContainsString(urlencode($user->email), $mail->actionUrl);
+    }
+
+    public function test_resend_mailer_builds_the_official_laravel_transport(): void
+    {
+        config(['services.resend.key' => 're_test_placeholder']);
+
+        $transport = app('mail.manager')->mailer('resend')->getSymfonyTransport();
+
+        $this->assertInstanceOf(ResendTransport::class, $transport);
     }
 
     public function test_reset_password_screen_can_be_rendered(): void
@@ -45,7 +88,7 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
+        Notification::assertSentTo($user, ResetPasswordNotification::class, function ($notification) {
             $response = $this->get('/reset-password/'.$notification->token);
 
             $response
@@ -66,7 +109,7 @@ class PasswordResetTest extends TestCase
             ->set('email', $user->email)
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+        Notification::assertSentTo($user, ResetPasswordNotification::class, function ($notification) use ($user) {
             $component = Volt::test('pages.auth.reset-password', ['token' => $notification->token])
                 ->set('email', $user->email)
                 ->set('password', 'password')

@@ -17,7 +17,7 @@ class OrderTracking extends Component
     public function mount(string $publicToken): void
     {
         abort_unless(strlen($publicToken) === 64, 404);
-        abort_unless(Order::where('public_token', $publicToken)->where('source', 'kiosk')->exists(), 404);
+        abort_unless(Order::where('public_token', $publicToken)->exists(), 404);
         $this->publicToken = $publicToken;
     }
 
@@ -26,7 +26,6 @@ class OrderTracking extends Component
     {
         return Order::with(['items.addons', 'items.ingredients', 'deliveryAssignment.driver'])
             ->where('public_token', $this->publicToken)
-            ->where('source', 'kiosk')
             ->firstOrFail();
     }
 

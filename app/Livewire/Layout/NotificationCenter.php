@@ -4,6 +4,7 @@ namespace App\Livewire\Layout;
 
 use App\Models\AppNotification;
 use App\Models\NotificationPreference;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Computed;
@@ -13,8 +14,6 @@ use Livewire\Component;
 class NotificationCenter extends Component
 {
     public bool $open = false;
-
-    public string $filter = 'all';
 
     public string $placement = 'navbar';
 
@@ -52,7 +51,6 @@ class NotificationCenter extends Component
         }
 
         return $this->baseQuery()
-            ->when($this->filter !== 'all', fn ($query) => $query->where('category', $this->filter))
             ->latest()
             ->limit(40)
             ->get();
@@ -81,13 +79,6 @@ class NotificationCenter extends Component
         $this->open = false;
     }
 
-    public function setFilter(string $filter): void
-    {
-        abort_unless(in_array($filter, ['all', 'orders', 'tables', 'delivery', 'system'], true), 422);
-        $this->filter = $filter;
-        unset($this->notifications);
-    }
-
     public function markRead(string $id): void
     {
         $this->baseQuery()->whereKey($id)->whereNull('read_at')->update(['read_at' => now(), 'updated_at' => now()]);
@@ -100,13 +91,25 @@ class NotificationCenter extends Component
         unset($this->notifications, $this->unreadCount);
     }
 
+    public function clearAll(): void
+    {
+        if (! $this->notificationsEnabled || ! Schema::hasTable('notifications')) {
+            return;
+        }
+
+        $this->baseQuery()->delete();
+        unset($this->notifications, $this->unreadCount);
+
+        $this->dispatch('notify', type: 'success', message: 'Notificaciones eliminadas permanentemente.');
+    }
+
     public function openNotification(string $id): void
     {
         $notification = $this->baseQuery()->whereKey($id)->firstOrFail();
         $notification->update(['read_at' => $notification->read_at ?? now()]);
-        $url = (string) ($notification->data['url'] ?? '');
+        $url = $this->destinationFor($notification);
 
-        if ($url !== '' && str_starts_with($url, '/')) {
+        if (str_starts_with($url, '/')) {
             $this->redirect($url, navigate: true);
         }
     }
@@ -179,6 +182,29 @@ class NotificationCenter extends Component
         return AppNotification::query()
             ->where('notifiable_type', User::class)
             ->where('notifiable_id', auth()->id());
+    }
+
+    private function destinationFor(AppNotification $notification): string
+    {
+        if ($notification->subject_type === Order::class && $notification->subject_id) {
+            $order = Order::query()->find($notification->subject_id);
+
+            if ($order?->type === 'mesa' && $order->mesa_id && auth()->user()?->can('ver mesas')) {
+                return route('app.mesas.ordenes', $order->mesa_id, false);
+            }
+
+            if ($order?->type === 'delivery' && auth()->user()?->can('ver delivery')) {
+                return route('app.delivery', ['order' => $order->id], false);
+            }
+
+            if ($order && auth()->user()?->can('ver ordenes')) {
+                return route('app.ordenes.show', $order, false);
+            }
+        }
+
+        $storedUrl = (string) ($notification->data['url'] ?? '');
+
+        return str_starts_with($storedUrl, '/') ? $storedUrl : route('app.dashboard', [], false);
     }
 
     public function render()

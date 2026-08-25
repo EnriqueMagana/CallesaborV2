@@ -78,7 +78,7 @@ class OperationalNotificationService
         $recipients = $this->usersByRoles(self::SUPERVISORS)->push($assignment->driver)->unique('id');
         $this->send('delivery.assigned', 'delivery', 'high', $assignment->order, $recipients,
             'Delivery asignado', "Pedido #{$assignment->order->display_folio} asignado a {$assignment->driver->name}.",
-            route('app.delivery', [], false), 'delivery', 'assignment-'.$assignment->id);
+            $this->urlFor($assignment->order), 'delivery', 'assignment-'.$assignment->id);
     }
 
     private function send(string $eventKey, string $category, string $priority, Order $subject, Collection $recipients,
@@ -224,8 +224,10 @@ class OperationalNotificationService
     private function urlFor(Order $order): string
     {
         return match ($order->type) {
-            'mesa' => route('app.mesas', [], false),
-            'delivery' => route('app.delivery', [], false),
+            'mesa' => $order->mesa_id
+                ? route('app.mesas.ordenes', $order->mesa_id, false)
+                : route('app.ordenes.show', $order, false),
+            'delivery' => route('app.delivery', ['order' => $order->id], false),
             default => route('app.ordenes.show', $order, false),
         };
     }

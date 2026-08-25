@@ -30,4 +30,37 @@ class AppNotification extends Model
     {
         return $this->morphTo();
     }
+
+    public function getIconAttribute(): string
+    {
+        return match ($this->event_key) {
+            'order.created' => 'bx-receipt',
+            'order.ready' => 'bx-check-circle',
+            'order.cancelled' => 'bx-x-circle',
+            'order.paid' => 'bx-wallet',
+            'delivery.available' => 'bx-package',
+            'delivery.assigned' => 'bx-user-check',
+            'delivery.picked_up' => 'bx-cycling',
+            'delivery.completed' => 'bx-check-shield',
+            'developer.realtime_test', 'developer.livewire_test' => 'bx-test-tube',
+            default => match ($this->category) {
+                'tables' => 'bx-table',
+                'delivery' => 'bx-cycling',
+                'system' => 'bx-info-circle',
+                default => 'bx-bell',
+            },
+        };
+    }
+
+    public function getToneAttribute(): string
+    {
+        return match ($this->event_key) {
+            'order.ready', 'delivery.available' => 'ready',
+            'order.cancelled' => 'danger',
+            'order.paid', 'delivery.completed' => 'success',
+            'delivery.assigned', 'delivery.picked_up' => 'delivery',
+            'developer.realtime_test', 'developer.livewire_test' => 'system',
+            default => $this->category === 'tables' ? 'table' : 'order',
+        };
+    }
 }

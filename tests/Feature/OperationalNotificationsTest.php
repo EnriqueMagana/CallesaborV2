@@ -2,14 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Delivery\DeliveryBoard;
 use App\Livewire\Layout\NotificationCenter;
 use App\Livewire\Profile\NotificationPreferencesForm;
+use App\Models\AppNotification;
+use App\Models\Area;
+use App\Models\CashRegister;
+use App\Models\Mesa;
 use App\Models\NotificationPreference;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\OperationalNotificationService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -76,6 +82,9 @@ class OperationalNotificationsTest extends TestCase
             'event_key' => 'delivery.available',
             'category' => 'delivery',
         ]);
+
+        $notification = $driver->fresh()->notifications()->where('event_key', 'delivery.available')->firstOrFail();
+        $this->assertSame('/app/delivery?order=502', $notification->data['url']);
     }
 
     public function test_duplicate_operational_events_are_ignored(): void
@@ -110,6 +119,94 @@ class OperationalNotificationsTest extends TestCase
             ->assertSet('open', false);
 
         $this->assertNotNull($notification->fresh()->read_at);
+    }
+
+    public function test_notification_center_has_event_icons_without_category_filters(): void
+    {
+        $waiter = $this->userWithRole('mesero');
+        $notification = $this->notificationFor($waiter, 'order.ready', 'tables');
+
+        $this->actingAs($waiter);
+        Livewire::test(NotificationCenter::class)
+            ->set('open', true)
+            ->assertSeeHtml('bx bx-check-circle')
+            ->assertSee('Eliminar todas las notificaciones')
+            ->assertDontSee('Filtrar notificaciones');
+
+        $this->assertSame('ready', $notification->fresh()->tone);
+    }
+
+    public function test_clear_all_permanently_deletes_only_the_authenticated_users_notifications(): void
+    {
+        $owner = $this->userWithRole('owner');
+        $waiter = $this->userWithRole('mesero');
+        $ownerNotification = $this->notificationFor($owner, 'order.created', 'orders');
+        $waiterNotification = $this->notificationFor($waiter, 'order.ready', 'tables');
+
+        $this->actingAs($owner);
+        Livewire::test(NotificationCenter::class)->call('clearAll');
+
+        $this->assertDatabaseMissing('notifications', ['id' => $ownerNotification->id]);
+        $this->assertDatabaseHas('notifications', ['id' => $waiterNotification->id]);
+    }
+
+    public function test_table_notification_opens_the_exact_table(): void
+    {
+        $waiter = $this->userWithRole('mesero');
+        $register = CashRegister::query()->create([
+            'name' => 'Turno prueba',
+            'opened_by' => $waiter->id,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $area = Area::query()->create(['name' => 'Salón']);
+        $mesa = Mesa::query()->create(['area_id' => $area->id, 'number' => 7, 'status' => 'ocupada']);
+        $order = Order::query()->create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $mesa->id,
+            'served_by' => $waiter->id,
+            'type' => 'mesa',
+            'status' => 'lista',
+            'subtotal' => 180,
+            'total' => 180,
+        ]);
+        $notification = $this->notificationFor($waiter, 'order.ready', 'tables', $order);
+
+        $this->actingAs($waiter);
+        Livewire::test(NotificationCenter::class)
+            ->call('openNotification', $notification->id)
+            ->assertRedirect(route('app.mesas.ordenes', $mesa));
+
+        $this->assertNotNull($notification->fresh()->read_at);
+    }
+
+    public function test_delivery_notification_focuses_the_exact_order_card(): void
+    {
+        $driver = $this->userWithRole('repartidor');
+        $register = CashRegister::query()->create([
+            'name' => 'Turno delivery',
+            'opened_by' => $driver->id,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $order = Order::query()->create([
+            'cash_register_id' => $register->id,
+            'served_by' => $driver->id,
+            'customer_name' => 'Cliente delivery',
+            'customer_address' => 'Calle 10',
+            'type' => 'delivery',
+            'status' => 'lista',
+            'subtotal' => 220,
+            'total' => 220,
+        ]);
+
+        $this->actingAs($driver);
+        Livewire::withQueryParams(['order' => $order->id])
+            ->test(DeliveryBoard::class)
+            ->assertSet('highlightOrderId', $order->id)
+            ->assertSet('tab', 'available')
+            ->assertSeeHtml('id="delivery-order-'.$order->id.'"')
+            ->assertSeeHtml('is-highlighted');
     }
 
     public function test_each_user_can_disable_operational_notifications(): void
@@ -161,5 +258,27 @@ class OperationalNotificationsTest extends TestCase
         $user->assignRole($role);
 
         return $user;
+    }
+
+    private function notificationFor(User $user, string $eventKey, string $category, ?Order $order = null): AppNotification
+    {
+        return AppNotification::query()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'test',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'event_key' => $eventKey,
+            'category' => $category,
+            'priority' => 'normal',
+            'subject_type' => $order ? Order::class : null,
+            'subject_id' => $order?->id,
+            'dedupe_key' => 'test:'.Str::uuid(),
+            'data' => [
+                'title' => 'Notificación de prueba',
+                'message' => 'Mensaje de prueba',
+                'url' => '/app/ordenes',
+                'sound' => 'order',
+            ],
+        ]);
     }
 }

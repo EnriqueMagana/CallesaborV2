@@ -39,7 +39,12 @@ class TicketTemplate extends Model
                 'qr_label' => null,
                 'footer_text' => 'Documento de control interno',
                 'blocks' => self::cashCutBlocks(),
-                'options' => ['show_rfc' => true, 'show_phone' => true, 'show_address' => true],
+                'options' => [
+                    'show_rfc' => true,
+                    'show_phone' => true,
+                    'show_address' => true,
+                    'logo_width_mm' => 42,
+                ],
                 'is_active' => true,
             ];
         }
@@ -63,7 +68,12 @@ class TicketTemplate extends Model
                     ['key' => 'inventory_purchase_notes', 'label' => 'Indicaciones de compra', 'enabled' => true],
                     ['key' => 'footer', 'label' => 'Pie del ticket', 'enabled' => true],
                 ],
-                'options' => ['show_rfc' => true, 'show_phone' => true, 'show_address' => true],
+                'options' => [
+                    'show_rfc' => true,
+                    'show_phone' => true,
+                    'show_address' => true,
+                    'logo_width_mm' => 42,
+                ],
                 'is_active' => true,
             ];
         }
@@ -92,7 +102,14 @@ class TicketTemplate extends Model
             'qr_label' => 'Escanea para consultar tu pedido',
             'footer_text' => $key === 'kitchen_area' ? '' : '¡Gracias por tu preferencia!',
             'blocks' => $blocks,
-            'options' => ['show_rfc' => true, 'show_phone' => true, 'show_address' => true],
+            'options' => [
+                'show_rfc' => true,
+                'show_phone' => true,
+                'show_address' => true,
+                'logo_width_mm' => 42,
+                'item_font_family' => 'courier',
+                'item_font_size' => $key === 'kitchen_area' ? 18 : 12,
+            ],
             'is_active' => true,
         ];
     }

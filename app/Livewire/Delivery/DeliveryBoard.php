@@ -15,6 +15,8 @@ class DeliveryBoard extends Component
 {
     public string $tab = 'available';
 
+    public ?int $highlightOrderId = null;
+
     public ?int $confirmingDeliveryOrderId = null;
 
     public ?string $lastCheckedAt = null;
@@ -22,6 +24,23 @@ class DeliveryBoard extends Component
     public function mount(): void
     {
         abort_unless(auth()->user()?->can('ver delivery'), 403);
+
+        $orderId = request()->integer('order');
+        if (! $orderId) {
+            return;
+        }
+
+        $order = Order::query()->with('deliveryAssignment')->where('type', 'delivery')->find($orderId);
+        if (! $order) {
+            return;
+        }
+
+        $this->highlightOrderId = $order->id;
+        $this->tab = match ($order->deliveryAssignment?->status) {
+            'entregado' => 'delivered',
+            'asignado' => 'assigned',
+            default => 'available',
+        };
     }
 
     #[Computed]

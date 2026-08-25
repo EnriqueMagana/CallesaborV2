@@ -47,7 +47,7 @@
             @elseif(in_array($effectiveStatus, ['lista', 'pagada'], true))
                 <div class="kiosk-tracking-icon"><i class="bx bx-check"></i></div>
                 <h1>{{ $isDelivery ? '¡Tu pedido está listo para salir!' : '¡Tu pedido está listo!' }}</h1>
-                <p>{{ $isDelivery ? 'En breve un repartidor tomará tu entrega.' : $order->customer_name . ', acércate al mostrador con tu número.' }}
+                <p>{{ $isDelivery ? 'En breve un repartidor tomará tu entrega.' : $order->display_name . ', acércate al mostrador con tu número.' }}
                 </p>
             @elseif($effectiveStatus === 'en_preparacion')
                 <div class="kiosk-tracking-icon"><i class="bx bx-restaurant"></i></div>
