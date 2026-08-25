@@ -110,4 +110,15 @@ class FirebaseRealtimeNotificationsTest extends TestCase
         $this->assertFalse($rules['rules']['.read']);
         $this->assertFalse($rules['rules']['.write']);
     }
+
+    public function test_browser_listener_buffers_livewire_startup_and_reconnects_without_polling(): void
+    {
+        $listener = file_get_contents(resource_path('js/firebase-realtime-notifications.js'));
+
+        $this->assertIsString($listener);
+        $this->assertStringContainsString('state.refreshPending = true', $listener);
+        $this->assertStringContainsString("document.addEventListener('livewire:init', resumeRealtimeNotifications)", $listener);
+        $this->assertStringContainsString("window.addEventListener('online', resumeRealtimeNotifications)", $listener);
+        $this->assertStringNotContainsString('setInterval(', $listener);
+    }
 }
