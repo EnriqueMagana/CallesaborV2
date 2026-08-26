@@ -20,9 +20,14 @@
             </div>
         </div>
         @can('crear usuarios')
-            <button type="button" class="users-primary-button" wire:click="openCreatePanel">
-                <i class="bx bx-user-plus" aria-hidden="true"></i><span>Nuevo usuario</span>
-            </button>
+            <div class="users-hero-actions">
+                <button type="button" class="users-secondary-button" wire:click="openInvitationPanel">
+                    <i class="bx bx-envelope" aria-hidden="true"></i><span>Invitar usuario</span>
+                </button>
+                <button type="button" class="users-primary-button" wire:click="openCreatePanel">
+                    <i class="bx bx-user-plus" aria-hidden="true"></i><span>Nuevo usuario</span>
+                </button>
+            </div>
         @endcan
     </header>
 
@@ -202,6 +207,35 @@
                     @endforeach
                 </div>@error('selectedRoles')<p class="users-form-alert">{{ $message }}</p>@enderror</div>
                 <footer class="users-modal-footer"><button type="button" class="users-secondary-button" wire:click="closeRolePanel"><i class="bx bx-arrow-back"></i>Volver</button><button type="button" class="users-primary-button" wire:click="saveRoles" wire:loading.attr="disabled" wire:target="saveRoles"><span wire:loading.remove wire:target="saveRoles"><i class="bx bx-save"></i>Guardar roles</span><span wire:loading wire:target="saveRoles"><i class="bx bx-loader-alt bx-spin"></i>Guardando</span></button></footer>
+            </section>
+        </div>
+    @endif
+
+    @if($showInvitationPanel)
+        <div class="app-modal-backdrop" wire:click="closeInvitationPanel"></div>
+        <div class="app-modal-layer users-modal-layer" role="dialog" aria-modal="true" aria-labelledby="invite-user-title">
+            <section class="users-modal users-invitation-modal">
+                <header class="users-modal-header">
+                    <div class="users-modal-heading"><span><i class="bx bx-envelope" aria-hidden="true"></i></span><div><span class="app-eyebrow">Incorporación segura</span><h2 id="invite-user-title">Invitar usuario</h2><p>La persona completará sus propios datos mediante un enlace privado.</p></div></div>
+                    <button type="button" class="users-modal-close" wire:click="closeInvitationPanel" aria-label="Cerrar"><i class="bx bx-x"></i></button>
+                </header>
+                <div class="users-modal-body">
+                    <aside class="users-invitation-notice"><i class="bx bx-time-five" aria-hidden="true"></i><div><strong>Vigencia obligatoria de 1 hora</strong><p>Al reenviar una invitación para el mismo correo, el enlace anterior quedará invalidado. El rol no podrá modificarse durante el registro.</p></div></aside>
+                    <div class="users-form-section">
+                        <header><span><i class="bx bx-user-voice" aria-hidden="true"></i></span><div><h3>Datos de la invitación</h3><p>Selecciona primero la cuenta y su función dentro del equipo.</p></div></header>
+                        <div class="users-form-grid">
+                            <label class="is-full"><span>Correo electrónico <b>*</b></span><input type="email" wire:model="inviteEmail" placeholder="persona@dominio.com" autocomplete="email" autofocus><small class="users-field-help">Aquí recibirá el enlace para completar su registro.</small>@error('inviteEmail')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                            <label class="is-full"><span>Rol que desempeñará <b>*</b></span><select wire:model="inviteRole"><option value="">Selecciona el rol asignado</option>@foreach($this->roles as $role)<option value="{{ $role->name }}">{{ str($role->name)->replace('-', ' ')->title() }} · {{ $role->permissions->count() }} permisos</option>@endforeach</select><small class="users-field-help">Este rol viajará protegido en la invitación y se asignará automáticamente.</small>@error('inviteRole')<small class="users-field-error">{{ $message }}</small>@enderror</label>
+                        </div>
+                    </div>
+                </div>
+                <footer class="users-modal-footer">
+                    <button type="button" class="users-secondary-button" wire:click="closeInvitationPanel">Cancelar</button>
+                    <button type="button" class="users-primary-button" wire:click="sendUserInvitation" wire:loading.attr="disabled" wire:target="sendUserInvitation">
+                        <span wire:loading.remove wire:target="sendUserInvitation"><i class="bx bx-send" aria-hidden="true"></i>Enviar invitación</span>
+                        <span wire:loading wire:target="sendUserInvitation"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Enviando correo</span>
+                    </button>
+                </footer>
             </section>
         </div>
     @endif
