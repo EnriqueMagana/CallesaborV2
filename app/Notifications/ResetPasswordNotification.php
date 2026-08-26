@@ -16,13 +16,19 @@ class ResetPasswordNotification extends ResetPassword
 
         $minutes = (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60);
 
+        $viewData = [
+            'actionUrl' => $resetUrl,
+            'brandName' => config('app.name', 'Calle Sabor'),
+            'expiresInMinutes' => $minutes,
+            'logoPath' => public_path('assets/img/logo.png'),
+            'logoUrl' => asset('assets/img/logo.png'),
+            'userName' => $notifiable->name,
+        ];
+
         return (new MailMessage)
             ->subject('Recupera el acceso a '.config('app.name'))
-            ->greeting('Hola, '.$notifiable->name)
-            ->line('Recibimos una solicitud para restablecer la contraseña de tu cuenta.')
-            ->action('Crear una nueva contraseña', $resetUrl)
-            ->line("Este enlace vence en {$minutes} minutos y solo puede utilizarse una vez.")
-            ->line('Si no solicitaste este cambio, puedes ignorar este correo de forma segura.')
-            ->salutation('Equipo de '.config('app.name'));
+            ->view('mail.password-reset', $viewData)
+            ->text('mail.password-reset-text', $viewData)
+            ->action('Restablecer contraseña', $resetUrl);
     }
 }

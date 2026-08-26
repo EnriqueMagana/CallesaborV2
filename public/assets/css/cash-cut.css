@@ -167,7 +167,7 @@
 .cash-cut-modal>footer { display:flex; justify-content:flex-end; gap:9px; padding:15px 22px; border-top:1px solid var(--app-border); background:#faf9fc; }
 
 .cash-cut-success { max-width:680px; display:grid; justify-items:center; margin:48px auto; padding:48px 30px; text-align:center; border:1px solid var(--app-border); border-radius:24px; background:#fff; box-shadow:var(--app-shadow); }
-.cash-cut-success__icon { width:76px; height:76px; display:grid; place-items:center; margin-bottom:17px; color:#fff; border-radius:24px; background:linear-gradient(145deg,#25a56a,var(--app-success)); box-shadow:0 15px 34px rgba(22,135,92,.24); font-size:42px; }
+.cash-cut-success__icon { width:76px; height:76px; display:grid; place-items:center; margin-bottom:17px; color:#fff; border-radius:30px; background:linear-gradient(145deg,#25a56a,var(--app-success)); box-shadow:0 15px 34px rgba(22,135,92,.24); font-size:72px; }
 .cash-cut-success h2 { margin:16px 0 7px; font-size:1.55rem; }
 .cash-cut-success>p { margin:0; color:var(--app-muted); }
 .cash-cut-success__actions { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-top:24px; }

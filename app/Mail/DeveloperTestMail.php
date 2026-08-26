@@ -27,7 +27,13 @@ class DeveloperTestMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'mail.developer-test',
+            view: 'mail.developer-test',
+            text: 'mail.developer-test-text',
+            with: [
+                'brandName' => config('app.name', 'Calle Sabor'),
+                'logoPath' => public_path('assets/img/logo.png'),
+                'logoUrl' => asset('assets/img/logo.png'),
+            ],
         );
     }
 }
