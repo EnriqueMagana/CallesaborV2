@@ -2,44 +2,74 @@
 
 namespace App\Livewire\Admin;
 
+use App\Mail\UserInvitationMail;
 use App\Models\User;
+use App\Models\UserInvitation;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
+use Throwable;
 
 class UserList extends Component
 {
     use AuthorizesRequests, WithPagination;
 
     public string $search = '';
+
     public string $filterRole = '';
+
     public string $filterStatus = 'active';
 
     public ?int $panelUserId = null;
+
     public ?User $panelUser = null;
+
     public bool $showRolePanel = false;
+
     public string $editName = '';
+
     public string $editEmail = '';
+
     public string $editPhone = '';
+
     public array $selectedRoles = [];
 
     public bool $showCreatePanel = false;
+
     public string $createName = '';
+
     public string $createEmail = '';
+
     public string $createPhone = '';
+
     public string $createPassword = '';
+
     public string $createPasswordCon = '';
+
     public string $createRole = '';
 
+    public bool $showInvitationPanel = false;
+
+    public string $inviteEmail = '';
+
+    public string $inviteRole = '';
+
     public bool $showBanPanel = false;
+
     public ?int $banUserId = null;
+
     public string $banReason = '';
 
     public function mount(): void
@@ -102,9 +132,124 @@ class UserList extends Component
         $this->dispatch('notify', type: 'success', message: "{$user->name} fue creado con el rol {$this->roleLabel($this->createRole)}.");
     }
 
-    public function updatingSearch(): void { $this->resetPage(); }
-    public function updatingFilterRole(): void { $this->resetPage(); }
-    public function updatingFilterStatus(): void { $this->resetPage(); }
+    public function openInvitationPanel(): void
+    {
+        $this->authorize('crear usuarios');
+        $this->reset('inviteEmail', 'inviteRole');
+        $this->resetValidation();
+        $this->showInvitationPanel = true;
+    }
+
+    public function closeInvitationPanel(): void
+    {
+        $this->showInvitationPanel = false;
+        $this->reset('inviteEmail', 'inviteRole');
+        $this->resetValidation();
+    }
+
+    public function sendUserInvitation(): void
+    {
+        $this->authorize('crear usuarios');
+        $allowedRoles = $this->roles->pluck('name')->all();
+
+        $validated = $this->validate([
+            'inviteEmail' => ['required', 'string', 'email:rfc', 'max:254', Rule::unique('users', 'email')],
+            'inviteRole' => ['required', 'string', Rule::in($allowedRoles)],
+        ], [
+            'inviteEmail.required' => 'Escribe el correo de la persona que deseas invitar.',
+            'inviteEmail.email' => 'Escribe una dirección de correo válida.',
+            'inviteEmail.unique' => 'Ya existe una cuenta con este correo, incluso si está en la papelera.',
+            'inviteRole.required' => 'Selecciona el rol que desempeñará la persona.',
+            'inviteRole.in' => 'No tienes autorización para asignar ese rol.',
+        ]);
+
+        if (config('mail.default') === 'resend' && blank(config('services.resend.key'))) {
+            $this->addError('inviteEmail', 'RESEND_API_KEY no está configurada.');
+
+            return;
+        }
+
+        if (str_ends_with(strtolower((string) config('mail.from.address')), '@example.com')) {
+            $this->addError('inviteEmail', 'MAIL_FROM_ADDRESS todavía usa example.com. Configura un remitente autorizado.');
+
+            return;
+        }
+
+        $rateLimitKey = 'send-user-invitation:'.auth()->id();
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            $this->addError('inviteEmail', "Alcanzaste el límite de invitaciones. Intenta de nuevo en {$seconds} segundos.");
+
+            return;
+        }
+        RateLimiter::hit($rateLimitKey, 60);
+
+        $email = mb_strtolower(trim($validated['inviteEmail']));
+        $role = Role::query()->where('name', $validated['inviteRole'])->firstOrFail();
+        $roleLabel = $this->roleLabel($role->name);
+        $token = Str::random(64);
+        $tokenHash = UserInvitation::hashToken($token);
+        $expiresAt = now()->addHour()->startOfSecond();
+
+        $invitation = UserInvitation::query()->updateOrCreate(
+            ['email' => $email],
+            [
+                'role_id' => $role->id,
+                'token_hash' => $tokenHash,
+                'invited_by' => auth()->id(),
+                'expires_at' => $expiresAt,
+                'accepted_at' => null,
+                'accepted_user_id' => null,
+            ],
+        );
+
+        $invitationUrl = route('invitations.accept', [
+            'invitation' => $invitation->id,
+            'token' => $token,
+        ]);
+
+        try {
+            Mail::to($email)->send(new UserInvitationMail(
+                invitationUrl: $invitationUrl,
+                roleLabel: $roleLabel,
+                invitedByName: auth()->user()?->name ?? 'Administración',
+                expiresAt: $expiresAt->translatedFormat('d/m/Y H:i'),
+            ));
+        } catch (Throwable $exception) {
+            UserInvitation::query()
+                ->whereKey($invitation->id)
+                ->where('token_hash', $tokenHash)
+                ->delete();
+
+            Log::warning('Falló el envío de una invitación de usuario.', [
+                'email' => $email,
+                'role' => $role->name,
+                'exception' => $exception::class,
+            ]);
+
+            $this->addError('inviteEmail', 'No se pudo enviar la invitación. Revisa la configuración del remitente e intenta nuevamente.');
+
+            return;
+        }
+
+        $this->closeInvitationPanel();
+        $this->dispatch('notify', type: 'success', message: "Invitación enviada a {$email} para el rol {$roleLabel}. El enlace vencerá en 1 hora.");
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterRole(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterStatus(): void
+    {
+        $this->resetPage();
+    }
 
     public function clearFilters(): void
     {
@@ -192,7 +337,9 @@ class UserList extends Component
     {
         $this->authorize('bloquear usuarios');
         $user = User::findOrFail($id);
-        if (! $this->canChangeAvailability($user, 'bloquear')) return;
+        if (! $this->canChangeAvailability($user, 'bloquear')) {
+            return;
+        }
         $this->ensureManageable($user);
 
         $this->banUserId = $id;
@@ -211,7 +358,9 @@ class UserList extends Component
     {
         $this->authorize('bloquear usuarios');
         $user = User::findOrFail($this->banUserId);
-        if (! $this->canChangeAvailability($user, 'bloquear')) return;
+        if (! $this->canChangeAvailability($user, 'bloquear')) {
+            return;
+        }
         $this->ensureManageable($user);
 
         $this->validate([
@@ -254,7 +403,9 @@ class UserList extends Component
     {
         $this->authorize('eliminar usuarios');
         $user = User::findOrFail($id);
-        if (! $this->canChangeAvailability($user, 'eliminar')) return;
+        if (! $this->canChangeAvailability($user, 'eliminar')) {
+            return;
+        }
         $this->ensureManageable($user);
         $this->dispatch('open-confirm',
             type: 'warning',
@@ -296,7 +447,9 @@ class UserList extends Component
     {
         $this->authorize('eliminar usuarios');
         $user = User::findOrFail($id);
-        if (! $this->canChangeAvailability($user, 'eliminar')) return;
+        if (! $this->canChangeAvailability($user, 'eliminar')) {
+            return;
+        }
         $this->ensureManageable($user);
         $this->revokeSessions($user);
         $user->delete();
@@ -325,7 +478,7 @@ class UserList extends Component
     }
 
     #[Computed]
-    public function roles(): \Illuminate\Database\Eloquent\Collection
+    public function roles(): Collection
     {
         $query = Role::query()->with('permissions')->orderBy('name');
         if (! auth()->user()->hasAnyRole(['owner', 'super-admin'])) {
@@ -384,7 +537,9 @@ class UserList extends Component
 
     private function canChangeAvailability(User $user, string $verb): bool
     {
-        if ($user->id !== auth()->id()) return true;
+        if ($user->id !== auth()->id()) {
+            return true;
+        }
         $this->dispatch('notify', type: 'error', message: "No puedes {$verb} tu propia cuenta.");
 
         return false;

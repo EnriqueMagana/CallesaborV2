@@ -17,6 +17,7 @@ use App\Livewire\Admin\DigitalMenuManager;
 use App\Livewire\Admin\KioskSettings;
 use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Admin\UserList;
+use App\Livewire\Auth\AcceptUserInvitation;
 use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\CorteDetalle;
 use App\Livewire\Caja\CorteHistorial;
@@ -69,6 +70,10 @@ Route::get('/kiosco-media/{path}', KioskMediaController::class)
     ->name('kiosk.media');
 Route::get('/kiosco/{token}', OrderWizard::class)->name('kiosk.order');
 Route::get('/pedido/{publicToken}', OrderTracking::class)->name('kiosk.track');
+Route::get('/invitacion/{invitation}/{token}', AcceptUserInvitation::class)
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->middleware('throttle:30,1')
+    ->name('invitations.accept');
 
 // Admin panel - requires auth
 Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class, EnforceSidebarModuleAccess::class, RequireOpenCashRegisterForConfiguredModules::class, 'verified'])->prefix('app')->name('app.')->group(function () {
