@@ -67,6 +67,15 @@ class PasswordResetTest extends TestCase
         $this->assertSame('Recupera el acceso a '.config('app.name'), $mail->subject);
         $this->assertStringContainsString('/reset-password/token-seguro', $mail->actionUrl);
         $this->assertStringContainsString(urlencode($user->email), $mail->actionUrl);
+
+        $html = (string) $mail->render();
+
+        $this->assertMatchesRegularExpression('/<img src="(?:data:image\/png;base64|cid:)/', $html);
+        $this->assertStringContainsString('alt="Logo de '.config('app.name').'"', $html);
+        $this->assertStringContainsString('Restablece tu contraseña', $html);
+        $this->assertStringContainsString('Hola, María:', $html);
+        $this->assertStringContainsString('Restablecer contraseña', $html);
+        $this->assertStringContainsString('/reset-password/token-seguro', $html);
     }
 
     public function test_resend_mailer_builds_the_official_laravel_transport(): void

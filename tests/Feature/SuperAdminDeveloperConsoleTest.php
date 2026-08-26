@@ -91,7 +91,15 @@ class SuperAdminDeveloperConsoleTest extends TestCase
             ->assertHasNoErrors('testEmailRecipient')
             ->assertSet('lastAction.ok', true);
 
-        Mail::assertSent(DeveloperTestMail::class, fn (DeveloperTestMail $mail): bool => $mail->hasTo('destino@example.com'));
+        Mail::assertSent(DeveloperTestMail::class, function (DeveloperTestMail $mail): bool {
+            $html = (string) $mail->render();
+
+            $this->assertMatchesRegularExpression('/<img src="(?:data:image\/png;base64|cid:)/', $html);
+            $this->assertStringContainsString('alt="Logo de '.config('app.name').'"', $html);
+            $this->assertStringContainsString('El envío de correo funciona', $html);
+
+            return $mail->hasTo('destino@example.com');
+        });
     }
 
     public function test_test_email_requires_a_valid_recipient(): void
