@@ -9,16 +9,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class OrderItem extends Model
 {
     protected $fillable = [
-        'order_id', 'product_id', 'product_name', 'product_price',
-        'quantity', 'subtotal', 'notes',
+        'order_id', 'product_id', 'promotion_id', 'product_name', 'product_price',
+        'quantity', 'subtotal', 'notes', 'promotion_selections',
         'is_cancelled', 'cancelled_by', 'cancelled_at',
     ];
 
     protected $casts = [
         'product_price' => 'decimal:2',
-        'subtotal'      => 'decimal:2',
-        'is_cancelled'  => 'boolean',
-        'cancelled_at'  => 'datetime',
+        'subtotal' => 'decimal:2',
+        'is_cancelled' => 'boolean',
+        'cancelled_at' => 'datetime',
+        'promotion_selections' => 'array',
     ];
 
     public function order(): BelongsTo
@@ -29,6 +30,11 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function promotion(): BelongsTo
+    {
+        return $this->belongsTo(Promotion::class);
     }
 
     public function cancelledBy(): BelongsTo

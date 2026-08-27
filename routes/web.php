@@ -15,6 +15,7 @@ use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use App\Livewire\Admin\BusinessSettingsManager;
 use App\Livewire\Admin\DigitalMenuManager;
 use App\Livewire\Admin\KioskSettings;
+use App\Livewire\Admin\PromotionManager;
 use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Admin\UserList;
 use App\Livewire\Auth\AcceptUserInvitation;
@@ -92,6 +93,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
         ->middleware('can:ver panel super admin')
         ->name('super-admin');
     Route::get('/menu-digital', DigitalMenuManager::class)->middleware('can:gestionar menu digital')->name('menu-digital');
+    Route::get('/promociones', PromotionManager::class)->middleware('can:ver promociones')->name('promociones');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
     Route::get('/ordenes', OrderList::class)->middleware('can:ver ordenes')->name('ordenes');
     Route::get('/clientes', CustomerManager::class)->middleware('can:ver clientes')->name('clientes');

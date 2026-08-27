@@ -50,8 +50,11 @@
                         <span class="cart-item-price">${{ number_format($item['subtotal'], 2) }}</span>
                     </div>
 
-                    @if (!empty($item['addons']) || !empty($item['ingredients']) || !empty($item['notes']))
+                    @if (!empty($item['promotion_selections']) || !empty($item['addons']) || !empty($item['ingredients']) || !empty($item['notes']))
                         <div class="cart-item-options" aria-label="Personalización">
+                            @foreach($item['promotion_selections'] ?? [] as $group)
+                                <div class="cart-item-promotion-group"><strong>{{ $group['group_name'] }}</strong>@foreach($group['items'] as $selected)<span><i class="bx bx-check"></i>{{ $selected['quantity'] }}× {{ $selected['product_name'] }}</span>@endforeach</div>
+                            @endforeach
                             @foreach ($item['addons'] as $addon)
                                 <div class="cart-item-addon">
                                     <i class="bx bx-plus-circle" aria-hidden="true"></i>
@@ -97,11 +100,11 @@
                         </div>
 
                         <div class="cart-item-actions">
-                            <button type="button" class="cart-item-action"
+                            @if(empty($item['promotion_id']))<button type="button" class="cart-item-action"
                                 wire:click="editCartItem('{{ $item['cart_id'] }}')" title="Personalizar"
                                 aria-label="Personalizar {{ $item['product_name'] }}">
                                 <i class="bx bx-slider-alt" aria-hidden="true"></i><span>Editar</span>
-                            </button>
+                            </button>@endif
                             <button type="button" class="cart-item-action is-danger"
                                 wire:click="removeCartItem('{{ $item['cart_id'] }}')" title="Quitar"
                                 aria-label="Quitar {{ $item['product_name'] }}">

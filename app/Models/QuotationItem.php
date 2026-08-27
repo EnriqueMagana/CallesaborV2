@@ -9,13 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class QuotationItem extends Model
 {
     protected $fillable = [
-        'quotation_id', 'product_id', 'product_name',
-        'product_price', 'quantity', 'subtotal', 'notes',
+        'quotation_id', 'product_id', 'promotion_id', 'product_name',
+        'product_price', 'quantity', 'subtotal', 'notes', 'promotion_selections',
     ];
 
     protected $casts = [
         'product_price' => 'decimal:2',
-        'subtotal'      => 'decimal:2',
+        'subtotal' => 'decimal:2',
+        'promotion_selections' => 'array',
     ];
 
     public function quotation(): BelongsTo
@@ -26,6 +27,11 @@ class QuotationItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function promotion(): BelongsTo
+    {
+        return $this->belongsTo(Promotion::class);
     }
 
     public function addons(): HasMany

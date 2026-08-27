@@ -51,7 +51,7 @@ class RolePermissionManager extends Component
 
     // ── Módulos / grupos disponibles ──────────────────────────────────
     public array $groups = [
-        'punto_venta', 'usuarios', 'clientes', 'menu', 'ordenes', 'mesas', 'caja',
+        'punto_venta', 'usuarios', 'clientes', 'menu', 'promociones', 'ordenes', 'mesas', 'caja',
         'reservas', 'delivery', 'inventario', 'reportes', 'configuracion', 'kiosco',
     ];
 
@@ -60,6 +60,7 @@ class RolePermissionManager extends Component
         'usuarios' => ['label' => 'Usuarios y roles', 'icon' => 'bx-group', 'tone' => 'primary', 'description' => 'Personal, cuentas y control de acceso.'],
         'clientes' => ['label' => 'Clientes', 'icon' => 'bx-user-pin', 'tone' => 'info', 'description' => 'Directorio y datos de clientes.'],
         'menu' => ['label' => 'Menú', 'icon' => 'bx-food-menu', 'tone' => 'success', 'description' => 'Productos, categorías y complementos.'],
+        'promociones' => ['label' => 'Promociones', 'icon' => 'bx-purchase-tag-alt', 'tone' => 'warning', 'description' => 'Campañas, combos, vigencias y canales de publicación.'],
         'ordenes' => ['label' => 'Órdenes', 'icon' => 'bx-receipt', 'tone' => 'info', 'description' => 'Pedidos, estados y tickets.'],
         'mesas' => ['label' => 'Mesas', 'icon' => 'bx-table', 'tone' => 'warning', 'description' => 'Servicio, cuentas y distribución del salón.'],
         'caja' => ['label' => 'Caja', 'icon' => 'bx-wallet', 'tone' => 'danger', 'description' => 'Apertura, cobro, gastos y cortes.'],

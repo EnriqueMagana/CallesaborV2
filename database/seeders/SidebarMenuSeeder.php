@@ -66,6 +66,11 @@ class SidebarMenuSeeder extends Seeder
             'icon' => 'bx-mobile-alt', 'route_name' => 'app.menu-digital', 'active_pattern' => 'app.menu-digital*',
             'permission' => 'gestionar menu digital', 'sort_order' => 15,
         ]);
+        $this->item('restaurant.promotions', [
+            'parent_id' => $restaurant->id, 'label' => 'Promociones', 'type' => 'link',
+            'icon' => 'bx-purchase-tag-alt', 'route_name' => 'app.promociones',
+            'active_pattern' => 'app.promociones*', 'permission' => 'ver promociones', 'sort_order' => 17,
+        ]);
         $this->item('restaurant.pos', [
             'parent_id' => $restaurant->id, 'label' => 'Punto de venta', 'type' => 'link',
             'icon' => 'bx-store-alt', 'route_name' => 'app.pos', 'permission' => 'usar punto de venta', 'sort_order' => 20,

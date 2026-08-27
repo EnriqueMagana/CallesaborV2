@@ -175,6 +175,13 @@ class UserList extends Component
             return;
         }
 
+        if (! Schema::hasTable('user_invitations')) {
+            Log::error('No se puede enviar la invitación: falta la tabla user_invitations.');
+            $this->addError('inviteEmail', 'La base de datos de invitaciones está pendiente de actualizar. Ejecuta las migraciones en producción e intenta nuevamente.');
+
+            return;
+        }
+
         $rateLimitKey = 'send-user-invitation:'.auth()->id();
         if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
@@ -185,30 +192,34 @@ class UserList extends Component
         RateLimiter::hit($rateLimitKey, 60);
 
         $email = mb_strtolower(trim($validated['inviteEmail']));
-        $role = Role::query()->where('name', $validated['inviteRole'])->firstOrFail();
-        $roleLabel = $this->roleLabel($role->name);
-        $token = Str::random(64);
-        $tokenHash = UserInvitation::hashToken($token);
-        $expiresAt = now()->addHour()->startOfSecond();
-
-        $invitation = UserInvitation::query()->updateOrCreate(
-            ['email' => $email],
-            [
-                'role_id' => $role->id,
-                'token_hash' => $tokenHash,
-                'invited_by' => auth()->id(),
-                'expires_at' => $expiresAt,
-                'accepted_at' => null,
-                'accepted_user_id' => null,
-            ],
-        );
-
-        $invitationUrl = route('invitations.accept', [
-            'invitation' => $invitation->id,
-            'token' => $token,
-        ]);
+        $invitation = null;
+        $tokenHash = null;
+        $roleName = $validated['inviteRole'];
 
         try {
+            $role = Role::query()->where('name', $roleName)->firstOrFail();
+            $roleLabel = $this->roleLabel($role->name);
+            $token = Str::random(64);
+            $tokenHash = UserInvitation::hashToken($token);
+            $expiresAt = now()->addHour()->startOfSecond();
+
+            $invitation = UserInvitation::query()->updateOrCreate(
+                ['email' => $email],
+                [
+                    'role_id' => $role->id,
+                    'token_hash' => $tokenHash,
+                    'invited_by' => auth()->id(),
+                    'expires_at' => $expiresAt,
+                    'accepted_at' => null,
+                    'accepted_user_id' => null,
+                ],
+            );
+
+            $invitationUrl = route('invitations.accept', [
+                'invitation' => $invitation->id,
+                'token' => $token,
+            ]);
+
             Mail::to($email)->send(new UserInvitationMail(
                 invitationUrl: $invitationUrl,
                 roleLabel: $roleLabel,
@@ -216,15 +227,25 @@ class UserList extends Component
                 expiresAt: $expiresAt->translatedFormat('d/m/Y H:i'),
             ));
         } catch (Throwable $exception) {
-            UserInvitation::query()
-                ->whereKey($invitation->id)
-                ->where('token_hash', $tokenHash)
-                ->delete();
+            if ($invitation && $tokenHash) {
+                try {
+                    UserInvitation::query()
+                        ->whereKey($invitation->id)
+                        ->where('token_hash', $tokenHash)
+                        ->delete();
+                } catch (Throwable $cleanupException) {
+                    Log::warning('No se pudo retirar la invitación fallida.', [
+                        'invitation_id' => $invitation->id,
+                        'exception' => $cleanupException::class,
+                    ]);
+                }
+            }
 
-            Log::warning('Falló el envío de una invitación de usuario.', [
+            Log::error('Falló la preparación o el envío de una invitación de usuario.', [
                 'email' => $email,
-                'role' => $role->name,
+                'role' => $roleName,
                 'exception' => $exception::class,
+                'message' => $exception->getMessage(),
             ]);
 
             $this->addError('inviteEmail', 'No se pudo enviar la invitación. Revisa la configuración del remitente e intenta nuevamente.');

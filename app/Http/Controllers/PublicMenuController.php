@@ -6,6 +6,7 @@ use App\Models\BusinessSetting;
 use App\Models\Category;
 use App\Models\DigitalMenuSetting;
 use App\Models\Product;
+use App\Models\Promotion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -47,6 +48,22 @@ class PublicMenuController extends Controller
         $galleryImages = collect($menuSettings->show_gallery ? $menuSettings->galleryItems() : [])
             ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
             ->values();
+        $campaigns = Promotion::query()
+            ->available('digital_menu')
+            ->with([
+                'groups.products' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->select(['products.id', 'products.name', 'products.description', 'products.image']),
+                'primaryProduct' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->with($this->productDetails()),
+            ])
+            ->orderBy('name')
+            ->get();
+        $promotions = $campaigns->reject->isProductLaunch()->values();
+        $newProductCampaigns = $campaigns
+            ->filter(fn (Promotion $campaign) => $campaign->isProductLaunch() && $campaign->primaryProduct)
+            ->values();
 
         return view('public-menu.index', [
             'business' => $business,
@@ -57,6 +74,8 @@ class PublicMenuController extends Controller
             'galleryImages' => $galleryImages,
             'openingStatus' => $business->openingStatus(),
             'totalProducts' => $catalogProducts->count(),
+            'promotions' => $promotions,
+            'newProductCampaigns' => $newProductCampaigns,
         ]);
     }
 
