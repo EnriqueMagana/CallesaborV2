@@ -25,6 +25,7 @@ use App\Models\QuotationItemAddon;
 use App\Models\QuotationItemIngredient;
 use App\Services\InventoryService;
 use App\Services\MesaServiceManager;
+use App\Services\PromotionPricingService;
 use App\Services\ThermalTicketRenderer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -315,6 +316,7 @@ class PointOfSale extends Component
     {
         return Promotion::query()
             ->available('pos')
+            ->forAnyFulfillment(Promotion::POS_FULFILLMENT_MODES)
             ->with(['groups.products' => fn ($query) => $query
                 ->where('is_active', true)
                 ->select(['products.id', 'products.name', 'products.image'])])
@@ -331,6 +333,7 @@ class PointOfSale extends Component
 
         return Promotion::query()
             ->available('pos')
+            ->forAnyFulfillment(Promotion::POS_FULFILLMENT_MODES)
             ->with(['groups.products' => fn ($query) => $query
                 ->where('is_active', true)
                 ->select(['products.id', 'products.name', 'products.image'])])
@@ -1015,10 +1018,17 @@ class PointOfSale extends Component
     public function mount(): void
     {
         $this->cart = Session::get('pos_cart_'.auth()->id(), []);
+        $this->saveCart();
     }
 
     private function saveCart(): void
     {
+        $this->cart = app(PromotionPricingService::class)->apply(
+            $this->cart,
+            'pos',
+            $this->promotionFulfillmentForOrderType($this->orderType)
+        );
+        unset($this->cartTotal, $this->cartCount);
         Session::put('pos_cart_'.auth()->id(), $this->cart);
     }
 
@@ -1087,6 +1097,7 @@ class PointOfSale extends Component
     {
         $promotion = Promotion::query()
             ->available('pos')
+            ->forAnyFulfillment(Promotion::POS_FULFILLMENT_MODES)
             ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
             ->find($promotionId);
 
@@ -1724,6 +1735,7 @@ class PointOfSale extends Component
 
     public function updatedOrderType(): void
     {
+        $this->saveCart();
         $this->payments = [];
         $this->payAmount = number_format($this->cartTotal, 2, '.', '');
         unset($this->paidTotal, $this->paymentRemaining);
@@ -1946,8 +1958,10 @@ class PointOfSale extends Component
                     'product_price' => $item['product_price'],
                     'quantity' => $item['quantity'],
                     'subtotal' => $item['subtotal'],
+                    'promotion_discount' => $item['promotion_discount'] ?? 0,
                     'notes' => $item['notes'] ?: null,
                     'promotion_selections' => $item['promotion_selections'] ?? null,
+                    'promotion_rule_snapshot' => $item['promotion_rule_snapshot'] ?? null,
                 ]);
 
                 foreach ($item['addons'] as $a) {
@@ -2017,14 +2031,18 @@ class PointOfSale extends Component
                 'unit_extra' => $addonExtra + $ingExtra,
                 'unit_total' => $unitTotal,
                 'subtotal' => $unitTotal * $item->quantity,
+                'promotion_discount' => (float) ($item->promotion_discount ?? 0),
                 'notes' => $item->notes ?? '',
                 'addons' => $addons,
                 'ingredients' => $ingredients,
                 'promotion_selections' => $item->promotion_selections ?? [],
+                'promotion_rule_snapshot' => $item->promotion_rule_snapshot,
+                'auto_promotion_applied' => filled($item->promotion_rule_snapshot),
             ];
         }
 
         $this->cart = $newCart;
+        $this->saveCart();
 
         if ($quotation->customer_id) {
             $this->customerId = $quotation->customer_id;
@@ -3920,7 +3938,7 @@ HTML;
 
     private function persistOrder(string $type, string $status): Order
     {
-        $this->refreshPromotionCart();
+        $this->refreshPromotionCart($this->promotionFulfillmentForOrderType($type));
         $cash = $this->activeCashRegister;
         $total = $this->cartTotal;
 
@@ -3955,8 +3973,10 @@ HTML;
                     'product_price' => $item['product_price'],
                     'quantity' => $item['quantity'],
                     'subtotal' => $item['subtotal'],
+                    'promotion_discount' => $item['promotion_discount'] ?? 0,
                     'notes' => $item['notes'] ?: null,
                     'promotion_selections' => $item['promotion_selections'] ?? null,
+                    'promotion_rule_snapshot' => $item['promotion_rule_snapshot'] ?? null,
                 ]);
 
                 foreach ($item['addons'] as $addon) {
@@ -3995,15 +4015,15 @@ HTML;
         });
     }
 
-    private function refreshPromotionCart(): void
+    private function refreshPromotionCart(?string $fulfillment = null): void
     {
         foreach ($this->cart as $index => $item) {
-            if (empty($item['promotion_id'])) {
+            if (empty($item['promotion_id']) || ! empty($item['auto_promotion_applied'])) {
                 continue;
             }
 
             $promotion = Promotion::query()
-                ->available('pos')
+                ->available('pos', null, $fulfillment)
                 ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
                 ->find($item['promotion_id']);
             if (! $promotion) {
@@ -4028,6 +4048,15 @@ HTML;
 
         unset($this->cartTotal, $this->cartCount);
         $this->saveCart();
+    }
+
+    private function promotionFulfillmentForOrderType(string $type): string
+    {
+        return match ($type) {
+            'delivery' => 'delivery',
+            'pick_up' => 'pickup',
+            default => 'takeaway',
+        };
     }
 
     private function validatedPromotionSnapshot(Promotion $promotion, array $selections): array

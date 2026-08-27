@@ -11,6 +11,7 @@
                 <button type="button" wire:click="closePromotionModal" aria-label="Cerrar"><i class="bx bx-x"></i></button>
             </header>
             <div class="promotion-picker__body">
+                <div class="promotion-picker__terms"><span><i class="bx bx-map-pin"></i>{{ $promotion->fulfillmentSummary() }}</span>@if($promotion->terms_and_conditions)<p><i class="bx bx-info-circle"></i>{{ $promotion->terms_and_conditions }}</p>@endif</div>
                 @foreach($promotion->groups as $group)
                     @php
                         $selectedCount = collect($promotionSelections[$group->id] ?? [])->sum();

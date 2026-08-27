@@ -291,6 +291,21 @@
                     @endforeach
                 </nav>
 
+                @if($this->campaignPromotions->isNotEmpty())
+                    <section class="kiosk-campaigns" aria-labelledby="kiosk-campaigns-title">
+                        <header><div><span>Beneficios por tiempo limitado</span><h2 id="kiosk-campaigns-title">Promociones</h2></div><p>Disponibles para {{ ['dine_in'=>'comer aquí','takeaway'=>'recoger en ventanilla','delivery'=>'entrega a domicilio'][$fulfillment] ?? 'tu pedido' }}.</p></header>
+                        <div class="kiosk-campaigns__rail" role="list" aria-label="Promociones disponibles">
+                            @foreach($this->campaignPromotions as $promotion)
+                                <button type="button" class="kiosk-campaign-card" role="listitem" wire:click="openPromotionModal({{ $promotion->id }})" wire:key="kiosk-campaign-{{ $promotion->id }}">
+                                    <span class="kiosk-campaign-card__media" @if($promotion->image) style="background-image:url('{{ route('kiosk.media', ['path'=>$promotion->image]) }}')" @endif></span>
+                                    <span class="kiosk-campaign-card__shade"></span>
+                                    <span class="kiosk-campaign-card__content"><small><i class="bx {{ $promotion->presentationIcon() }}"></i>{{ $promotion->presentationLabel() }}</small><strong>{{ $promotion->name }}</strong><span>{{ $promotion->short_description }}</span><b>${{ number_format($promotion->price, 2) }}</b></span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
                 <div class="kiosk-products-shell">
                     <div class="kiosk-products">
                     @foreach($this->products as $product)
@@ -357,6 +372,9 @@
                             @if ($line['addon_names'] || $line['ingredient_names'])
                                 <small>{{ implode(' · ', array_merge($line['addon_names'], $line['ingredient_names'])) }}</small>
                             @endif
+                            @if(!empty($line['promotion_discount']))
+                                <small class="kiosk-auto-promotion"><i class="bx bx-purchase-tag-alt"></i>{{ data_get($line, 'promotion_rule_snapshot.label', 'Promoción automática') }} <b>−${{ number_format($line['promotion_discount'], 2) }}</b></small>
+                            @endif
                             <div class="kiosk-quantity">
                                 <button type="button" wire:click="changeCartQuantity('{{ $line['id'] }}', -1)"
                                     aria-label="Quitar uno"><i class="bx bx-minus"></i></button>
@@ -383,6 +401,29 @@
                 </button>
             </aside>
         </section>
+        @if($showPromotionModal && $this->customizingPromotion)
+            @php $campaign = $this->customizingPromotion; @endphp
+            <div class="kiosk-campaign-modal-backdrop" wire:click="closePromotionModal"></div>
+            <div class="kiosk-campaign-modal-wrap" role="dialog" aria-modal="true" aria-labelledby="kiosk-campaign-modal-title">
+                <section class="kiosk-campaign-modal">
+                    <header><div><small>{{ $campaign->presentationLabel() }}</small><h2 id="kiosk-campaign-modal-title">{{ $campaign->name }}</h2><p>{{ $campaign->short_description }}</p></div><strong>${{ number_format($campaign->price, 2) }}</strong><button type="button" wire:click="closePromotionModal" aria-label="Cerrar"><i class="bx bx-x"></i></button></header>
+                    <div class="kiosk-campaign-modal__body">
+                        <div class="kiosk-campaign-rules"><span><i class="bx bx-map-pin"></i>{{ $campaign->fulfillmentSummary() }}</span>@if($campaign->terms_and_conditions)<p><i class="bx bx-info-circle"></i>{{ $campaign->terms_and_conditions }}</p>@endif</div>
+                        @foreach($campaign->groups as $group)
+                            @php $selectedCount = collect($promotionSelections[$group->id] ?? [])->sum(); @endphp
+                            <fieldset class="kiosk-campaign-group"><legend><span><strong>{{ $group->name }}</strong><small>Elige de {{ $group->min_selections }} a {{ $group->max_selections }}</small></span><b>{{ $selectedCount }}/{{ $group->max_selections }}</b></legend><div>
+                                @foreach($group->products as $product)
+                                    @php $selectedQuantity = (int)($promotionSelections[$group->id][$product->id] ?? 0); @endphp
+                                    <article class="{{ $selectedQuantity ? 'is-selected' : '' }}">@if($product->image)<img src="{{ route('kiosk.media',['path'=>$product->image]) }}" alt="" width="72" height="72">@else<span><i class="bx bx-dish"></i></span>@endif<strong>{{ $product->name }}</strong><div><button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},-1)" @disabled(!$selectedQuantity) aria-label="Quitar {{ $product->name }}"><i class="bx bx-minus"></i></button><b>{{ $selectedQuantity }}</b><button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},1)" @disabled($selectedCount >= $group->max_selections) aria-label="Agregar {{ $product->name }}"><i class="bx bx-plus"></i></button></div></article>
+                                @endforeach
+                            </div></fieldset>
+                        @endforeach
+                        @error('promotion')<p class="kiosk-error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
+                    </div>
+                    <footer><label><span>Cantidad</span><input type="number" wire:model="promotionQuantity" min="1" max="99"></label><div><button type="button" wire:click="closePromotionModal">Cancelar</button><button type="button" class="is-primary" wire:click="addPromotionToCart"><i class="bx bx-cart-add"></i>Agregar promoción</button></div></footer>
+                </section>
+            </div>
+        @endif
     @elseif($step === 4 && $this->product)
         <section class="kiosk-customizer"
             x-data="kioskCustomizer(@js([
@@ -861,6 +902,7 @@
                             <div class="kiosk-summary-line"><span><b>{{ $line['quantity'] }}×</b>
                                     {{ $line['product_name'] }}</span><strong>${{ number_format($line['subtotal'], 2) }}</strong>
                             </div>
+                            @if(!empty($line['promotion_discount']))<small class="kiosk-auto-promotion"><i class="bx bx-purchase-tag-alt"></i>{{ data_get($line, 'promotion_rule_snapshot.label') }} · ahorras ${{ number_format($line['promotion_discount'], 2) }}</small>@endif
                         @endforeach
                     </div>
                     <div class="kiosk-cart-total">

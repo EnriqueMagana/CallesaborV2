@@ -13,8 +13,11 @@ use App\Models\OrderItem;
 use App\Models\OrderItemAddon;
 use App\Models\OrderItemIngredient;
 use App\Models\Product;
+use App\Models\Promotion;
 use App\Services\KioskQrCode;
 use App\Services\MesaServiceManager;
+use App\Services\PromotionSelectionService;
+use App\Services\PromotionPricingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -49,6 +52,14 @@ class OrderWizard extends Component
     public ?int $categoryFilter = null;
 
     public array $cart = [];
+
+    public bool $showPromotionModal = false;
+
+    public ?int $customizingPromotionId = null;
+
+    public array $promotionSelections = [];
+
+    public int $promotionQuantity = 1;
 
     public ?int $customizingProduct = null;
 
@@ -191,6 +202,117 @@ class OrderWizard extends Component
             ->orderBy('sort_order')
             ->get()
             ->keyBy('product_id');
+    }
+
+    #[Computed]
+    public function campaignPromotions()
+    {
+        if (! in_array($this->fulfillment, Promotion::FULFILLMENT_MODES, true)) {
+            return collect();
+        }
+
+        return Promotion::query()
+            ->available('kiosk', null, $this->fulfillment)
+            ->with(['groups.products' => fn ($query) => $query
+                ->where('is_active', true)
+                ->select(['products.id', 'products.name', 'products.image'])])
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
+    public function customizingPromotion(): ?Promotion
+    {
+        if (! $this->customizingPromotionId) {
+            return null;
+        }
+
+        return Promotion::query()
+            ->available('kiosk', null, $this->fulfillment)
+            ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->find($this->customizingPromotionId);
+    }
+
+    public function openPromotionModal(int $promotionId): void
+    {
+        $promotion = Promotion::query()
+            ->available('kiosk', null, $this->fulfillment)
+            ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->find($promotionId);
+
+        if (! $promotion || $promotion->groups->isEmpty()) {
+            $this->addError('cart', 'Esta promoción no está disponible para la modalidad elegida.');
+
+            return;
+        }
+
+        $this->customizingPromotionId = $promotion->id;
+        $this->promotionSelections = [];
+        $this->promotionQuantity = 1;
+        $this->showPromotionModal = true;
+        $this->resetErrorBag('promotion');
+        unset($this->customizingPromotion);
+    }
+
+    public function closePromotionModal(): void
+    {
+        $this->showPromotionModal = false;
+        $this->customizingPromotionId = null;
+        $this->promotionSelections = [];
+        $this->promotionQuantity = 1;
+        $this->resetErrorBag('promotion');
+        unset($this->customizingPromotion);
+    }
+
+    public function changePromotionSelection(int $groupId, int $productId, int $delta): void
+    {
+        $group = $this->customizingPromotion?->groups->firstWhere('id', $groupId);
+        if (! $group || ! $group->products->contains('id', $productId)) {
+            return;
+        }
+
+        $current = (int) ($this->promotionSelections[$groupId][$productId] ?? 0);
+        $groupTotal = (int) collect($this->promotionSelections[$groupId] ?? [])->sum();
+        if ($delta > 0 && $groupTotal >= $group->max_selections) {
+            return;
+        }
+
+        $next = max(0, $current + ($delta > 0 ? 1 : -1));
+        if ($next === 0) {
+            unset($this->promotionSelections[$groupId][$productId]);
+        } else {
+            $this->promotionSelections[$groupId][$productId] = $next;
+        }
+        $this->resetErrorBag('promotion');
+    }
+
+    public function addPromotionToCart(): void
+    {
+        $promotion = $this->customizingPromotion;
+        if (! $promotion || $this->promotionQuantity < 1 || $this->promotionQuantity > 99) {
+            $this->addError('promotion', 'La promoción ya no está disponible o la cantidad no es válida.');
+
+            return;
+        }
+
+        $snapshot = app(PromotionSelectionService::class)->snapshot($promotion, $this->promotionSelections);
+        $this->cart[] = [
+            'id' => (string) Str::uuid(),
+            'product_id' => null,
+            'promotion_id' => $promotion->id,
+            'product_name' => $promotion->name,
+            'image' => $promotion->image,
+            'addon_names' => [],
+            'ingredient_names' => [],
+            'promotion_selections' => $snapshot,
+            'notes' => '',
+            'quantity' => $this->promotionQuantity,
+            'unit_total' => (float) $promotion->price,
+            'subtotal' => (float) $promotion->price * $this->promotionQuantity,
+        ];
+
+        $this->closePromotionModal();
+        unset($this->cartCount, $this->cartTotal, $this->campaignPromotions);
     }
 
     public function selectFeaturedProduct(int $productId): void
@@ -425,6 +547,7 @@ class OrderWizard extends Component
         abort_if($fulfillment === 'takeaway' && ! $this->terminal->allow_takeaway, 422);
         abort_if($fulfillment === 'delivery' && ! $this->terminal->allow_delivery, 422);
         $this->fulfillment = $fulfillment;
+        $this->repriceCart();
         $this->selectedMesaId = null;
         $this->step = 2;
 
@@ -635,7 +758,7 @@ class OrderWizard extends Component
             }
             break;
         }
-        unset($this->cartCount, $this->cartTotal);
+        $this->repriceCart();
     }
 
     public function reviewOrder(): void
@@ -765,7 +888,19 @@ class OrderWizard extends Component
                     throw ValidationException::withMessages(['order' => 'El terminal no tiene un responsable configurado.']);
                 }
 
-                $lines = collect($this->cart)->map(fn ($line) => $this->resolveLine($line));
+                $this->repriceCart();
+                $lines = collect($this->cart)->map(function (array $line): array {
+                    $resolved = $this->resolveLine(! empty($line['auto_promotion_applied'])
+                        ? array_merge($line, ['promotion_id' => null])
+                        : $line);
+
+                    return array_merge($resolved, [
+                        'promotion_id' => $line['promotion_id'] ?? $resolved['promotion']?->id,
+                        'promotion_discount' => (float) ($line['promotion_discount'] ?? 0),
+                        'promotion_rule_snapshot' => $line['promotion_rule_snapshot'] ?? null,
+                        'subtotal' => (float) ($line['subtotal'] ?? $resolved['subtotal']),
+                    ]);
+                });
                 $total = round((float) $lines->sum('subtotal'), 2);
                 $publicToken = Str::random(64);
 
@@ -840,12 +975,16 @@ class OrderWizard extends Component
                 foreach ($lines as $line) {
                     $orderItem = OrderItem::create([
                         'order_id' => $order->id,
-                        'product_id' => $line['product']->id,
-                        'product_name' => $line['product']->name,
+                        'product_id' => $line['product']?->id,
+                        'promotion_id' => $line['promotion_id'],
+                        'product_name' => $line['product']?->name ?: $line['promotion']->name,
                         'product_price' => $line['base_price'],
                         'quantity' => $line['quantity'],
                         'subtotal' => $line['subtotal'],
+                        'promotion_discount' => $line['promotion_discount'],
                         'notes' => $line['notes'] ?: null,
+                        'promotion_selections' => $line['promotion_selections'],
+                        'promotion_rule_snapshot' => $line['promotion_rule_snapshot'],
                     ]);
 
                     foreach ($line['addons'] as $addon) {
@@ -959,14 +1098,19 @@ class OrderWizard extends Component
             'ingredient_names' => $line['ingredients']->map(fn ($item) => $item['model']->name.' ×'.$item['quantity'])->all(),
             'notes' => trim($notes),
             'quantity' => $quantity,
+            'product_price' => $line['base_price'],
             'unit_total' => $line['unit_total'],
             'subtotal' => $line['subtotal'],
         ];
-        unset($this->cartCount, $this->cartTotal);
+        $this->repriceCart();
     }
 
     private function resolveLine(array $line): array
     {
+        if (! empty($line['promotion_id'])) {
+            return $this->resolvePromotionLine($line);
+        }
+
         $product = Product::with(['addonGroups.addons', 'ingredients'])
             ->where('is_active', true)->findOrFail((int) $line['product_id']);
         $addonQuantities = collect($line['addon_quantities'] ?? [])
@@ -1007,6 +1151,7 @@ class OrderWizard extends Component
 
         return [
             'product' => $product,
+            'promotion' => null,
             'addons' => $addons,
             'ingredients' => $ingredientModels,
             'quantity' => $quantity,
@@ -1014,6 +1159,53 @@ class OrderWizard extends Component
             'base_price' => round($basePrice, 2),
             'unit_total' => round($unitTotal, 2),
             'subtotal' => round($unitTotal * $quantity, 2),
+            'promotion_selections' => null,
+        ];
+    }
+
+    private function repriceCart(): void
+    {
+        if ($this->fulfillment === '') {
+            unset($this->cartCount, $this->cartTotal);
+
+            return;
+        }
+
+        $this->cart = app(PromotionPricingService::class)->apply($this->cart, 'kiosk', $this->fulfillment);
+        unset($this->cartCount, $this->cartTotal);
+    }
+
+    private function resolvePromotionLine(array $line): array
+    {
+        $promotion = Promotion::query()
+            ->available('kiosk', null, $this->fulfillment)
+            ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->find($line['promotion_id']);
+
+        if (! $promotion) {
+            throw ValidationException::withMessages([
+                'cart' => 'Una promoción venció o no aplica a la modalidad elegida. Retírala para continuar.',
+            ]);
+        }
+
+        $selectionService = app(PromotionSelectionService::class);
+        $snapshot = $selectionService->snapshot(
+            $promotion,
+            $selectionService->selectionMap($line['promotion_selections'] ?? [])
+        );
+        $quantity = max(1, min(99, (int) ($line['quantity'] ?? 1)));
+
+        return [
+            'product' => null,
+            'promotion' => $promotion,
+            'addons' => collect(),
+            'ingredients' => collect(),
+            'quantity' => $quantity,
+            'notes' => '',
+            'base_price' => round((float) $promotion->price, 2),
+            'unit_total' => round((float) $promotion->price, 2),
+            'subtotal' => round((float) $promotion->price * $quantity, 2),
+            'promotion_selections' => $snapshot,
         ];
     }
 

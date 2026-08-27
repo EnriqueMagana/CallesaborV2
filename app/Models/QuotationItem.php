@@ -10,13 +10,15 @@ class QuotationItem extends Model
 {
     protected $fillable = [
         'quotation_id', 'product_id', 'promotion_id', 'product_name',
-        'product_price', 'quantity', 'subtotal', 'notes', 'promotion_selections',
+        'product_price', 'quantity', 'subtotal', 'promotion_discount', 'notes', 'promotion_selections', 'promotion_rule_snapshot',
     ];
 
     protected $casts = [
         'product_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
+        'promotion_discount' => 'decimal:2',
         'promotion_selections' => 'array',
+        'promotion_rule_snapshot' => 'array',
     ];
 
     public function quotation(): BelongsTo

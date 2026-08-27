@@ -84,7 +84,11 @@ class ThermalTicketRenderer
                         'name' => '• '.($selected['product_name'] ?? 'Producto').((int) ($selected['quantity'] ?? 1) > 1 ? ' x'.(int) $selected['quantity'] : ''),
                         'price' => 0,
                     ])
-                ))->values()->all(),
+                ))->when((float) ($item->promotion_discount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
+                    'name' => '• Oferta: '.data_get($item->promotion_rule_snapshot, 'label', 'promoción automática')
+                        .' (-$'.number_format((float) $item->promotion_discount, 2).')',
+                    'price' => 0,
+                ]))->values()->all(),
             ])->values()->all(),
             'total' => (float) $order->total,
             'payments' => $order->payments->map(fn ($payment) => [
