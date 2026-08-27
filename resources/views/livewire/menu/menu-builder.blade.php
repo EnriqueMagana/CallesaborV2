@@ -130,6 +130,11 @@
                         @endif
                     </td>
                     <td class="text-end">
+                        @can('crear promociones')
+                        <a class="btn btn-sm btn-icon btn-outline-warning" title="Promocionar en el menú digital" aria-label="Promocionar {{ $product->name }} en el menú digital" href="{{ route('app.promociones', ['product' => $product->id]) }}">
+                            <i class="bx bx-broadcast"></i>
+                        </a>
+                        @endcan
                         @can('editar platos')
                         <button class="btn btn-sm btn-icon btn-outline-success" title="Ingredientes" wire:click="openProductIngredientsModal({{ $product->id }})">
                             <i class="bx bx-spa"></i>

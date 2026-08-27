@@ -37,6 +37,21 @@
         @endforeach
     </div>
 
+    @if($this->activePromotions->isNotEmpty())
+        <section class="pos-promotions" aria-labelledby="pos-promotions-title">
+            <header><div><span>Precio especial</span><h2 id="pos-promotions-title">Promociones activas</h2></div><small>Elige las opciones incluidas; no se suman precios individuales.</small></header>
+            <div class="pos-promotions__rail">
+                @foreach($this->activePromotions as $promotion)
+                    <button type="button" wire:click="openPromotionModal({{ $promotion->id }})" wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name), null)" x-cloak>
+                        <span class="pos-promotion__image">@if($promotion->image)<img src="{{ Storage::url($promotion->image) }}" alt="" width="240" height="150" loading="lazy">@else<i class="bx bx-purchase-tag-alt"></i>@endif</span>
+                        <span class="pos-promotion__content"><small>Promoción</small><strong>{{ $promotion->name }}</strong><span>{{ $promotion->groups->count() }} {{ $promotion->groups->count() === 1 ? 'grupo' : 'grupos' }} para elegir</span></span>
+                        <b>${{ number_format($promotion->price, 2) }}</b>
+                    </button>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <div class="catalog-grid">
         @php $cartProductIds = collect($cart)->groupBy('product_id')->map->sum('quantity'); @endphp
 

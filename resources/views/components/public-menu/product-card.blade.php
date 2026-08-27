@@ -1,11 +1,14 @@
-@props(['product', 'featured' => false, 'rank' => null])
+@props(['product', 'featured' => false, 'rank' => null, 'badge' => null, 'imageOverride' => null, 'titleOverride' => null, 'descriptionOverride' => null])
 
 @php
+    $cardName = $titleOverride ?: $product->name;
+    $cardDescription = $descriptionOverride ?: $product->description;
+    $cardImage = $imageOverride ?: $product->image;
     $modalProduct = [
-        'name' => $product->name,
-        'description' => $product->description ?: 'Consulta los detalles y opciones disponibles de este producto.',
+        'name' => $cardName,
+        'description' => $cardDescription ?: 'Consulta los detalles y opciones disponibles de este producto.',
         'price' => '$'.number_format((float) $product->price, 2),
-        'image' => $product->image ? Storage::url($product->image) : null,
+        'image' => $cardImage ? Storage::url($cardImage) : null,
         'category' => $product->category?->name ?? 'Especialidad',
         'customizable' => (bool) $product->is_customizable,
         'minIngredients' => (int) ($product->min_ingredients ?? 0),
@@ -35,12 +38,12 @@
 <article
     {{ $attributes->class(['product-card', 'product-card--featured' => $featured, 'product-card--ranked' => $rank]) }}
     data-menu-product
-    data-search="{{ \Illuminate\Support\Str::lower($product->name.' '.$product->description.' '.$product->category?->name) }}"
+    data-search="{{ \Illuminate\Support\Str::lower($cardName.' '.$cardDescription.' '.$product->category?->name) }}"
 >
     <button
         type="button"
         class="product-card__trigger"
-        aria-label="Ver detalles de {{ $product->name }}"
+        aria-label="Ver detalles de {{ $cardName }}"
         aria-haspopup="dialog"
         data-product-detail="{{ json_encode($modalProduct, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
     ></button>
@@ -48,10 +51,10 @@
         @if($rank)
             <span class="product-card__rank" aria-label="Favorito número {{ $rank }}">{{ $rank }}</span>
         @endif
-        @if($product->image)
+        @if($cardImage)
             <img
-                src="{{ Storage::url($product->image) }}"
-                alt="{{ $product->name }}"
+                src="{{ Storage::url($cardImage) }}"
+                alt="{{ $cardName }}"
                 width="{{ $featured ? 640 : 440 }}"
                 height="{{ $featured ? 400 : 330 }}"
                 loading="lazy"
@@ -60,8 +63,8 @@
         @else
             <span class="product-card__placeholder" aria-hidden="true"><i class="bx bx-dish"></i></span>
         @endif
-        @if($featured)
-            <span class="product-card__badge"><i class="bx bx-star" aria-hidden="true"></i> Destacado</span>
+        @if($featured || $badge)
+            <span class="product-card__badge"><i class="bx bx-star" aria-hidden="true"></i> {{ $badge ?: 'Destacado' }}</span>
         @endif
     </div>
     <div class="product-card__content">
@@ -69,11 +72,11 @@
             <span class="product-card__category">{{ $product->category->name }}</span>
         @endif
         <div class="product-card__title-row">
-            <h3>{{ $product->name }}</h3>
+            <h3>{{ $cardName }}</h3>
             <strong class="product-card__price">${{ number_format((float) $product->price, 2) }}</strong>
         </div>
-        @if($product->description)
-            <p>{{ $product->description }}</p>
+        @if($cardDescription)
+            <p>{{ $cardDescription }}</p>
         @endif
         <span class="product-card__detail">Ver detalle <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
         <span class="product-card__action" aria-hidden="true"><i class="bx bx-plus"></i></span>

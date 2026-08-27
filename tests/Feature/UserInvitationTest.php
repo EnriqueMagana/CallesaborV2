@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -79,6 +80,41 @@ class UserInvitationTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseCount('user_invitations', 0);
+    }
+
+    public function test_mail_provider_failure_is_reported_without_leaving_an_active_invitation(): void
+    {
+        $owner = $this->owner();
+        RateLimiter::clear('send-user-invitation:'.$owner->id);
+        Mail::shouldReceive('to')->once()->with('fallo@equipo.test')->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(new \RuntimeException('Provider unavailable'));
+
+        Livewire::actingAs($owner)
+            ->test(UserList::class)
+            ->call('openInvitationPanel')
+            ->set('inviteEmail', 'fallo@equipo.test')
+            ->set('inviteRole', 'cajero')
+            ->call('sendUserInvitation')
+            ->assertHasErrors('inviteEmail')
+            ->assertSet('showInvitationPanel', true);
+
+        $this->assertDatabaseMissing('user_invitations', ['email' => 'fallo@equipo.test']);
+    }
+
+    public function test_missing_invitation_migration_is_reported_without_a_server_error(): void
+    {
+        $owner = $this->owner();
+        RateLimiter::clear('send-user-invitation:'.$owner->id);
+        Schema::shouldReceive('hasTable')->once()->with('user_invitations')->andReturnFalse();
+
+        Livewire::actingAs($owner)
+            ->test(UserList::class)
+            ->call('openInvitationPanel')
+            ->set('inviteEmail', 'pendiente@equipo.test')
+            ->set('inviteRole', 'cajero')
+            ->call('sendUserInvitation')
+            ->assertHasErrors('inviteEmail')
+            ->assertSee('pendiente de actualizar');
     }
 
     public function test_invited_person_can_complete_the_wizard_with_the_preassigned_role_and_optional_photo(): void

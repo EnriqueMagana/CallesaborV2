@@ -79,7 +79,12 @@ class ThermalTicketRenderer
                 ])->concat($item->ingredients->map(fn ($ingredient) => [
                     'name' => '• '.$ingredient->ingredient_name.($ingredient->quantity > 1 ? ' x'.$ingredient->quantity : ''),
                     'price' => (float) $ingredient->extra_price * max(1, (int) $ingredient->quantity),
-                ]))->values()->all(),
+                ]))->concat(collect($item->promotion_selections ?? [])->flatMap(
+                    fn (array $group) => collect($group['items'] ?? [])->map(fn (array $selected) => [
+                        'name' => '• '.($selected['product_name'] ?? 'Producto').((int) ($selected['quantity'] ?? 1) > 1 ? ' x'.(int) $selected['quantity'] : ''),
+                        'price' => 0,
+                    ])
+                ))->values()->all(),
             ])->values()->all(),
             'total' => (float) $order->total,
             'payments' => $order->payments->map(fn ($payment) => [

@@ -107,6 +107,7 @@
 
 {{-- Modals --}}
 @include('livewire.pos.partials.modals.customize')
+@include('livewire.pos.partials.modals.promotion')
 @include('livewire.pos.partials.modals.checkout')
 @include('livewire.pos.partials.modals.expense')
 @include('livewire.pos.partials.modals.quotations')

@@ -283,7 +283,7 @@ class SidebarMenuManagerTest extends TestCase
         $orderedIds = SidebarMenuItem::where('parent_id', $restaurant->id)
             ->orderBy('sort_order')->orderBy('id')->pluck('id')->all();
         $this->assertLessThan(array_search($pos->id, $orderedIds, true), array_search($operations->id, $orderedIds, true));
-        $this->assertSame([10, 20, 30, 40, 50], SidebarMenuItem::where('parent_id', $restaurant->id)->orderBy('sort_order')->pluck('sort_order')->all());
+        $this->assertSame([10, 20, 30, 40, 50, 60], SidebarMenuItem::where('parent_id', $restaurant->id)->orderBy('sort_order')->pluck('sort_order')->all());
     }
 
     public function test_same_internal_route_cannot_be_registered_twice(): void

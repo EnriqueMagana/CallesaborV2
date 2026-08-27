@@ -152,7 +152,8 @@
     const empty = document.getElementById('menu-no-results');
     const form = document.getElementById('menu-search-form');
     const cards = [...document.querySelectorAll('.menu-catalog [data-menu-product]')];
-    const sections = [...document.querySelectorAll('[data-menu-section]')];
+    const catalogSections = [...document.querySelectorAll('[data-menu-section]')];
+    const sections = [...document.querySelectorAll('[data-menu-section], [data-category-section]')];
     const categoryNav = document.querySelector('.category-nav');
     const categoryRail = document.querySelector('[data-category-rail]');
     const categoryScroll = document.querySelector('[data-category-scroll]');
@@ -270,7 +271,7 @@
                 if (matches) visible += 1;
             });
 
-            sections.forEach((section) => {
+            catalogSections.forEach((section) => {
                 section.hidden = ![...section.querySelectorAll('[data-menu-product]')].some((card) => !card.hidden);
             });
 
@@ -291,6 +292,143 @@
             input.value = '';
             filterMenu();
             input.focus();
+        });
+    }
+
+    document.querySelectorAll('[data-promotion-carousel]').forEach((carousel) => {
+        const rail = carousel.querySelector('[data-promotion-rail]');
+        const previous = carousel.querySelector('[data-promotion-previous]');
+        const next = carousel.querySelector('[data-promotion-next]');
+        const dots = [...carousel.querySelectorAll('[data-promotion-dot]')];
+        if (!rail) return;
+
+        const updateControls = () => {
+            if (previous) previous.disabled = rail.scrollLeft <= 4;
+            if (next) next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4;
+            const railCenter = rail.scrollLeft + (rail.clientWidth / 2);
+            const activeIndex = [...rail.children].reduce((closest, item, index, items) => {
+                const itemCenter = item.offsetLeft + (item.offsetWidth / 2);
+                const closestCenter = items[closest].offsetLeft + (items[closest].offsetWidth / 2);
+                return Math.abs(itemCenter - railCenter) < Math.abs(closestCenter - railCenter) ? index : closest;
+            }, 0);
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('is-active', index === activeIndex);
+                if (index === activeIndex) dot.setAttribute('aria-current', 'true');
+                else dot.removeAttribute('aria-current');
+            });
+        };
+        const move = (direction) => rail.scrollBy({
+            left: direction * Math.max(260, rail.clientWidth * .82),
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+        previous?.addEventListener('click', () => move(-1));
+        next?.addEventListener('click', () => move(1));
+        dots.forEach((dot) => dot.addEventListener('click', () => {
+            const item = rail.children[Number(dot.dataset.index) || 0];
+            item?.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                block: 'nearest',
+                inline: 'start',
+            });
+        }));
+        rail.addEventListener('scroll', () => window.requestAnimationFrame(updateControls), { passive: true });
+        window.addEventListener('resize', updateControls, { passive: true });
+        updateControls();
+    });
+
+    const promotionModal = document.getElementById('promotion-detail-modal');
+    if (promotionModal) {
+        const image = promotionModal.querySelector('[data-promotion-modal-image]');
+        const placeholder = promotionModal.querySelector('[data-promotion-modal-placeholder]');
+        const badge = promotionModal.querySelector('[data-promotion-modal-badge]');
+        const name = promotionModal.querySelector('[data-promotion-modal-name]');
+        const price = promotionModal.querySelector('[data-promotion-modal-price]');
+        const summary = promotionModal.querySelector('[data-promotion-modal-summary]');
+        const description = promotionModal.querySelector('[data-promotion-modal-description]');
+        const days = promotionModal.querySelector('[data-promotion-modal-days]');
+        const validity = promotionModal.querySelector('[data-promotion-modal-validity]');
+        const groups = promotionModal.querySelector('[data-promotion-modal-groups]');
+        let lastTrigger = null;
+
+        const element = (tag, className, text) => {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text) node.textContent = text;
+            return node;
+        };
+
+        document.querySelectorAll('[data-promotion-detail]').forEach((trigger) => {
+            trigger.addEventListener('click', () => {
+                let promotion;
+                try {
+                    promotion = JSON.parse(trigger.dataset.promotionDetail);
+                } catch {
+                    return;
+                }
+                lastTrigger = trigger;
+                name.textContent = promotion.name;
+                price.textContent = promotion.price;
+                summary.textContent = promotion.summary;
+                description.textContent = promotion.description || '';
+                description.hidden = !promotion.description;
+                days.textContent = promotion.days;
+                validity.textContent = promotion.validity;
+                badge.textContent = promotion.badge;
+                image.hidden = !promotion.image;
+                placeholder.hidden = Boolean(promotion.image);
+                if (promotion.image) {
+                    image.src = promotion.image;
+                    image.alt = promotion.name;
+                } else {
+                    image.removeAttribute('src');
+                    image.alt = '';
+                }
+
+                groups.replaceChildren();
+                promotion.groups.forEach((group) => {
+                    const section = element('section', 'product-modal__section promotion-detail-group');
+                    const heading = element('div');
+                    const icon = element('i', 'bx bx-list-check');
+                    icon.setAttribute('aria-hidden', 'true');
+                    const copy = element('span');
+                    copy.append(element('h3', '', group.name), element('p', '', group.rule));
+                    heading.append(icon, copy);
+                    const products = element('ul', 'promotion-detail-products');
+                    group.products.forEach((product) => {
+                        const item = element('li');
+                        const media = element('span', 'promotion-detail-products__media');
+                        if (product.image) {
+                            const productImage = element('img');
+                            productImage.src = product.image;
+                            productImage.alt = product.name;
+                            productImage.width = 52;
+                            productImage.height = 52;
+                            productImage.loading = 'lazy';
+                            media.append(productImage);
+                        } else {
+                            const productIcon = element('i', 'bx bx-dish');
+                            productIcon.setAttribute('aria-hidden', 'true');
+                            media.append(productIcon);
+                        }
+                        const productCopy = element('span');
+                        productCopy.append(element('strong', '', product.name));
+                        if (product.description) productCopy.append(element('small', '', product.description));
+                        item.append(media, productCopy);
+                        products.append(item);
+                    });
+                    section.append(heading, products);
+                    groups.append(section);
+                });
+
+                document.body.classList.add('has-product-modal');
+                promotionModal.showModal();
+            });
+        });
+        promotionModal.querySelectorAll('[data-promotion-modal-close]').forEach((button) => button.addEventListener('click', () => promotionModal.close()));
+        promotionModal.addEventListener('click', (event) => { if (event.target === promotionModal) promotionModal.close(); });
+        promotionModal.addEventListener('close', () => {
+            document.body.classList.remove('has-product-modal');
+            lastTrigger?.focus();
         });
     }
 
