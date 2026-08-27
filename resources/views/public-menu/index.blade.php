@@ -21,8 +21,8 @@
 
 <body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
-    <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus"
-        action-label="Volver al inicio" :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
+    <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
+        :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
 
     <main>
         <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
@@ -51,122 +51,192 @@
                     'category-nav',
                     'category-nav--circles' => $menuSettings->category_style === 'circles',
                 ]) aria-label="Categorías del menú">
-                <div class="menu-container category-nav__rail" data-category-rail>
-                    <button class="category-nav__control category-nav__control--previous" type="button"
-                        data-category-previous aria-label="Ver categorías anteriores"
-                        aria-controls="category-nav-scroll" hidden>
-                        <i class="bx bx-chevron-left" aria-hidden="true"></i>
-                    </button>
-                    <div class="category-nav__scroll" id="category-nav-scroll" data-category-scroll tabindex="0">
-                        <a href="#catalog-title" class="category-nav__item is-active" data-category-all
-                            aria-current="location">
-                            <span class="category-nav__icon"><i class="bx bx-grid-alt" aria-hidden="true"></i></span>
-                            <span><strong>Todo</strong><small>{{ $totalProducts }} opciones</small></span>
-                        </a>
-                        @if($promotions->isNotEmpty())
-                            <a href="#digital-promotions" class="category-nav__item" data-category-link="digital-promotions">
-                                <span class="category-nav__icon"><i class="bx bx-purchase-tag-alt" aria-hidden="true"></i></span>
-                                <span><strong>Promociones</strong><small>{{ $promotions->count() }} {{ $promotions->count() === 1 ? 'disponible' : 'disponibles' }}</small></span>
+                    <div class="menu-container category-nav__rail" data-category-rail>
+                        <button class="category-nav__control category-nav__control--previous" type="button"
+                            data-category-previous aria-label="Ver categorías anteriores"
+                            aria-controls="category-nav-scroll" hidden>
+                            <i class="bx bx-chevron-left" aria-hidden="true"></i>
+                        </button>
+                        <div class="category-nav__scroll" id="category-nav-scroll" data-category-scroll tabindex="0">
+                            <a href="#catalog-title" class="category-nav__item is-active" data-category-all
+                                aria-current="location">
+                                <span class="category-nav__icon"><i class="bx bx-grid-alt"
+                                        aria-hidden="true"></i></span>
+                                <span><strong>Todo</strong><small>{{ $totalProducts }} opciones</small></span>
                             </a>
-                        @endif
-                        @if($newProductCampaigns->isNotEmpty())
-                            <a href="#new-products" class="category-nav__item" data-category-link="new-products">
-                                <span class="category-nav__icon"><i class="bx bx-star" aria-hidden="true"></i></span>
-                                <span><strong>Nuevos productos</strong><small>{{ $newProductCampaigns->count() }} {{ $newProductCampaigns->count() === 1 ? 'novedad' : 'novedades' }}</small></span>
-                            </a>
-                        @endif
-                        @foreach ($categories as $category)
-                            @php
-                                $categoryPreview = $category->products->first(fn ($product) => filled($product->image));
-                            @endphp
-                            <a href="#category-{{ $category->id }}" class="category-nav__item"
-                                data-category-link="category-{{ $category->id }}">
-                                <span class="category-nav__icon"
-                                    style="--category-color: {{ $category->color ?: $business->primary_color }}">
-                                    @if ($menuSettings->category_style === 'circles' && $categoryPreview)
-                                        <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
-                                            width="64" height="64" loading="lazy" decoding="async">
-                                    @else
-                                        <i class="bx {{ $category->icon ?: 'bx-food-menu' }}" aria-hidden="true"></i>
-                                    @endif
-                                </span>
-                                <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
-                                        {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
-                            </a>
-                        @endforeach
-                        @if ($uncategorized->isNotEmpty())
-                            <a href="#category-other" class="category-nav__item" data-category-link="category-other">
-                                <span class="category-nav__icon"><i class="bx bx-dish" aria-hidden="true"></i></span>
-                                <span><strong>Otros</strong><small>{{ $uncategorized->count() }}
-                                        opciones</small></span>
-                            </a>
-                        @endif
+                            @if ($promotions->isNotEmpty())
+                                <a href="#digital-promotions" class="category-nav__item"
+                                    data-category-link="digital-promotions">
+                                    <span class="category-nav__icon"><i class="bx bx-purchase-tag-alt"
+                                            aria-hidden="true"></i></span>
+                                    <span><strong>Promociones</strong><small>{{ $promotions->count() }}
+                                            {{ $promotions->count() === 1 ? 'disponible' : 'disponibles' }}</small></span>
+                                </a>
+                            @endif
+                            @if ($newProductCampaigns->isNotEmpty())
+                                <a href="#new-products" class="category-nav__item" data-category-link="new-products">
+                                    <span class="category-nav__icon"><i class="bx bx-star"
+                                            aria-hidden="true"></i></span>
+                                    <span><strong>Nuevos productos</strong><small>{{ $newProductCampaigns->count() }}
+                                            {{ $newProductCampaigns->count() === 1 ? 'novedad' : 'novedades' }}</small></span>
+                                </a>
+                            @endif
+                            @foreach ($categories as $category)
+                                @php
+                                    $categoryPreview = $category->products->first(
+                                        fn($product) => filled($product->image),
+                                    );
+                                @endphp
+                                <a href="#category-{{ $category->id }}" class="category-nav__item"
+                                    data-category-link="category-{{ $category->id }}">
+                                    <span class="category-nav__icon"
+                                        style="--category-color: {{ $category->color ?: $business->primary_color }}">
+                                        @if ($menuSettings->category_style === 'circles' && $categoryPreview)
+                                            <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
+                                                width="64" height="64" loading="lazy" decoding="async">
+                                        @else
+                                            <i class="bx {{ $category->icon ?: 'bx-food-menu' }}"
+                                                aria-hidden="true"></i>
+                                        @endif
+                                    </span>
+                                    <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
+                                            {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
+                                </a>
+                            @endforeach
+                            @if ($uncategorized->isNotEmpty())
+                                <a href="#category-other" class="category-nav__item"
+                                    data-category-link="category-other">
+                                    <span class="category-nav__icon"><i class="bx bx-dish"
+                                            aria-hidden="true"></i></span>
+                                    <span><strong>Otros</strong><small>{{ $uncategorized->count() }}
+                                            opciones</small></span>
+                                </a>
+                            @endif
+                        </div>
+                        <button class="category-nav__control category-nav__control--next" type="button"
+                            data-category-next aria-label="Ver más categorías" aria-controls="category-nav-scroll"
+                            hidden>
+                            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    <button class="category-nav__control category-nav__control--next" type="button" data-category-next
-                        aria-label="Ver más categorías" aria-controls="category-nav-scroll" hidden>
-                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
-                    </button>
-                </div>
                 </nav>
             @endif
 
-            @if($promotions->isNotEmpty())
-                <section class="promotion-banners menu-container" id="digital-promotions" aria-labelledby="digital-promotions-title" data-category-section data-promotion-carousel>
+            @if ($promotions->isNotEmpty())
+                <section class="promotion-banners menu-container" id="digital-promotions"
+                    aria-labelledby="digital-promotions-title" data-category-section data-promotion-carousel
+                    data-autoplay-interval="4500">
                     <div class="section-heading promotion-banners__heading">
-                        <div><span class="menu-kicker">Beneficios por tiempo limitado</span><h2 id="digital-promotions-title">Promociones</h2></div>
-                        <div class="promotion-banners__actions"><p>Banners con descuentos, combos y campañas especiales.</p>@if($promotions->count()>1)<button type="button" data-promotion-previous aria-label="Promoción anterior"><i class="bx bx-chevron-left"></i></button><button type="button" data-promotion-next aria-label="Promoción siguiente"><i class="bx bx-chevron-right"></i></button>@endif</div>
+                        <div><span class="menu-kicker">Beneficios por tiempo limitado</span>
+                            <h2 id="digital-promotions-title">Promociones</h2>
+                        </div>
+                        <p>Más por menos con nuestros combos y promociones.</p>
                     </div>
-                    <div class="promotion-banners__rail" data-promotion-rail tabindex="0" aria-label="Carrusel de promociones">
-                        @foreach($promotions as $promotion)
+                    <div class="promotion-banners__rail" data-promotion-rail tabindex="0"
+                        aria-label="Carrusel de promociones">
+                        @foreach ($promotions as $promotion)
                             @php
                                 $modalPromotion = [
                                     'name' => $promotion->name,
-                                    'summary' => $promotion->short_description ?: \Illuminate\Support\Str::limit($promotion->description ?: $promotion->name, 160),
+                                    'summary' =>
+                                        $promotion->short_description ?:
+                                        \Illuminate\Support\Str::limit(
+                                            $promotion->description ?: $promotion->name,
+                                            160,
+                                        ),
                                     'description' => $promotion->description,
-                                    'price' => '$'.number_format((float)$promotion->price, 2),
+                                    'price' => '$' . number_format((float) $promotion->price, 2),
                                     'image' => $promotion->image ? Storage::url($promotion->image) : null,
                                     'badge' => $promotion->presentationLabel(),
                                     'icon' => $promotion->presentationIcon(),
                                     'days' => $promotion->weekdayLabel(),
-                                    'validity' => $promotion->ends_on ? 'Válida hasta '.$promotion->ends_on->translatedFormat('d M Y') : 'Sin fecha de finalización',
-                                    'groups' => $promotion->groups->map(fn($group) => [
-                                        'name' => $group->name,
-                                        'rule' => "Elige de {$group->min_selections} a {$group->max_selections}",
-                                        'products' => $group->products->map(fn($product) => [
-                                            'name' => $product->name,
-                                            'description' => $product->description,
-                                            'image' => $product->image ? Storage::url($product->image) : null,
-                                        ])->values(),
-                                    ])->values(),
+                                    'validity' => $promotion->ends_on
+                                        ? 'Válida hasta ' . $promotion->ends_on->translatedFormat('d M Y')
+                                        : 'Sin fecha de finalización',
+                                    'fulfillment' => $promotion->fulfillmentLabels(),
+                                    'fulfillmentSummary' => $promotion->fulfillmentSummary(),
+                                    'terms' => $promotion->terms_and_conditions,
+                                    'groups' => $promotion->groups
+                                        ->map(
+                                            fn($group) => [
+                                                'name' => $group->name,
+                                                'rule' => "Elige de {$group->min_selections} a {$group->max_selections}",
+                                                'products' => $group->products
+                                                    ->map(
+                                                        fn($product) => [
+                                                            'name' => $product->name,
+                                                            'description' => $product->description,
+                                                            'image' => $product->image
+                                                                ? Storage::url($product->image)
+                                                                : null,
+                                                        ],
+                                                    )
+                                                    ->values(),
+                                            ],
+                                        )
+                                        ->values(),
                                 ];
                             @endphp
-                            <article class="promotion-banner is-{{ $promotion->presentation_type }} {{ $promotion->image ? 'has-image' : '' }}">
-                                <button type="button" class="promotion-banner__trigger" aria-label="Ver detalles de {{ $promotion->name }}" aria-haspopup="dialog" data-promotion-detail="{{ json_encode($modalPromotion, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"></button>
-                                <div class="promotion-banner__media" @if($promotion->image) style="background-image: url('{{ Storage::url($promotion->image) }}')" @endif aria-hidden="true">@unless($promotion->image)<span><i class="bx {{ $promotion->presentationIcon() }}"></i></span>@endunless</div>
-                                <div class="promotion-banner__overlay"><span><i class="bx {{ $promotion->presentationIcon() }}"></i>{{ $promotion->presentationLabel() }}</span><h3>{{ $promotion->name }}</h3><p>{{ $promotion->short_description }}</p><div><small>{{ $promotion->weekdayLabel() }}</small><strong>${{ number_format($promotion->price, 2) }}</strong></div></div>
+                            <article
+                                class="promotion-banner is-{{ $promotion->presentation_type }} {{ $promotion->image ? 'has-image' : '' }}">
+                                <button type="button" class="promotion-banner__trigger"
+                                    aria-label="Ver detalles de {{ $promotion->name }}" aria-haspopup="dialog"
+                                    data-promotion-detail="{{ json_encode($modalPromotion, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"></button>
+                                <div class="promotion-banner__media"
+                                    @if ($promotion->image) style="background-image: url('{{ Storage::url($promotion->image) }}')" @endif
+                                    aria-hidden="true">
+                                    @unless ($promotion->image)
+                                        <span><i class="bx {{ $promotion->presentationIcon() }}"></i></span>
+                                    @endunless
+                                </div>
+                                <div class="promotion-banner__overlay"><span><i
+                                            class="bx {{ $promotion->presentationIcon() }}"></i>{{ $promotion->presentationLabel() }}</span>
+                                    <h3>{{ $promotion->name }}</h3>
+                                    <p>{{ $promotion->short_description }}</p><small
+                                        class="promotion-banner__fulfillment"><i
+                                            class="bx bx-map-pin"></i>{{ $promotion->fulfillmentSummary() }}</small>
+                                    <div>
+                                        <small>{{ $promotion->weekdayLabel() }}</small>
+                                    </div>
+                                </div>
+                                <strong class="promotion-banner__price"><small>Precio promo</small><span>${{ number_format($promotion->price, 2) }}</span></strong>
                             </article>
                         @endforeach
                     </div>
-                    @if($promotions->count() > 1)<div class="promotion-banners__dots" aria-label="Seleccionar promoción">@foreach($promotions as $promotion)<button type="button" data-promotion-dot data-index="{{ $loop->index }}" @if($loop->first) class="is-active" aria-current="true" @endif aria-label="Ver promoción {{ $loop->iteration }}: {{ $promotion->name }}"></button>@endforeach</div>@endif
-                    <p class="promotion-banners__note"><i class="bx bx-info-circle"></i>El precio publicado cubre la promoción; los productos internos no suman su precio individual.</p>
+                    <div class="promotion-banners__dots"
+                        aria-label="{{ $promotions->count() }} {{ $promotions->count() === 1 ? 'promoción' : 'promociones' }}"
+                        role="status">
+                        @foreach ($promotions as $promotion)
+                            <span data-promotion-dot data-index="{{ $loop->index }}"
+                                @if ($loop->first) class="is-active" @endif aria-hidden="true"></span>
+                        @endforeach
+                    </div>
+                    <p class="promotion-banners__note"><i class="bx bx-info-circle" aria-hidden="true"></i>El precio
+                        publicado cubre la promoción; los productos internos no suman su precio individual.</p>
                 </section>
             @endif
 
-            @if($newProductCampaigns->isNotEmpty())
-                <section class="new-products menu-container" id="new-products" aria-labelledby="new-products-title" data-category-section>
-                    <div class="section-heading"><div><span class="menu-kicker">Recién llegados</span><h2 id="new-products-title">Nuevos productos</h2></div><p>Conoce las novedades del menú y todas sus opciones antes de elegir.</p></div>
-                    <div class="new-products__rail" role="list" tabindex="0" aria-label="Nuevos productos, carrusel horizontal">
-                        @foreach($newProductCampaigns as $campaign)
-                            <x-public-menu.product-card :product="$campaign->primaryProduct" :image-override="$campaign->image" :title-override="$campaign->name" :description-override="$campaign->short_description" badge="Nuevo" role="listitem" data-new-product-item />
+            @if ($newProductCampaigns->isNotEmpty())
+                <section class="new-products menu-container" id="new-products" aria-labelledby="new-products-title"
+                    data-category-section>
+                    <div class="section-heading">
+                        <div><span class="menu-kicker">Recién llegados</span>
+                            <h2 id="new-products-title">Nuevos productos</h2>
+                        </div>
+                    </div>
+                    <div class="new-products__rail" role="list" tabindex="0"
+                        aria-label="Nuevos productos, carrusel horizontal">
+                        @foreach ($newProductCampaigns as $campaign)
+                            <x-public-menu.product-card :product="$campaign->primaryProduct" :image-override="$campaign->image" :title-override="$campaign->name"
+                                :description-override="$campaign->short_description" :badge="$campaign->pricingRuleShortLabel() ? 'Nuevo · '.$campaign->pricingRuleShortLabel() : 'Nuevo'" role="listitem" data-new-product-item />
                         @endforeach
                     </div>
                 </section>
             @endif
 
             @if ($featured->isNotEmpty())
-                <section class="featured-menu menu-container" aria-labelledby="featured-title"
-                    data-featured-carousel data-autoplay="true"
-                    data-interval="{{ ((int) $menuSettings->banner_interval_seconds) * 1000 }}">
+                <section class="featured-menu menu-container" aria-labelledby="featured-title" data-featured-carousel
+                    data-autoplay="true" data-interval="{{ ((int) $menuSettings->banner_interval_seconds) * 1000 }}">
                     <div class="section-heading">
                         <div><span class="menu-kicker">Recomendados</span>
                             <h2 id="featured-title">Favoritos de la casa</h2>
@@ -193,8 +263,8 @@
                     <div class="featured-menu__rail" role="list" tabindex="0"
                         aria-label="Favoritos de la casa, carrusel horizontal">
                         @foreach ($featured as $product)
-                            <x-public-menu.product-card :product="$product" :rank="$loop->iteration" featured
-                                role="listitem" data-featured-item />
+                            <x-public-menu.product-card :product="$product" :rank="$loop->iteration" featured role="listitem"
+                                data-featured-item />
                         @endforeach
                     </div>
                 </section>
@@ -319,20 +389,43 @@
 
     <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
 
-    @if($promotions->isNotEmpty())
-        <dialog class="product-modal promotion-detail-modal" id="promotion-detail-modal" aria-labelledby="promotion-modal-title">
+    @if ($promotions->isNotEmpty())
+        <dialog class="product-modal promotion-detail-modal" id="promotion-detail-modal"
+            aria-labelledby="promotion-modal-title">
             <div class="product-modal__shell">
-                <button type="button" class="product-modal__close" data-promotion-modal-close aria-label="Cerrar detalle de la promoción"><i class="bx bx-x" aria-hidden="true"></i></button>
+                <button type="button" class="product-modal__close" data-promotion-modal-close
+                    aria-label="Cerrar detalle de la promoción"><i class="bx bx-x" aria-hidden="true"></i></button>
                 <div class="product-modal__layout">
-                    <div class="product-modal__media"><img src="" alt="" width="720" height="640" data-promotion-modal-image><span class="product-modal__placeholder" data-promotion-modal-placeholder aria-hidden="true"><i class="bx bx-gift"></i></span><span class="product-modal__category" data-promotion-modal-badge></span></div>
+                    <div class="product-modal__media"><img src="" alt="" width="720"
+                            height="640" data-promotion-modal-image><span class="product-modal__placeholder"
+                            data-promotion-modal-placeholder aria-hidden="true"><i class="bx bx-gift"></i></span><span
+                            class="product-modal__category" data-promotion-modal-badge></span></div>
                     <div class="product-modal__content">
-                        <div class="product-modal__heading"><span class="menu-kicker">Detalle de la promoción</span><h2 id="promotion-modal-title" data-promotion-modal-name></h2><strong data-promotion-modal-price></strong><p data-promotion-modal-summary></p></div>
-                        <div class="product-modal__limits"><div class="product-modal__limit"><i class="bx bx-calendar-check"></i><span><small>Días válidos</small><strong data-promotion-modal-days></strong></span></div><div class="product-modal__limit"><i class="bx bx-time-five"></i><span><small>Vigencia</small><strong data-promotion-modal-validity></strong></span></div></div>
+                        <div class="product-modal__heading"><span class="menu-kicker">Detalle de la promoción</span>
+                            <h2 id="promotion-modal-title" data-promotion-modal-name></h2><strong
+                                data-promotion-modal-price></strong>
+                            <p data-promotion-modal-summary></p>
+                        </div>
+                        <div class="product-modal__limits">
+                            <div class="product-modal__limit"><i class="bx bx-calendar-check"></i><span><small>Días
+                                        válidos</small><strong data-promotion-modal-days></strong></span></div>
+                            <div class="product-modal__limit"><i
+                                    class="bx bx-time-five"></i><span><small>Vigencia</small><strong
+                                        data-promotion-modal-validity></strong></span></div>
+                            <div class="product-modal__limit"><i
+                                    class="bx bx-map-pin"></i><span><small>Modalidades</small><strong
+                                        data-promotion-modal-fulfillment></strong></span></div>
+                        </div>
                         <p class="promotion-detail-modal__description" data-promotion-modal-description></p>
+                        <div class="promotion-detail-modal__terms" data-promotion-modal-terms-wrap hidden><i
+                                class="bx bx-info-circle"></i><span><small>Términos y condiciones</small><strong
+                                    data-promotion-modal-terms></strong></span></div>
                         <div class="product-modal__groups" data-promotion-modal-groups></div>
                     </div>
                 </div>
-                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>El precio mostrado cubre la promoción completa</span><button type="button" data-promotion-modal-close>Cerrar detalle</button></footer>
+                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>El
+                        precio mostrado cubre la promoción completa</span><button type="button"
+                        data-promotion-modal-close>Cerrar detalle</button></footer>
             </div>
         </dialog>
     @endif

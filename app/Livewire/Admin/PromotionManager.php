@@ -39,15 +39,31 @@ class PromotionManager extends Component
 
     public string $price = '';
 
+    public bool $launchOfferEnabled = false;
+
+    public int $buyQuantity = 1;
+
+    public int $rewardQuantity = 1;
+
+    public int $rewardDiscountPercentage = 50;
+
+    public string $maxApplicationsPerOrder = '';
+
     public string $startsOn = '';
 
     public string $endsOn = '';
 
     public array $weekdays = [];
 
+    public array $fulfillmentModes = ['dine_in', 'takeaway', 'pickup', 'delivery'];
+
+    public string $termsAndConditions = '';
+
     public bool $showOnPos = true;
 
     public bool $showOnDigitalMenu = true;
+
+    public bool $showOnKiosk = true;
 
     public bool $isActive = true;
 
@@ -75,6 +91,7 @@ class PromotionManager extends Component
                 $this->primaryProductId = $product->id;
                 $this->startsOn = now()->toDateString();
                 $this->showOnPos = false;
+                $this->showOnKiosk = false;
                 $this->updatedPrimaryProductId($product->id);
                 $this->wizardStep = 2;
                 $this->showEditor = true;
@@ -173,12 +190,23 @@ class PromotionManager extends Component
         $this->presentationType = $promotion->presentation_type;
         $this->primaryProductId = $promotion->primary_product_id;
         $this->discountPercentage = (string) ($promotion->discount_percentage ?? '');
+        $pricingRule = $promotion->normalizedPricingRule();
+        $this->launchOfferEnabled = $promotion->hasAutomaticPricingRule();
+        $this->buyQuantity = $pricingRule['buy_quantity'];
+        $this->rewardQuantity = $pricingRule['reward_quantity'];
+        $this->rewardDiscountPercentage = $pricingRule['reward_discount_percentage'];
+        $this->maxApplicationsPerOrder = (string) ($pricingRule['max_applications_per_order'] ?? '');
         $this->price = (string) $promotion->price;
         $this->startsOn = $promotion->starts_on->toDateString();
         $this->endsOn = $promotion->ends_on?->toDateString() ?? '';
         $this->weekdays = array_map('intval', $promotion->weekdays ?? []);
+        $this->fulfillmentModes = $promotion->isProductLaunch() && ! $promotion->hasAutomaticPricingRule()
+            ? Promotion::FULFILLMENT_MODES
+            : array_values($promotion->fulfillment_modes ?: Promotion::FULFILLMENT_MODES);
+        $this->termsAndConditions = (string) $promotion->terms_and_conditions;
         $this->showOnPos = $promotion->show_on_pos;
         $this->showOnDigitalMenu = $promotion->show_on_digital_menu;
+        $this->showOnKiosk = $promotion->show_on_kiosk;
         $this->isActive = $promotion->is_active;
         $this->currentImage = $promotion->image;
         $this->groups = $promotion->groups->map(fn ($group) => [
@@ -217,7 +245,7 @@ class PromotionManager extends Component
 
         $this->resetValidation();
         if ($type === 'new') {
-            $this->showOnPos = false;
+            $this->fulfillmentModes = Promotion::FULFILLMENT_MODES;
             $this->groups = [];
 
             return;
@@ -225,6 +253,7 @@ class PromotionManager extends Component
 
         $this->primaryProductId = null;
         $this->showOnPos = true;
+        $this->showOnKiosk = true;
         if ($this->groups === []) {
             $this->addGroup();
         }
@@ -263,6 +292,9 @@ class PromotionManager extends Component
             ];
             if ($this->presentationType === 'new') {
                 $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
+                if ($this->launchOfferEnabled) {
+                    $rules += $this->pricingRuleValidationRules();
+                }
             } else {
                 $rules['price'] = ['required', 'numeric', 'min:0.01', 'max:999999.99'];
                 $rules['discountPercentage'] = ['nullable', 'required_if:presentationType,discount', 'integer', 'between:1,99'];
@@ -286,11 +318,20 @@ class PromotionManager extends Component
         }
 
         if ($this->wizardStep === 3) {
-            $this->validate([
+            $rules = [
                 'startsOn' => ['required', 'date'],
                 'endsOn' => ['nullable', 'date', 'after_or_equal:startsOn'],
                 'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            ]);
+            ];
+            if ($this->presentationType !== 'new' || $this->launchOfferEnabled) {
+                $rules += [
+                    'fulfillmentModes' => ['required', 'array', 'min:1'],
+                    'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
+                    'termsAndConditions' => ['nullable', 'string', 'max:1000'],
+                ];
+            }
+            $this->validate($rules);
+            $this->validateChannelFulfillmentCompatibility();
             if ($this->presentationType !== 'new' && ! $this->image && ! $this->currentImage) {
                 throw ValidationException::withMessages(['image' => 'Carga una imagen horizontal para el banner promocional.']);
             }
@@ -300,7 +341,7 @@ class PromotionManager extends Component
                     throw ValidationException::withMessages(['image' => 'Carga una imagen o agrega una al producto seleccionado.']);
                 }
             }
-            if (! $this->showOnPos && ! $this->showOnDigitalMenu) {
+            if (! $this->showOnPos && ! $this->showOnDigitalMenu && ! $this->showOnKiosk) {
                 throw ValidationException::withMessages(['channels' => 'Selecciona al menos un canal de publicación.']);
             }
         }
@@ -346,15 +387,27 @@ class PromotionManager extends Component
             'endsOn' => ['nullable', 'date', 'after_or_equal:startsOn'],
             'weekdays' => ['array'],
             'weekdays.*' => ['integer', 'between:1,7', 'distinct'],
+            'fulfillmentModes' => ['array'],
+            'termsAndConditions' => ['nullable', 'string', 'max:1000'],
             'showOnPos' => ['boolean'],
             'showOnDigitalMenu' => ['boolean'],
+            'showOnKiosk' => ['boolean'],
             'isActive' => ['boolean'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ];
         if ($this->presentationType === 'new') {
             $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
+            if ($this->launchOfferEnabled) {
+                $rules += $this->pricingRuleValidationRules();
+                $rules += [
+                    'fulfillmentModes' => ['required', 'array', 'min:1'],
+                    'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
+                ];
+            }
         } else {
             $rules += [
+                'fulfillmentModes' => ['required', 'array', 'min:1'],
+                'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
                 'groups' => ['required', 'array', 'min:1', 'max:12'],
                 'groups.*.name' => ['required', 'string', 'max:100'],
                 'groups.*.min_selections' => ['required', 'integer', 'min:0', 'max:99'],
@@ -371,9 +424,9 @@ class PromotionManager extends Component
             'endsOn' => 'fecha de fin',
             'image' => 'imagen',
         ]);
+        $this->validateChannelFulfillmentCompatibility();
 
         if ($this->presentationType === 'new') {
-            $this->showOnPos = false;
             $selectedProduct = Product::query()->where('is_active', true)->findOrFail((int) $validated['primaryProductId']);
             if (! $this->image && ! $this->currentImage && ! $selectedProduct->image) {
                 throw ValidationException::withMessages(['primaryProductId' => 'El producto necesita una imagen antes de publicarse como novedad.']);
@@ -382,7 +435,7 @@ class PromotionManager extends Component
             throw ValidationException::withMessages(['image' => 'Los banners promocionales necesitan una imagen horizontal.']);
         }
 
-        if (! $this->showOnPos && ! $this->showOnDigitalMenu) {
+        if (! $this->showOnPos && ! $this->showOnDigitalMenu && ! $this->showOnKiosk) {
             throw ValidationException::withMessages(['channels' => 'Selecciona al menos un canal de publicación.']);
         }
 
@@ -425,11 +478,35 @@ class PromotionManager extends Component
                     'discount_percentage' => $validated['presentationType'] === 'discount'
                         ? (int) $validated['discountPercentage']
                         : null,
+                    'pricing_rule_type' => $validated['presentationType'] === 'new' && $this->launchOfferEnabled
+                        ? Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT
+                        : null,
+                    'pricing_rule_config' => $validated['presentationType'] === 'new' && $this->launchOfferEnabled
+                        ? [
+                            'version' => 1,
+                            'buy_quantity' => (int) $validated['buyQuantity'],
+                            'reward_quantity' => (int) $validated['rewardQuantity'],
+                            'reward_discount_percentage' => (int) $validated['rewardDiscountPercentage'],
+                            'max_applications_per_order' => filled($validated['maxApplicationsPerOrder'] ?? null)
+                                ? (int) $validated['maxApplicationsPerOrder']
+                                : null,
+                            'apply_to_addons' => false,
+                            'reward_scope' => 'same_product',
+                        ]
+                        : null,
+                    'auto_apply' => $validated['presentationType'] === 'new' && $this->launchOfferEnabled,
                     'starts_on' => $validated['startsOn'],
                     'ends_on' => filled($validated['endsOn'] ?? null) ? $validated['endsOn'] : null,
                     'weekdays' => array_values(array_map('intval', $validated['weekdays'] ?? [])),
-                    'show_on_pos' => $validated['presentationType'] === 'new' ? false : $validated['showOnPos'],
+                    'fulfillment_modes' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled
+                        ? Promotion::FULFILLMENT_MODES
+                        : array_values(array_unique($validated['fulfillmentModes'])),
+                    'terms_and_conditions' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled
+                        ? null
+                        : (trim((string) ($validated['termsAndConditions'] ?? '')) ?: null),
+                    'show_on_pos' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled ? false : $validated['showOnPos'],
                     'show_on_digital_menu' => $validated['showOnDigitalMenu'],
+                    'show_on_kiosk' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled ? false : $validated['showOnKiosk'],
                     'is_active' => $validated['isActive'],
                     'image' => $newImage ?: $promotion->image,
                 ])->save();
@@ -492,14 +569,51 @@ class PromotionManager extends Component
         $this->reset([
             'editingId', 'name', 'description', 'shortDescription', 'presentationType',
             'primaryProductId', 'wizardStep', 'discountPercentage', 'price', 'startsOn', 'endsOn', 'weekdays',
-            'showOnPos', 'showOnDigitalMenu', 'isActive', 'image', 'currentImage', 'groups',
+            'launchOfferEnabled', 'buyQuantity', 'rewardQuantity', 'rewardDiscountPercentage', 'maxApplicationsPerOrder',
+            'fulfillmentModes', 'termsAndConditions', 'showOnPos', 'showOnDigitalMenu', 'showOnKiosk',
+            'isActive', 'image', 'currentImage', 'groups',
         ]);
+        $this->fulfillmentModes = Promotion::FULFILLMENT_MODES;
         $this->showOnPos = true;
         $this->showOnDigitalMenu = true;
+        $this->showOnKiosk = true;
         $this->isActive = true;
         $this->presentationType = 'promotion';
         $this->wizardStep = 1;
+        $this->buyQuantity = 1;
+        $this->rewardQuantity = 1;
+        $this->rewardDiscountPercentage = 50;
         $this->resetValidation();
+    }
+
+    private function validateChannelFulfillmentCompatibility(): void
+    {
+        if ($this->presentationType === 'new' && ! $this->launchOfferEnabled) {
+            return;
+        }
+
+        if ($this->showOnPos && array_intersect($this->fulfillmentModes, Promotion::POS_FULFILLMENT_MODES) === []) {
+            throw ValidationException::withMessages([
+                'channels' => 'El punto de venta solo admite Para llevar, Pasar a buscar o Entrega a domicilio.',
+            ]);
+        }
+
+        if ($this->showOnKiosk && array_intersect($this->fulfillmentModes, Promotion::KIOSK_FULFILLMENT_MODES) === []) {
+            throw ValidationException::withMessages([
+                'channels' => 'El kiosco no maneja pedidos programados para pasar a buscar; habilita otra modalidad o desactiva ese canal.',
+            ]);
+        }
+    }
+
+    private function pricingRuleValidationRules(): array
+    {
+        return [
+            'launchOfferEnabled' => ['boolean'],
+            'buyQuantity' => ['required', 'integer', 'between:1,99'],
+            'rewardQuantity' => ['required', 'integer', 'between:1,99'],
+            'rewardDiscountPercentage' => ['required', 'integer', 'between:1,100'],
+            'maxApplicationsPerOrder' => ['nullable', 'integer', 'between:1,99'],
+        ];
     }
 
     public function render()

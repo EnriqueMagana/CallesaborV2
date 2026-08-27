@@ -70,6 +70,14 @@
                 <div class="spinner-border spinner-border-sm text-primary"></div>
             </div>
 
+            @if($this->activePromotions->isNotEmpty())
+                <section class="mo-promotions" aria-labelledby="mo-promotions-title"><header><div><span>Solo para comedor</span><h2 id="mo-promotions-title">Promociones disponibles</h2></div><small>Selecciona los productos incluidos.</small></header><div>
+                    @foreach($this->activePromotions as $promotion)
+                        <button type="button" wire:click="openPromotionModal({{ $promotion->id }})" wire:key="mesa-promotion-{{ $promotion->id }}"><span>@if($promotion->image)<img src="{{ Storage::url($promotion->image) }}" alt="" width="220" height="110" loading="lazy">@else<i class="bx bx-gift"></i>@endif</span><div><small>{{ $promotion->presentationLabel() }}</small><strong>{{ $promotion->name }}</strong><b>${{ number_format($promotion->price,2) }}</b></div></button>
+                    @endforeach
+                </div></section>
+            @endif
+
             @forelse($this->filteredProducts as $category)
                 <div class="mo-cat-group">
                     <div class="mo-cat-label">
@@ -108,6 +116,12 @@
             @endforelse
         </div>
     </div>
+
+    @if($showPromotionModal && $this->customizingPromotion)
+        @php $promotion = $this->customizingPromotion; @endphp
+        <div class="mo-promotion-backdrop" wire:click="closePromotionModal"></div>
+        <div class="mo-promotion-wrap" role="dialog" aria-modal="true" aria-labelledby="mo-promotion-title"><section class="mo-promotion-modal"><header><div><small>Promoción para comedor</small><h2 id="mo-promotion-title">{{ $promotion->name }}</h2><p>{{ $promotion->short_description }}</p></div><strong>${{ number_format($promotion->price,2) }}</strong><button type="button" wire:click="closePromotionModal" aria-label="Cerrar"><i class="bx bx-x"></i></button></header><div class="mo-promotion-body"><div class="mo-promotion-terms"><span><i class="bx bx-restaurant"></i>{{ $promotion->fulfillmentSummary() }}</span>@if($promotion->terms_and_conditions)<p><i class="bx bx-info-circle"></i>{{ $promotion->terms_and_conditions }}</p>@endif</div>@foreach($promotion->groups as $group)@php $selectedCount=collect($promotionSelections[$group->id]??[])->sum(); @endphp<fieldset><legend><span><strong>{{ $group->name }}</strong><small>Elige de {{ $group->min_selections }} a {{ $group->max_selections }}</small></span><b>{{ $selectedCount }}/{{ $group->max_selections }}</b></legend><div>@foreach($group->products as $product)@php $selectedQuantity=(int)($promotionSelections[$group->id][$product->id]??0); @endphp<article class="{{ $selectedQuantity?'is-selected':'' }}">@if($product->image)<img src="{{ Storage::url($product->image) }}" alt="" width="64" height="64">@else<span><i class="bx bx-dish"></i></span>@endif<strong>{{ $product->name }}</strong><div><button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},-1)" @disabled(!$selectedQuantity)><i class="bx bx-minus"></i></button><b>{{ $selectedQuantity }}</b><button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},1)" @disabled($selectedCount >= $group->max_selections)><i class="bx bx-plus"></i></button></div></article>@endforeach</div></fieldset>@endforeach @error('promotion')<p class="mo-promotion-error">{{ $message }}</p>@enderror</div><footer><label>Cantidad <input type="number" wire:model="promotionQuantity" min="1" max="99"></label><div><button type="button" wire:click="closePromotionModal">Cancelar</button><button type="button" class="is-primary" wire:click="addPromotionToCart">Agregar promoción</button></div></footer></section></div>
+    @endif
 
     {{-- ══ BACKDROP ══ --}}
     <div class="mo-cart-backdrop" :class="{ 'show': cartOpen }" @click="cartOpen = false" x-cloak></div>
@@ -161,7 +175,7 @@
                         <div class="mo-cart-item-copy">
                             <div class="mo-cart-item-heading">
                                 <div class="mo-cart-item-name">{{ $line['name'] }}</div>
-                                <strong class="mo-cart-item-price">${{ number_format($line['unit_total'] * $line['qty'], 2) }}</strong>
+                                <strong class="mo-cart-item-price">${{ number_format($line['subtotal'] ?? ($line['unit_total'] * $line['qty']), 2) }}</strong>
                             </div>
                             @if(!empty($line['addons']))
                                 <div class="mo-cart-item-mods">
@@ -176,6 +190,12 @@
                                         <span class="mo-cart-mod-chip mo-cart-mod-chip--ing">{{ $i['ingredient_name'] }}@if($i['quantity']>1)×{{ $i['quantity'] }}@endif</span>
                                     @endforeach
                                 </div>
+                            @endif
+                            @if(!empty($line['promotion_selections']))
+                                <div class="mo-cart-item-mods mo-cart-item-promotions">@foreach($line['promotion_selections'] as $group)@foreach($group['items'] as $selected)<span class="mo-cart-mod-chip"><i class="bx bx-check"></i>{{ $selected['quantity'] }}× {{ $selected['product_name'] }}</span>@endforeach @endforeach</div>
+                            @endif
+                            @if(!empty($line['promotion_discount']))
+                                <div class="mo-cart-item-discount"><i class="bx bx-purchase-tag-alt"></i><span>{{ data_get($line, 'promotion_rule_snapshot.label', 'Promoción automática') }}</span><strong>−${{ number_format($line['promotion_discount'], 2) }}</strong></div>
                             @endif
                             @if(!empty($line['notes']))
                                 <div class="mo-cart-item-note">
@@ -196,9 +216,9 @@
                         </button>
                         </div>
                         <div class="mo-cart-item-actions">
-                        <button type="button" class="mo-cart-edit" wire:click="editCartItem('{{ $line['cart_id'] }}')" title="Personalizar" aria-label="Personalizar {{ $line['name'] }}">
+                        @if(empty($line['promotion_id']) || !empty($line['auto_promotion_applied']))<button type="button" class="mo-cart-edit" wire:click="editCartItem('{{ $line['cart_id'] }}')" title="Personalizar" aria-label="Personalizar {{ $line['name'] }}">
                             <i class="bx bx-slider-alt" aria-hidden="true"></i><span>Editar</span>
-                        </button>
+                        </button>@endif
                         <button type="button" class="mo-cart-remove" wire:click="removeFromCart('{{ $line['cart_id'] }}')" title="Eliminar" aria-label="Eliminar {{ $line['name'] }}">
                             <i class="bx bx-trash" aria-hidden="true"></i>
                         </button>

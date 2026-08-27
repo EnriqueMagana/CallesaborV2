@@ -82,6 +82,9 @@
                             @endif
                         </div>
                     @endif
+                    @if(!empty($item['promotion_discount']))
+                        <div class="pos-cart-promotion-saving"><i class="bx bx-purchase-tag-alt"></i><span>{{ data_get($item, 'promotion_rule_snapshot.label', 'Promoción automática') }}</span><strong>−${{ number_format($item['promotion_discount'], 2) }}</strong></div>
+                    @endif
 
                     <div class="cart-item__footer">
                         <div class="cart-qty-controls" aria-label="Cantidad de {{ $item['product_name'] }}">
@@ -100,7 +103,7 @@
                         </div>
 
                         <div class="cart-item-actions">
-                            @if(empty($item['promotion_id']))<button type="button" class="cart-item-action"
+                            @if(empty($item['promotion_id']) || !empty($item['auto_promotion_applied']))<button type="button" class="cart-item-action"
                                 wire:click="editCartItem('{{ $item['cart_id'] }}')" title="Personalizar"
                                 aria-label="Personalizar {{ $item['product_name'] }}">
                                 <i class="bx bx-slider-alt" aria-hidden="true"></i><span>Editar</span>

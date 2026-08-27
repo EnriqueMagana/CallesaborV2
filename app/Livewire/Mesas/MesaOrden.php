@@ -10,8 +10,12 @@ use App\Models\OrderItem;
 use App\Models\OrderItemAddon;
 use App\Models\OrderItemIngredient;
 use App\Models\Product;
+use App\Models\Promotion;
 use App\Services\MesaServiceManager;
+use App\Services\PromotionSelectionService;
+use App\Services\PromotionPricingService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -28,6 +32,14 @@ class MesaOrden extends Component
     public ?int $categoryFilter = null;
 
     public array $cart = [];
+
+    public bool $showPromotionModal = false;
+
+    public ?int $customizingPromotionId = null;
+
+    public array $promotionSelections = [];
+
+    public int $promotionQuantity = 1;
 
     public string $orderNotes = '';
 
@@ -129,6 +141,109 @@ class MesaOrden extends Component
     }
 
     #[Computed]
+    public function activePromotions()
+    {
+        return Promotion::query()
+            ->available('pos', null, 'dine_in')
+            ->with(['groups.products' => fn ($query) => $query
+                ->where('is_active', true)
+                ->select(['products.id', 'products.name', 'products.image'])])
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
+    public function customizingPromotion(): ?Promotion
+    {
+        if (! $this->customizingPromotionId) {
+            return null;
+        }
+
+        return Promotion::query()
+            ->available('pos', null, 'dine_in')
+            ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->find($this->customizingPromotionId);
+    }
+
+    public function openPromotionModal(int $promotionId): void
+    {
+        $promotion = Promotion::query()
+            ->available('pos', null, 'dine_in')
+            ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->find($promotionId);
+
+        if (! $promotion || $promotion->groups->isEmpty()) {
+            $this->addError('cart', 'Esta promoción no está disponible para comedor.');
+
+            return;
+        }
+
+        $this->customizingPromotionId = $promotion->id;
+        $this->promotionSelections = [];
+        $this->promotionQuantity = 1;
+        $this->showPromotionModal = true;
+        unset($this->customizingPromotion);
+    }
+
+    public function closePromotionModal(): void
+    {
+        $this->showPromotionModal = false;
+        $this->customizingPromotionId = null;
+        $this->promotionSelections = [];
+        $this->promotionQuantity = 1;
+        $this->resetErrorBag('promotion');
+        unset($this->customizingPromotion);
+    }
+
+    public function changePromotionSelection(int $groupId, int $productId, int $delta): void
+    {
+        $group = $this->customizingPromotion?->groups->firstWhere('id', $groupId);
+        if (! $group || ! $group->products->contains('id', $productId)) {
+            return;
+        }
+        $current = (int) ($this->promotionSelections[$groupId][$productId] ?? 0);
+        $total = (int) collect($this->promotionSelections[$groupId] ?? [])->sum();
+        if ($delta > 0 && $total >= $group->max_selections) {
+            return;
+        }
+        $next = max(0, $current + ($delta > 0 ? 1 : -1));
+        if ($next) {
+            $this->promotionSelections[$groupId][$productId] = $next;
+        } else {
+            unset($this->promotionSelections[$groupId][$productId]);
+        }
+        $this->resetErrorBag('promotion');
+    }
+
+    public function addPromotionToCart(): void
+    {
+        $promotion = $this->customizingPromotion;
+        if (! $promotion || $this->promotionQuantity < 1 || $this->promotionQuantity > self::MAX_ITEM_QUANTITY) {
+            $this->addError('promotion', 'La promoción ya no está disponible o la cantidad no es válida.');
+
+            return;
+        }
+
+        $snapshot = app(PromotionSelectionService::class)->snapshot($promotion, $this->promotionSelections);
+        $this->cart[] = [
+            'cart_id' => uniqid('promotion_'),
+            'product_id' => null,
+            'promotion_id' => $promotion->id,
+            'name' => $promotion->name,
+            'image' => $promotion->image,
+            'price' => (float) $promotion->price,
+            'unit_total' => (float) $promotion->price,
+            'qty' => $this->promotionQuantity,
+            'notes' => '',
+            'addons' => [],
+            'ingredients' => [],
+            'promotion_selections' => $snapshot,
+        ];
+        $this->closePromotionModal();
+        unset($this->cartTotal, $this->cartCount, $this->activePromotions);
+    }
+
+    #[Computed]
     public function customizingProductModel(): ?Product
     {
         if (! $this->customizingProduct) {
@@ -165,7 +280,7 @@ class MesaOrden extends Component
     {
         $total = 0;
         foreach ($this->cart as $line) {
-            $total += ($line['unit_total'] ?? $line['price'] ?? 0) * $line['qty'];
+            $total += $line['subtotal'] ?? (($line['unit_total'] ?? $line['price'] ?? 0) * $line['qty']);
         }
 
         return round($total, 2);
@@ -292,7 +407,7 @@ class MesaOrden extends Component
             ];
         }
 
-        unset($this->cartTotal, $this->cartCount);
+        $this->repriceCart();
         $this->resetErrorBag('cart');
     }
 
@@ -570,7 +685,7 @@ class MesaOrden extends Component
         }
 
         $this->resetCustomizationState();
-        unset($this->cartTotal, $this->cartCount);
+        $this->repriceCart();
     }
 
     public function incrementQty(string $cartId): void
@@ -587,7 +702,7 @@ class MesaOrden extends Component
             }
         }
         unset($line);
-        unset($this->cartTotal, $this->cartCount);
+        $this->repriceCart();
     }
 
     public function decrementQty(string $cartId): void
@@ -602,12 +717,47 @@ class MesaOrden extends Component
                 break;
             }
         }
-        unset($this->cartTotal, $this->cartCount);
+        $this->repriceCart();
     }
 
     public function removeFromCart(string $cartId): void
     {
         $this->cart = array_values(array_filter($this->cart, fn ($l) => $l['cart_id'] !== $cartId));
+        $this->repriceCart();
+    }
+
+    private function refreshPromotionCart(): void
+    {
+        $service = app(PromotionSelectionService::class);
+
+        foreach ($this->cart as $index => $line) {
+            if (empty($line['promotion_id']) || ! empty($line['auto_promotion_applied'])) {
+                continue;
+            }
+
+            $promotion = Promotion::query()
+                ->available('pos', null, 'dine_in')
+                ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+                ->find($line['promotion_id']);
+            if (! $promotion) {
+                throw ValidationException::withMessages([
+                    'cart' => "La promoción «{$line['name']}» venció o no aplica para comedor. Retírala para continuar.",
+                ]);
+            }
+
+            $snapshot = $service->snapshot($promotion, $service->selectionMap($line['promotion_selections'] ?? []));
+            $this->cart[$index]['name'] = $promotion->name;
+            $this->cart[$index]['price'] = (float) $promotion->price;
+            $this->cart[$index]['unit_total'] = (float) $promotion->price;
+            $this->cart[$index]['promotion_selections'] = $snapshot;
+        }
+
+        unset($this->cartTotal, $this->cartCount);
+    }
+
+    private function repriceCart(): void
+    {
+        $this->cart = app(PromotionPricingService::class)->apply($this->cart, 'pos', 'dine_in');
         unset($this->cartTotal, $this->cartCount);
     }
 
@@ -628,6 +778,9 @@ class MesaOrden extends Component
 
             return;
         }
+
+        $this->refreshPromotionCart();
+        $this->repriceCart();
 
         foreach ($this->cart as $line) {
             $quantity = (int) ($line['qty'] ?? 0);
@@ -695,14 +848,33 @@ class MesaOrden extends Component
             $timestamp = now();
 
             foreach ($this->cart as $line) {
+                $promotion = null;
+                if (! empty($line['promotion_id']) && empty($line['auto_promotion_applied'])) {
+                    $promotion = Promotion::query()
+                        ->available('pos', null, 'dine_in')
+                        ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+                        ->lockForUpdate()
+                        ->find($line['promotion_id']);
+                    if (! $promotion || (float) $promotion->price !== (float) $line['price']) {
+                        throw ValidationException::withMessages(['cart' => 'Una promoción cambió mientras enviabas la orden. Revisa el carrito e inténtalo de nuevo.']);
+                    }
+                    app(PromotionSelectionService::class)->snapshot(
+                        $promotion,
+                        app(PromotionSelectionService::class)->selectionMap($line['promotion_selections'] ?? [])
+                    );
+                }
                 $item = OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $line['product_id'],
+                    'promotion_id' => $line['promotion_id'] ?? null,
                     'product_name' => $line['name'],
                     'product_price' => $line['price'],
                     'quantity' => $line['qty'],
-                    'subtotal' => round($line['unit_total'] * $line['qty'], 2),
+                    'subtotal' => $line['subtotal'] ?? round($line['unit_total'] * $line['qty'], 2),
+                    'promotion_discount' => $line['promotion_discount'] ?? 0,
                     'notes' => $line['notes'] ?: null,
+                    'promotion_selections' => $line['promotion_selections'] ?? null,
+                    'promotion_rule_snapshot' => $line['promotion_rule_snapshot'] ?? null,
                 ]);
 
                 foreach ($line['addons'] ?? [] as $addon) {

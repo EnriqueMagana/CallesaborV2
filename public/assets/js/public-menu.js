@@ -297,43 +297,52 @@
 
     document.querySelectorAll('[data-promotion-carousel]').forEach((carousel) => {
         const rail = carousel.querySelector('[data-promotion-rail]');
-        const previous = carousel.querySelector('[data-promotion-previous]');
-        const next = carousel.querySelector('[data-promotion-next]');
         const dots = [...carousel.querySelectorAll('[data-promotion-dot]')];
         if (!rail) return;
 
-        const updateControls = () => {
-            if (previous) previous.disabled = rail.scrollLeft <= 4;
-            if (next) next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4;
+        const slides = [...rail.children];
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const interval = Math.max(3000, Number(carousel.dataset.autoplayInterval) || 4500);
+        let activeIndex = 0;
+        let autoplayTimer = null;
+
+        const updateIndicators = () => {
             const railCenter = rail.scrollLeft + (rail.clientWidth / 2);
-            const activeIndex = [...rail.children].reduce((closest, item, index, items) => {
+            activeIndex = slides.reduce((closest, item, index, items) => {
                 const itemCenter = item.offsetLeft + (item.offsetWidth / 2);
                 const closestCenter = items[closest].offsetLeft + (items[closest].offsetWidth / 2);
                 return Math.abs(itemCenter - railCenter) < Math.abs(closestCenter - railCenter) ? index : closest;
             }, 0);
-            dots.forEach((dot, index) => {
-                dot.classList.toggle('is-active', index === activeIndex);
-                if (index === activeIndex) dot.setAttribute('aria-current', 'true');
-                else dot.removeAttribute('aria-current');
-            });
+            dots.forEach((dot, index) => dot.classList.toggle('is-active', index === activeIndex));
         };
-        const move = (direction) => rail.scrollBy({
-            left: direction * Math.max(260, rail.clientWidth * .82),
-            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-        });
-        previous?.addEventListener('click', () => move(-1));
-        next?.addEventListener('click', () => move(1));
-        dots.forEach((dot) => dot.addEventListener('click', () => {
-            const item = rail.children[Number(dot.dataset.index) || 0];
-            item?.scrollIntoView({
-                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-                block: 'nearest',
-                inline: 'start',
-            });
-        }));
-        rail.addEventListener('scroll', () => window.requestAnimationFrame(updateControls), { passive: true });
-        window.addEventListener('resize', updateControls, { passive: true });
-        updateControls();
+
+        const showSlide = (index) => {
+            const slide = slides[index];
+            if (!slide) return;
+            rail.scrollTo({ left: slide.offsetLeft, behavior: reduceMotion ? 'auto' : 'smooth' });
+        };
+        const stopAutoplay = () => {
+            if (autoplayTimer) window.clearInterval(autoplayTimer);
+            autoplayTimer = null;
+        };
+        const startAutoplay = () => {
+            stopAutoplay();
+            if (reduceMotion || slides.length < 2 || document.hidden) return;
+            autoplayTimer = window.setInterval(() => showSlide((activeIndex + 1) % slides.length), interval);
+        };
+
+        rail.addEventListener('scroll', () => window.requestAnimationFrame(updateIndicators), { passive: true });
+        carousel.addEventListener('mouseenter', stopAutoplay);
+        carousel.addEventListener('mouseleave', startAutoplay);
+        rail.addEventListener('pointerdown', stopAutoplay);
+        rail.addEventListener('pointerup', startAutoplay);
+        rail.addEventListener('pointercancel', startAutoplay);
+        carousel.addEventListener('focusin', stopAutoplay);
+        carousel.addEventListener('focusout', startAutoplay);
+        document.addEventListener('visibilitychange', startAutoplay);
+        window.addEventListener('resize', updateIndicators, { passive: true });
+        updateIndicators();
+        startAutoplay();
     });
 
     const promotionModal = document.getElementById('promotion-detail-modal');
@@ -347,6 +356,9 @@
         const description = promotionModal.querySelector('[data-promotion-modal-description]');
         const days = promotionModal.querySelector('[data-promotion-modal-days]');
         const validity = promotionModal.querySelector('[data-promotion-modal-validity]');
+        const fulfillment = promotionModal.querySelector('[data-promotion-modal-fulfillment]');
+        const terms = promotionModal.querySelector('[data-promotion-modal-terms]');
+        const termsWrap = promotionModal.querySelector('[data-promotion-modal-terms-wrap]');
         const groups = promotionModal.querySelector('[data-promotion-modal-groups]');
         let lastTrigger = null;
 
@@ -373,6 +385,9 @@
                 description.hidden = !promotion.description;
                 days.textContent = promotion.days;
                 validity.textContent = promotion.validity;
+                fulfillment.textContent = promotion.fulfillmentSummary || (promotion.fulfillment || []).join(', ');
+                terms.textContent = promotion.terms || '';
+                termsWrap.hidden = !promotion.terms;
                 badge.textContent = promotion.badge;
                 image.hidden = !promotion.image;
                 placeholder.hidden = Boolean(promotion.image);
