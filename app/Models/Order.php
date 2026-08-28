@@ -15,7 +15,7 @@ class Order extends Model
         'cash_register_id', 'kiosk_terminal_id', 'public_token', 'customer_id', 'mesa_id',
         'mesa_service_id',
         'folio',
-        'customer_name', 'customer_phone', 'customer_address', 'customer_references',
+        'customer_name', 'customer_phone', 'customer_address', 'customer_neighborhood', 'customer_references',
         'served_by', 'type', 'source', 'fulfillment', 'table_identifier', 'delivery_method',
         'status', 'subtotal', 'total', 'notes',
         'cancelled_by', 'cancellation_reason', 'cancelled_at', 'paid_at',

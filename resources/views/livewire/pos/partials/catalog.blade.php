@@ -2,6 +2,7 @@
      x-data="{
         query: '',
         category: null,
+        mode: $wire.entangle('catalogMode').live,
         normalize(value) {
             return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         },
@@ -13,8 +14,8 @@
     <div class="catalog-search-bar">
         <div class="search-wrap" :class="{ 'has-query': query }">
             <i class="bx bx-search si-icon" aria-hidden="true"></i>
-            <input type="search" x-model.debounce.120ms="query" aria-label="Buscar platillo"
-                   class="pos-input" placeholder="Buscar platillo..." autocomplete="off"
+            <input type="search" x-model.debounce.120ms="query" :aria-label="mode === 'products' ? 'Buscar platillo' : 'Buscar promoción'"
+                   class="pos-input" :placeholder="mode === 'products' ? 'Buscar platillo...' : 'Buscar promoción...'" autocomplete="off"
                    data-pos-catalog-search aria-keyshortcuts="F3 F10" title="Buscar platillo (F3 o F10)">
             <kbd class="pos-control-shortcut pos-search-shortcut" aria-hidden="true">F3 · F10</kbd>
             <button type="button" class="pos-search-clear" x-show="query" x-cloak
@@ -24,7 +25,20 @@
         </div>
     </div>
 
-    <div class="cat-tabs" role="tablist" aria-label="Categorías del menú">
+    <div class="pos-catalog-switcher" role="tablist" aria-label="Contenido del catálogo">
+        <button type="button" class="pos-catalog-switcher__tab" @click="mode = 'products'; category = null"
+                :class="{ 'is-active': mode === 'products' }" :aria-selected="mode === 'products'" role="tab">
+            <i class="bx bx-food-menu" aria-hidden="true"></i><span>Productos</span>
+        </button>
+        @if($this->activePromotions->isNotEmpty())
+            <button type="button" class="pos-catalog-switcher__tab" @click="mode = 'promotions'; category = null"
+                    :class="{ 'is-active': mode === 'promotions' }" :aria-selected="mode === 'promotions'" role="tab">
+                <i class="bx bx-purchase-tag-alt" aria-hidden="true"></i><span>Promociones</span><b>{{ $this->activePromotions->count() }}</b>
+            </button>
+        @endif
+    </div>
+
+    <div class="cat-tabs" role="tablist" aria-label="Categorías del menú" x-show="mode === 'products'" x-cloak>
         <button type="button" @click="category = null" :class="{ 'active': category === null }"
                 class="cat-tab" role="tab" :aria-selected="category === null">Todos</button>
         @foreach($this->allCategories as $cat)
@@ -38,21 +52,49 @@
     </div>
 
     @if($this->activePromotions->isNotEmpty())
-        <section class="pos-promotions" aria-labelledby="pos-promotions-title">
-            <header><div><span>Precio especial</span><h2 id="pos-promotions-title">Promociones activas</h2></div><small>Elige las opciones incluidas; no se suman precios individuales.</small></header>
-            <div class="pos-promotions__rail">
+        <section class="pos-promotion-catalog" aria-labelledby="pos-promotions-title" x-show="mode === 'promotions'" x-cloak>
+            <header class="pos-promotion-catalog__header">
+                <div><span>Beneficios disponibles</span><h2 id="pos-promotions-title">Promociones</h2></div>
+                <small>Las ofertas automáticas se calculan en el carrito; los combos permiten elegir sus productos.</small>
+            </header>
+            <div class="catalog-grid pos-promotion-grid">
                 @foreach($this->activePromotions as $promotion)
-                    <button type="button" wire:click="openPromotionModal({{ $promotion->id }})" wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name), null)" x-cloak>
-                        <span class="pos-promotion__image">@if($promotion->image)<img src="{{ Storage::url($promotion->image) }}" alt="" width="240" height="150" loading="lazy">@else<i class="bx bx-purchase-tag-alt"></i>@endif</span>
-                        <span class="pos-promotion__content"><small>Promoción</small><strong>{{ $promotion->name }}</strong><span>{{ $promotion->fulfillmentSummary() }}</span><span>{{ $promotion->groups->count() }} {{ $promotion->groups->count() === 1 ? 'grupo' : 'grupos' }} para elegir</span></span>
-                        <b>${{ number_format($promotion->price, 2) }}</b>
+                    @php
+                        $isAutomatic = $promotion->hasAutomaticPricingRule();
+                        $promotionImage = $promotion->image ?: $promotion->primaryProduct?->image;
+                        $promotionBenefit = $isAutomatic ? $promotion->pricingRuleShortLabel() : '$'.number_format($promotion->price, 2);
+                        $promotionDescription = $promotion->short_description
+                            ?: ($isAutomatic ? 'Se aplica automáticamente al completar las cantidades requeridas.' : 'Configura los productos incluidos en este combo.');
+                    @endphp
+                    <button type="button" wire:click="selectPromotionFromCatalog({{ $promotion->id }})"
+                            wire:loading.attr="disabled" wire:target="selectPromotionFromCatalog({{ $promotion->id }})"
+                            wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name.' '.$promotionDescription), null)" x-cloak
+                            class="prod-card pos-promotion-card"
+                            aria-label="{{ $isAutomatic ? 'Agregar producto para' : 'Configurar' }} {{ $promotion->name }}, {{ $promotion->pricingRuleLabel() ?: 'precio $'.number_format($promotion->price, 2) }}">
+                        <span class="prod-img pos-promotion-card__image">
+                            @if($promotionImage)
+                                <img src="{{ Storage::url($promotionImage) }}" alt="{{ $promotion->name }}" width="320" height="216" loading="lazy" decoding="async">
+                            @else
+                                <i class="bx bx-purchase-tag-alt no-img" aria-hidden="true"></i>
+                            @endif
+                            <span class="pos-promotion-card__badge"><i class="bx {{ $isAutomatic ? 'bx-bolt-circle' : 'bx-selection' }}" aria-hidden="true"></i>{{ $isAutomatic ? 'Automática' : 'Configurable' }}</span>
+                        </span>
+                        <span class="prod-info pos-promotion-card__info">
+                            <span class="prod-name">{{ $promotion->name }}</span>
+                            <span class="pos-promotion-card__description">{{ $promotionDescription }}</span>
+                            <span class="pos-promotion-card__availability">{{ $promotion->fulfillmentSummary() }}</span>
+                            <span class="prod-card-footer">
+                                <strong class="prod-price">{{ $promotionBenefit }}</strong>
+                                <span class="prod-card-cta" aria-hidden="true"><i class="bx {{ $isAutomatic ? 'bx-plus' : 'bx-slider-alt' }}"></i></span>
+                            </span>
+                        </span>
                     </button>
                 @endforeach
             </div>
         </section>
     @endif
 
-    <div class="catalog-grid">
+    <div class="catalog-grid" x-show="mode === 'products'" x-cloak>
         @php $cartProductIds = collect($cart)->groupBy('product_id')->map->sum('quantity'); @endphp
 
         @foreach($this->categoriesWithProducts as $category)

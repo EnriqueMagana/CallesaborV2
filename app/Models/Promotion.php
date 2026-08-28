@@ -14,6 +14,18 @@ class Promotion extends Model
 
     public const PRICING_RULE_BUY_X_GET_Y_DISCOUNT = 'buy_x_get_y_discount';
 
+    public const PRICING_RULE_PERCENTAGE_DISCOUNT = 'percentage_discount';
+
+    public const PRICING_RULE_FIXED_PRODUCT_PRICE = 'fixed_product_price';
+
+    public const AUTOMATIC_PRICING_RULES = [
+        self::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
+        self::PRICING_RULE_PERCENTAGE_DISCOUNT,
+        self::PRICING_RULE_FIXED_PRODUCT_PRICE,
+    ];
+
+    public const RECURRENCE_TYPES = ['date_range', 'weekdays', 'monthly'];
+
     public const FULFILLMENT_MODES = ['dine_in', 'takeaway', 'pickup', 'delivery'];
 
     public const POS_FULFILLMENT_MODES = ['takeaway', 'pickup', 'delivery'];
@@ -23,7 +35,7 @@ class Promotion extends Model
     protected $fillable = [
         'name', 'description', 'presentation_type', 'primary_product_id', 'short_description', 'image', 'price',
         'discount_percentage', 'pricing_rule_type', 'pricing_rule_config', 'auto_apply',
-        'starts_on', 'ends_on', 'weekdays', 'fulfillment_modes',
+        'starts_on', 'ends_on', 'recurrence_type', 'weekdays', 'monthly_day', 'fulfillment_modes',
         'terms_and_conditions', 'show_on_pos', 'show_on_digital_menu', 'show_on_kiosk', 'is_active', 'created_by',
     ];
 
@@ -35,12 +47,22 @@ class Promotion extends Model
         'starts_on' => 'date',
         'ends_on' => 'date',
         'weekdays' => 'array',
+        'monthly_day' => 'integer',
         'fulfillment_modes' => 'array',
         'show_on_pos' => 'boolean',
         'show_on_digital_menu' => 'boolean',
         'show_on_kiosk' => 'boolean',
         'is_active' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Promotion $promotion): void {
+            if ($promotion->isDirty('weekdays') && ! $promotion->isDirty('recurrence_type')) {
+                $promotion->recurrence_type = ($promotion->weekdays ?? []) === [] ? 'date_range' : 'weekdays';
+            }
+        });
+    }
 
     public function groups(): HasMany
     {
@@ -65,7 +87,7 @@ class Promotion extends Model
     public function hasAutomaticPricingRule(): bool
     {
         return $this->auto_apply
-            && $this->pricing_rule_type === self::PRICING_RULE_BUY_X_GET_Y_DISCOUNT
+            && in_array($this->pricing_rule_type, self::AUTOMATIC_PRICING_RULES, true)
             && $this->primary_product_id !== null;
     }
 
@@ -78,6 +100,8 @@ class Promotion extends Model
             'buy_quantity' => max(1, min(99, (int) ($config['buy_quantity'] ?? 1))),
             'reward_quantity' => max(1, min(99, (int) ($config['reward_quantity'] ?? 1))),
             'reward_discount_percentage' => max(1, min(100, (int) ($config['reward_discount_percentage'] ?? 50))),
+            'discount_percentage' => max(1, min(100, (int) ($config['discount_percentage'] ?? $this->discount_percentage ?? 10))),
+            'fixed_price' => max(0.01, round((float) ($config['fixed_price'] ?? $this->price), 2)),
             'max_applications_per_order' => filled($config['max_applications_per_order'] ?? null)
                 ? max(1, min(99, (int) $config['max_applications_per_order']))
                 : null,
@@ -94,7 +118,23 @@ class Promotion extends Model
 
         $rule = $this->normalizedPricingRule();
 
-        return "Compra {$rule['buy_quantity']} y recibe {$rule['reward_quantity']} al {$rule['reward_discount_percentage']}%";
+        if ($this->pricing_rule_type === self::PRICING_RULE_PERCENTAGE_DISCOUNT) {
+            return "{$rule['discount_percentage']}% de descuento";
+        }
+
+        if ($this->pricing_rule_type === self::PRICING_RULE_FIXED_PRODUCT_PRICE) {
+            return 'Precio especial $'.number_format($rule['fixed_price'], 2);
+        }
+
+        if ($rule['reward_discount_percentage'] === 100) {
+            return ($rule['buy_quantity'] + $rule['reward_quantity']).'x'.$rule['buy_quantity'];
+        }
+
+        if ($rule['buy_quantity'] === 1 && $rule['reward_quantity'] === 1 && $rule['reward_discount_percentage'] === 50) {
+            return 'Compra 1 y el segundo a mitad de precio';
+        }
+
+        return "Compra {$rule['buy_quantity']} y recibe {$rule['reward_quantity']} con {$rule['reward_discount_percentage']}% de descuento";
     }
 
     public function pricingRuleShortLabel(): ?string
@@ -105,9 +145,23 @@ class Promotion extends Model
 
         $rule = $this->normalizedPricingRule();
 
-        return $rule['buy_quantity'] === 1 && $rule['reward_quantity'] === 1
-            ? "2.º al {$rule['reward_discount_percentage']}%"
-            : "Compra {$rule['buy_quantity']} + {$rule['reward_quantity']} al {$rule['reward_discount_percentage']}%";
+        if ($this->pricing_rule_type === self::PRICING_RULE_PERCENTAGE_DISCOUNT) {
+            return "-{$rule['discount_percentage']}%";
+        }
+
+        if ($this->pricing_rule_type === self::PRICING_RULE_FIXED_PRODUCT_PRICE) {
+            return '$'.number_format($rule['fixed_price'], 2);
+        }
+
+        if ($rule['reward_discount_percentage'] === 100) {
+            return ($rule['buy_quantity'] + $rule['reward_quantity']).'x'.$rule['buy_quantity'];
+        }
+
+        if ($rule['buy_quantity'] === 1 && $rule['reward_quantity'] === 1 && $rule['reward_discount_percentage'] === 50) {
+            return '2.º al 50%';
+        }
+
+        return "Compra {$rule['buy_quantity']} + {$rule['reward_quantity']} con -{$rule['reward_discount_percentage']}%";
     }
 
     public function scopeAutomaticPricingAvailable(
@@ -126,7 +180,7 @@ class Promotion extends Model
 
         return $query->where('is_active', true)
             ->where('auto_apply', true)
-            ->where('pricing_rule_type', self::PRICING_RULE_BUY_X_GET_Y_DISCOUNT)
+            ->whereIn('pricing_rule_type', self::AUTOMATIC_PRICING_RULES)
             ->whereNotNull('primary_product_id')
             ->where($column, true)
             ->when($fulfillment, fn (Builder $available) => $available->where(fn (Builder $modes) => $modes
@@ -134,7 +188,7 @@ class Promotion extends Model
                 ->orWhereJsonContains('fulfillment_modes', $fulfillment)))
             ->whereDate('starts_on', '<=', $at->toDateString())
             ->where(fn (Builder $dates) => $dates->whereNull('ends_on')->orWhereDate('ends_on', '>=', $at->toDateString()))
-            ->where(fn (Builder $days) => $days->whereNull('weekdays')->orWhereJsonLength('weekdays', 0)->orWhereJsonContains('weekdays', $weekday));
+            ->where(fn (Builder $schedule) => $this->applyRecurrenceQuery($schedule, $weekday, $at->day));
     }
 
     public function scopeAvailable(
@@ -155,7 +209,9 @@ class Promotion extends Model
         return $query
             ->where('is_active', true)
             ->where($column, true)
-            ->when(in_array($channel, ['pos', 'kiosk'], true), fn (Builder $available) => $available->where('presentation_type', '!=', 'new'))
+            ->when(in_array($channel, ['pos', 'kiosk'], true), fn (Builder $available) => $available
+                ->where('presentation_type', '!=', 'new')
+                ->where(fn (Builder $manual) => $manual->whereNull('auto_apply')->orWhere('auto_apply', false)))
             ->when(
                 $fulfillment && in_array($fulfillment, self::FULFILLMENT_MODES, true),
                 fn (Builder $available) => $available->where(fn (Builder $modes) => $modes
@@ -167,10 +223,7 @@ class Promotion extends Model
             ->where(fn (Builder $dates) => $dates
                 ->whereNull('ends_on')
                 ->orWhereDate('ends_on', '>=', $at->toDateString()))
-            ->where(fn (Builder $days) => $days
-                ->whereNull('weekdays')
-                ->orWhereJsonLength('weekdays', 0)
-                ->orWhereJsonContains('weekdays', $weekday));
+            ->where(fn (Builder $schedule) => $this->applyRecurrenceQuery($schedule, $weekday, $at->day));
     }
 
     public function isAvailableFor(string $channel, ?CarbonInterface $at = null, ?string $fulfillment = null): bool
@@ -275,13 +328,19 @@ class Promotion extends Model
             return false;
         }
 
-        $weekdays = array_map('intval', $this->weekdays ?? []);
-
-        return $weekdays === [] || in_array($at->dayOfWeekIso, $weekdays, true);
+        return match ($this->recurrence_type ?: 'date_range') {
+            'weekdays' => in_array($at->dayOfWeekIso, array_map('intval', $this->weekdays ?? []), true),
+            'monthly' => (int) $this->monthly_day === $at->day,
+            default => true,
+        };
     }
 
     public function presentationLabel(): string
     {
+        if ($this->hasAutomaticPricingRule()) {
+            return $this->pricingRuleLabel() ?? 'Beneficio automático';
+        }
+
         return match ($this->presentation_type) {
             'discount' => $this->discount_percentage ? "{$this->discount_percentage}% de descuento" : 'Precio con descuento',
             'new' => 'Nuevo en el menú',
@@ -306,5 +365,24 @@ class Promotion extends Model
         return $weekdays === []
             ? 'Todos los días'
             : collect($weekdays)->map(fn (int $day) => $labels[$day] ?? null)->filter()->join(', ');
+    }
+
+    public function scheduleSummary(): string
+    {
+        return match ($this->recurrence_type ?: 'date_range') {
+            'weekdays' => $this->weekdayLabel(),
+            'monthly' => 'Cada mes, el día '.(int) $this->monthly_day,
+            default => $this->ends_on
+                ? 'Del '.$this->starts_on->format('d/m/Y').' al '.$this->ends_on->format('d/m/Y')
+                : 'Desde el '.$this->starts_on->format('d/m/Y').' sin fecha final',
+        };
+    }
+
+    private function applyRecurrenceQuery(Builder $query, int $weekday, int $monthDay): Builder
+    {
+        return $query
+            ->where(fn (Builder $range) => $range->whereNull('recurrence_type')->orWhere('recurrence_type', 'date_range'))
+            ->orWhere(fn (Builder $weekly) => $weekly->where('recurrence_type', 'weekdays')->whereJsonContains('weekdays', $weekday))
+            ->orWhere(fn (Builder $monthly) => $monthly->where('recurrence_type', 'monthly')->where('monthly_day', $monthDay));
     }
 }

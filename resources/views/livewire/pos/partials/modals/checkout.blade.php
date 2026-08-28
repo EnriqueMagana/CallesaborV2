@@ -203,14 +203,17 @@
                         <div class="pay-methods" data-ui="xui-w2df8o">
                             <button wire:click="$set('payMethod','cash')"
                                 class="pay-btn {{ $payMethod === 'cash' ? 'active' : '' }}">
+                                <i class="bx bx-money" aria-hidden="true"></i>
                                 <div class="pay-label">Efectivo</div>
                             </button>
                             <button wire:click="$set('payMethod','card')"
                                 class="pay-btn {{ $payMethod === 'card' ? 'active' : '' }}">
+                                <i class="bx bx-credit-card" aria-hidden="true"></i>
                                 <div class="pay-label">Tarjeta</div>
                             </button>
                             <button wire:click="$set('payMethod','transfer')"
                                 class="pay-btn {{ $payMethod === 'transfer' ? 'active' : '' }}">
+                                <i class="bx bx-transfer-alt" aria-hidden="true"></i>
                                 <div class="pay-label">Transferencia</div>
                             </button>
                         </div>
@@ -292,14 +295,17 @@
                         <div class="pay-methods">
                             <button wire:click="$set('payMethod','cash')"
                                 class="pay-btn {{ $payMethod === 'cash' ? 'active' : '' }}">
+                                <i class="bx bx-money" aria-hidden="true"></i>
                                 <div class="pay-label">Efectivo</div>
                             </button>
                             <button wire:click="$set('payMethod','card')"
                                 class="pay-btn {{ $payMethod === 'card' ? 'active' : '' }}">
+                                <i class="bx bx-credit-card" aria-hidden="true"></i>
                                 <div class="pay-label">Tarjeta</div>
                             </button>
                             <button wire:click="$set('payMethod','transfer')"
                                 class="pay-btn {{ $payMethod === 'transfer' ? 'active' : '' }}">
+                                <i class="bx bx-transfer-alt" aria-hidden="true"></i>
                                 <div class="pay-label">Transferencia</div>
                             </button>
                         </div>
@@ -341,43 +347,49 @@
                 @endif
 
             </div>
-            <div class="modal-footer-pos">
+            <div class="modal-footer-pos checkout-modal-footer">
                 <button wire:click="$set('showCheckoutModal',false)" class="pos-btn pos-btn-ghost">Cancelar</button>
-                <span data-ui="xui-ckcaff"></span>
+                <button type="button" class="pos-btn pos-btn-secondary checkout-save-draft" data-pos-save-draft
+                    aria-keyshortcuts="F5" title="Guardar borrador (F5)"
+                    wire:click="$set('showSaveQuotationModal',true)">
+                    <i class="bx bx-save" aria-hidden="true"></i>
+                    <span>Guardar borrador</span>
+                    <kbd class="pos-control-shortcut" aria-hidden="true">F5</kbd>
+                </button>
                 @if ($orderType === 'ventanilla')
                     <button wire:click="submitOrder" wire:loading.attr="disabled" wire:target="submitOrder"
-                        class="pos-btn pos-btn-primary pos-btn-lg">
+                        class="pos-btn pos-btn-primary pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2">
                         <span wire:loading wire:target="submitOrder" class="pos-btn-spinner"></span>
                         <i wire:loading.remove wire:target="submitOrder" class="bx bx-send"></i>
-                        Cobrar y enviar
+                        Cobrar y enviar <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>
                     </button>
                 @elseif($orderType === 'pick_up')
                     <button wire:click="submitPickupLater" wire:loading.attr="disabled"
-                        wire:target="submitPickupLater" class="pos-btn pos-btn-pickup pos-btn-lg">
+                        wire:target="submitPickupLater" class="pos-btn pos-btn-pickup pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2">
                         <span wire:loading wire:target="submitPickupLater" class="pos-btn-spinner"></span>
                         <i wire:loading.remove wire:target="submitPickupLater" class="bx bx-store-alt"></i>
-                        Enviar a cocina
+                        Enviar a cocina <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>
                     </button>
                 @elseif($orderType === 'delivery' && $deliveryMethod === 'contra_entrega')
                     <button wire:click="submitOrder" wire:loading.attr="disabled" wire:target="submitOrder"
-                        class="pos-btn pos-btn-primary pos-btn-lg">
+                        class="pos-btn pos-btn-primary pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2">
                         <span wire:loading wire:target="submitOrder" class="pos-btn-spinner"></span>
                         <i wire:loading.remove wire:target="submitOrder" class="bx bx-cycling"></i>
-                        Enviar a delivery
+                        Enviar a delivery <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>
                     </button>
                 @elseif($orderType === 'delivery')
                     <button wire:click="submitOrder" wire:loading.attr="disabled" wire:target="submitOrder"
-                        class="pos-btn pos-btn-primary pos-btn-lg">
+                        class="pos-btn pos-btn-primary pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2">
                         <span wire:loading wire:target="submitOrder" class="pos-btn-spinner"></span>
                         <i wire:loading.remove wire:target="submitOrder" class="bx bx-send"></i>
-                        Confirmar pedido · ${{ number_format($this->cartTotal, 2) }}
+                        Confirmar pedido · ${{ number_format($this->cartTotal, 2) }} <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>
                     </button>
                 @else
                     <button wire:click="submitOrder" wire:loading.attr="disabled" wire:target="submitOrder"
-                        class="pos-btn pos-btn-primary pos-btn-lg">
+                        class="pos-btn pos-btn-primary pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2">
                         <span wire:loading wire:target="submitOrder" class="pos-btn-spinner"></span>
                         <i wire:loading.remove wire:target="submitOrder" class="bx bx-send"></i>
-                        Cobrar y enviar
+                        Cobrar y enviar <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>
                     </button>
                 @endif
             </div>

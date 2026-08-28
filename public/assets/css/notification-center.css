@@ -78,6 +78,41 @@
 .app-notification-toast button { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 9px; background: transparent; color: #667085; }
 @keyframes nc-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
+.notification-clear-dialog { position: fixed; inset: 0; z-index: 10070; display: grid; place-items: center; padding: 20px; }
+.notification-clear-dialog__backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(15, 23, 42, .58); backdrop-filter: blur(3px); }
+.notification-clear-dialog__card {
+    position: relative; width: min(460px, 100%); overflow: hidden; border: 1px solid #f1d1d5; border-radius: 22px;
+    background: #fff; color: var(--nc-text); box-shadow: 0 28px 80px rgba(15, 23, 42, .3);
+    animation: nc-dialog-in .2s cubic-bezier(.2,.8,.2,1) both;
+}
+.notification-clear-dialog__visual { display: grid; width: 58px; height: 58px; margin: 24px 24px 0; place-items: center; border-radius: 18px; background: #fff0f1; color: #c92a3e; box-shadow: inset 0 0 0 1px #ffd5da; }
+.notification-clear-dialog__visual i { font-size: 29px; }
+.notification-clear-dialog__content { padding: 16px 24px 22px; }
+.notification-clear-dialog__eyebrow { color: #b4233b; font-size: 11px; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
+.notification-clear-dialog__content h3 { margin: 5px 0 8px; color: #1d2939; font-size: clamp(20px, 3vw, 24px); line-height: 1.25; }
+.notification-clear-dialog__content > p { margin: 0; color: #5d6675; font-size: 14px; line-height: 1.55; }
+.notification-clear-dialog__warning { display: grid; grid-template-columns: 22px 1fr; gap: 9px; align-items: start; margin-top: 16px; padding: 12px 13px; border: 1px solid #fed7aa; border-radius: 12px; background: #fff8eb; color: #854d0e; font-size: 12px; font-weight: 650; line-height: 1.45; }
+.notification-clear-dialog__warning i { margin-top: 1px; font-size: 20px; }
+.notification-clear-dialog__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 24px max(20px, env(safe-area-inset-bottom)); border-top: 1px solid #eaecf0; background: #fcfcfd; }
+.notification-clear-dialog__actions button { min-height: 48px; padding: 10px 16px; border-radius: 12px; font: 750 13px/1.2 "Public Sans", sans-serif; cursor: pointer; transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.notification-clear-dialog__cancel { border: 1px solid #d0d5dd; background: #fff; color: #344054; }
+.notification-clear-dialog__cancel:hover { border-color: #aeb5c0; background: #f8fafc; }
+.notification-clear-dialog__confirm { border: 1px solid #c92a3e; background: #c92a3e; color: #fff; box-shadow: 0 8px 18px rgba(180, 35, 59, .2); }
+.notification-clear-dialog__confirm:hover { border-color: #a61e32; background: #a61e32; }
+.notification-clear-dialog__confirm > span { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.notification-clear-dialog__confirm i { font-size: 18px; }
+.notification-clear-dialog__confirm:disabled { cursor: wait; opacity: .62; box-shadow: none; }
+.notification-clear-dialog__actions button:focus-visible { outline: 3px solid rgba(105, 86, 232, .28); outline-offset: 2px; }
+@keyframes nc-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+html.dark-style .notification-clear-dialog__card { border-color: #633642; background: #292630; color: #f5f2fa; }
+html.dark-style .notification-clear-dialog__content h3 { color: #f8f6fb; }
+html.dark-style .notification-clear-dialog__content > p { color: #c8c2d0; }
+html.dark-style .notification-clear-dialog__visual { background: #4a2932; color: #ff9aaa; box-shadow: inset 0 0 0 1px #6c3744; }
+html.dark-style .notification-clear-dialog__warning { border-color: #715224; background: #3d3425; color: #ffd59a; }
+html.dark-style .notification-clear-dialog__actions { border-color: #45404e; background: #24212b; }
+html.dark-style .notification-clear-dialog__cancel { border-color: #514c59; background: #312e38; color: #f3f0f7; }
+
 body:has(.notification-center__portal) { overflow: hidden; }
 
 @media (max-width: 575.98px) {
@@ -85,10 +120,16 @@ body:has(.notification-center__portal) { overflow: hidden; }
     .notification-center__header { padding: max(18px, env(safe-area-inset-top)) 16px 13px; }
     .notification-center__list { padding-inline: 8px; }
     .app-notification-toast { top: auto; right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); }
+    .notification-clear-dialog { align-items: end; padding: 12px; }
+    .notification-clear-dialog__card { border-radius: 22px; }
+    .notification-clear-dialog__visual { margin: 20px 20px 0; }
+    .notification-clear-dialog__content { padding: 14px 20px 18px; }
+    .notification-clear-dialog__actions { grid-template-columns: 1fr; padding: 14px 20px max(18px, env(safe-area-inset-bottom)); }
+    .notification-clear-dialog__confirm { grid-row: 1; }
 }
 @media (max-width: 1400px) and (min-width: 576px) {
     .notification-center--pos .notification-center__trigger-label { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .notification-center__panel, .app-notification-toast { animation: none; transition: none; }
+    .notification-center__panel, .notification-clear-dialog__card, .app-notification-toast { animation: none; transition: none; }
 }

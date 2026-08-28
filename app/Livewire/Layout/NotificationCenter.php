@@ -15,6 +15,8 @@ class NotificationCenter extends Component
 {
     public bool $open = false;
 
+    public bool $confirmingClearAll = false;
+
     public string $placement = 'navbar';
 
     public bool $soundEnabled = true;
@@ -69,6 +71,9 @@ class NotificationCenter extends Component
     public function togglePanel(): void
     {
         $this->open = ! $this->open;
+        if (! $this->open) {
+            $this->confirmingClearAll = false;
+        }
         if ($this->open) {
             $this->announceNew();
         }
@@ -77,6 +82,32 @@ class NotificationCenter extends Component
     public function closePanel(): void
     {
         $this->open = false;
+        $this->confirmingClearAll = false;
+    }
+
+    public function requestClearAll(): void
+    {
+        if ($this->notifications->isEmpty()) {
+            return;
+        }
+
+        $this->confirmingClearAll = true;
+    }
+
+    public function cancelClearAll(): void
+    {
+        $this->confirmingClearAll = false;
+    }
+
+    public function handleEscape(): void
+    {
+        if ($this->confirmingClearAll) {
+            $this->cancelClearAll();
+
+            return;
+        }
+
+        $this->closePanel();
     }
 
     public function markRead(string $id): void
@@ -98,6 +129,7 @@ class NotificationCenter extends Component
         }
 
         $this->baseQuery()->delete();
+        $this->confirmingClearAll = false;
         unset($this->notifications, $this->unreadCount);
 
         $this->dispatch('notify', type: 'success', message: 'Notificaciones eliminadas permanentemente.');

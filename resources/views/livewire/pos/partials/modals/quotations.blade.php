@@ -44,10 +44,11 @@
     <div class="pos-modal" @click.stop>
         <div class="modal-header-pos">
             <i class="bx bx-save" data-ui="xui-zbum5m"></i>
-            <h4>Guardar pedido</h4>
+            <h4>Guardar borrador</h4>
             <button wire:click="$set('showSaveQuotationModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
         </div>
         <div class="modal-body-pos">
+            <p class="pos-draft-help"><i class="bx bx-info-circle" aria-hidden="true"></i><span>Se conservarán el cliente, dirección, referencias, tipo de venta, pagos y todos los productos, promociones y descuentos capturados.</span></p>
             <div data-ui="xui-n3c866">
                 <label class="co-label">Nombre o referencia</label>
                 <input type="text" wire:model="quotationName" class="co-input" placeholder="Ej: Cumpleaños Carlos">
@@ -63,7 +64,7 @@
                 class="pos-btn pos-btn-primary">
                 <span wire:loading wire:target="saveQuotation" class="pos-btn-spinner"></span>
                 <i wire:loading.remove wire:target="saveQuotation" class="bx bx-save"></i>
-                <span wire:loading.remove wire:target="saveQuotation">Guardar y limpiar</span>
+                <span wire:loading.remove wire:target="saveQuotation">Guardar borrador</span>
                 <span wire:loading wire:target="saveQuotation">Guardando…</span>
             </button>
         </div>

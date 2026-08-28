@@ -205,6 +205,7 @@ class KioskPosWorkflowTest extends TestCase
     {
         $view = file_get_contents(resource_path('views/livewire/pos/point-of-sale.blade.php'));
         $cart = file_get_contents(resource_path('views/livewire/pos/partials/cart.blade.php'));
+        $checkout = file_get_contents(resource_path('views/livewire/pos/partials/modals/checkout.blade.php'));
         $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
         $header = file_get_contents(resource_path('views/livewire/pos/partials/header.blade.php'));
         $toolbar = file_get_contents(resource_path('views/livewire/pos/partials/toolbar.blade.php'));
@@ -212,6 +213,7 @@ class KioskPosWorkflowTest extends TestCase
 
         $this->assertIsString($view);
         $this->assertIsString($cart);
+        $this->assertIsString($checkout);
         $this->assertIsString($catalog);
         $this->assertIsString($header);
         $this->assertIsString($toolbar);
@@ -219,7 +221,9 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertStringContainsString('@keydown.window="handleKeyboardShortcut($event)"', $view);
         $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
         $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
-        $this->assertStringContainsString('data-pos-save-cart', $cart);
+        $this->assertStringNotContainsString('data-pos-save-cart', $cart);
+        $this->assertStringContainsString('data-pos-save-draft', $checkout);
+        $this->assertStringContainsString('data-pos-submit-order', $checkout);
         $this->assertStringContainsString('cart-header__meta', $cart);
         $this->assertStringContainsString('cart-item__footer', $cart);
         $this->assertStringContainsString('cart-mobile-close', $cart);
@@ -228,7 +232,8 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertStringContainsString('pos-search-shortcut', $catalog);
         $this->assertStringContainsString('data-pos-saved', $header);
         $this->assertStringContainsString('>F4</kbd>', $header);
-        $this->assertStringContainsString('>F5</kbd>', $cart);
+        $this->assertStringContainsString('>F5</kbd>', $checkout);
+        $this->assertStringContainsString('aria-keyshortcuts="F2"', $checkout);
         foreach (['F6', 'F7', 'F8', 'F9', 'F11'] as $shortcut) {
             $this->assertStringContainsString('aria-keyshortcuts="'.$shortcut.'"', $toolbar);
         }
@@ -659,6 +664,96 @@ class KioskPosWorkflowTest extends TestCase
             'subtotal' => 135,
         ]);
         $this->assertSame([], session('pos_cart_'.$user->id));
+    }
+
+    public function test_saved_order_restores_the_complete_checkout_and_uses_it_when_charged(): void
+    {
+        [$user] = $this->posContext();
+        $product = Product::create([
+            'name' => 'Latte de borrador',
+            'price' => 135,
+            'is_active' => true,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->set('quotationName', 'Delivery incompleto')
+            ->set('orderType', 'delivery')
+            ->set('deliveryMethod', 'transfer')
+            ->set('orderNotes', 'Sin popote')
+            ->set('customerName', 'Cliente borrador')
+            ->set('customerPhone', '9991112233')
+            ->set('customerAddress', 'Calle 10 #20')
+            ->set('customerNeighborhood', 'Centro')
+            ->set('customerReferences', '')
+            ->set('payMethod', 'transfer')
+            ->set('payAmount', '135.00')
+            ->set('payTransferRef', 'TRX-BORRADOR')
+            ->set('cart', [[
+                'cart_id' => 'complete-draft-test',
+                'product_id' => $product->id,
+                'promotion_id' => null,
+                'product_name' => $product->name,
+                'product_price' => 135,
+                'product_image' => null,
+                'quantity' => 1,
+                'unit_extra' => 0,
+                'unit_total' => 135,
+                'subtotal' => 135,
+                'promotion_discount' => 0,
+                'notes' => '',
+                'addons' => [],
+                'ingredients' => [],
+                'promotion_selections' => [],
+                'promotion_rule_snapshot' => null,
+                'auto_promotion_applied' => false,
+            ]])
+            ->call('saveQuotation')
+            ->assertSet('cart', [])
+            ->assertSet('orderType', 'ventanilla')
+            ->assertSet('customerAddress', '')
+            ->assertSet('payTransferRef', '');
+
+        $quotation = Quotation::where('name', 'Delivery incompleto')->firstOrFail();
+        $this->assertSame('delivery', $quotation->order_type);
+        $this->assertSame(1, $quotation->draft_version);
+        $this->assertSame('Calle 10 #20', data_get($quotation->checkout_state, 'customer.address'));
+        $this->assertSame('', data_get($quotation->checkout_state, 'customer.references'));
+        $this->assertSame('TRX-BORRADOR', data_get($quotation->checkout_state, 'payment.transfer_reference'));
+
+        $component->call('loadQuotation', $quotation->id)
+            ->assertSet('orderType', 'delivery')
+            ->assertSet('deliveryMethod', 'transfer')
+            ->assertSet('orderNotes', 'Sin popote')
+            ->assertSet('customerName', 'Cliente borrador')
+            ->assertSet('customerAddress', 'Calle 10 #20')
+            ->assertSet('customerNeighborhood', 'Centro')
+            ->assertSet('customerReferences', '')
+            ->assertSet('payMethod', 'transfer')
+            ->assertSet('payAmount', '135.00')
+            ->assertSet('payTransferRef', 'TRX-BORRADOR')
+            ->assertSet('cart.0.product_name', 'Latte de borrador')
+            ->call('openCheckoutModal')
+            ->assertSet('orderType', 'delivery')
+            ->assertSet('deliveryMethod', 'transfer')
+            ->assertSet('payTransferRef', 'TRX-BORRADOR')
+            ->call('addPayment')
+            ->call('submitOrder')
+            ->assertHasNoErrors();
+
+        $order = Order::latest('id')->firstOrFail();
+        $this->assertSame('delivery', $order->type);
+        $this->assertSame('transfer', $order->delivery_method);
+        $this->assertSame('Centro', $order->customer_neighborhood);
+        $this->assertSame('', (string) $order->customer_references);
+        $this->assertSame('Sin popote', $order->notes);
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id,
+            'method' => 'transferencia',
+            'amount' => 135,
+            'transfer_reference' => 'TRX-BORRADOR',
+        ]);
+        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
     }
 
     public function test_pos_layout_does_not_load_the_admin_menu_controller(): void
