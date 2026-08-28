@@ -14,7 +14,7 @@
 
     @if ($open)
         @teleport('body')
-        <div class="notification-center__portal" wire:keydown.escape.window="closePanel">
+        <div class="notification-center__portal" wire:keydown.escape.window="handleEscape">
             <button type="button" class="notification-center__backdrop" wire:click="closePanel"
                 aria-label="Cerrar notificaciones"></button>
             <section id="notification-panel-{{ $this->getId() }}" class="notification-center__panel" role="dialog"
@@ -27,8 +27,7 @@
                 <div class="notification-center__header-actions">
                     @if ($this->notifications->isNotEmpty())
                         <button type="button" class="notification-center__icon-button notification-center__icon-button--danger"
-                            wire:click="clearAll"
-                            wire:confirm="¿Eliminar permanentemente todas tus notificaciones? Esta acción no se puede deshacer."
+                            wire:click="requestClearAll"
                             aria-label="Eliminar todas las notificaciones" title="Limpiar notificaciones">
                             <i class="bx bx-trash" aria-hidden="true"></i>
                         </button>
@@ -83,6 +82,43 @@
                 </footer>
             @endif
             </section>
+
+            @if ($confirmingClearAll)
+                <div class="notification-clear-dialog" wire:key="notification-clear-dialog"
+                    x-data x-init="$nextTick(() => $refs.cancelClearNotifications.focus())">
+                    <button type="button" class="notification-clear-dialog__backdrop"
+                        wire:click="cancelClearAll" aria-label="Cancelar y volver a las notificaciones"></button>
+                    <section class="notification-clear-dialog__card" role="alertdialog" aria-modal="true"
+                        aria-labelledby="notification-clear-title-{{ $this->getId() }}"
+                        aria-describedby="notification-clear-description-{{ $this->getId() }}">
+                        <div class="notification-clear-dialog__visual" aria-hidden="true">
+                            <i class="bx bx-trash"></i>
+                        </div>
+                        <div class="notification-clear-dialog__content">
+                            <span class="notification-clear-dialog__eyebrow">Acción irreversible</span>
+                            <h3 id="notification-clear-title-{{ $this->getId() }}">¿Eliminar todas las notificaciones?</h3>
+                            <p id="notification-clear-description-{{ $this->getId() }}">
+                                Se borrarán permanentemente todos tus mensajes, tanto leídos como pendientes.
+                            </p>
+                            <div class="notification-clear-dialog__warning">
+                                <i class="bx bx-error-circle" aria-hidden="true"></i>
+                                <span>Esta acción elimina los registros de la base de datos y no se puede deshacer.</span>
+                            </div>
+                        </div>
+                        <div class="notification-clear-dialog__actions">
+                            <button type="button" class="notification-clear-dialog__cancel"
+                                x-ref="cancelClearNotifications" wire:click="cancelClearAll">
+                                Conservar mensajes
+                            </button>
+                            <button type="button" class="notification-clear-dialog__confirm"
+                                wire:click="clearAll" wire:loading.attr="disabled" wire:target="clearAll">
+                                <span wire:loading.remove wire:target="clearAll"><i class="bx bx-trash" aria-hidden="true"></i>Eliminar todo</span>
+                                <span wire:loading wire:target="clearAll"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Eliminando…</span>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            @endif
         </div>
         @endteleport
     @endif

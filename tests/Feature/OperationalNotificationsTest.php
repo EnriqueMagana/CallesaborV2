@@ -131,6 +131,14 @@ class OperationalNotificationsTest extends TestCase
             ->set('open', true)
             ->assertSeeHtml('bx bx-check-circle')
             ->assertSee('Eliminar todas las notificaciones')
+            ->assertDontSeeHtml('wire:confirm')
+            ->call('requestClearAll')
+            ->assertSet('confirmingClearAll', true)
+            ->assertSee('Acción irreversible')
+            ->assertSee('Conservar mensajes')
+            ->assertSee('Eliminar todo')
+            ->call('cancelClearAll')
+            ->assertSet('confirmingClearAll', false)
             ->assertDontSee('Filtrar notificaciones');
 
         $this->assertSame('ready', $notification->fresh()->tone);
@@ -144,7 +152,12 @@ class OperationalNotificationsTest extends TestCase
         $waiterNotification = $this->notificationFor($waiter, 'order.ready', 'tables');
 
         $this->actingAs($owner);
-        Livewire::test(NotificationCenter::class)->call('clearAll');
+        Livewire::test(NotificationCenter::class)
+            ->set('open', true)
+            ->call('requestClearAll')
+            ->assertSet('confirmingClearAll', true)
+            ->call('clearAll')
+            ->assertSet('confirmingClearAll', false);
 
         $this->assertDatabaseMissing('notifications', ['id' => $ownerNotification->id]);
         $this->assertDatabaseHas('notifications', ['id' => $waiterNotification->id]);

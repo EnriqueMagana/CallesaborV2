@@ -1,13 +1,15 @@
-@props(['product', 'featured' => false, 'rank' => null, 'badge' => null, 'imageOverride' => null, 'titleOverride' => null, 'descriptionOverride' => null])
+@props(['product', 'featured' => false, 'rank' => null, 'badge' => null, 'imageOverride' => null, 'titleOverride' => null, 'descriptionOverride' => null, 'priceOverride' => null, 'originalPrice' => null, 'discountPercent' => null])
 
 @php
     $cardName = $titleOverride ?: $product->name;
     $cardDescription = $descriptionOverride ?: $product->description;
     $cardImage = $imageOverride ?: $product->image;
+    $cardPrice = $priceOverride !== null ? (float) $priceOverride : (float) $product->price;
     $modalProduct = [
         'name' => $cardName,
         'description' => $cardDescription ?: 'Consulta los detalles y opciones disponibles de este producto.',
-        'price' => '$'.number_format((float) $product->price, 2),
+        'price' => '$'.number_format($cardPrice, 2),
+        'originalPrice' => $originalPrice !== null ? '$'.number_format((float) $originalPrice, 2) : null,
         'image' => $cardImage ? Storage::url($cardImage) : null,
         'category' => $product->category?->name ?? 'Especialidad',
         'customizable' => (bool) $product->is_customizable,
@@ -63,22 +65,37 @@
         @else
             <span class="product-card__placeholder" aria-hidden="true"><i class="bx bx-dish"></i></span>
         @endif
-        @if($featured || $badge)
+        @if(($featured || $badge) && $discountPercent === null)
             <span class="product-card__badge"><i class="bx bx-star" aria-hidden="true"></i> {{ $badge ?: 'Destacado' }}</span>
+        @endif
+        @if($discountPercent !== null)
+            <span class="product-card__action product-card__action--discount" aria-hidden="true"><i class="bx bx-plus"></i></span>
         @endif
     </div>
     <div class="product-card__content">
-        @if($product->category)
-            <span class="product-card__category">{{ $product->category->name }}</span>
+        @if($discountPercent !== null)
+            <div class="product-card__discount-summary">
+                <span class="product-card__discount-line">
+                    <strong class="product-card__price">${{ number_format($cardPrice, 2) }}</strong>
+                    <span class="product-card__discount-badge"><i class="bx bxs-hot" aria-hidden="true"></i>-{{ $discountPercent }}%</span>
+                </span>
+                @if($originalPrice !== null)
+                    <del>${{ number_format((float) $originalPrice, 2) }}</del>
+                @endif
+            </div>
+        @else
+            @if($product->category)
+                <span class="product-card__category">{{ $product->category->name }}</span>
+            @endif
+            <div class="product-card__title-row">
+                <h3>{{ $cardName }}</h3>
+                <span class="product-card__pricing"><strong class="product-card__price">${{ number_format($cardPrice, 2) }}</strong>@if($originalPrice !== null)<del>${{ number_format((float) $originalPrice, 2) }}</del>@endif</span>
+            </div>
+            @if($cardDescription)
+                <p>{{ $cardDescription }}</p>
+            @endif
+            <span class="product-card__detail">Ver detalle <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
+            <span class="product-card__action" aria-hidden="true"><i class="bx bx-plus"></i></span>
         @endif
-        <div class="product-card__title-row">
-            <h3>{{ $cardName }}</h3>
-            <strong class="product-card__price">${{ number_format((float) $product->price, 2) }}</strong>
-        </div>
-        @if($cardDescription)
-            <p>{{ $cardDescription }}</p>
-        @endif
-        <span class="product-card__detail">Ver detalle <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
-        <span class="product-card__action" aria-hidden="true"><i class="bx bx-plus"></i></span>
     </div>
 </article>

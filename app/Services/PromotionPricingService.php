@@ -57,6 +57,72 @@ class PromotionPricingService
         return array_values($cart);
     }
 
+    /**
+     * Returns incomplete buy-X/get-Y benefits that are one or more units away
+     * from activating. Prices are still calculated exclusively by apply().
+     */
+    public function opportunities(array $cart, string $channel, string $fulfillment): array
+    {
+        if (! config('promotions.automatic_pricing_enabled', true) || $cart === []) {
+            return [];
+        }
+
+        $quantities = collect($cart)
+            ->filter(fn (array $line) => ! empty($line['product_id']) && empty($line['promotion_selections']))
+            ->groupBy(fn (array $line) => (int) $line['product_id'])
+            ->map(fn ($lines) => (int) $lines->sum(fn (array $line) => $this->quantity($line)))
+            ->filter();
+
+        if ($quantities->isEmpty()) {
+            return [];
+        }
+
+        $rules = Promotion::query()
+            ->automaticPricingAvailable($channel, null, $fulfillment)
+            ->where('pricing_rule_type', Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT)
+            ->whereIn('primary_product_id', $quantities->keys())
+            ->with(['primaryProduct:id,name,image,is_active,is_customizable'])
+            ->orderByDesc('starts_on')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('primary_product_id');
+
+        return $quantities->map(function (int $quantity, int $productId) use ($rules) {
+            return collect($rules->get($productId, collect()))
+                ->map(function (Promotion $promotion) use ($quantity) {
+                    $product = $promotion->primaryProduct;
+                    $config = $promotion->normalizedPricingRule();
+                    $cycle = $config['buy_quantity'] + $config['reward_quantity'];
+                    $completed = intdiv($quantity, $cycle);
+                    $remainder = $quantity % $cycle;
+
+                    if (! $product?->is_active
+                        || $remainder < $config['buy_quantity']
+                        || ($config['max_applications_per_order'] && $completed >= $config['max_applications_per_order'])) {
+                        return null;
+                    }
+
+                    $missing = $cycle - $remainder;
+
+                    return [
+                        'promotion_id' => $promotion->id,
+                        'promotion_name' => $promotion->name,
+                        'promotion_label' => $promotion->pricingRuleLabel(),
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'product_image' => $product->image,
+                        'missing_quantity' => $missing,
+                        'message' => $missing === 1
+                            ? "Agrega 1 {$product->name} y activa {$promotion->pricingRuleLabel()}."
+                            : "Agrega {$missing} unidades de {$product->name} y activa {$promotion->pricingRuleLabel()}.",
+                    ];
+                })
+                ->filter()
+                ->sortByDesc(fn (array $opportunity) => $opportunity['promotion_label'])
+                ->first();
+        })->filter()->values()->all();
+    }
+
     private function resetAutomaticDiscounts(array $cart): array
     {
         foreach ($cart as $index => $line) {
@@ -79,6 +145,18 @@ class PromotionPricingService
     private function potentialDiscount(Promotion $promotion, array $cart, array $indexes): float
     {
         $config = $promotion->normalizedPricingRule();
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT) {
+            return round((float) collect($indexes)->sum(
+                fn (int $index) => $this->quantity($cart[$index]) * $this->basePrice($cart[$index])
+            ) * ($config['discount_percentage'] / 100), 2);
+        }
+
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE) {
+            return round((float) collect($indexes)->sum(
+                fn (int $index) => max(0, $this->basePrice($cart[$index]) - $config['fixed_price']) * $this->quantity($cart[$index])
+            ), 2);
+        }
+
         $cycle = $config['buy_quantity'] + $config['reward_quantity'];
         $quantity = collect($indexes)->sum(fn (int $index) => $this->quantity($cart[$index]));
         $applications = intdiv($quantity, $cycle);
@@ -97,6 +175,14 @@ class PromotionPricingService
     private function applyRule(array $cart, array $indexes, Promotion $promotion): array
     {
         $config = $promotion->normalizedPricingRule();
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT) {
+            return $this->applyPercentageRule($cart, $indexes, $promotion, $config);
+        }
+
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE) {
+            return $this->applyFixedProductPriceRule($cart, $indexes, $promotion, $config);
+        }
+
         $totalQuantity = collect($indexes)->sum(fn (int $index) => $this->quantity($cart[$index]));
         $applications = intdiv($totalQuantity, $config['buy_quantity'] + $config['reward_quantity']);
         if ($config['max_applications_per_order']) {
@@ -132,6 +218,66 @@ class PromotionPricingService
             $cart[$index]['promotion_id'] = $promotion->id;
             $cart[$index]['promotion_discount'] = $discount;
             $cart[$index]['promotion_rule_snapshot'] = $snapshot;
+            $cart[$index]['auto_promotion_applied'] = true;
+            $cart[$index]['subtotal'] = round($regularSubtotal - $discount, 2);
+        }
+
+        return $cart;
+    }
+
+    private function applyPercentageRule(array $cart, array $indexes, Promotion $promotion, array $config): array
+    {
+        foreach ($indexes as $index) {
+            $quantity = $this->quantity($cart[$index]);
+            $regularSubtotal = round($this->unitTotal($cart[$index]) * $quantity, 2);
+            $discount = round($this->basePrice($cart[$index]) * $quantity * ($config['discount_percentage'] / 100), 2);
+            if ($discount <= 0) {
+                continue;
+            }
+
+            $cart[$index]['promotion_id'] = $promotion->id;
+            $cart[$index]['promotion_discount'] = $discount;
+            $cart[$index]['promotion_rule_snapshot'] = [
+                'version' => 1,
+                'promotion_id' => $promotion->id,
+                'promotion_name' => $promotion->name,
+                'rule_type' => $promotion->pricing_rule_type,
+                'label' => $promotion->pricingRuleLabel(),
+                'config' => $config,
+                'rewarded_units' => $quantity,
+                'discount_amount' => $discount,
+                'regular_subtotal' => $regularSubtotal,
+            ];
+            $cart[$index]['auto_promotion_applied'] = true;
+            $cart[$index]['subtotal'] = round($regularSubtotal - $discount, 2);
+        }
+
+        return $cart;
+    }
+
+    private function applyFixedProductPriceRule(array $cart, array $indexes, Promotion $promotion, array $config): array
+    {
+        foreach ($indexes as $index) {
+            $quantity = $this->quantity($cart[$index]);
+            $regularSubtotal = round($this->unitTotal($cart[$index]) * $quantity, 2);
+            $discount = round(max(0, $this->basePrice($cart[$index]) - $config['fixed_price']) * $quantity, 2);
+            if ($discount <= 0) {
+                continue;
+            }
+
+            $cart[$index]['promotion_id'] = $promotion->id;
+            $cart[$index]['promotion_discount'] = $discount;
+            $cart[$index]['promotion_rule_snapshot'] = [
+                'version' => 1,
+                'promotion_id' => $promotion->id,
+                'promotion_name' => $promotion->name,
+                'rule_type' => $promotion->pricing_rule_type,
+                'label' => $promotion->pricingRuleLabel(),
+                'config' => $config,
+                'rewarded_units' => $quantity,
+                'discount_amount' => $discount,
+                'regular_subtotal' => $regularSubtotal,
+            ];
             $cart[$index]['auto_promotion_applied'] = true;
             $cart[$index]['subtotal'] = round($regularSubtotal - $discount, 2);
         }

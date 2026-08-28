@@ -73,6 +73,12 @@
                                             {{ $promotions->count() === 1 ? 'disponible' : 'disponibles' }}</small></span>
                                 </a>
                             @endif
+                            @if ($discountCampaigns->isNotEmpty())
+                                <a href="#discount-products" class="category-nav__item" data-category-link="discount-products">
+                                    <span class="category-nav__icon"><i class="bx bx-purchase-tag" aria-hidden="true"></i></span>
+                                    <span><strong>Descuentos</strong><small>{{ $discountCampaigns->count() }} {{ $discountCampaigns->count() === 1 ? 'producto' : 'productos' }}</small></span>
+                                </a>
+                            @endif
                             @if ($newProductCampaigns->isNotEmpty())
                                 <a href="#new-products" class="category-nav__item" data-category-link="new-products">
                                     <span class="category-nav__icon"><i class="bx bx-star"
@@ -149,7 +155,7 @@
                                     'image' => $promotion->image ? Storage::url($promotion->image) : null,
                                     'badge' => $promotion->presentationLabel(),
                                     'icon' => $promotion->presentationIcon(),
-                                    'days' => $promotion->weekdayLabel(),
+                                    'days' => $promotion->scheduleSummary(),
                                     'validity' => $promotion->ends_on
                                         ? 'Válida hasta ' . $promotion->ends_on->translatedFormat('d M Y')
                                         : 'Sin fecha de finalización',
@@ -196,10 +202,10 @@
                                         class="promotion-banner__fulfillment"><i
                                             class="bx bx-map-pin"></i>{{ $promotion->fulfillmentSummary() }}</small>
                                     <div>
-                                        <small>{{ $promotion->weekdayLabel() }}</small>
+                                        <small>{{ $promotion->scheduleSummary() }}</small>
                                     </div>
                                 </div>
-                                <strong class="promotion-banner__price"><small>Precio promo</small><span>${{ number_format($promotion->price, 2) }}</span></strong>
+                                <strong class="promotion-banner__price"><small>{{ $promotion->pricing_rule_type === \App\Models\Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE || ! $promotion->hasAutomaticPricingRule() ? 'Precio promo' : 'Precio base' }}</small><span>${{ number_format($promotion->price, 2) }}</span></strong>
                             </article>
                         @endforeach
                     </div>
@@ -211,8 +217,34 @@
                                 @if ($loop->first) class="is-active" @endif aria-hidden="true"></span>
                         @endforeach
                     </div>
-                    <p class="promotion-banners__note"><i class="bx bx-info-circle" aria-hidden="true"></i>El precio
-                        publicado cubre la promoción; los productos internos no suman su precio individual.</p>
+                    <p class="promotion-banners__note"><i class="bx bx-info-circle" aria-hidden="true"></i>Los beneficios automáticos se calculan al agregar la cantidad requerida; los combos conservan el precio publicado.</p>
+                </section>
+            @endif
+
+            @if ($discountCampaigns->isNotEmpty())
+                <section class="discount-products menu-container" id="discount-products" aria-labelledby="discount-products-title" data-category-section>
+                    <div class="section-heading discount-products__heading">
+                        <div><span class="menu-kicker">Precios especiales</span><h2 id="discount-products-title">Descuentos</h2></div>
+                        <p>Ahorra en productos seleccionados por tiempo limitado.</p>
+                    </div>
+                    <div class="discount-products__rail" role="list" tabindex="0" aria-label="Productos con descuento, carrusel horizontal">
+                        @foreach ($discountCampaigns as $campaign)
+                            @php
+                                $discountProduct = $campaign->primaryProduct;
+                                $originalPrice = (float) $discountProduct->price;
+                                $discountPrice = (float) $campaign->price;
+                                $discountPercent = $campaign->pricing_rule_type === \App\Models\Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT
+                                    ? $campaign->normalizedPricingRule()['discount_percentage']
+                                    : ($originalPrice > 0 ? max(1, min(99, (int) round((1 - ($discountPrice / $originalPrice)) * 100))) : 0);
+                                $discountDescription = $discountPercent > 0
+                                    ? $discountPercent.'% de descuento. Antes $'.number_format($originalPrice, 2).' y ahora $'.number_format($discountPrice, 2).'.'
+                                    : 'Precio especial: antes $'.number_format($originalPrice, 2).' y ahora $'.number_format($discountPrice, 2).'.';
+                            @endphp
+                            <x-public-menu.product-card :product="$discountProduct" :image-override="$discountProduct->image ?: $campaign->image" :title-override="$discountProduct->name"
+                                :description-override="$discountDescription" :price-override="$discountPrice" :original-price="$originalPrice"
+                                :discount-percent="$discountPercent" class="discount-product-card" role="listitem" data-discount-product-item />
+                        @endforeach
+                    </div>
                 </section>
             @endif
 

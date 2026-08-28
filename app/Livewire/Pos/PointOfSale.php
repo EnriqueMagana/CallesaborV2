@@ -37,6 +37,8 @@ use Livewire\Component;
 
 class PointOfSale extends Component
 {
+    private const DRAFT_STATE_VERSION = 1;
+
     private const MAX_ITEM_QUANTITY = 99;
 
     private const MAX_ITEM_NOTES_LENGTH = 500;
@@ -85,6 +87,8 @@ class PointOfSale extends Component
     public string $productSearch = '';
 
     public ?int $selectedCategoryId = null;
+
+    public string $catalogMode = 'products';
 
     public bool $showPromotionModal = false;
 
@@ -314,14 +318,38 @@ class PointOfSale extends Component
     #[Computed]
     public function activePromotions()
     {
-        return Promotion::query()
+        $fulfillment = $this->promotionFulfillmentForOrderType($this->orderType);
+        $relations = [
+            'primaryProduct' => fn ($query) => $query
+                ->select(['id', 'name', 'image', 'price', 'is_active', 'is_customizable'])
+                ->withCount(['addonGroups', 'ingredients']),
+            'groups.products' => fn ($query) => $query
+                ->where('is_active', true)
+                ->select(['products.id', 'products.category_id', 'products.name', 'products.image']),
+            'groups.products.category.printArea',
+        ];
+
+        $manual = Promotion::query()
             ->available('pos')
             ->forAnyFulfillment(Promotion::POS_FULFILLMENT_MODES)
-            ->with(['groups.products' => fn ($query) => $query
-                ->where('is_active', true)
-                ->select(['products.id', 'products.name', 'products.image'])])
-            ->orderBy('name')
+            ->with($relations)
             ->get();
+        $automatic = Promotion::query()
+            ->automaticPricingAvailable('pos', null, $fulfillment)
+            ->with($relations)
+            ->get();
+
+        return $manual->concat($automatic)->unique('id')->sortBy('name')->values();
+    }
+
+    #[Computed]
+    public function promotionOpportunities(): array
+    {
+        return app(PromotionPricingService::class)->opportunities(
+            $this->cart,
+            'pos',
+            $this->promotionFulfillmentForOrderType($this->orderType)
+        );
     }
 
     #[Computed]
@@ -336,7 +364,8 @@ class PointOfSale extends Component
             ->forAnyFulfillment(Promotion::POS_FULFILLMENT_MODES)
             ->with(['groups.products' => fn ($query) => $query
                 ->where('is_active', true)
-                ->select(['products.id', 'products.name', 'products.image'])])
+                ->select(['products.id', 'products.category_id', 'products.name', 'products.image']),
+                'groups.products.category.printArea'])
             ->find($this->customizingPromotionId);
     }
 
@@ -1028,7 +1057,7 @@ class PointOfSale extends Component
             'pos',
             $this->promotionFulfillmentForOrderType($this->orderType)
         );
-        unset($this->cartTotal, $this->cartCount);
+        unset($this->cartTotal, $this->cartCount, $this->promotionOpportunities);
         Session::put('pos_cart_'.auth()->id(), $this->cart);
     }
 
@@ -1060,6 +1089,74 @@ class PointOfSale extends Component
     public function selectCategory(?int $id): void
     {
         $this->selectedCategoryId = $id;
+    }
+
+    public function setCatalogMode(string $mode): void
+    {
+        abort_unless(in_array($mode, ['products', 'promotions'], true), 422);
+        $this->catalogMode = $mode;
+    }
+
+    public function selectPromotionFromCatalog(int $promotionId): void
+    {
+        $fulfillment = $this->promotionFulfillmentForOrderType($this->orderType);
+        $promotion = Promotion::query()->with('primaryProduct')->find($promotionId);
+        if (! $promotion) {
+            $this->dispatch('notify', type: 'warning', message: 'Esta promoción ya no está disponible.');
+
+            return;
+        }
+
+        if (! $promotion->hasAutomaticPricingRule()) {
+            $this->openPromotionModal($promotionId);
+
+            return;
+        }
+
+        $available = Promotion::query()
+            ->automaticPricingAvailable('pos', null, $fulfillment)
+            ->whereKey($promotionId)
+            ->exists();
+        if (! $available || ! $promotion->primaryProduct?->is_active) {
+            $this->dispatch('notify', type: 'warning', message: 'Esta oferta no aplica a la modalidad actual.');
+
+            return;
+        }
+
+        $this->openCustomizeModal($promotion->primary_product_id);
+    }
+
+    public function completePromotionOpportunity(int $promotionId): void
+    {
+        $opportunity = collect($this->promotionOpportunities)->firstWhere('promotion_id', $promotionId);
+        if (! $opportunity) {
+            $this->dispatch('notify', type: 'info', message: 'La oferta ya fue aplicada o dejó de estar disponible.');
+
+            return;
+        }
+
+        $product = Product::query()
+            ->where('is_active', true)
+            ->withCount(['addonGroups', 'ingredients'])
+            ->find($opportunity['product_id']);
+        if (! $product) {
+            $this->dispatch('notify', type: 'warning', message: 'El producto de la oferta ya no está disponible.');
+
+            return;
+        }
+
+        $missing = max(1, min(self::MAX_ITEM_QUANTITY, (int) $opportunity['missing_quantity']));
+        if ($product->is_customizable || $product->addon_groups_count > 0 || $product->ingredients_count > 0) {
+            $this->openCustomizeModal($product->id);
+            $this->itemQuantity = $missing;
+
+            return;
+        }
+
+        for ($unit = 0; $unit < $missing; $unit++) {
+            $this->addSimpleProductToCart($product);
+        }
+        $this->dispatch('notify', type: 'success', message: 'Producto agregado; la promoción se aplicó automáticamente.');
     }
 
     // ─── Customize product modal ───────────────────────────────────────────────
@@ -1098,7 +1195,12 @@ class PointOfSale extends Component
         $promotion = Promotion::query()
             ->available('pos')
             ->forAnyFulfillment(Promotion::POS_FULFILLMENT_MODES)
-            ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->with([
+                'groups.products' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->select(['products.id', 'products.category_id', 'products.name', 'products.image']),
+                'groups.products.category.printArea',
+            ])
             ->find($promotionId);
 
         if (! $promotion || $promotion->groups->isEmpty()) {
@@ -1721,20 +1823,17 @@ class PointOfSale extends Component
 
         $this->refreshPromotionCart();
 
-        $this->payments = [];
-        $this->payMethod = 'cash';
-        $this->payAmount = number_format($this->cartTotal, 2, '.', '');
-        $this->payCashReceived = '';
-        $this->payCardLast4 = '';
-        $this->payTransferRef = '';
-        $this->orderType = 'ventanilla';
-        $this->deliveryMethod = 'contra_entrega';
+        if ($this->payments === [] && blank($this->payAmount)) {
+            $this->payAmount = number_format($this->cartTotal, 2, '.', '');
+        }
         $this->resetErrorBag();
         $this->showCheckoutModal = true;
     }
 
     public function updatedOrderType(): void
     {
+        $this->catalogMode = 'products';
+        unset($this->activePromotions, $this->promotionOpportunities);
         $this->saveCart();
         $this->payments = [];
         $this->payAmount = number_format($this->cartTotal, 2, '.', '');
@@ -1845,6 +1944,12 @@ class PointOfSale extends Component
                     'change_amount' => $payment['method'] === 'cash'
                         ? ($payment['cash_change'] ?? 0)
                         : 0,
+                    'card_last4' => $payment['method'] === 'card'
+                        ? ($payment['card_last4'] ?? null)
+                        : null,
+                    'transfer_reference' => $payment['method'] === 'transfer'
+                        ? ($payment['transfer_ref'] ?? null)
+                        : null,
                     'created_at' => $timestamp,
                     'updated_at' => $timestamp,
                 ])->all());
@@ -1938,16 +2043,35 @@ class PointOfSale extends Component
         $this->refreshPromotionCart();
 
         DB::transaction(function (): void {
-            $quotation = Quotation::create([
+            $quotation = $this->activeQuotationId
+                ? Quotation::query()
+                    ->whereKey($this->activeQuotationId)
+                    ->where('created_by', auth()->id())
+                    ->where('status', 'active')
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
+            $attributes = [
                 'created_by' => auth()->id(),
                 'customer_id' => $this->customerId,
                 'name' => $this->quotationName ?: null,
                 'notes' => $this->quotationNotes ?: null,
                 'customer_name' => $this->customerName ?: null,
                 'customer_phone' => $this->customerPhone ?: null,
+                'order_type' => $this->orderType,
+                'draft_version' => self::DRAFT_STATE_VERSION,
+                'checkout_state' => $this->draftCheckoutState(),
                 'total' => $this->cartTotal,
                 'status' => 'active',
-            ]);
+            ];
+
+            if ($quotation) {
+                $quotation->update($attributes);
+                $quotation->items()->delete();
+            } else {
+                $quotation = Quotation::create($attributes);
+            }
 
             foreach ($this->cart as $item) {
                 $qi = QuotationItem::create([
@@ -1987,6 +2111,7 @@ class PointOfSale extends Component
         });
 
         $this->showSaveQuotationModal = false;
+        $this->showCheckoutModal = false;
         $this->quotationName = '';
         $this->quotationNotes = '';
         $this->clearCart();
@@ -1996,7 +2121,9 @@ class PointOfSale extends Component
 
     public function loadQuotation(int $id): void
     {
-        $quotation = Quotation::with(['items.addons', 'items.ingredients', 'customer'])
+        $quotation = Quotation::query()
+            ->where('created_by', auth()->id())
+            ->with(['items.addons', 'items.ingredients', 'customer'])
             ->findOrFail($id);
 
         $newCart = [];
@@ -2041,7 +2168,11 @@ class PointOfSale extends Component
             ];
         }
 
-        $this->cart = $newCart;
+        $draftState = is_array($quotation->checkout_state) ? $quotation->checkout_state : [];
+        $savedCart = $draftState['cart'] ?? null;
+        $this->cart = is_array($savedCart) && $savedCart !== []
+            ? $this->restoreDraftCart($savedCart)
+            : $newCart;
         $this->saveCart();
 
         if ($quotation->customer_id) {
@@ -2056,6 +2187,10 @@ class PointOfSale extends Component
             $this->customerPhone = $quotation->customer_phone ?? '';
         }
 
+        $this->restoreDraftCheckoutState($draftState);
+        $this->quotationName = $quotation->name ?? '';
+        $this->quotationNotes = $quotation->notes ?? '';
+
         $this->activeQuotationId = $quotation->id;
         $this->showQuotationsModal = false;
         unset($this->cartTotal, $this->cartCount, $this->quotations);
@@ -2065,9 +2200,115 @@ class PointOfSale extends Component
     public function deleteQuotation(int $id): void
     {
         abort_unless(auth()->user()?->can('editar ordenes'), 403);
-        Quotation::findOrFail($id)->delete();
+        Quotation::query()
+            ->where('created_by', auth()->id())
+            ->findOrFail($id)
+            ->delete();
         unset($this->quotations);
         $this->dispatch('notify', type: 'warning', message: 'Cotización eliminada.');
+    }
+
+    /**
+     * Snapshot versionado de todos los datos editables del pedido.
+     * Las partidas tambiÃ©n se guardan en tablas relacionales para conservar
+     * compatibilidad con los borradores creados antes de esta versiÃ³n.
+     */
+    private function draftCheckoutState(): array
+    {
+        return [
+            'version' => self::DRAFT_STATE_VERSION,
+            'cart' => $this->cart,
+            'order' => [
+                'type' => $this->orderType,
+                'delivery_method' => $this->deliveryMethod,
+                'notes' => $this->orderNotes,
+            ],
+            'customer' => [
+                'id' => $this->customerId,
+                'name' => $this->customerName,
+                'phone' => $this->customerPhone,
+                'address' => $this->customerAddress,
+                'neighborhood' => $this->customerNeighborhood,
+                'references' => $this->customerReferences,
+                'search' => $this->customerSearch,
+            ],
+            'payment' => [
+                'payments' => $this->payments,
+                'method' => $this->payMethod,
+                'amount' => $this->payAmount,
+                'cash_received' => $this->payCashReceived,
+                'card_last4' => $this->payCardLast4,
+                'transfer_reference' => $this->payTransferRef,
+            ],
+        ];
+    }
+
+    private function restoreDraftCheckoutState(array $state): void
+    {
+        if ($state === []) {
+            return;
+        }
+
+        $order = is_array($state['order'] ?? null) ? $state['order'] : [];
+        $customer = is_array($state['customer'] ?? null) ? $state['customer'] : [];
+        $payment = is_array($state['payment'] ?? null) ? $state['payment'] : [];
+
+        $orderType = (string) ($order['type'] ?? 'ventanilla');
+        $this->orderType = in_array($orderType, ['ventanilla', 'pick_up', 'delivery'], true)
+            ? $orderType
+            : 'ventanilla';
+
+        $deliveryMethod = (string) ($order['delivery_method'] ?? 'contra_entrega');
+        $this->deliveryMethod = in_array($deliveryMethod, ['contra_entrega', 'cash', 'card', 'transfer'], true)
+            ? $deliveryMethod
+            : 'contra_entrega';
+        $this->orderNotes = (string) ($order['notes'] ?? '');
+
+        $savedCustomerId = filter_var($customer['id'] ?? null, FILTER_VALIDATE_INT);
+        $this->customerId = $savedCustomerId && Customer::query()->whereKey($savedCustomerId)->exists()
+            ? (int) $savedCustomerId
+            : null;
+        $this->customerName = (string) ($customer['name'] ?? '');
+        $this->customerPhone = (string) ($customer['phone'] ?? '');
+        $this->customerAddress = (string) ($customer['address'] ?? '');
+        $this->customerNeighborhood = (string) ($customer['neighborhood'] ?? '');
+        $this->customerReferences = (string) ($customer['references'] ?? '');
+        $this->customerSearch = (string) ($customer['search'] ?? '');
+
+        $this->payments = collect(is_array($payment['payments'] ?? null) ? $payment['payments'] : [])
+            ->filter(fn ($item) => is_array($item)
+                && in_array($item['method'] ?? null, ['cash', 'card', 'transfer'], true)
+                && is_numeric($item['amount'] ?? null)
+                && (float) $item['amount'] > 0)
+            ->values()
+            ->all();
+
+        $payMethod = (string) ($payment['method'] ?? 'cash');
+        $this->payMethod = in_array($payMethod, ['cash', 'card', 'transfer'], true) ? $payMethod : 'cash';
+        $this->payAmount = (string) ($payment['amount'] ?? '');
+        $this->payCashReceived = (string) ($payment['cash_received'] ?? '');
+        $this->payCardLast4 = (string) ($payment['card_last4'] ?? '');
+        $this->payTransferRef = (string) ($payment['transfer_reference'] ?? '');
+
+        unset($this->customerSearchResults, $this->paidTotal, $this->paymentRemaining);
+    }
+
+    private function restoreDraftCart(array $savedCart): array
+    {
+        return collect($savedCart)
+            ->filter(fn ($item) => is_array($item) && array_key_exists('product_name', $item))
+            ->map(function (array $item): array {
+                $item['cart_id'] = Str::uuid()->toString();
+                $item['addons'] = is_array($item['addons'] ?? null) ? $item['addons'] : [];
+                $item['ingredients'] = is_array($item['ingredients'] ?? null) ? $item['ingredients'] : [];
+                $item['promotion_selections'] = is_array($item['promotion_selections'] ?? null)
+                    ? $item['promotion_selections']
+                    : [];
+
+                return $item;
+            })
+            ->values()
+            ->all();
     }
 
     public function updatedDeliveryMethod(): void
@@ -3949,6 +4190,7 @@ HTML;
                 'customer_name' => $this->customerName ?: null,
                 'customer_phone' => $this->customerPhone ?: null,
                 'customer_address' => $type === 'delivery' ? $this->formattedCustomerDeliveryAddress() : null,
+                'customer_neighborhood' => $type === 'delivery' ? ($this->customerNeighborhood ?: null) : null,
                 'customer_references' => $type === 'delivery' ? ($this->customerReferences ?: null) : null,
                 'served_by' => auth()->id(),
                 'type' => $type,
@@ -4024,7 +4266,12 @@ HTML;
 
             $promotion = Promotion::query()
                 ->available('pos', null, $fulfillment)
-                ->with(['groups.products' => fn ($query) => $query->where('is_active', true)])
+                ->with([
+                    'groups.products' => fn ($query) => $query
+                        ->where('is_active', true)
+                        ->select(['products.id', 'products.category_id', 'products.name', 'products.image']),
+                    'groups.products.category.printArea',
+                ])
                 ->find($item['promotion_id']);
             if (! $promotion) {
                 throw ValidationException::withMessages([
@@ -4080,11 +4327,20 @@ HTML;
             $snapshot[] = [
                 'group_id' => $group->id,
                 'group_name' => $group->name,
-                'items' => $requested->map(fn ($quantity, $productId) => [
-                    'product_id' => (int) $productId,
-                    'product_name' => $allowed->get((int) $productId)->name,
-                    'quantity' => (int) $quantity,
-                ])->values()->all(),
+                'items' => $requested->map(function ($quantity, $productId) use ($allowed, $group) {
+                    $product = $allowed->get((int) $productId);
+                    $category = $product?->category;
+                    $printArea = $category?->printArea;
+
+                    return [
+                        'product_id' => (int) $productId,
+                        'product_name' => $product?->name ?? 'Producto',
+                        'quantity' => (int) $quantity,
+                        'category_name' => $category?->name,
+                        'print_area_id' => $printArea?->id,
+                        'print_area_name' => $printArea?->name ?? $category?->name ?? $group->name ?? 'General',
+                    ];
+                })->values()->all(),
             ];
         }
 
@@ -4133,6 +4389,12 @@ HTML;
         $this->customerReferences = '';
         $this->customerSearch = '';
         $this->payments = [];
+        $this->payMethod = 'cash';
+        $this->payAmount = '';
+        $this->payCashReceived = '';
+        $this->payCardLast4 = '';
+        $this->payTransferRef = '';
+        unset($this->paidTotal, $this->paymentRemaining, $this->customerSearchResults);
     }
 
     public function startNewSale(): void

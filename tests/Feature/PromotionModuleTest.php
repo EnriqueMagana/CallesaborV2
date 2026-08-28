@@ -8,11 +8,13 @@ use App\Livewire\Mesas\MesaOrden;
 use App\Livewire\Pos\PointOfSale;
 use App\Models\CashRegister;
 use App\Models\Area;
+use App\Models\Category;
 use App\Models\Ingredient;
 use App\Models\KioskTerminal;
 use App\Models\Mesa;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\PrintArea;
 use App\Models\Promotion;
 use App\Models\Quotation;
 use App\Models\SidebarMenuItem;
@@ -92,6 +94,68 @@ class PromotionModuleTest extends TestCase
         $this->assertSame(0.0, $notEligible[0]['promotion_discount']);
     }
 
+    public function test_percentage_discount_is_applied_to_the_base_product_without_discounting_addons(): void
+    {
+        $product = Product::create(['name' => 'Pasta especial', 'price' => 100, 'is_active' => true]);
+        $promotion = Promotion::create([
+            'name' => 'Pasta con 25% de descuento',
+            'presentation_type' => 'discount',
+            'primary_product_id' => $product->id,
+            'price' => 75,
+            'pricing_rule_type' => Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT,
+            'pricing_rule_config' => ['discount_percentage' => 25],
+            'auto_apply' => true,
+            'starts_on' => now()->subDay(),
+            'fulfillment_modes' => ['takeaway'],
+            'show_on_pos' => true,
+            'is_active' => true,
+        ]);
+
+        $priced = app(PromotionPricingService::class)->apply([[
+            'cart_id' => 'pasta-extra',
+            'product_id' => $product->id,
+            'product_price' => 100,
+            'unit_total' => 120,
+            'quantity' => 2,
+            'subtotal' => 240,
+        ]], 'pos', 'takeaway');
+
+        $this->assertSame(190.0, $priced[0]['subtotal']);
+        $this->assertSame(50.0, $priced[0]['promotion_discount']);
+        $this->assertSame('25% de descuento', $promotion->pricingRuleLabel());
+    }
+
+    public function test_fixed_product_price_replaces_only_the_base_price_and_keeps_addons(): void
+    {
+        $product = Product::create(['name' => 'Latte especial', 'price' => 100, 'is_active' => true]);
+        $promotion = Promotion::create([
+            'name' => 'Latte a precio especial',
+            'presentation_type' => 'discount',
+            'primary_product_id' => $product->id,
+            'price' => 70,
+            'pricing_rule_type' => Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE,
+            'pricing_rule_config' => ['fixed_price' => 70],
+            'auto_apply' => true,
+            'starts_on' => now()->subDay(),
+            'fulfillment_modes' => ['takeaway'],
+            'show_on_pos' => true,
+            'is_active' => true,
+        ]);
+
+        $priced = app(PromotionPricingService::class)->apply([[
+            'cart_id' => 'latte-fixed',
+            'product_id' => $product->id,
+            'product_price' => 100,
+            'unit_total' => 120,
+            'quantity' => 2,
+            'subtotal' => 240,
+        ]], 'pos', 'takeaway');
+
+        $this->assertSame(180.0, $priced[0]['subtotal']);
+        $this->assertSame(60.0, $priced[0]['promotion_discount']);
+        $this->assertSame('Precio especial $70.00', $promotion->pricingRuleLabel());
+    }
+
     public function test_pos_reprices_the_cart_automatically_and_removes_the_offer_when_fulfillment_changes(): void
     {
         $user = User::factory()->create();
@@ -124,6 +188,59 @@ class PromotionModuleTest extends TestCase
             ->assertSet('cart.0.promotion_id', null);
     }
 
+    public function test_pos_catalog_offers_and_completes_a_three_for_two_promotion(): void
+    {
+        $user = User::factory()->create();
+        $product = Product::create([
+            'name' => 'Latte clásico',
+            'description' => 'Latte preparado al momento.',
+            'price' => 50,
+            'is_active' => true,
+        ]);
+        $promotion = Promotion::create([
+            'name' => 'Tres Lattes por el precio de dos',
+            'short_description' => 'Lleva tres y paga solamente dos.',
+            'presentation_type' => 'promotion',
+            'primary_product_id' => $product->id,
+            'price' => 50,
+            'pricing_rule_type' => Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
+            'pricing_rule_config' => [
+                'buy_quantity' => 2,
+                'reward_quantity' => 1,
+                'reward_discount_percentage' => 100,
+            ],
+            'auto_apply' => true,
+            'starts_on' => now()->subDay(),
+            'fulfillment_modes' => ['takeaway'],
+            'show_on_pos' => true,
+            'is_active' => true,
+        ]);
+        CashRegister::create([
+            'name' => 'Caja prueba promociones',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+
+        Livewire::actingAs($user)->test(PointOfSale::class)
+            ->assertSee('pos-catalog-switcher', false)
+            ->assertSee('Productos')
+            ->assertSee('Promociones')
+            ->assertSee($promotion->name)
+            ->assertSee('Automática')
+            ->call('openCustomizeModal', $product->id)
+            ->call('openCustomizeModal', $product->id)
+            ->assertSet('cart.0.quantity', 2)
+            ->assertSee('Agrega 1 Latte clásico y activa 3x2.')
+            ->call('completePromotionOpportunity', $promotion->id)
+            ->assertSet('cart.0.quantity', 3)
+            ->assertSet('cart.0.subtotal', 100.0)
+            ->assertSet('cart.0.promotion_discount', 50.0)
+            ->assertSet('cart.0.promotion_id', $promotion->id)
+            ->assertDontSee('Estás a un paso');
+    }
+
     public function test_availability_respects_channels_dates_and_configured_weekdays(): void
     {
         $monday = now()->startOfWeek();
@@ -145,6 +262,71 @@ class PromotionModuleTest extends TestCase
 
         $promotion->update(['ends_on' => null, 'weekdays' => []]);
         $this->assertTrue($promotion->fresh()->isAvailableFor('pos', $monday->copy()->addYear()));
+    }
+
+    public function test_monthly_recurrence_only_activates_on_the_selected_day_inside_its_date_range(): void
+    {
+        $selectedDate = now()->startOfMonth()->addDays(14);
+        $promotion = Promotion::create([
+            'name' => 'Promoción de quincena',
+            'price' => 150,
+            'starts_on' => $selectedDate->copy()->subMonths(2)->startOfMonth(),
+            'ends_on' => $selectedDate->copy()->addMonths(2)->endOfMonth(),
+            'recurrence_type' => 'monthly',
+            'monthly_day' => 15,
+            'show_on_digital_menu' => true,
+            'is_active' => true,
+        ]);
+
+        $this->assertTrue($promotion->isAvailableFor('digital_menu', $selectedDate));
+        $this->assertFalse($promotion->isAvailableFor('digital_menu', $selectedDate->copy()->addDay()));
+        $this->assertSame('Cada mes, el día 15', $promotion->scheduleSummary());
+    }
+
+    public function test_wizard_saves_percentage_mechanic_and_monthly_schedule(): void
+    {
+        Storage::fake('public');
+        Permission::create(['name' => 'ver promociones', 'guard_name' => 'web']);
+        Permission::create(['name' => 'crear promociones', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->givePermissionTo(['ver promociones', 'crear promociones']);
+        $productImage = UploadedFile::fake()->image('latte-producto.jpg', 800, 800)->store('products', 'public');
+        $product = Product::create(['name' => 'Latte frío', 'price' => 100, 'image' => $productImage, 'is_active' => true]);
+
+        Livewire::actingAs($user)->test(PromotionManager::class)
+            ->call('openCreate')
+            ->set('presentationType', 'discount')
+            ->call('nextWizardStep')
+            ->assertSee('Descuento porcentual')
+            ->assertSee('Precio especial')
+            ->set('pricingMechanic', 'percentage_discount')
+            ->set('primaryProductId', $product->id)
+            ->set('discountPercentage', 20)
+            ->set('name', 'Latte con descuento mensual')
+            ->set('shortDescription', 'Beneficio especial disponible una vez cada mes.')
+            ->call('nextWizardStep')
+            ->assertHasNoErrors()
+            ->set('scheduleType', 'monthly')
+            ->set('monthlyDay', 15)
+            ->set('startsOn', now()->subMonth()->toDateString())
+            ->set('endsOn', now()->addMonths(3)->toDateString())
+            ->set('fulfillmentModes', ['takeaway'])
+            ->call('nextWizardStep')
+            ->assertHasNoErrors()
+            ->assertSet('wizardStep', 4)
+            ->call('nextWizardStep')
+            ->assertHasNoErrors()
+            ->assertSet('wizardStep', 5)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $promotion = Promotion::firstOrFail();
+        $this->assertSame(Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT, $promotion->pricing_rule_type);
+        $this->assertSame(20, $promotion->normalizedPricingRule()['discount_percentage']);
+        $this->assertSame('80.00', $promotion->price);
+        $this->assertSame('monthly', $promotion->recurrence_type);
+        $this->assertSame(15, $promotion->monthly_day);
+        $this->assertTrue($promotion->auto_apply);
     }
 
     public function test_promotion_eligibility_is_filtered_by_fulfillment_but_new_products_remain_universal(): void
@@ -198,7 +380,7 @@ class PromotionModuleTest extends TestCase
             ->assertSee('Crear campaña')
             ->assertSee('aria-describedby="promotion-editor-description"', false)
             ->assertSee('wire:click.self="closeEditor"', false)
-            ->set('presentationType', 'discount')
+            ->set('presentationType', 'promotion')
             ->call('nextWizardStep')
             ->assertSet('wizardStep', 2)
             ->set('name', 'Elige dos hamburguesas')
@@ -219,7 +401,19 @@ class PromotionModuleTest extends TestCase
             ->set('termsAndConditions', 'No acumulable con otras promociones.')
             ->set('showOnKiosk', true)
             ->call('nextWizardStep')
+            ->assertHasNoErrors()
             ->assertSet('wizardStep', 4)
+            ->call('nextWizardStep')
+            ->assertHasNoErrors()
+            ->assertSet('wizardStep', 5)
+            ->assertSee('Así lo verá el cliente')
+            ->assertSee('Móvil')
+            ->assertSee('Tableta')
+            ->assertSee('Escritorio')
+            ->set('previewDevice', 'tablet')
+            ->assertSee('promotion-device-frame is-tablet', false)
+            ->set('previewDevice', 'desktop')
+            ->assertSee('promotion-device-frame is-desktop', false)
             ->call('save')
             ->assertHasNoErrors()
             ->assertSet('showEditor', false)
@@ -228,8 +422,8 @@ class PromotionModuleTest extends TestCase
 
         $promotion = Promotion::with('groups.products')->firstOrFail();
         $this->assertSame('179.00', $promotion->price);
-        $this->assertSame('discount', $promotion->presentation_type);
-        $this->assertSame(25, $promotion->discount_percentage);
+        $this->assertSame('promotion', $promotion->presentation_type);
+        $this->assertNull($promotion->discount_percentage);
         $this->assertSame(['takeaway', 'delivery'], $promotion->fulfillment_modes);
         $this->assertSame('No acumulable con otras promociones.', $promotion->terms_and_conditions);
         $this->assertTrue($promotion->show_on_kiosk);
@@ -242,7 +436,7 @@ class PromotionModuleTest extends TestCase
         $this->assertLessThanOrEqual(1600, $optimizedImage[0]);
         $this->get(route('public.menu'))
             ->assertOk()
-            ->assertSee('class="promotion-banner is-discount has-image"', false)
+            ->assertSee('class="promotion-banner is-promotion has-image"', false)
             ->assertSee("background-image: url('".Storage::disk('public')->url($promotion->image)."')", false);
         $this->assertNull($promotion->ends_on);
         $this->assertCount(1, $promotion->groups);
@@ -311,14 +505,16 @@ class PromotionModuleTest extends TestCase
             ->call('openCreate')
             ->set('presentationType', 'new')
             ->call('nextWizardStep')
-            ->assertSet('wizardStep', 2)
+            ->assertSet('wizardStep', 3)
             ->set('primaryProductId', $product->id)
             ->assertSet('name', $product->name)
             ->assertSet('price', '210.00')
             ->call('nextWizardStep')
-            ->assertSet('wizardStep', 3)
-            ->call('nextWizardStep')
+            ->assertHasNoErrors()
             ->assertSet('wizardStep', 4)
+            ->call('nextWizardStep')
+            ->assertHasNoErrors()
+            ->assertSet('wizardStep', 5)
             ->call('save')
             ->assertHasNoErrors()
             ->assertSet('showEditor', false);
@@ -357,18 +553,19 @@ class PromotionModuleTest extends TestCase
             ->set('rewardDiscountPercentage', 50)
             ->set('maxApplicationsPerOrder', '2')
             ->call('nextWizardStep')
-            ->assertSet('wizardStep', 3)
+            ->assertSet('wizardStep', 4)
             ->set('fulfillmentModes', ['takeaway'])
             ->set('termsAndConditions', 'Máximo dos beneficios por pedido.')
             ->set('showOnPos', true)
             ->set('showOnKiosk', false)
             ->call('nextWizardStep')
+            ->assertSet('wizardStep', 5)
             ->call('save')
             ->assertHasNoErrors();
 
         $campaign = Promotion::firstOrFail();
         $this->assertTrue($campaign->hasAutomaticPricingRule());
-        $this->assertSame('Compra 1 y recibe 1 al 50%', $campaign->pricingRuleLabel());
+        $this->assertSame('Compra 1 y el segundo a mitad de precio', $campaign->pricingRuleLabel());
         $this->assertSame(2, $campaign->pricing_rule_config['max_applications_per_order']);
         $this->assertSame(['takeaway'], $campaign->fulfillment_modes);
         $this->assertTrue($campaign->show_on_pos);
@@ -399,8 +596,7 @@ class PromotionModuleTest extends TestCase
     {
         [$promotion] = $this->promotionFixture();
         $promotion->update([
-            'presentation_type' => 'discount',
-            'discount_percentage' => 25,
+            'presentation_type' => 'promotion',
             'short_description' => 'Elige dos hamburguesas y disfruta un precio especial.',
             'fulfillment_modes' => ['takeaway'],
             'terms_and_conditions' => 'Válido únicamente para recoger en ventanilla.',
@@ -411,7 +607,7 @@ class PromotionModuleTest extends TestCase
             ->assertSee('Beneficios por tiempo limitado')
             ->assertSee($promotion->name)
             ->assertSee('$175.00')
-            ->assertSee('25% de descuento')
+            ->assertSee('Promoción especial')
             ->assertSee('Precio promo')
             ->assertSee('promotion-banner__price', false)
             ->assertSee('promotion-banner', false)
@@ -420,7 +616,7 @@ class PromotionModuleTest extends TestCase
             ->assertSee('Elige de 2 a 2')
             ->assertSee('Solo para llevar')
             ->assertSee('Válido únicamente para recoger en ventanilla.')
-            ->assertSee('los productos internos no suman su precio individual');
+            ->assertSee('los combos conservan el precio publicado');
 
         $css = file_get_contents(public_path('assets/css/promotions-public.css'));
         $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
@@ -441,6 +637,59 @@ class PromotionModuleTest extends TestCase
         $this->assertStringContainsString('<span data-promotion-dot', $menuHtml);
         $this->assertStringNotContainsString('data-promotion-previous', $menuHtml);
         $this->assertStringNotContainsString('data-promotion-next', $menuHtml);
+    }
+
+    public function test_public_digital_menu_renders_discounts_as_separate_product_cards(): void
+    {
+        Storage::fake('public');
+        $image = UploadedFile::fake()->image('latte.jpg', 900, 900)->store('products', 'public');
+        $campaignImage = UploadedFile::fake()->image('campaign.jpg', 1600, 600)->store('promotions', 'public');
+        $product = Product::create([
+            'name' => 'Latte caramelo',
+            'description' => 'Bebida fría con caramelo.',
+            'image' => $image,
+            'price' => 100,
+            'is_active' => true,
+        ]);
+        Promotion::create([
+            'name' => 'Latte con descuento',
+            'short_description' => 'Aprovecha este latte a precio especial.',
+            'image' => $campaignImage,
+            'presentation_type' => 'discount',
+            'primary_product_id' => $product->id,
+            'price' => 55,
+            'pricing_rule_type' => Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT,
+            'pricing_rule_config' => ['discount_percentage' => 45],
+            'auto_apply' => true,
+            'starts_on' => now()->subDay(),
+            'show_on_digital_menu' => true,
+            'is_active' => true,
+        ]);
+
+        $response = $this->get(route('public.menu'));
+
+        $response->assertOk()
+            ->assertSee('id="discount-products"', false)
+            ->assertSee('data-category-link="discount-products"', false)
+            ->assertSee('discount-product-card', false)
+            ->assertSee('product-card__action--discount', false)
+            ->assertSee('product-card__discount-badge', false)
+            ->assertSee(Storage::url($image), false)
+            ->assertDontSee(Storage::url($campaignImage), false)
+            ->assertSee('Latte caramelo')
+            ->assertSee('-45%')
+            ->assertSee('$55.00')
+            ->assertSee('$100.00')
+            ->assertSee('45% de descuento. Antes $100.00 y ahora $55.00.')
+            ->assertDontSee('id="digital-promotions"', false);
+
+        $css = file_get_contents(public_path('assets/css/promotions-public.css'));
+        $this->assertStringContainsString('.discount-products__rail', $css);
+        $this->assertStringContainsString('grid-auto-columns:calc((100% - 20px)/3)', $css);
+        $this->assertStringContainsString('.product-card__action--discount', $css);
+        $this->assertStringContainsString('.product-card__discount-badge', $css);
+        $this->assertStringContainsString('border:1px solid #c7ddcb!important', $css);
+        $this->assertStringContainsString('border-radius:18px!important', $css);
     }
 
     public function test_kiosk_only_lists_campaigns_for_selected_fulfillment_and_persists_selection(): void
@@ -759,6 +1008,81 @@ class PromotionModuleTest extends TestCase
         $this->assertStringContainsString('Hamburguesa BBQ', $ticket);
         $this->assertStringNotContainsString('$100.00', $ticket);
         $this->assertStringNotContainsString('$120.00', $ticket);
+    }
+
+    public function test_promotion_selections_inherit_product_areas_in_cart_and_kitchen_tickets(): void
+    {
+        Permission::create(['name' => 'crear ordenes', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->givePermissionTo('crear ordenes');
+        CashRegister::create([
+            'name' => 'Caja áreas promocionales',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+
+        $pastaArea = PrintArea::create(['name' => 'Pastas', 'is_active' => true]);
+        $drinksArea = PrintArea::create(['name' => 'Bebidas', 'is_active' => true]);
+        $pastaCategory = Category::create([
+            'print_area_id' => $pastaArea->id,
+            'name' => 'Pastas',
+            'is_active' => true,
+        ]);
+        $drinksCategory = Category::create([
+            'print_area_id' => $drinksArea->id,
+            'name' => 'Bebidas',
+            'is_active' => true,
+        ]);
+        $pasta = Product::create([
+            'category_id' => $pastaCategory->id,
+            'name' => 'Pasta grande',
+            'price' => 150,
+            'is_active' => true,
+        ]);
+        $drink = Product::create([
+            'category_id' => $drinksCategory->id,
+            'name' => 'Agua fresca',
+            'price' => 40,
+            'is_active' => true,
+        ]);
+        $promotion = Promotion::create([
+            'name' => 'Jueves de Pastas',
+            'price' => 165,
+            'starts_on' => now()->subDay(),
+            'weekdays' => [],
+            'show_on_pos' => true,
+            'is_active' => true,
+        ]);
+        $group = $promotion->groups()->create([
+            'name' => 'Elige tu combo',
+            'min_selections' => 2,
+            'max_selections' => 2,
+        ]);
+        $group->products()->attach([$pasta->id, $drink->id]);
+
+        Livewire::actingAs($user)->test(PointOfSale::class)
+            ->call('openPromotionModal', $promotion->id)
+            ->call('changePromotionSelection', $group->id, $pasta->id, 1)
+            ->call('changePromotionSelection', $group->id, $drink->id, 1)
+            ->call('addPromotionToCart')
+            ->assertSet('cart.0.promotion_selections.0.items.0.print_area_name', 'Pastas')
+            ->assertSet('cart.0.promotion_selections.0.items.1.print_area_name', 'Bebidas')
+            ->assertSee('Pasta grande')
+            ->assertSee('Agua fresca')
+            ->set('customerName', 'Cliente promoción por áreas')
+            ->call('submitOrderLater')
+            ->assertHasNoErrors();
+
+        $order = Order::with(['items.addons', 'items.ingredients', 'items.product.category.printArea'])->firstOrFail();
+        $ticket = app(ThermalTicketRenderer::class)->renderOrder($order, 'kitchen_area', autoPrint: false);
+
+        $this->assertStringContainsString('PASTAS', $ticket);
+        $this->assertStringContainsString('BEBIDAS', $ticket);
+        $this->assertStringContainsString('Pasta grande', $ticket);
+        $this->assertStringContainsString('Agua fresca', $ticket);
+        $this->assertStringNotContainsString('Jueves de Pastas', $ticket);
     }
 
     public function test_seeders_register_module_and_promotion_permissions(): void

@@ -10,10 +10,13 @@ class Quotation extends Model
 {
     protected $fillable = [
         'created_by', 'customer_id', 'name', 'notes',
-        'customer_name', 'customer_phone', 'total', 'status',
+        'customer_name', 'customer_phone', 'order_type', 'draft_version',
+        'checkout_state', 'total', 'status',
     ];
 
     protected $casts = [
+        'checkout_state' => 'array',
+        'draft_version' => 'integer',
         'total' => 'decimal:2',
     ];
 

@@ -60,7 +60,13 @@ class PublicMenuController extends Controller
             ])
             ->orderBy('name')
             ->get();
-        $promotions = $campaigns->reject->isProductLaunch()->values();
+        $promotions = $campaigns
+            ->where('presentation_type', 'promotion')
+            ->values();
+        $discountCampaigns = $campaigns
+            ->where('presentation_type', 'discount')
+            ->filter(fn (Promotion $campaign) => $campaign->primaryProduct)
+            ->values();
         $newProductCampaigns = $campaigns
             ->filter(fn (Promotion $campaign) => $campaign->isProductLaunch() && $campaign->primaryProduct)
             ->values();
@@ -75,6 +81,7 @@ class PublicMenuController extends Controller
             'openingStatus' => $business->openingStatus(),
             'totalProducts' => $catalogProducts->count(),
             'promotions' => $promotions,
+            'discountCampaigns' => $discountCampaigns,
             'newProductCampaigns' => $newProductCampaigns,
         ]);
     }

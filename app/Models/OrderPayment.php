@@ -9,7 +9,7 @@ class OrderPayment extends Model
 {
     protected $fillable = [
         'order_id', 'method', 'amount',
-        'received_amount', 'change_amount',
+        'received_amount', 'change_amount', 'card_last4', 'transfer_reference',
     ];
 
     protected $casts = [

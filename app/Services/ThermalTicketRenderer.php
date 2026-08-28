@@ -10,6 +10,7 @@ use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaService;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\TicketTemplate;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
@@ -28,8 +29,12 @@ class ThermalTicketRenderer
 
         $items = $order->items->filter(fn ($item) => ! (bool) $item->is_cancelled);
 
+        if ($type === 'kitchen_area') {
+            $items = $this->kitchenLines($items);
+        }
+
         if ($type === 'kitchen_area' && $printArea === null) {
-            $areas = $items->groupBy(fn ($item) => (string) ($item->product?->category?->printArea?->name ?? 'General'));
+            $areas = $items->groupBy(fn (array $item) => (string) ($item['print_area_name'] ?? 'General'));
             if ($areas->count() > 1) {
                 return $this->renderBatch('kitchen_area', $areas->map(
                     fn ($areaItems, $areaName) => array_merge(
@@ -38,11 +43,16 @@ class ThermalTicketRenderer
                     )
                 )->values()->all(), $autoPrint);
             }
+
+            $resolvedArea = (string) ($areas->keys()->first() ?? 'General');
+            if (strcasecmp($resolvedArea, 'General') !== 0) {
+                $printArea = $resolvedArea;
+            }
         }
 
         if ($type === 'kitchen_area' && $printArea) {
             $items = $items->filter(
-                fn ($item) => strcasecmp((string) ($item->product?->category?->printArea?->name ?? 'General'), $printArea) === 0
+                fn (array $item) => strcasecmp((string) ($item['print_area_name'] ?? 'General'), $printArea) === 0
             );
         }
 
@@ -66,9 +76,11 @@ class ThermalTicketRenderer
             'customer' => $order->display_name,
             'served_by' => $order->seller?->name,
             'table' => $order->table_identifier ?: $order->mesa?->display_name,
-            'area' => $order->mesa?->area?->name ?: $printArea,
+            'area' => $type === 'kitchen_area'
+                ? ($printArea ?: $order->mesa?->area?->name ?: 'General')
+                : ($order->mesa?->area?->name ?: $printArea),
             'notes' => $order->notes,
-            'items' => collect($items)->map(fn ($item) => [
+            'items' => collect($items)->map(fn ($item) => is_array($item) ? $item : [
                 'name' => $item->product_name,
                 'quantity' => $item->quantity,
                 'subtotal' => (float) $item->subtotal,
@@ -104,6 +116,79 @@ class ThermalTicketRenderer
             ],
             'tracking_url' => route('kiosk.track', $order->ensurePublicToken()),
         ];
+    }
+
+    /**
+     * Expand configurable promotions into the real products selected by the
+     * cashier. Kitchen routing must follow each product's print area instead
+     * of the promotion container, whose product_id is intentionally null.
+     */
+    private function kitchenLines($items)
+    {
+        $selectedProductIds = collect($items)
+            ->flatMap(fn ($item) => collect($item->promotion_selections ?? [])
+                ->flatMap(fn (array $group) => collect($group['items'] ?? [])->pluck('product_id')))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $selectedProducts = Product::query()
+            ->with('category.printArea')
+            ->whereIn('id', $selectedProductIds)
+            ->get()
+            ->keyBy('id');
+
+        return collect($items)->flatMap(function ($item) use ($selectedProducts) {
+            $selections = collect($item->promotion_selections ?? [])
+                ->flatMap(fn (array $group) => collect($group['items'] ?? [])->map(
+                    fn (array $selected) => array_merge($selected, [
+                        'group_name' => $group['group_name'] ?? null,
+                    ])
+                ));
+
+            if ($selections->isNotEmpty()) {
+                return $selections->map(function (array $selected) use ($item, $selectedProducts) {
+                    $product = $selectedProducts->get((int) ($selected['product_id'] ?? 0));
+                    $category = $product?->category;
+                    $printArea = $category?->printArea;
+
+                    return [
+                        'name' => $product?->name ?? ($selected['product_name'] ?? 'Producto'),
+                        'quantity' => max(1, (int) $item->quantity) * max(1, (int) ($selected['quantity'] ?? 1)),
+                        'subtotal' => 0,
+                        'notes' => $item->notes,
+                        'modifiers' => [],
+                        'print_area_name' => $printArea?->name
+                            ?? $selected['print_area_name']
+                            ?? $category?->name
+                            ?? $selected['category_name']
+                            ?? $selected['group_name']
+                            ?? 'General',
+                    ];
+                });
+            }
+
+            return [[
+                'name' => $item->product_name,
+                'quantity' => $item->quantity,
+                'subtotal' => (float) $item->subtotal,
+                'notes' => $item->notes,
+                'modifiers' => $item->addons->map(fn ($addon) => [
+                    'name' => '+ '.$addon->addon_name,
+                    'price' => (float) $addon->extra_price * max(1, (int) $addon->quantity),
+                ])->concat($item->ingredients->map(fn ($ingredient) => [
+                    'name' => '• '.$ingredient->ingredient_name.($ingredient->quantity > 1 ? ' x'.$ingredient->quantity : ''),
+                    'price' => (float) $ingredient->extra_price * max(1, (int) $ingredient->quantity),
+                ]))->when((float) ($item->promotion_discount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
+                    'name' => '• Oferta: '.data_get($item->promotion_rule_snapshot, 'label', 'promoción automática'),
+                    'price' => 0,
+                ]))->values()->all(),
+                'print_area_name' => $item->product?->category?->printArea?->name
+                    ?? $item->product?->category?->name
+                    ?? 'General',
+            ]];
+        })->values();
     }
 
     public function renderCashCut(CashRegisterCut $cut): string

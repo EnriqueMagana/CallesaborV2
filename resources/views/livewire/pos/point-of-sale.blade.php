@@ -16,7 +16,6 @@
         const shortcuts = {
             F2: '[data-pos-checkout]',
             F4: '[data-pos-saved]',
-            F5: '[data-pos-save-cart]',
             F6: '[data-pos-panel=pickup]',
             F7: '[data-pos-panel=tables]',
             F8: '[data-pos-panel=delivery]',
@@ -25,9 +24,26 @@
         };
         const key = event.key.toUpperCase();
         const isSearchShortcut = key === 'F3' || key === 'F10';
-        if (!isSearchShortcut && !shortcuts[key]) return;
+        const isCheckoutShortcut = key === 'F2';
+        const isDraftShortcut = key === 'F5';
+        if (!isSearchShortcut && !isDraftShortcut && !shortcuts[key]) return;
 
         event.preventDefault();
+        if (isDraftShortcut) {
+            const saveDraft = this.visibleShortcutTarget('[data-pos-save-draft]');
+            if (saveDraft) saveDraft.click();
+            return;
+        }
+
+        if (isCheckoutShortcut) {
+            const submitOrder = this.visibleShortcutTarget('[data-pos-submit-order]');
+            if (submitOrder) {
+                submitOrder.focus({ preventScroll: true });
+                submitOrder.click();
+                return;
+            }
+        }
+
         if (this.hasBlockingLayer()) return;
 
         if (isSearchShortcut) {

@@ -35,9 +35,13 @@ class PromotionManager extends Component
 
     public int $wizardStep = 1;
 
+    public string $previewDevice = 'mobile';
+
     public string $discountPercentage = '';
 
     public string $price = '';
+
+    public string $pricingMechanic = 'fixed_price';
 
     public bool $launchOfferEnabled = false;
 
@@ -54,6 +58,10 @@ class PromotionManager extends Component
     public string $endsOn = '';
 
     public array $weekdays = [];
+
+    public string $scheduleType = 'date_range';
+
+    public int $monthlyDay = 1;
 
     public array $fulfillmentModes = ['dine_in', 'takeaway', 'pickup', 'delivery'];
 
@@ -93,7 +101,7 @@ class PromotionManager extends Component
                 $this->showOnPos = false;
                 $this->showOnKiosk = false;
                 $this->updatedPrimaryProductId($product->id);
-                $this->wizardStep = 2;
+                $this->wizardStep = 3;
                 $this->showEditor = true;
             }
         }
@@ -196,10 +204,22 @@ class PromotionManager extends Component
         $this->rewardQuantity = $pricingRule['reward_quantity'];
         $this->rewardDiscountPercentage = $pricingRule['reward_discount_percentage'];
         $this->maxApplicationsPerOrder = (string) ($pricingRule['max_applications_per_order'] ?? '');
+        $this->pricingMechanic = match ($promotion->pricing_rule_type) {
+            Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT => 'percentage_discount',
+            Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE => 'fixed_product_price',
+            Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT => match (true) {
+                $pricingRule['buy_quantity'] === 1 && $pricingRule['reward_quantity'] === 1 && $pricingRule['reward_discount_percentage'] === 100 => 'two_for_one',
+                $pricingRule['buy_quantity'] === 1 && $pricingRule['reward_quantity'] === 1 && $pricingRule['reward_discount_percentage'] === 50 => 'second_half',
+                default => 'custom_quantity',
+            },
+            default => $promotion->isProductLaunch() ? 'catalog_price' : 'fixed_price',
+        };
         $this->price = (string) $promotion->price;
         $this->startsOn = $promotion->starts_on->toDateString();
         $this->endsOn = $promotion->ends_on?->toDateString() ?? '';
         $this->weekdays = array_map('intval', $promotion->weekdays ?? []);
+        $this->scheduleType = $promotion->recurrence_type ?: ($this->weekdays !== [] ? 'weekdays' : 'date_range');
+        $this->monthlyDay = (int) ($promotion->monthly_day ?: 1);
         $this->fulfillmentModes = $promotion->isProductLaunch() && ! $promotion->hasAutomaticPricingRule()
             ? Promotion::FULFILLMENT_MODES
             : array_values($promotion->fulfillment_modes ?: Promotion::FULFILLMENT_MODES);
@@ -245,6 +265,8 @@ class PromotionManager extends Component
 
         $this->resetValidation();
         if ($type === 'new') {
+            $this->pricingMechanic = 'catalog_price';
+            $this->launchOfferEnabled = false;
             $this->fulfillmentModes = Promotion::FULFILLMENT_MODES;
             $this->groups = [];
 
@@ -252,16 +274,72 @@ class PromotionManager extends Component
         }
 
         $this->primaryProductId = null;
+        $this->pricingMechanic = $type === 'discount' ? 'percentage_discount' : 'fixed_price';
+        $this->updatedPricingMechanic($this->pricingMechanic);
         $this->showOnPos = true;
         $this->showOnKiosk = true;
-        if ($this->groups === []) {
+    }
+
+    public function updatedPricingMechanic(string $mechanic): void
+    {
+        if (! in_array($mechanic, ['catalog_price', 'fixed_price', 'fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'], true)) {
+            return;
+        }
+
+        $this->launchOfferEnabled = $this->isAutomaticMechanic();
+        if ($mechanic === 'two_for_one') {
+            [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [1, 1, 100];
+        } elseif ($mechanic === 'second_half') {
+            [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [1, 1, 50];
+        }
+
+        if ($mechanic === 'fixed_price' && $this->groups === []) {
             $this->addGroup();
+        }
+        if ($mechanic !== 'fixed_price') {
+            $this->groups = [];
+        }
+        $this->resetValidation();
+    }
+
+    public function updatedLaunchOfferEnabled(bool $enabled): void
+    {
+        if ($this->presentationType !== 'new') {
+            return;
+        }
+
+        $this->pricingMechanic = $enabled ? 'second_half' : 'catalog_price';
+        $this->updatedPricingMechanic($this->pricingMechanic);
+    }
+
+    public function updatedDiscountPercentage(): void
+    {
+        if ($this->primaryProductId) {
+            $this->updatedPrimaryProductId($this->primaryProductId);
+        }
+    }
+
+    public function updatedScheduleType(string $type): void
+    {
+        if (! in_array($type, Promotion::RECURRENCE_TYPES, true)) {
+            return;
+        }
+        if ($type !== 'weekdays') {
+            $this->weekdays = [];
+        }
+        $this->resetValidation();
+    }
+
+    public function updatedPreviewDevice(string $device): void
+    {
+        if (! in_array($device, ['mobile', 'tablet', 'desktop'], true)) {
+            $this->previewDevice = 'mobile';
         }
     }
 
     public function updatedPrimaryProductId($productId): void
     {
-        if ($this->presentationType !== 'new' || ! $productId) {
+        if ((! $this->isAutomaticMechanic() && $this->presentationType !== 'new') || ! $productId) {
             return;
         }
 
@@ -270,10 +348,16 @@ class PromotionManager extends Component
             return;
         }
 
-        $this->name = $product->name;
-        $this->description = (string) $product->description;
-        $this->shortDescription = str($product->description ?: "Descubre {$product->name}, nuevo en nuestro menú.")->limit(160, '')->toString();
-        $this->price = (string) $product->price;
+        if ($this->presentationType === 'new') {
+            $this->name = $product->name;
+            $this->description = (string) $product->description;
+            $this->shortDescription = str($product->description ?: "Descubre {$product->name}, nuevo en nuestro menú.")->limit(160, '')->toString();
+        }
+        if ($this->pricingMechanic === 'percentage_discount' && is_numeric($this->discountPercentage)) {
+            $this->price = number_format((float) $product->price * (1 - ((int) $this->discountPercentage / 100)), 2, '.', '');
+        } elseif ($this->pricingMechanic !== 'fixed_product_price') {
+            $this->price = (string) $product->price;
+        }
     }
 
     public function nextWizardStep(): void
@@ -282,22 +366,19 @@ class PromotionManager extends Component
             $this->validateOnly('presentationType', [
                 'presentationType' => ['required', Rule::in(Promotion::PRESENTATION_TYPES)],
             ]);
+
+            $this->wizardStep = $this->presentationType === 'new' ? 3 : 2;
+            $this->resetValidation();
+
+            return;
         }
 
         if ($this->wizardStep === 2) {
             $rules = [
-                'name' => ['required', 'string', 'max:120'],
-                'shortDescription' => ['required', 'string', 'min:10', 'max:160'],
-                'description' => ['nullable', 'string', 'max:500'],
+                'pricingMechanic' => ['required', Rule::in($this->allowedPricingMechanics())],
             ];
-            if ($this->presentationType === 'new') {
-                $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
-                if ($this->launchOfferEnabled) {
-                    $rules += $this->pricingRuleValidationRules();
-                }
-            } else {
+            if ($this->pricingMechanic === 'fixed_price') {
                 $rules['price'] = ['required', 'numeric', 'min:0.01', 'max:999999.99'];
-                $rules['discountPercentage'] = ['nullable', 'required_if:presentationType,discount', 'integer', 'between:1,99'];
                 $rules += [
                     'groups' => ['required', 'array', 'min:1', 'max:12'],
                     'groups.*.name' => ['required', 'string', 'max:100'],
@@ -306,8 +387,18 @@ class PromotionManager extends Component
                     'groups.*.product_ids' => ['required', 'array', 'min:1'],
                     'groups.*.product_ids.*' => ['required', 'integer', 'distinct', 'exists:products,id'],
                 ];
+            } else {
+                $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
+                if ($this->pricingMechanic === 'percentage_discount') {
+                    $rules['discountPercentage'] = ['required', 'integer', 'between:1,99'];
+                } elseif ($this->pricingMechanic === 'fixed_product_price') {
+                    $rules['price'] = ['required', 'numeric', 'min:0.01', 'max:999999.99'];
+                } else {
+                    $rules += $this->pricingRuleValidationRules();
+                }
             }
             $this->validate($rules);
+            $this->validateFixedProductPrice();
             foreach ($this->groups as $index => $group) {
                 if ((int) $group['min_selections'] > (int) $group['max_selections']) {
                     throw ValidationException::withMessages([
@@ -319,10 +410,41 @@ class PromotionManager extends Component
 
         if ($this->wizardStep === 3) {
             $rules = [
-                'startsOn' => ['required', 'date'],
-                'endsOn' => ['nullable', 'date', 'after_or_equal:startsOn'],
+                'name' => ['required', 'string', 'max:120'],
+                'shortDescription' => ['required', 'string', 'min:10', 'max:160'],
+                'description' => ['nullable', 'string', 'max:500'],
                 'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             ];
+            if ($this->presentationType === 'new') {
+                $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
+            }
+            $this->validate($rules);
+            if ($this->presentationType === 'promotion' && ! $this->image && ! $this->currentImage) {
+                throw ValidationException::withMessages(['image' => 'Carga una imagen horizontal para el banner promocional.']);
+            }
+            if (in_array($this->presentationType, ['new', 'discount'], true)) {
+                $product = Product::query()->where('is_active', true)->find($this->primaryProductId);
+                if (! $this->image && ! $this->currentImage && ! $product?->image) {
+                    throw ValidationException::withMessages(['image' => 'Carga una imagen o agrega una al producto seleccionado para poder mostrar su tarjeta.']);
+                }
+            }
+        }
+
+        if ($this->wizardStep === 4) {
+            $rules = [
+                'startsOn' => ['required', 'date'],
+                'endsOn' => ['nullable', 'date', 'after_or_equal:startsOn'],
+                'scheduleType' => ['required', Rule::in(Promotion::RECURRENCE_TYPES)],
+                'weekdays' => ['array'],
+                'weekdays.*' => ['integer', 'between:1,7', 'distinct'],
+                'monthlyDay' => ['nullable', 'integer', 'between:1,31'],
+            ];
+            if ($this->scheduleType === 'weekdays') {
+                $rules['weekdays'] = ['required', 'array', 'min:1'];
+            }
+            if ($this->scheduleType === 'monthly') {
+                $rules['monthlyDay'] = ['required', 'integer', 'between:1,31'];
+            }
             if ($this->presentationType !== 'new' || $this->launchOfferEnabled) {
                 $rules += [
                     'fulfillmentModes' => ['required', 'array', 'min:1'],
@@ -332,26 +454,19 @@ class PromotionManager extends Component
             }
             $this->validate($rules);
             $this->validateChannelFulfillmentCompatibility();
-            if ($this->presentationType !== 'new' && ! $this->image && ! $this->currentImage) {
-                throw ValidationException::withMessages(['image' => 'Carga una imagen horizontal para el banner promocional.']);
-            }
-            if ($this->presentationType === 'new') {
-                $product = Product::query()->where('is_active', true)->find($this->primaryProductId);
-                if (! $this->image && ! $this->currentImage && ! $product?->image) {
-                    throw ValidationException::withMessages(['image' => 'Carga una imagen o agrega una al producto seleccionado.']);
-                }
-            }
             if (! $this->showOnPos && ! $this->showOnDigitalMenu && ! $this->showOnKiosk) {
                 throw ValidationException::withMessages(['channels' => 'Selecciona al menos un canal de publicación.']);
             }
         }
 
-        $this->wizardStep = min(4, $this->wizardStep + 1);
+        $this->wizardStep = min(5, $this->wizardStep + 1);
     }
 
     public function previousWizardStep(): void
     {
-        $this->wizardStep = max(1, $this->wizardStep - 1);
+        $this->wizardStep = $this->presentationType === 'new' && $this->wizardStep === 3
+            ? 1
+            : max(1, $this->wizardStep - 1);
         $this->resetValidation();
     }
 
@@ -368,10 +483,14 @@ class PromotionManager extends Component
     {
         $this->authorize($this->editingId ? 'editar promociones' : 'crear promociones');
 
-        if ($this->presentationType === 'new' && $this->primaryProductId) {
+        if (($this->presentationType === 'new' || $this->isAutomaticMechanic()) && $this->primaryProductId) {
             $productPrice = Product::query()->where('is_active', true)->find($this->primaryProductId)?->price;
             if ($productPrice !== null) {
-                $this->price = (string) $productPrice;
+                if ($this->pricingMechanic === 'percentage_discount') {
+                    $this->price = number_format((float) $productPrice * (1 - ((int) $this->discountPercentage / 100)), 2, '.', '');
+                } elseif ($this->pricingMechanic !== 'fixed_product_price') {
+                    $this->price = (string) $productPrice;
+                }
             }
         }
 
@@ -380,13 +499,16 @@ class PromotionManager extends Component
             'description' => ['nullable', 'string', 'max:500'],
             'shortDescription' => ['required', 'string', 'min:10', 'max:160'],
             'presentationType' => ['required', Rule::in(Promotion::PRESENTATION_TYPES)],
+            'pricingMechanic' => ['required', Rule::in($this->allowedPricingMechanics())],
             'primaryProductId' => ['nullable'],
-            'discountPercentage' => ['nullable', 'required_if:presentationType,discount', 'integer', 'between:1,99'],
+            'discountPercentage' => ['nullable', 'integer', 'between:1,99'],
             'price' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'startsOn' => ['required', 'date'],
             'endsOn' => ['nullable', 'date', 'after_or_equal:startsOn'],
+            'scheduleType' => ['required', Rule::in(Promotion::RECURRENCE_TYPES)],
             'weekdays' => ['array'],
             'weekdays.*' => ['integer', 'between:1,7', 'distinct'],
+            'monthlyDay' => ['nullable', 'integer', 'between:1,31'],
             'fulfillmentModes' => ['array'],
             'termsAndConditions' => ['nullable', 'string', 'max:1000'],
             'showOnPos' => ['boolean'],
@@ -395,16 +517,9 @@ class PromotionManager extends Component
             'isActive' => ['boolean'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ];
-        if ($this->presentationType === 'new') {
+        if ($this->pricingMechanic === 'catalog_price') {
             $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
-            if ($this->launchOfferEnabled) {
-                $rules += $this->pricingRuleValidationRules();
-                $rules += [
-                    'fulfillmentModes' => ['required', 'array', 'min:1'],
-                    'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
-                ];
-            }
-        } else {
+        } elseif ($this->pricingMechanic === 'fixed_price') {
             $rules += [
                 'fulfillmentModes' => ['required', 'array', 'min:1'],
                 'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
@@ -415,6 +530,25 @@ class PromotionManager extends Component
                 'groups.*.product_ids' => ['required', 'array', 'min:1'],
                 'groups.*.product_ids.*' => ['required', 'integer', 'distinct', 'exists:products,id'],
             ];
+        } else {
+            $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
+            $rules += [
+                'fulfillmentModes' => ['required', 'array', 'min:1'],
+                'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
+            ];
+            if ($this->pricingMechanic === 'percentage_discount') {
+                $rules['discountPercentage'] = ['required', 'integer', 'between:1,99'];
+            } elseif ($this->pricingMechanic === 'fixed_product_price') {
+                $rules['price'] = ['required', 'numeric', 'min:0.01', 'max:999999.99'];
+            } else {
+                $rules += $this->pricingRuleValidationRules();
+            }
+        }
+        if ($this->scheduleType === 'weekdays') {
+            $rules['weekdays'] = ['required', 'array', 'min:1'];
+        }
+        if ($this->scheduleType === 'monthly') {
+            $rules['monthlyDay'] = ['required', 'integer', 'between:1,31'];
         }
 
         $validated = $this->validate($rules, [], [
@@ -424,12 +558,13 @@ class PromotionManager extends Component
             'endsOn' => 'fecha de fin',
             'image' => 'imagen',
         ]);
+        $this->validateFixedProductPrice();
         $this->validateChannelFulfillmentCompatibility();
 
-        if ($this->presentationType === 'new') {
+        if (in_array($this->presentationType, ['new', 'discount'], true)) {
             $selectedProduct = Product::query()->where('is_active', true)->findOrFail((int) $validated['primaryProductId']);
             if (! $this->image && ! $this->currentImage && ! $selectedProduct->image) {
-                throw ValidationException::withMessages(['primaryProductId' => 'El producto necesita una imagen antes de publicarse como novedad.']);
+                throw ValidationException::withMessages(['primaryProductId' => 'El producto necesita una imagen para publicar su tarjeta.']);
             }
         } elseif (! $this->image && ! $this->currentImage) {
             throw ValidationException::withMessages(['image' => 'Los banners promocionales necesitan una imagen horizontal.']);
@@ -471,18 +606,29 @@ class PromotionManager extends Component
                     'description' => trim((string) ($validated['description'] ?? '')) ?: null,
                     'short_description' => trim($validated['shortDescription']),
                     'presentation_type' => $validated['presentationType'],
-                    'primary_product_id' => $validated['presentationType'] === 'new'
+                    'primary_product_id' => $validated['presentationType'] === 'new' || $this->isAutomaticMechanic()
                         ? (int) $validated['primaryProductId']
                         : null,
                     'price' => $validated['price'],
-                    'discount_percentage' => $validated['presentationType'] === 'discount'
+                    'discount_percentage' => ($this->pricingMechanic === 'percentage_discount' || ($validated['presentationType'] === 'discount' && filled($validated['discountPercentage'] ?? null)))
                         ? (int) $validated['discountPercentage']
                         : null,
-                    'pricing_rule_type' => $validated['presentationType'] === 'new' && $this->launchOfferEnabled
-                        ? Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT
-                        : null,
-                    'pricing_rule_config' => $validated['presentationType'] === 'new' && $this->launchOfferEnabled
-                        ? [
+                    'pricing_rule_type' => match ($this->pricingMechanic) {
+                        'percentage_discount' => Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT,
+                        'fixed_product_price' => Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE,
+                        'two_for_one', 'second_half', 'custom_quantity' => Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
+                        default => null,
+                    },
+                    'pricing_rule_config' => $this->isAutomaticMechanic()
+                        ? ($this->pricingMechanic === 'percentage_discount' ? [
+                            'version' => 1,
+                            'discount_percentage' => (int) $validated['discountPercentage'],
+                            'apply_to_addons' => false,
+                        ] : ($this->pricingMechanic === 'fixed_product_price' ? [
+                            'version' => 1,
+                            'fixed_price' => (float) $validated['price'],
+                            'apply_to_addons' => false,
+                        ] : [
                             'version' => 1,
                             'buy_quantity' => (int) $validated['buyQuantity'],
                             'reward_quantity' => (int) $validated['rewardQuantity'],
@@ -492,21 +638,25 @@ class PromotionManager extends Component
                                 : null,
                             'apply_to_addons' => false,
                             'reward_scope' => 'same_product',
-                        ]
+                        ]))
                         : null,
-                    'auto_apply' => $validated['presentationType'] === 'new' && $this->launchOfferEnabled,
+                    'auto_apply' => $this->isAutomaticMechanic(),
                     'starts_on' => $validated['startsOn'],
                     'ends_on' => filled($validated['endsOn'] ?? null) ? $validated['endsOn'] : null,
-                    'weekdays' => array_values(array_map('intval', $validated['weekdays'] ?? [])),
-                    'fulfillment_modes' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled
+                    'recurrence_type' => $validated['scheduleType'],
+                    'weekdays' => $validated['scheduleType'] === 'weekdays'
+                        ? array_values(array_map('intval', $validated['weekdays'] ?? []))
+                        : [],
+                    'monthly_day' => $validated['scheduleType'] === 'monthly' ? (int) $validated['monthlyDay'] : null,
+                    'fulfillment_modes' => $this->pricingMechanic === 'catalog_price'
                         ? Promotion::FULFILLMENT_MODES
                         : array_values(array_unique($validated['fulfillmentModes'])),
-                    'terms_and_conditions' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled
+                    'terms_and_conditions' => $this->pricingMechanic === 'catalog_price'
                         ? null
                         : (trim((string) ($validated['termsAndConditions'] ?? '')) ?: null),
-                    'show_on_pos' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled ? false : $validated['showOnPos'],
+                    'show_on_pos' => $this->pricingMechanic === 'catalog_price' ? false : $validated['showOnPos'],
                     'show_on_digital_menu' => $validated['showOnDigitalMenu'],
-                    'show_on_kiosk' => $validated['presentationType'] === 'new' && ! $this->launchOfferEnabled ? false : $validated['showOnKiosk'],
+                    'show_on_kiosk' => $this->pricingMechanic === 'catalog_price' ? false : $validated['showOnKiosk'],
                     'is_active' => $validated['isActive'],
                     'image' => $newImage ?: $promotion->image,
                 ])->save();
@@ -568,7 +718,8 @@ class PromotionManager extends Component
     {
         $this->reset([
             'editingId', 'name', 'description', 'shortDescription', 'presentationType',
-            'primaryProductId', 'wizardStep', 'discountPercentage', 'price', 'startsOn', 'endsOn', 'weekdays',
+            'primaryProductId', 'wizardStep', 'previewDevice', 'discountPercentage', 'price', 'pricingMechanic',
+            'startsOn', 'endsOn', 'weekdays', 'scheduleType', 'monthlyDay',
             'launchOfferEnabled', 'buyQuantity', 'rewardQuantity', 'rewardDiscountPercentage', 'maxApplicationsPerOrder',
             'fulfillmentModes', 'termsAndConditions', 'showOnPos', 'showOnDigitalMenu', 'showOnKiosk',
             'isActive', 'image', 'currentImage', 'groups',
@@ -579,7 +730,11 @@ class PromotionManager extends Component
         $this->showOnKiosk = true;
         $this->isActive = true;
         $this->presentationType = 'promotion';
+        $this->pricingMechanic = 'fixed_price';
+        $this->scheduleType = 'date_range';
+        $this->monthlyDay = 1;
         $this->wizardStep = 1;
+        $this->previewDevice = 'mobile';
         $this->buyQuantity = 1;
         $this->rewardQuantity = 1;
         $this->rewardDiscountPercentage = 50;
@@ -614,6 +769,34 @@ class PromotionManager extends Component
             'rewardDiscountPercentage' => ['required', 'integer', 'between:1,100'],
             'maxApplicationsPerOrder' => ['nullable', 'integer', 'between:1,99'],
         ];
+    }
+
+    private function validateFixedProductPrice(): void
+    {
+        if ($this->pricingMechanic !== 'fixed_product_price' || ! $this->primaryProductId || ! is_numeric($this->price)) {
+            return;
+        }
+
+        $catalogPrice = Product::query()->where('is_active', true)->find((int) $this->primaryProductId)?->price;
+        if ($catalogPrice !== null && (float) $this->price >= (float) $catalogPrice) {
+            throw ValidationException::withMessages([
+                'price' => 'El precio especial debe ser menor que el precio actual del producto ($'.number_format((float) $catalogPrice, 2).').',
+            ]);
+        }
+    }
+
+    private function isAutomaticMechanic(): bool
+    {
+        return in_array($this->pricingMechanic, ['fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'], true);
+    }
+
+    private function allowedPricingMechanics(): array
+    {
+        return match ($this->presentationType) {
+            'new' => ['catalog_price', 'fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'],
+            'discount' => ['fixed_product_price', 'percentage_discount'],
+            default => ['fixed_price', 'two_for_one', 'second_half', 'custom_quantity'],
+        };
     }
 
     public function render()

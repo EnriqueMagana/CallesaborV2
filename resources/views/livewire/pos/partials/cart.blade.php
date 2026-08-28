@@ -34,6 +34,21 @@
         </div>
     </header>
 
+    @if($this->promotionOpportunities !== [])
+        <div class="pos-cart-opportunities" aria-label="Promociones por completar" aria-live="polite">
+            @foreach($this->promotionOpportunities as $opportunity)
+                <article wire:key="pos-opportunity-{{ $opportunity['promotion_id'] }}">
+                    <span class="pos-cart-opportunities__icon" aria-hidden="true"><i class="bx bx-gift"></i></span>
+                    <span class="pos-cart-opportunities__copy"><small>Estás a un paso</small><strong>{{ $opportunity['message'] }}</strong></span>
+                    <button type="button" wire:click="completePromotionOpportunity({{ $opportunity['promotion_id'] }})"
+                            wire:loading.attr="disabled" wire:target="completePromotionOpportunity({{ $opportunity['promotion_id'] }})">
+                        <i class="bx bx-plus" aria-hidden="true"></i><span>Completar</span>
+                    </button>
+                </article>
+            @endforeach
+        </div>
+    @endif
+
     <div class="cart-items" role="list" aria-label="Productos del pedido">
         @forelse($cart as $item)
             <article class="cart-item" role="listitem" wire:key="pos-cart-{{ $item['cart_id'] }}">
@@ -52,8 +67,27 @@
 
                     @if (!empty($item['promotion_selections']) || !empty($item['addons']) || !empty($item['ingredients']) || !empty($item['notes']))
                         <div class="cart-item-options" aria-label="Personalización">
-                            @foreach($item['promotion_selections'] ?? [] as $group)
-                                <div class="cart-item-promotion-group"><strong>{{ $group['group_name'] }}</strong>@foreach($group['items'] as $selected)<span><i class="bx bx-check"></i>{{ $selected['quantity'] }}× {{ $selected['product_name'] }}</span>@endforeach</div>
+                            @php
+                                $promotionSelectionsByArea = collect($item['promotion_selections'] ?? [])
+                                    ->flatMap(function ($group) {
+                                        return collect($group['items'] ?? [])->map(function ($selected) use ($group) {
+                                            return array_merge($selected, [
+                                                'display_area' => $selected['print_area_name']
+                                                    ?? $selected['category_name']
+                                                    ?? $group['group_name']
+                                                    ?? 'General',
+                                            ]);
+                                        });
+                                    })
+                                    ->groupBy('display_area');
+                            @endphp
+                            @foreach($promotionSelectionsByArea as $areaName => $selectedProducts)
+                                <div class="cart-item-promotion-group">
+                                    <strong><i class="bx bx-dish" aria-hidden="true"></i><span>{{ $areaName }}</span></strong>
+                                    @foreach($selectedProducts as $selected)
+                                        <span><i class="bx bx-check" aria-hidden="true"></i>{{ $selected['quantity'] }}× {{ $selected['product_name'] }}</span>
+                                    @endforeach
+                                </div>
                             @endforeach
                             @foreach ($item['addons'] as $addon)
                                 <div class="cart-item-addon">
@@ -149,12 +183,6 @@
             </div>
 
             <div class="cart-cta">
-                <button type="button" class="pos-btn pos-btn-secondary cart-cta-save" data-pos-save-cart
-                    aria-keyshortcuts="F5" aria-label="Guardar pedido" title="Guardar pedido (F5)"
-                    wire:click="$set('showSaveQuotationModal',true)">
-                    <i class="bx bx-save" aria-hidden="true"></i><span>Guardar</span>
-                    <kbd class="pos-control-shortcut" aria-hidden="true">F5</kbd>
-                </button>
                 <button type="button" class="btn-checkout cart-cta-checkout" data-pos-checkout
                     aria-keyshortcuts="F2" title="Cobrar pedido (F2)" wire:click="openCheckoutModal"
                     wire:loading.attr="disabled" wire:target="openCheckoutModal">
