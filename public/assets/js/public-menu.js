@@ -146,6 +146,113 @@
         schedule();
     });
 
+    document.querySelectorAll('[data-quick-access-carousel]').forEach((carousel) => {
+        const rail = carousel.querySelector('[data-quick-access-rail]');
+        const items = [...carousel.querySelectorAll('[data-quick-access-item]')];
+        const dots = [...carousel.querySelectorAll('[data-quick-access-dot]')];
+        const previous = carousel.querySelector('[data-quick-access-previous]');
+        const next = carousel.querySelector('[data-quick-access-next]');
+        const current = carousel.querySelector('[data-quick-access-current]');
+        const currentLabel = carousel.querySelector('[data-quick-access-label]');
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let activeIndex = 0;
+        let scrollFrame = null;
+        let programmaticScroll = false;
+        let settleTimer = null;
+
+        if (!rail || items.length === 0) return;
+
+        const itemLabel = (item) => item.querySelector(':scope > span:last-child')?.textContent.trim() || '';
+
+        const renderState = () => {
+            items.forEach((item, index) => item.classList.toggle('is-active', index === activeIndex));
+
+            dots.forEach((dot, index) => {
+                const isActive = index === activeIndex;
+                dot.classList.toggle('is-active', isActive);
+                dot.setAttribute('aria-pressed', String(isActive));
+            });
+            const label = itemLabel(items[activeIndex]);
+            if (current) current.textContent = String(activeIndex + 1);
+            if (currentLabel) {
+                currentLabel.textContent = label;
+                currentLabel.setAttribute('aria-label', `${label}, acceso ${activeIndex + 1} de ${items.length}`);
+            }
+            if (previous) previous.disabled = activeIndex === 0;
+            if (next) next.disabled = activeIndex === items.length - 1;
+            previous?.setAttribute('aria-label', activeIndex > 0 ? `Ver ${itemLabel(items[activeIndex - 1])}` : 'No hay accesos anteriores');
+            next?.setAttribute('aria-label', activeIndex < items.length - 1 ? `Ver ${itemLabel(items[activeIndex + 1])}` : 'No hay más accesos');
+        };
+
+        const updateState = () => {
+            const hasOverflow = rail.scrollWidth > rail.clientWidth + 2;
+            if (hasOverflow) {
+                const center = rail.scrollLeft + (rail.clientWidth / 2);
+                activeIndex = items.reduce((closest, item, index) => {
+                    const itemCenter = item.offsetLeft + (item.offsetWidth / 2);
+                    const closestCenter = items[closest].offsetLeft + (items[closest].offsetWidth / 2);
+                    return Math.abs(itemCenter - center) < Math.abs(closestCenter - center) ? index : closest;
+                }, 0);
+            }
+            renderState();
+        };
+
+        const settleProgrammaticScroll = (delay = 120) => {
+            window.clearTimeout(settleTimer);
+            settleTimer = window.setTimeout(() => {
+                programmaticScroll = false;
+                renderState();
+            }, delay);
+        };
+
+        const goTo = (requestedIndex) => {
+            activeIndex = Math.max(0, Math.min(requestedIndex, items.length - 1));
+            const maximumLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
+            const targetLeft = items[activeIndex].offsetLeft - ((rail.clientWidth - items[activeIndex].offsetWidth) / 2);
+            window.clearTimeout(settleTimer);
+            programmaticScroll = true;
+            rail.scrollTo({
+                left: Math.max(0, Math.min(targetLeft, maximumLeft)),
+                behavior: reduceMotion ? 'auto' : 'smooth',
+            });
+            renderState();
+            settleProgrammaticScroll(reduceMotion ? 0 : 500);
+        };
+
+        const requestStateUpdate = () => {
+            if (programmaticScroll) {
+                settleProgrammaticScroll();
+                return;
+            }
+            if (scrollFrame !== null) return;
+            scrollFrame = window.requestAnimationFrame(() => {
+                scrollFrame = null;
+                updateState();
+            });
+        };
+
+        previous?.addEventListener('click', () => goTo(activeIndex - 1));
+        next?.addEventListener('click', () => goTo(activeIndex + 1));
+        dots.forEach((dot, index) => dot.addEventListener('click', () => goTo(index)));
+        rail.addEventListener('scroll', requestStateUpdate, { passive: true });
+        rail.addEventListener('pointerdown', () => {
+            window.clearTimeout(settleTimer);
+            programmaticScroll = false;
+        }, { passive: true });
+        rail.addEventListener('wheel', () => {
+            window.clearTimeout(settleTimer);
+            programmaticScroll = false;
+        }, { passive: true });
+        rail.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                goTo(activeIndex + (event.key === 'ArrowRight' ? 1 : -1));
+            }
+        });
+        window.addEventListener('resize', requestStateUpdate, { passive: true });
+        updateState();
+    });
+
     const input = document.getElementById('menu-search-input');
     const clear = document.getElementById('menu-search-clear');
     const status = document.getElementById('menu-search-status');

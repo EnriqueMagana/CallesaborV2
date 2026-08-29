@@ -686,6 +686,11 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
     line-height: 1.5;
 }
 .pos-draft-help i { flex: 0 0 auto; margin-top: 2px; color: var(--pos-accent); font-size: 1.05rem; }
+html.dark-style .pos-draft-help {
+    color: var(--pos-muted);
+    border-color: rgba(155, 140, 255, .28);
+    background: rgba(155, 140, 255, .1);
+}
 .pos-root .pos-btn { min-height: 44px; border-radius: 11px; font-weight: 650; }
 .pos-root .pos-btn-primary { box-shadow: 0 7px 16px rgba(105, 86, 232, 0.18); }
 .pos-root :is(.pos-input, .co-input, select) { min-height: 46px; border-color: var(--pos-border); border-radius: 11px; }

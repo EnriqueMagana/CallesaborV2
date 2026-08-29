@@ -2116,7 +2116,7 @@ class PointOfSale extends Component
         $this->quotationNotes = '';
         $this->clearCart();
         unset($this->quotations);
-        $this->dispatch('notify', type: 'success', message: 'Pedido guardado. El carrito está listo para una nueva venta.');
+        $this->dispatch('notify', type: 'success', message: 'Borrador guardado con todos los datos capturados.');
     }
 
     public function loadQuotation(int $id): void
@@ -2169,32 +2169,35 @@ class PointOfSale extends Component
         }
 
         $draftState = is_array($quotation->checkout_state) ? $quotation->checkout_state : [];
+        if ($draftState === []) {
+            $this->resetOrderForm();
+        } else {
+            $this->restoreDraftCheckoutState($draftState);
+        }
         $savedCart = $draftState['cart'] ?? null;
         $this->cart = is_array($savedCart) && $savedCart !== []
             ? $this->restoreDraftCart($savedCart)
             : $newCart;
         $this->saveCart();
 
-        if ($quotation->customer_id) {
+        if ($draftState === [] && $quotation->customer_id) {
             $this->customerId = $quotation->customer_id;
             $this->customerName = $quotation->customer?->name ?? '';
             $this->customerPhone = $quotation->customer?->phone ?? '';
             $this->customerAddress = $quotation->customer?->address ?? '';
             $this->customerNeighborhood = $quotation->customer?->neighborhood ?? '';
             $this->customerReferences = $quotation->customer?->references ?? '';
-        } elseif ($quotation->customer_name) {
+        } elseif ($draftState === [] && $quotation->customer_name) {
             $this->customerName = $quotation->customer_name;
             $this->customerPhone = $quotation->customer_phone ?? '';
         }
-
-        $this->restoreDraftCheckoutState($draftState);
         $this->quotationName = $quotation->name ?? '';
         $this->quotationNotes = $quotation->notes ?? '';
 
         $this->activeQuotationId = $quotation->id;
         $this->showQuotationsModal = false;
         unset($this->cartTotal, $this->cartCount, $this->quotations);
-        $this->dispatch('notify', type: 'info', message: "Cotización \"{$quotation->display_name}\" cargada.");
+        $this->dispatch('notify', type: 'info', message: "Borrador \"{$quotation->display_name}\" cargado.");
     }
 
     public function deleteQuotation(int $id): void
@@ -2205,7 +2208,7 @@ class PointOfSale extends Component
             ->findOrFail($id)
             ->delete();
         unset($this->quotations);
-        $this->dispatch('notify', type: 'warning', message: 'Cotización eliminada.');
+        $this->dispatch('notify', type: 'warning', message: 'Borrador eliminado.');
     }
 
     /**

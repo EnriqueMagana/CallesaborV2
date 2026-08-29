@@ -37,6 +37,6 @@ class Quotation extends Model
 
     public function getDisplayNameAttribute(): string
     {
-        return $this->name ?? ($this->customer_name ? "Cliente: {$this->customer_name}" : "Cotización #{$this->id}");
+        return $this->name ?? ($this->customer_name ? "Cliente: {$this->customer_name}" : "Borrador #{$this->id}");
     }
 }

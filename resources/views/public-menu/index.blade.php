@@ -10,7 +10,7 @@
     @include('partials.favicon')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Allura&family=Poppins:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
     <link rel="stylesheet"
@@ -372,53 +372,64 @@
             </div>
         </section>
 
-        <section class="menu-info-links" aria-labelledby="restaurant-info-title">
+        @php
+            $socialUrl = $business->instagram_url
+                ?: ($business->facebook_url ?: ($business->tiktok_url ?: route('public.contact')));
+            $locationUrl = $business->maps_url ?: route('public.contact');
+            $quickAccesses = [
+                ['label' => 'Inicio', 'icon' => 'bx-home-alt', 'href' => route('public.home'), 'external' => false],
+                ['label' => 'Haz una reservación', 'icon' => 'bx-calendar-check', 'href' => route('public.home') . '#reservar', 'external' => false],
+                ['label' => 'Horarios', 'icon' => 'bx-time-five', 'href' => route('public.hours'), 'external' => false],
+                ['label' => 'Redes sociales', 'icon' => 'bxl-instagram', 'href' => $socialUrl, 'external' => $socialUrl !== route('public.contact')],
+                ['label' => 'Ubicación', 'icon' => 'bx-map-pin', 'href' => $locationUrl, 'external' => filled($business->maps_url)],
+            ];
+        @endphp
+        <section class="menu-farewell" aria-labelledby="menu-farewell-title" data-quick-access-carousel>
             <div class="menu-container">
-                <div class="section-heading">
-                    <div><span class="menu-kicker">Conoce el restaurante</span>
-                        <h2 id="restaurant-info-title">Información útil</h2>
-                    </div>
-                    <p>{{ $menuSettings->show_gallery ? 'Consulta nuestros horarios, fotografías y canales oficiales.' : 'Consulta nuestros horarios y canales oficiales.' }}
-                    </p>
+                <header class="menu-farewell__heading">
+                    <h2 id="menu-farewell-title">Gracias por tu visita</h2>
+                    <p>Esperamos volver a verte pronto.</p>
+                </header>
+
+                <div class="menu-farewell__carousel">
+                    <button class="menu-farewell__control menu-farewell__control--previous" type="button"
+                        data-quick-access-previous aria-label="Ver acceso anterior"
+                        aria-controls="menu-quick-access-rail">
+                        <i class="bx bx-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    <nav class="menu-farewell__rail" id="menu-quick-access-rail" data-quick-access-rail
+                        aria-label="Accesos rápidos" aria-roledescription="carrusel" tabindex="0">
+                        @foreach ($quickAccesses as $access)
+                            <a @class(['menu-farewell__item', 'is-active' => $loop->first]) href="{{ $access['href'] }}" data-quick-access-item
+                                @if ($access['external']) target="_blank" rel="noopener noreferrer" @endif>
+                                <span class="menu-farewell__icon" aria-hidden="true">
+                                    <i class="bx {{ $access['icon'] }}"></i>
+                                </span>
+                                <span>{{ $access['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </nav>
+                    <button class="menu-farewell__control menu-farewell__control--next" type="button"
+                        data-quick-access-next aria-label="Ver siguiente acceso"
+                        aria-controls="menu-quick-access-rail">
+                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                    </button>
                 </div>
-                <div @class([
-                    'menu-info-links__grid',
-                    'menu-info-links__grid--without-gallery' => !$menuSettings->show_gallery,
-                ])>
-                    <a href="{{ route('public.home') }}#reservar" class="menu-info-card menu-info-card--reservation">
-                        <span class="menu-info-card__icon"><i class="bx bx-calendar-check"
-                                aria-hidden="true"></i></span>
-                        <span><small>Planea tu visita</small><strong>Reservar una mesa</strong><span>Elige fecha, hora y
-                                número de personas</span></span>
-                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                    </a>
-                    <a href="{{ route('public.hours') }}" class="menu-info-card menu-info-card--hours">
-                        <span class="menu-info-card__icon"><i class="bx bx-time-five" aria-hidden="true"></i></span>
-                        <span><small>Antes de
-                                visitarnos</small><strong>Horarios</strong><span>{{ $openingStatus['label'] }} ·
-                                {{ $openingStatus['detail'] }}</span></span>
-                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                    </a>
-                    @if ($menuSettings->show_gallery)
-                        <a href="{{ route('public.gallery') }}" class="menu-info-card menu-info-card--gallery">
-                            @if ($galleryImages->isNotEmpty())
-                                <img src="{{ Storage::url($galleryImages->first()['path']) }}" alt=""
-                                    width="520" height="320" loading="lazy">
-                            @endif
-                            <span class="menu-info-card__shade"></span>
-                            <span class="menu-info-card__icon"><i class="bx bx-images" aria-hidden="true"></i></span>
-                            <span><small>Nuestros
-                                    espacios</small><strong>Galería</strong><span>{{ $galleryImages->count() ? $galleryImages->count() . ' ' . ($galleryImages->count() === 1 ? 'fotografía' : 'fotografías') : 'Próximamente' }}</span></span>
-                            <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                        </a>
-                    @endif
-                    <a href="{{ route('public.contact') }}" class="menu-info-card menu-info-card--contact">
-                        <span class="menu-info-card__icon"><i class="bx bx-message-rounded-dots"
-                                aria-hidden="true"></i></span>
-                        <span><small>Canales oficiales</small><strong>Contacto y
-                                redes</strong><span>{{ $business->phone ?: 'Conoce cómo encontrarnos' }}</span></span>
-                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                    </a>
+
+                <div class="menu-farewell__pagination">
+                    <span class="menu-farewell__position" aria-hidden="true">
+                        <strong data-quick-access-current>1</strong><span>de</span><strong>{{ count($quickAccesses) }}</strong>
+                    </span>
+                    <div class="menu-farewell__dots" aria-label="Elegir acceso rápido">
+                        @foreach ($quickAccesses as $access)
+                            <button type="button" data-quick-access-dot="{{ $loop->index }}"
+                                aria-label="Mostrar {{ $access['label'] }}"
+                                aria-pressed="{{ $loop->first ? 'true' : 'false' }}"
+                                @class(['is-active' => $loop->first])></button>
+                        @endforeach
+                    </div>
+                    <p class="menu-farewell__current-label" data-quick-access-label aria-live="polite"
+                        aria-atomic="true">Inicio</p>
                 </div>
             </div>
         </section>
