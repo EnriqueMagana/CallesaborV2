@@ -10,36 +10,30 @@
     @include('partials.favicon')
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Allura&family=Poppins:wght@400;500;600;700;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Parisienne&family=Poppins:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
     <link rel="stylesheet"
         href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
     <link rel="stylesheet"
         href="{{ asset('assets/css/promotions-public.css') }}?v={{ filemtime(public_path('assets/css/promotions-public.css')) }}">
-    <noscript><style>.menu-page-loader{display:none!important}.is-media-pending::after{display:none!important}img[data-progressive-image]{display:none!important}</style></noscript>
+    <noscript><style>.home-preloader{display:none!important}</style></noscript>
 </head>
 
 <body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
-    <div class="menu-page-loader" data-menu-page-loader role="status" aria-live="polite"
-        aria-label="Cargando contenido">
-        <div class="menu-page-loader__content">
-            <div class="menu-page-loader__skeleton" aria-hidden="true">
-                <span class="menu-page-loader__search"></span>
-                <div class="menu-page-loader__chips"><span></span><span></span><span></span></div>
-                <div class="menu-page-loader__cards">
-                    @for ($placeholder = 0; $placeholder < 4; $placeholder++)
-                        <span><i></i><b></b><small></small></span>
-                    @endfor
-                </div>
-            </div>
+    <div class="home-preloader" data-home-preloader role="status" aria-live="polite"
+        aria-label="Cargando {{ $business->business_name }}">
+        <div class="home-preloader__chase" aria-hidden="true">
+            @for ($dot = 0; $dot < 6; $dot++)
+                <span></span>
+            @endfor
         </div>
     </div>
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
         :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
 
-    <main data-menu-content>
+    <main>
         <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
             <div class="menu-container menu-discovery__intro">
                 <div class="menu-discovery__heading">
@@ -113,15 +107,16 @@
                                 @endphp
                                 <a href="#category-{{ $category->id }}" class="category-nav__item"
                                     data-category-link="category-{{ $category->id }}">
-                                    <span class="category-nav__icon {{ $menuSettings->category_style === 'circles' && $categoryPreview ? 'is-media-pending' : '' }}"
-                                        @if ($menuSettings->category_style === 'circles' && $categoryPreview) data-progressive-shell @endif
+                                    <span @class([
+                                        'category-nav__icon',
+                                        'menu-image-shell is-image-loading' => $menuSettings->category_style === 'circles' && $categoryPreview,
+                                    ])
+                                        @if ($menuSettings->category_style === 'circles' && $categoryPreview) data-menu-image-shell @endif
                                         style="--category-color: {{ $category->color ?: $business->primary_color }}">
                                         @if ($menuSettings->category_style === 'circles' && $categoryPreview)
-                                            <img data-src="{{ Storage::url($categoryPreview->image) }}"
-                                                data-progressive-image alt="" width="64" height="64" loading="lazy"
-                                                decoding="async">
-                                            <noscript><img src="{{ Storage::url($categoryPreview->image) }}" alt=""
-                                                    width="64" height="64"></noscript>
+                                            <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
+                                                width="64" height="64" loading="lazy" decoding="async"
+                                                data-menu-image>
                                         @else
                                             <i class="bx {{ $category->icon ?: 'bx-food-menu' }}"
                                                 aria-hidden="true"></i>
@@ -210,8 +205,8 @@
                                 <button type="button" class="promotion-banner__trigger"
                                     aria-label="Ver detalles de {{ $promotion->name }}" aria-haspopup="dialog"
                                     data-promotion-detail="{{ json_encode($modalPromotion, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"></button>
-                                <div class="promotion-banner__media {{ $promotion->image ? 'is-media-pending' : '' }}"
-                                    @if ($promotion->image) data-progressive-background data-background-src="{{ Storage::url($promotion->image) }}" data-progressive-shell @endif
+                                <div class="promotion-banner__media"
+                                    @if ($promotion->image) style="background-image: url('{{ Storage::url($promotion->image) }}')" @endif
                                     aria-hidden="true">
                                     @unless ($promotion->image)
                                         <span><i class="bx {{ $promotion->presentationIcon() }}"></i></span>
@@ -281,7 +276,7 @@
                                             '.';
                             @endphp
                             <x-public-menu.product-card :product="$discountProduct" :image-override="$discountProduct->image ?: $campaign->image" :title-override="$discountProduct->name"
-                                :description-override="$discountDescription" :price-override="$discountPrice" :original-price="$originalPrice" :discount-percent="$discountPercent"
+                                :description-override="$discountProduct->description ?: $discountDescription" :price-override="$discountPrice" :original-price="$originalPrice" :discount-percent="$discountPercent"
                                 class="discount-product-card" role="listitem" data-discount-product-item />
                         @endforeach
                     </div>
@@ -396,11 +391,11 @@
                 ?: ($business->facebook_url ?: ($business->tiktok_url ?: route('public.contact')));
             $locationUrl = $business->maps_url ?: route('public.contact');
             $quickAccesses = [
-                ['label' => 'Inicio', 'icon' => 'bx-home-alt', 'href' => route('public.home'), 'external' => false],
-                ['label' => 'Haz una reservación', 'icon' => 'bx-calendar-check', 'href' => route('public.home') . '#reservar', 'external' => false],
-                ['label' => 'Horarios', 'icon' => 'bx-time-five', 'href' => route('public.hours'), 'external' => false],
-                ['label' => 'Redes sociales', 'icon' => 'bxl-instagram', 'href' => $socialUrl, 'external' => $socialUrl !== route('public.contact')],
-                ['label' => 'Ubicación', 'icon' => 'bx-map-pin', 'href' => $locationUrl, 'external' => filled($business->maps_url)],
+                ['label' => 'Inicio', 'mobile_label' => 'Inicio', 'icon' => 'bx-home-alt', 'mobile_icon' => 'bx-home', 'href' => route('public.home'), 'external' => false],
+                ['label' => 'Haz una reservación', 'mobile_label' => 'Reservar', 'icon' => 'bx-calendar-check', 'mobile_icon' => 'bx-calendar', 'href' => route('public.home') . '#reservar', 'external' => false],
+                ['label' => 'Horarios', 'mobile_label' => 'Horarios', 'icon' => 'bx-time-five', 'mobile_icon' => 'bx-time-five', 'href' => route('public.hours'), 'external' => false],
+                ['label' => 'Redes sociales', 'mobile_label' => 'Redes', 'icon' => 'bxl-instagram', 'mobile_icon' => 'bxl-instagram', 'href' => $socialUrl, 'external' => $socialUrl !== route('public.contact')],
+                ['label' => 'Ubicación', 'mobile_label' => 'Ubicación', 'icon' => 'bx-map-pin', 'mobile_icon' => 'bx-map', 'href' => $locationUrl, 'external' => filled($business->maps_url)],
             ];
         @endphp
         <section class="menu-farewell" aria-labelledby="menu-farewell-title" data-quick-access-carousel>
@@ -420,11 +415,16 @@
                         aria-label="Accesos rápidos" aria-roledescription="carrusel" tabindex="0">
                         @foreach ($quickAccesses as $access)
                             <a @class(['menu-farewell__item', 'is-active' => $loop->first]) href="{{ $access['href'] }}" data-quick-access-item
+                                data-access-label="{{ $access['label'] }}"
                                 @if ($access['external']) target="_blank" rel="noopener noreferrer" @endif>
                                 <span class="menu-farewell__icon" aria-hidden="true">
-                                    <i class="bx {{ $access['icon'] }}"></i>
+                                    <i class="bx {{ $access['icon'] }} menu-farewell__icon-desktop"></i>
+                                    <i class="bx {{ $access['mobile_icon'] }} menu-farewell__icon-mobile"></i>
                                 </span>
-                                <span>{{ $access['label'] }}</span>
+                                <span class="menu-farewell__label">
+                                    <span class="menu-farewell__label-desktop">{{ $access['label'] }}</span>
+                                    <span class="menu-farewell__label-mobile">{{ $access['mobile_label'] }}</span>
+                                </span>
                             </a>
                         @endforeach
                     </nav>
@@ -533,6 +533,7 @@
             </footer>
         </div>
     </dialog>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" async></script>
     <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}"
         defer></script>
 </body>

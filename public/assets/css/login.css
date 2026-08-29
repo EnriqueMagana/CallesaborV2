@@ -95,9 +95,10 @@
 .auth-security-note strong { color: #494454; font-size: .73rem; }
 .auth-security-note span { margin-top: 3px; color: var(--auth-muted); font-size: .68rem; line-height: 1.45; }
 .auth-recovery { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 11px; align-items: center; margin-top: 18px; padding: 13px; border: 1px solid #ddd7fa; border-radius: 14px; background: #faf9ff; }
-.auth-recovery__icon { display: flex; flex: 0 0 42px; width: 42px; height: 42px; align-items: center; justify-content: center; color: var(--auth-primary-dark); border-radius: 12px; background: var(--auth-primary-soft); font-size: 21px; line-height: 1; }
-.auth-recovery__icon i { display: block; line-height: 1; }
-.auth-recovery strong,.auth-recovery span { display: block; }
+.auth-recovery__icon { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; color: var(--auth-primary-dark); border-radius: 12px; background: var(--auth-primary-soft); font-size: 21px; line-height: 1; }
+.auth-recovery__icon i { display: grid; width: 1em; height: 1em; place-items: center; margin: 0; line-height: 1; }
+.auth-recovery__icon i::before { display: block; line-height: 1; }
+.auth-recovery > div strong,.auth-recovery > div span { display: block; }
 .auth-recovery strong { color: #393548; font-size: .76rem; }
 .auth-recovery span { margin-top: 2px; color: var(--auth-muted); font-size: .68rem; line-height: 1.4; }
 .auth-recovery a { min-height: 44px; padding: 8px 11px; display: inline-flex; align-items: center; justify-content: center; color: var(--auth-primary-dark); border-radius: 10px; font-size: .7rem; font-weight: 750; text-align: center; text-decoration: none; }

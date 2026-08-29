@@ -5,9 +5,11 @@ namespace App\Livewire\SuperAdmin;
 use App\Mail\DeveloperTestMail;
 use App\Models\AppNotification;
 use App\Services\DeveloperDiagnosticsService;
+use App\Services\Firebase\FirebaseRealtimeDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
 
@@ -22,12 +24,16 @@ class DeveloperConsole extends Component
     /** @var array<string, mixed>|null */
     public ?array $lastAction = null;
 
+    /** @var array<string, mixed> */
+    public array $firebaseNotifications = [];
+
     public string $testEmailRecipient = '';
 
-    public function mount(DeveloperDiagnosticsService $diagnostics): void
+    public function mount(DeveloperDiagnosticsService $diagnostics, FirebaseRealtimeDatabase $firebase): void
     {
         abort_unless(auth()->user()?->can('ver panel super admin'), 403);
         $this->diagnostics = $diagnostics->snapshot();
+        $this->firebaseNotifications = $firebase->notificationSignals();
     }
 
     public function refreshDiagnostics(DeveloperDiagnosticsService $diagnostics): void
@@ -57,7 +63,10 @@ class DeveloperConsole extends Component
         $this->diagnostics = $diagnostics->snapshot();
     }
 
-    public function testRealtimeNotification(DeveloperDiagnosticsService $diagnostics): void
+    public function testRealtimeNotification(
+        DeveloperDiagnosticsService $diagnostics,
+        FirebaseRealtimeDatabase $firebase,
+    ): void
     {
         $this->authorizeNotificationTests();
         $result = $diagnostics->createTestNotification(auth()->user(), true);
@@ -69,6 +78,57 @@ class DeveloperConsole extends Component
             'id' => $result['notification']->getKey(),
         ];
         $this->diagnostics = $diagnostics->snapshot();
+        $this->firebaseNotifications = $firebase->notificationSignals();
+    }
+
+    public function refreshFirebaseNotifications(FirebaseRealtimeDatabase $firebase): void
+    {
+        $this->authorizeDiagnostics();
+        $this->firebaseNotifications = $firebase->notificationSignals();
+        $this->lastAction = [
+            'ok' => (bool) ($this->firebaseNotifications['ok'] ?? false),
+            'message' => (string) ($this->firebaseNotifications['message'] ?? 'Consulta de Firebase completada.'),
+        ];
+    }
+
+    public function clearFirebaseNotifications(FirebaseRealtimeDatabase $firebase): void
+    {
+        $this->authorizeDiagnostics();
+        $cleared = $firebase->clearNotifications('manual_cleanup');
+        $this->firebaseNotifications = $firebase->notificationSignals();
+        $this->lastAction = [
+            'ok' => $cleared,
+            'message' => $cleared
+                ? 'Las señales pendientes de Firebase fueron eliminadas manualmente.'
+                : 'No se pudo limpiar Firebase. Revisa la configuración, el registro y Laravel Pulse.',
+        ];
+    }
+
+    public function confirmClearFirebaseNotifications(): void
+    {
+        $this->authorizeDiagnostics();
+
+        if ((int) ($this->firebaseNotifications['total'] ?? 0) === 0) {
+            return;
+        }
+
+        $this->dispatch(
+            'open-confirm',
+            type: 'danger',
+            title: 'Limpiar señales de Firebase',
+            message: 'Se eliminarán todas las señales efímeras del nodo <strong>'.e((string) ($this->firebaseNotifications['root'] ?? 'notifications')).'</strong>. Las notificaciones históricas de MySQL no serán afectadas.',
+            action: 'clearFirebaseNotifications',
+            confirmText: 'Eliminar señales',
+            cancelText: 'Conservar datos',
+        );
+    }
+
+    #[On('modal-confirmed')]
+    public function handleModalConfirmed(string $action, array $params = []): void
+    {
+        if ($action === 'clearFirebaseNotifications') {
+            $this->clearFirebaseNotifications(app(FirebaseRealtimeDatabase::class));
+        }
     }
 
     public function testPulse(DeveloperDiagnosticsService $diagnostics): void

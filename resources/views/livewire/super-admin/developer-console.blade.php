@@ -151,6 +151,72 @@
         </aside>
     </div>
 
+    <section class="developer-panel developer-firebase-records">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div>
+                <span class="developer-panel__icon"><i class="bx bx-data" aria-hidden="true"></i></span>
+                <div>
+                    <h2>Señales pendientes en Firebase</h2>
+                    <p>Información efímera que debe eliminar el cron diario del nodo de notificaciones.</p>
+                </div>
+            </div>
+            <div class="developer-firebase-records__actions">
+                <button type="button" class="developer-button developer-button--secondary"
+                    wire:click="refreshFirebaseNotifications" wire:loading.attr="disabled"
+                    wire:target="refreshFirebaseNotifications,clearFirebaseNotifications">
+                    <i class="bx bx-refresh" aria-hidden="true"></i>
+                    <span wire:loading.remove wire:target="refreshFirebaseNotifications">Actualizar</span>
+                    <span wire:loading wire:target="refreshFirebaseNotifications">Consultando…</span>
+                </button>
+                <button type="button" class="developer-button developer-button--danger"
+                    wire:click="confirmClearFirebaseNotifications"
+                    wire:loading.attr="disabled" wire:target="confirmClearFirebaseNotifications,clearFirebaseNotifications"
+                    @disabled(!($firebaseNotifications['available'] ?? false) || (int) ($firebaseNotifications['total'] ?? 0) === 0)>
+                    <i class="bx bx-trash" aria-hidden="true"></i>
+                    <span wire:loading.remove wire:target="confirmClearFirebaseNotifications,clearFirebaseNotifications">Eliminar señales</span>
+                    <span wire:loading wire:target="clearFirebaseNotifications">Eliminando…</span>
+                </button>
+            </div>
+        </header>
+
+        <dl class="developer-firebase-summary" aria-label="Resumen de Firebase Realtime Database">
+            <div><dt>Ruta consultada</dt><dd><code>{{ $firebaseNotifications['root'] ?? 'notifications' }}</code></dd></div>
+            <div><dt>Señales pendientes</dt><dd>{{ number_format((int) ($firebaseNotifications['total'] ?? 0)) }}</dd></div>
+            <div><dt>Última consulta</dt><dd>{{ $firebaseNotifications['fetched_at'] ?? 'Sin consultar' }}</dd></div>
+        </dl>
+
+        @if (!($firebaseNotifications['ok'] ?? false))
+            <div class="developer-firebase-records__notice" role="status">
+                <i class="bx bx-error-circle" aria-hidden="true"></i>
+                <span>{{ $firebaseNotifications['message'] ?? 'No se pudo consultar Firebase.' }}</span>
+            </div>
+        @endif
+
+        <div class="developer-table-wrap" wire:loading.class="is-loading"
+            wire:target="refreshFirebaseNotifications,clearFirebaseNotifications">
+            <table class="developer-table developer-firebase-table">
+                <thead><tr><th>Evento</th><th>Usuario Firebase</th><th>ID de notificación</th><th>Fecha</th></tr></thead>
+                <tbody>
+                    @forelse (($firebaseNotifications['signals'] ?? []) as $signal)
+                        <tr wire:key="firebase-signal-{{ $signal['user_uid'] }}-{{ $signal['id'] }}">
+                            <td><code>{{ $signal['event_key'] }}</code></td>
+                            <td>{{ $signal['user_uid'] }}</td>
+                            <td><small class="developer-firebase-table__id">{{ $signal['id'] }}</small></td>
+                            <td>{{ $signal['created_at'] }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="developer-table__empty">
+                            {{ ($firebaseNotifications['ok'] ?? false) ? 'Firebase no tiene señales pendientes.' : 'La información aparecerá cuando Firebase esté disponible.' }}
+                        </td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ((int) ($firebaseNotifications['total'] ?? 0) > (int) ($firebaseNotifications['shown'] ?? 0))
+            <p class="developer-firebase-records__limit">Se muestran las {{ $firebaseNotifications['shown'] }} señales más recientes de {{ $firebaseNotifications['total'] }}.</p>
+        @endif
+    </section>
+
     <section class="developer-panel">
         <header class="developer-panel__header developer-panel__header--split">
             <div><span class="developer-panel__icon"><i class="bx bx-git-branch" aria-hidden="true"></i></span><div><h2>Validación de responsabilidades</h2><p>Referencia rápida para evitar notificaciones dirigidas al rol incorrecto.</p></div></div>
