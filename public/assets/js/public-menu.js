@@ -1,149 +1,124 @@
 (() => {
+    'use strict';
+
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const scrollTweens = new WeakMap();
+    const scrollInterruptionBound = new WeakSet();
 
-    const progressiveMedia = (() => {
-        const media = [
-            ...document.querySelectorAll('[data-progressive-image]'),
-            ...document.querySelectorAll('[data-progressive-background]'),
-        ];
-        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-        const constrainedConnection = Boolean(connection?.saveData) || /(^|-)2g$/.test(connection?.effectiveType || '');
-        const preloadDistance = constrainedConnection ? 280 : 960;
-        const pendingLoads = new WeakMap();
+    const cancelScrollTween = (scroller) => {
+        const state = scrollTweens.get(scroller);
+        if (state && window.gsap) window.gsap.killTweensOf(state);
+        scrollTweens.delete(scroller);
+    };
 
-        const completeShell = (element, loaded) => {
-            const shell = element.closest('[data-progressive-shell]');
-            if (!shell) return;
-            shell.classList.remove('is-media-pending');
-            shell.classList.toggle('is-media-loaded', loaded);
-            shell.classList.toggle('is-media-failed', !loaded);
-        };
+    const bindScrollInterruption = (scroller) => {
+        if (scrollInterruptionBound.has(scroller)) return;
+        scrollInterruptionBound.add(scroller);
+        const cancel = () => cancelScrollTween(scroller);
+        scroller.addEventListener('wheel', cancel, { passive: true });
+        scroller.addEventListener('touchstart', cancel, { passive: true });
+        scroller.addEventListener('pointerdown', cancel, { passive: true });
+        scroller.addEventListener('keydown', cancel);
+    };
 
-        const load = (element, priority = 'auto') => {
-            if (pendingLoads.has(element)) return pendingLoads.get(element);
+    const animateAxisScroll = (scroller, axis, destination, duration = 0.52) => {
+        if (!scroller) return;
 
-            const promise = new Promise((resolve) => {
-                const finish = (loaded) => {
-                    element.dataset.progressiveState = loaded ? 'loaded' : 'failed';
-                    completeShell(element, loaded);
-                    resolve(loaded);
-                };
+        const isWindow = scroller === window;
+        const current = axis === 'x'
+            ? scroller.scrollLeft
+            : (isWindow ? window.scrollY : scroller.scrollTop);
+        const target = Math.max(0, destination);
 
-                if (element.matches('[data-progressive-image]')) {
-                    const source = element.dataset.src;
-                    if (!source) {
-                        finish(false);
-                        return;
-                    }
+        cancelScrollTween(scroller);
+        bindScrollInterruption(scroller);
 
-                    element.dataset.progressiveState = 'loading';
-                    element.loading = 'eager';
-                    element.fetchPriority = priority;
-                    element.addEventListener('load', () => finish(true), { once: true });
-                    element.addEventListener('error', () => finish(false), { once: true });
-                    element.src = source;
-                    element.removeAttribute('data-src');
-                    if (element.complete) finish(element.naturalWidth > 0);
-                    return;
-                }
-
-                const source = element.dataset.backgroundSrc;
-                if (!source) {
-                    finish(false);
-                    return;
-                }
-
-                element.dataset.progressiveState = 'loading';
-                const image = new Image();
-                image.decoding = 'async';
-                image.onload = () => {
-                    element.style.backgroundImage = `url("${source.replaceAll('"', '\\"')}")`;
-                    finish(true);
-                };
-                image.onerror = () => finish(false);
-                image.src = source;
-            });
-
-            pendingLoads.set(element, promise);
-            return promise;
-        };
-
-        const initial = media
-            .filter((element) => {
-                const bounds = element.getBoundingClientRect();
-                return bounds.bottom >= -80 && bounds.top <= window.innerHeight * 1.35;
-            })
-            .slice(0, constrainedConnection ? 4 : 8);
-
-        const initialReady = Promise.allSettled(
-            initial.map((element, index) => load(element, index < 2 ? 'high' : 'auto')),
-        );
-
-        if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach((entry) => {
-                    if (!entry.isIntersecting) return;
-                    load(entry.target);
-                    observer.unobserve(entry.target);
+        if (reducedMotion || !window.gsap) {
+            if (isWindow) {
+                window.scrollTo({ top: target, behavior: reducedMotion ? 'auto' : 'smooth' });
+            } else {
+                scroller.scrollTo({
+                    [axis === 'x' ? 'left' : 'top']: target,
+                    behavior: reducedMotion ? 'auto' : 'smooth',
                 });
-            }, { rootMargin: `${preloadDistance}px 0px`, threshold: 0.01 });
-
-            media.forEach((element) => {
-                if (!pendingLoads.has(element)) observer.observe(element);
-            });
-        } else {
-            media.forEach((element) => load(element));
-        }
-
-        return { initialReady };
-    })();
-
-    (() => {
-        const loader = document.querySelector('[data-menu-page-loader]');
-        const content = document.querySelector('[data-menu-content]');
-        if (!loader) {
-            content?.setAttribute('aria-busy', 'false');
+            }
             return;
         }
-        content?.setAttribute('aria-busy', 'true');
+
+        const state = { position: current };
+        scrollTweens.set(scroller, state);
+        window.gsap.to(state, {
+            position: target,
+            duration,
+            ease: 'power3.out',
+            overwrite: true,
+            onUpdate: () => {
+                if (isWindow) window.scrollTo(0, state.position);
+                else if (axis === 'x') scroller.scrollLeft = state.position;
+                else scroller.scrollTop = state.position;
+            },
+            onComplete: () => scrollTweens.delete(scroller),
+        });
+    };
+
+    const animateWindowTo = (target) => {
+        if (!target) return;
+        const rootStyles = window.getComputedStyle(document.documentElement);
+        const targetStyles = window.getComputedStyle(target);
+        const offset = Math.max(
+            Number.parseFloat(rootStyles.scrollPaddingTop) || 0,
+            Number.parseFloat(targetStyles.scrollMarginTop) || 0,
+        );
+        animateAxisScroll(window, 'y', window.scrollY + target.getBoundingClientRect().top - offset, 0.62);
+    };
+
+    const initializeImageLoadingStates = (scope = document) => {
+        scope.querySelectorAll('[data-menu-image]').forEach((image) => {
+            if (image.dataset.imageStateBound === 'true') return;
+            image.dataset.imageStateBound = 'true';
+            const shell = image.closest('[data-menu-image-shell]');
+            if (!shell) return;
+
+            const finish = (loaded) => {
+                shell.classList.remove('is-image-loading');
+                shell.classList.toggle('is-image-ready', loaded);
+                shell.classList.toggle('is-image-error', !loaded);
+            };
+
+            image.addEventListener('load', () => finish(true), { once: true });
+            image.addEventListener('error', () => finish(false), { once: true });
+            if (image.complete) finish(image.naturalWidth > 0);
+        });
+    };
+
+    const initializePreloader = () => {
+        const preloader = document.querySelector('[data-home-preloader]');
+        if (!preloader) return;
 
         const startedAt = performance.now();
         let hidden = false;
-        const minimumVisible = reducedMotion ? 0 : 480;
-        const exitDuration = reducedMotion ? 0 : 280;
-
-        const waitForImage = (image) => new Promise((resolve) => {
-            if (image.complete) {
-                resolve();
-                return;
-            }
-            image.addEventListener('load', resolve, { once: true });
-            image.addEventListener('error', resolve, { once: true });
-        });
-
-        const criticalImages = [
-            document.querySelector('[data-menu-banner-slide].is-active img'),
-            document.querySelector('.menu-identity__brand img'),
-        ].filter(Boolean);
-
         const hide = () => {
             if (hidden) return;
             hidden = true;
-            const remaining = Math.max(0, minimumVisible - (performance.now() - startedAt));
+            const minimumDisplay = reducedMotion ? 0 : Math.max(0, 650 - (performance.now() - startedAt));
+
             window.setTimeout(() => {
-                loader.classList.add('is-hidden');
-                loader.setAttribute('aria-hidden', 'true');
-                content?.setAttribute('aria-busy', 'false');
-                window.setTimeout(() => loader.remove(), exitDuration);
-            }, remaining);
+                preloader.classList.add('is-hidden');
+                preloader.setAttribute('aria-hidden', 'true');
+                window.setTimeout(() => preloader.remove(), reducedMotion ? 0 : 450);
+            }, minimumDisplay);
         };
 
-        Promise.allSettled([
-            progressiveMedia.initialReady,
-            ...criticalImages.map(waitForImage),
-        ]).then(hide);
-        window.setTimeout(hide, 2400);
-    })();
+        if (document.readyState === 'complete') {
+            hide();
+        } else {
+            window.addEventListener('load', hide, { once: true });
+            window.setTimeout(hide, 4500);
+        }
+    };
+
+    initializePreloader();
+    initializeImageLoadingStates();
 
     document.querySelectorAll('[data-menu-banner-carousel]').forEach((carousel) => {
         const slides = [...carousel.querySelectorAll('[data-menu-banner-slide]')];
@@ -239,10 +214,7 @@
 
         const goTo = (requestedIndex) => {
             activeIndex = (requestedIndex + items.length) % items.length;
-            rail.scrollTo({
-                left: items[activeIndex].offsetLeft,
-                behavior: prefersReducedMotion ? 'auto' : 'smooth',
-            });
+            animateAxisScroll(rail, 'x', items[activeIndex].offsetLeft);
             updateStatus();
             schedule();
         };
@@ -308,7 +280,9 @@
 
         if (!rail || items.length === 0) return;
 
-        const itemLabel = (item) => item.querySelector(':scope > span:last-child')?.textContent.trim() || '';
+        const itemLabel = (item) => item.dataset.accessLabel
+            || item.querySelector(':scope > span:last-child')?.textContent.trim()
+            || '';
 
         const renderState = () => {
             items.forEach((item, index) => item.classList.toggle('is-active', index === activeIndex));
@@ -357,10 +331,7 @@
             const targetLeft = items[activeIndex].offsetLeft - ((rail.clientWidth - items[activeIndex].offsetWidth) / 2);
             window.clearTimeout(settleTimer);
             programmaticScroll = true;
-            rail.scrollTo({
-                left: Math.max(0, Math.min(targetLeft, maximumLeft)),
-                behavior: reduceMotion ? 'auto' : 'smooth',
-            });
+            animateAxisScroll(rail, 'x', Math.max(0, Math.min(targetLeft, maximumLeft)), 0.48);
             renderState();
             settleProgrammaticScroll(reduceMotion ? 0 : 500);
         };
@@ -414,7 +385,6 @@
     const allCategoriesLink = document.querySelector('[data-category-all]');
     const previousCategories = document.querySelector('[data-category-previous]');
     const nextCategories = document.querySelector('[data-category-next]');
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let activeCategoryId = null;
     let categoryFrame = null;
 
@@ -437,10 +407,7 @@
 
         const targetLeft = link.offsetLeft - ((categoryScroll.clientWidth - link.offsetWidth) / 2);
         const maximumLeft = Math.max(0, categoryScroll.scrollWidth - categoryScroll.clientWidth);
-        categoryScroll.scrollTo({
-            left: Math.max(0, Math.min(targetLeft, maximumLeft)),
-            behavior: prefersReducedMotion ? 'auto' : 'smooth',
-        });
+        animateAxisScroll(categoryScroll, 'x', Math.max(0, Math.min(targetLeft, maximumLeft)), 0.44);
     };
 
     const setActiveCategory = (categoryId, keepVisible = true) => {
@@ -487,10 +454,9 @@
 
     const moveCategories = (direction) => {
         if (!categoryScroll) return;
-        categoryScroll.scrollBy({
-            left: direction * Math.max(240, categoryScroll.clientWidth * 0.72),
-            behavior: prefersReducedMotion ? 'auto' : 'smooth',
-        });
+        const maximumLeft = Math.max(0, categoryScroll.scrollWidth - categoryScroll.clientWidth);
+        const targetLeft = categoryScroll.scrollLeft + (direction * Math.max(240, categoryScroll.clientWidth * 0.72));
+        animateAxisScroll(categoryScroll, 'x', Math.max(0, Math.min(targetLeft, maximumLeft)), 0.44);
     };
 
     previousCategories?.addEventListener('click', () => moveCategories(-1));
@@ -498,9 +464,17 @@
     categoryScroll?.addEventListener('scroll', requestCategorySync, { passive: true });
     window.addEventListener('scroll', requestCategorySync, { passive: true });
     window.addEventListener('resize', requestCategorySync);
-    allCategoriesLink?.addEventListener('click', () => setActiveCategory(null));
+    allCategoriesLink?.addEventListener('click', (event) => {
+        event.preventDefault();
+        setActiveCategory(null);
+        animateWindowTo(document.getElementById('catalog-title'));
+    });
     categoryLinks.forEach((link) => {
-        link.addEventListener('click', () => setActiveCategory(link.dataset.categoryLink));
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            setActiveCategory(link.dataset.categoryLink);
+            animateWindowTo(document.getElementById(link.dataset.categoryLink));
+        });
     });
 
     updateCategoryControls();
@@ -538,8 +512,7 @@
         form?.addEventListener('submit', (event) => {
             event.preventDefault();
             filterMenu();
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            document.getElementById('catalog-title')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+            animateWindowTo(document.getElementById('catalog-title'));
         });
         clear.addEventListener('click', () => {
             input.value = '';
@@ -572,7 +545,7 @@
         const showSlide = (index) => {
             const slide = slides[index];
             if (!slide) return;
-            rail.scrollTo({ left: slide.offsetLeft, behavior: reduceMotion ? 'auto' : 'smooth' });
+            animateAxisScroll(rail, 'x', slide.offsetLeft, 0.48);
         };
         const stopAutoplay = () => {
             if (autoplayTimer) window.clearInterval(autoplayTimer);

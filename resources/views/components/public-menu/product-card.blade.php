@@ -49,22 +49,23 @@
         aria-haspopup="dialog"
         data-product-detail="{{ json_encode($modalProduct, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
     ></button>
-    <div class="product-card__media {{ $cardImage ? 'is-media-pending' : '' }}" @if($cardImage) data-progressive-shell @endif>
+    <div @class([
+        'product-card__media',
+        'menu-image-shell is-image-loading' => filled($cardImage),
+    ]) @if($cardImage) data-menu-image-shell @endif>
         @if($rank)
             <span class="product-card__rank" aria-label="Favorito número {{ $rank }}">{{ $rank }}</span>
         @endif
         @if($cardImage)
             <img
-                data-src="{{ Storage::url($cardImage) }}"
-                data-progressive-image
+                src="{{ Storage::url($cardImage) }}"
                 alt="{{ $cardName }}"
                 width="{{ $featured ? 640 : 440 }}"
                 height="{{ $featured ? 400 : 330 }}"
                 loading="lazy"
                 decoding="async"
+                data-menu-image
             >
-            <noscript><img src="{{ Storage::url($cardImage) }}" alt="{{ $cardName }}"
-                    width="{{ $featured ? 640 : 440 }}" height="{{ $featured ? 400 : 330 }}"></noscript>
         @else
             <span class="product-card__placeholder" aria-hidden="true"><i class="bx bx-dish"></i></span>
         @endif
@@ -78,6 +79,10 @@
     <div class="product-card__content">
         @if($discountPercent !== null)
             <div class="product-card__discount-summary">
+                <h3>{{ $cardName }}</h3>
+                @if($cardDescription)
+                    <p>{{ $cardDescription }}</p>
+                @endif
                 <span class="product-card__discount-line">
                     <strong class="product-card__price">${{ number_format($cardPrice, 2) }}</strong>
                     <span class="product-card__discount-badge"><i class="bx bxs-hot" aria-hidden="true"></i>-{{ $discountPercent }}%</span>
@@ -86,6 +91,7 @@
                     <del>${{ number_format((float) $originalPrice, 2) }}</del>
                 @endif
             </div>
+            <span class="product-card__detail">Ver detalle <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
         @else
             @if($product->category)
                 <span class="product-card__category">{{ $product->category->name }}</span>

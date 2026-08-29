@@ -37,6 +37,23 @@ class AuthenticationTest extends TestCase
             ->assertSee('Una cuenta, un navegador activo.');
     }
 
+    public function test_password_recovery_icon_keeps_its_centered_layout(): void
+    {
+        $response = $this->get('/login');
+        $css = file_get_contents(public_path('assets/css/login.css'));
+
+        $response
+            ->assertOk()
+            ->assertSee('class="auth-recovery__icon"', false)
+            ->assertSee('bx bx-key', false);
+
+        $this->assertStringContainsString('.auth-recovery__icon { display: grid;', $css);
+        $this->assertStringContainsString('place-items: center;', $css);
+        $this->assertStringContainsString('.auth-recovery__icon i { display: grid;', $css);
+        $this->assertStringContainsString('.auth-recovery > div strong,.auth-recovery > div span { display: block; }', $css);
+        $this->assertStringNotContainsString('.auth-recovery strong,.auth-recovery span { display: block; }', $css);
+    }
+
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
         $user = User::factory()->create();

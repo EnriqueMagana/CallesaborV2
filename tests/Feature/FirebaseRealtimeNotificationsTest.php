@@ -101,6 +101,47 @@ class FirebaseRealtimeNotificationsTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_super_admin_snapshot_lists_realtime_notification_signals_newest_first(): void
+    {
+        $credentialsPath = tempnam(sys_get_temp_dir(), 'firebase-list-test-');
+        file_put_contents($credentialsPath, json_encode([
+            'client_email' => 'firebase-test@example.test',
+            'private_key' => 'unused-in-this-test',
+        ], JSON_THROW_ON_ERROR));
+
+        config()->set('firebase.realtime.enabled', true);
+        config()->set('firebase.realtime.database_url', 'https://example-default-rtdb.firebaseio.com');
+        config()->set('firebase.realtime.credentials_path', $credentialsPath);
+        config()->set('firebase.realtime.root_path', 'notifications');
+
+        $tokens = Mockery::mock(FirebaseAccessTokenProvider::class);
+        $tokens->shouldReceive('token')->once()->andReturn('test-access-token');
+        $this->app->instance(FirebaseAccessTokenProvider::class, $tokens);
+        Http::fake(['*' => Http::response([
+            'laravel_9' => [
+                'older-id' => ['id' => 'older-id', 'event_key' => 'order.created', 'created_at_ms' => 1700000000000],
+            ],
+            'laravel_12' => [
+                'newer-id' => ['id' => 'newer-id', 'event_key' => 'order.ready', 'created_at_ms' => 1800000000000],
+            ],
+        ])]);
+
+        try {
+            $snapshot = app(FirebaseRealtimeDatabase::class)->notificationSignals();
+
+            $this->assertTrue($snapshot['ok']);
+            $this->assertTrue($snapshot['available']);
+            $this->assertSame(2, $snapshot['total']);
+            $this->assertSame('newer-id', $snapshot['signals'][0]['id']);
+            $this->assertSame('laravel_12', $snapshot['signals'][0]['user_uid']);
+            $this->assertSame('order.ready', $snapshot['signals'][0]['event_key']);
+            Http::assertSent(fn ($request): bool => $request->method() === 'GET'
+                && $request->url() === 'https://example-default-rtdb.firebaseio.com/notifications.json');
+        } finally {
+            @unlink($credentialsPath);
+        }
+    }
+
     public function test_cleanup_command_deletes_the_complete_realtime_notifications_root(): void
     {
         $credentialsPath = tempnam(sys_get_temp_dir(), 'firebase-cleanup-test-');

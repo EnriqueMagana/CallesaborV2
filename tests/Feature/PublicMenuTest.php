@@ -106,6 +106,10 @@ class PublicMenuTest extends TestCase
             ->assertSee('data-quick-access-next', false)
             ->assertSee('data-quick-access-current', false)
             ->assertSee('data-quick-access-label', false)
+            ->assertSee('data-access-label="Haz una reservación"', false)
+            ->assertSee('menu-farewell__label-mobile">Reservar', false)
+            ->assertSee('menu-farewell__label-mobile">Redes', false)
+            ->assertSee('family=Parisienne', false)
             ->assertSee('aria-pressed="true"', false)
             ->assertSee('instagram.com/callesabor', false)
             ->assertSee('maps.app.goo.gl/callesabor', false)
@@ -116,10 +120,18 @@ class PublicMenuTest extends TestCase
 
         $this->assertStringContainsString('.menu-farewell__rail{', $css);
         $this->assertStringContainsString('.menu-farewell__item.is-active .menu-farewell__icon', $css);
-        $this->assertStringContainsString('font-size:clamp(46px,4.4vw,54px)', $css);
+        $this->assertStringContainsString('font-family:"Parisienne",cursive', $css);
+        $this->assertStringContainsString('.menu-farewell__icon{width:76px;height:76px', $css);
+        $this->assertStringContainsString('@media(min-width:681px) and (max-width:1024px)', $css);
+        $this->assertStringContainsString('.menu-farewell__icon{width:64px;height:64px', $css);
+        $this->assertStringContainsString('.menu-farewell__control{display:none}', $css);
+        $this->assertStringContainsString('.menu-farewell__rail{width:calc(100% + 30px);grid-auto-columns:64px;gap:10px', $css);
+        $this->assertStringContainsString('.menu-farewell__icon{width:56px;height:56px', $css);
+        $this->assertStringContainsString('.menu-farewell__position,.menu-farewell__current-label{display:none}', $css);
         $this->assertStringContainsString('scroll-snap-type:x mandatory', $css);
         $this->assertStringContainsString("document.querySelectorAll('[data-quick-access-carousel]')", $javascript);
         $this->assertStringContainsString('currentLabel.textContent = label', $javascript);
+        $this->assertStringContainsString('item.dataset.accessLabel', $javascript);
         $this->assertStringContainsString('programmaticScroll = true', $javascript);
         $this->assertStringContainsString('const settleProgrammaticScroll = (delay = 120) =>', $javascript);
         $this->assertStringContainsString('settleProgrammaticScroll(reduceMotion ? 0 : 500)', $javascript);
@@ -190,7 +202,7 @@ class PublicMenuTest extends TestCase
         );
     }
 
-    public function test_menu_uses_an_accessible_loader_and_progressively_preloads_images_near_the_viewport(): void
+    public function test_menu_uses_the_home_preloader_and_only_skeletonizes_images_while_they_load(): void
     {
         Product::create([
             'name' => 'Platillo progresivo',
@@ -205,24 +217,58 @@ class PublicMenuTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('data-menu-page-loader', false)
+            ->assertSee('data-home-preloader', false)
+            ->assertSee('home-preloader__chase', false)
             ->assertDontSee('Preparando el menú')
-            ->assertDontSee('menu-page-loader__brand', false)
-            ->assertDontSee('menu-page-loader__progress', false)
-            ->assertSee('data-menu-content', false)
-            ->assertSee('data-progressive-image', false)
-            ->assertSee('data-src="/storage/products/progressive.webp"', false)
+            ->assertDontSee('menu-page-loader', false)
+            ->assertDontSee('data-progressive-image', false)
+            ->assertDontSee('data-progressive-background', false)
+            ->assertSee('src="/storage/products/progressive.webp"', false)
+            ->assertSee('data-menu-image-shell', false)
+            ->assertSee('data-menu-image', false)
+            ->assertSee('is-image-loading', false)
+            ->assertSee('https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js', false)
             ->assertSee('<noscript>', false);
 
-        $this->assertStringContainsString('.menu-page-loader{', $css);
-        $this->assertStringContainsString('.is-media-pending::after{', $css);
+        $this->assertStringContainsString('.home-preloader{', $css);
+        $this->assertStringContainsString('.home-preloader__chase{', $css);
+        $this->assertStringNotContainsString('.menu-page-loader{', $css);
+        $this->assertStringNotContainsString('.is-media-pending::after{', $css);
+        $this->assertStringContainsString('.menu-image-shell.is-image-loading::after', $css);
+        $this->assertStringContainsString('@keyframes menu-image-shimmer', $css);
         $this->assertStringContainsString('@media(prefers-reduced-motion:reduce)', $css);
-        $this->assertStringContainsString("document.querySelectorAll('[data-progressive-image]')", $javascript);
-        $this->assertStringContainsString("new IntersectionObserver", $javascript);
-        $this->assertStringContainsString('const preloadDistance = constrainedConnection ? 280 : 960', $javascript);
-        $this->assertStringContainsString("content?.setAttribute('aria-busy', 'false')", $javascript);
-        $this->assertStringContainsString("content?.setAttribute('aria-busy', 'true')", $javascript);
-        $this->assertStringContainsString('window.setTimeout(hide, 2400)', $javascript);
+        $this->assertStringContainsString("document.querySelector('[data-home-preloader]')", $javascript);
+        $this->assertStringContainsString('Math.max(0, 650 - (performance.now() - startedAt))', $javascript);
+        $this->assertStringContainsString("window.addEventListener('load', hide, { once: true })", $javascript);
+        $this->assertStringContainsString('window.setTimeout(hide, 4500)', $javascript);
+        $this->assertStringContainsString('const initializeImageLoadingStates = (scope = document) =>', $javascript);
+        $this->assertStringContainsString("window.gsap.to(state", $javascript);
+        $this->assertStringContainsString("animateAxisScroll(window, 'y'", $javascript);
+        $this->assertStringNotContainsString("document.querySelectorAll('[data-progressive-image]')", $javascript);
+    }
+
+    public function test_discount_product_cards_keep_the_product_name_and_description_visible(): void
+    {
+        $product = Product::create([
+            'name' => 'Hamburguesa de la casa',
+            'description' => 'Carne a la parrilla con ingredientes frescos.',
+            'price' => 120,
+            'is_active' => true,
+        ]);
+
+        $this->blade(
+            '<x-public-menu.product-card :product="$product" :price-override="108" :original-price="120" :discount-percent="10" />',
+            compact('product')
+        )
+            ->assertSee('<h3>Hamburguesa de la casa</h3>', false)
+            ->assertSee('<p>Carne a la parrilla con ingredientes frescos.</p>', false)
+            ->assertSee('$108.00')
+            ->assertSee('-10%')
+            ->assertSee('$120.00');
+
+        $css = file_get_contents(public_path('assets/css/promotions-public.css'));
+        $this->assertStringContainsString('.product-card__discount-summary>p{display:-webkit-box', $css);
+        $this->assertStringContainsString('min-height:122px!important', $css);
     }
 
     public function test_category_navigation_tracks_the_visible_section_and_exposes_desktop_controls(): void

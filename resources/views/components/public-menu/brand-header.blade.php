@@ -26,12 +26,14 @@
         @if ($bannerItems->isNotEmpty())
             <div class="menu-cover__slides">
                 @foreach ($bannerItems as $item)
-                    <figure class="menu-cover__slide {{ $loop->first ? 'is-active' : '' }}" data-menu-banner-slide
+                    <figure class="menu-cover__slide menu-image-shell is-image-loading {{ $loop->first ? 'is-active' : '' }}"
+                        data-menu-banner-slide data-menu-image-shell
                         aria-hidden="{{ $loop->first ? 'false' : 'true' }}">
                         <img src="{{ Storage::url($item['path']) }}"
                             alt="{{ $item['alt'] ?: 'Ambiente de ' . $business->business_name }}" width="1600"
                             height="640" loading="{{ $loop->first ? 'eager' : 'lazy' }}"
-                            fetchpriority="{{ $loop->first ? 'high' : 'auto' }}" decoding="async">
+                            fetchpriority="{{ $loop->first ? 'high' : 'auto' }}" decoding="async"
+                            data-menu-image>
                     </figure>
                 @endforeach
             </div>
