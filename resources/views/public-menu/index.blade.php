@@ -17,14 +17,29 @@
         href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
     <link rel="stylesheet"
         href="{{ asset('assets/css/promotions-public.css') }}?v={{ filemtime(public_path('assets/css/promotions-public.css')) }}">
+    <noscript><style>.menu-page-loader{display:none!important}.is-media-pending::after{display:none!important}img[data-progressive-image]{display:none!important}</style></noscript>
 </head>
 
 <body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
+    <div class="menu-page-loader" data-menu-page-loader role="status" aria-live="polite"
+        aria-label="Cargando contenido">
+        <div class="menu-page-loader__content">
+            <div class="menu-page-loader__skeleton" aria-hidden="true">
+                <span class="menu-page-loader__search"></span>
+                <div class="menu-page-loader__chips"><span></span><span></span><span></span></div>
+                <div class="menu-page-loader__cards">
+                    @for ($placeholder = 0; $placeholder < 4; $placeholder++)
+                        <span><i></i><b></b><small></small></span>
+                    @endfor
+                </div>
+            </div>
+        </div>
+    </div>
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
         :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
 
-    <main>
+    <main data-menu-content>
         <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
             <div class="menu-container menu-discovery__intro">
                 <div class="menu-discovery__heading">
@@ -98,11 +113,15 @@
                                 @endphp
                                 <a href="#category-{{ $category->id }}" class="category-nav__item"
                                     data-category-link="category-{{ $category->id }}">
-                                    <span class="category-nav__icon"
+                                    <span class="category-nav__icon {{ $menuSettings->category_style === 'circles' && $categoryPreview ? 'is-media-pending' : '' }}"
+                                        @if ($menuSettings->category_style === 'circles' && $categoryPreview) data-progressive-shell @endif
                                         style="--category-color: {{ $category->color ?: $business->primary_color }}">
                                         @if ($menuSettings->category_style === 'circles' && $categoryPreview)
-                                            <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
-                                                width="64" height="64" loading="lazy" decoding="async">
+                                            <img data-src="{{ Storage::url($categoryPreview->image) }}"
+                                                data-progressive-image alt="" width="64" height="64" loading="lazy"
+                                                decoding="async">
+                                            <noscript><img src="{{ Storage::url($categoryPreview->image) }}" alt=""
+                                                    width="64" height="64"></noscript>
                                         @else
                                             <i class="bx {{ $category->icon ?: 'bx-food-menu' }}"
                                                 aria-hidden="true"></i>
@@ -191,8 +210,8 @@
                                 <button type="button" class="promotion-banner__trigger"
                                     aria-label="Ver detalles de {{ $promotion->name }}" aria-haspopup="dialog"
                                     data-promotion-detail="{{ json_encode($modalPromotion, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"></button>
-                                <div class="promotion-banner__media"
-                                    @if ($promotion->image) style="background-image: url('{{ Storage::url($promotion->image) }}')" @endif
+                                <div class="promotion-banner__media {{ $promotion->image ? 'is-media-pending' : '' }}"
+                                    @if ($promotion->image) data-progressive-background data-background-src="{{ Storage::url($promotion->image) }}" data-progressive-shell @endif
                                     aria-hidden="true">
                                     @unless ($promotion->image)
                                         <span><i class="bx {{ $promotion->presentationIcon() }}"></i></span>
