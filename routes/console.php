@@ -21,7 +21,8 @@ Schedule::call(function (): void {
 })->dailyAt('03:20')->name('notifications:prune')->withoutOverlapping();
 
 Schedule::command('notifications:clear-realtime')
-    ->dailyAt((string) config('firebase.realtime.cleanup_time', '23:59'))
+    ->dailyAt((string) config('firebase.realtime.cleanup_time', '00:00'))
     ->timezone((string) config('firebase.realtime.cleanup_timezone', 'America/Mexico_City'))
     ->name('notifications:clear-realtime')
+    ->appendOutputTo(storage_path('logs/firebase-cleanup.log'))
     ->withoutOverlapping();

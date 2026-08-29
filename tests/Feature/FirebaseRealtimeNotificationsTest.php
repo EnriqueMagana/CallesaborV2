@@ -6,6 +6,7 @@ use App\Models\AppNotification;
 use App\Models\User;
 use App\Services\Firebase\FirebaseAccessTokenProvider;
 use App\Services\Firebase\FirebaseRealtimeDatabase;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -98,6 +99,44 @@ class FirebaseRealtimeNotificationsTest extends TestCase
 
         $this->artisan('notifications:clear-realtime')
             ->assertSuccessful();
+    }
+
+    public function test_cleanup_command_deletes_the_complete_realtime_notifications_root(): void
+    {
+        $credentialsPath = tempnam(sys_get_temp_dir(), 'firebase-cleanup-test-');
+        file_put_contents($credentialsPath, json_encode([
+            'client_email' => 'firebase-test@example.test',
+            'private_key' => 'unused-in-this-test',
+        ], JSON_THROW_ON_ERROR));
+
+        config()->set('firebase.realtime.enabled', true);
+        config()->set('firebase.realtime.database_url', 'https://example-default-rtdb.firebaseio.com');
+        config()->set('firebase.realtime.credentials_path', $credentialsPath);
+        config()->set('firebase.realtime.root_path', 'notifications');
+
+        $tokens = Mockery::mock(FirebaseAccessTokenProvider::class);
+        $tokens->shouldReceive('token')->once()->andReturn('test-access-token');
+        $this->app->instance(FirebaseAccessTokenProvider::class, $tokens);
+        Http::fake(['*' => Http::response(null, 200)]);
+
+        try {
+            $this->artisan('notifications:clear-realtime')->assertSuccessful();
+
+            Http::assertSent(fn ($request): bool => $request->method() === 'DELETE'
+                && $request->url() === 'https://example-default-rtdb.firebaseio.com/notifications.json');
+        } finally {
+            @unlink($credentialsPath);
+        }
+    }
+
+    public function test_firebase_cleanup_is_scheduled_at_midnight_in_mexico_city(): void
+    {
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($scheduled): bool => $scheduled->description === 'notifications:clear-realtime');
+
+        $this->assertNotNull($event);
+        $this->assertSame('0 0 * * *', $event->expression);
+        $this->assertSame('America/Mexico_City', $event->timezone);
     }
 
     public function test_firebase_rules_only_allow_each_authenticated_user_to_read_their_branch(): void

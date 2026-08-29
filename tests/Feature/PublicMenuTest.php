@@ -67,6 +67,7 @@ class PublicMenuTest extends TestCase
             ->assertSee('product-card__action', false)
             ->assertSee('menu-cover__topbar', false)
             ->assertSee('menu-identity', false)
+            ->assertSee('menu-farewell', false)
             ->assertSee('menu-footer__brand', false)
             ->assertSee('Especialidades')
             ->assertSee('Taco de la casa')
@@ -76,6 +77,56 @@ class PublicMenuTest extends TestCase
             ->assertDontSee('Producto oculto')
             ->assertDontSee('Agregar al carrito')
             ->assertDontSee('Hacer pedido');
+    }
+
+    public function test_menu_places_the_mobile_quick_access_carousel_before_the_shared_footer(): void
+    {
+        $business = BusinessSetting::current();
+        $business->update([
+            'instagram_url' => 'https://instagram.com/callesabor',
+            'maps_url' => 'https://maps.app.goo.gl/callesabor',
+        ]);
+
+        $response = $this->get(route('public.menu'));
+
+        $response
+            ->assertOk()
+            ->assertSee('Gracias por tu visita')
+            ->assertSee('Esperamos volver a verte pronto.')
+            ->assertSeeInOrder([
+                'Inicio',
+                'Haz una reservación',
+                'Horarios',
+                'Redes sociales',
+                'Ubicación',
+            ])
+            ->assertSee('data-quick-access-carousel', false)
+            ->assertSee('data-quick-access-rail', false)
+            ->assertSee('data-quick-access-previous', false)
+            ->assertSee('data-quick-access-next', false)
+            ->assertSee('data-quick-access-current', false)
+            ->assertSee('data-quick-access-label', false)
+            ->assertSee('aria-pressed="true"', false)
+            ->assertSee('instagram.com/callesabor', false)
+            ->assertSee('maps.app.goo.gl/callesabor', false)
+            ->assertSeeInOrder(['menu-farewell', 'pie-de-pagina'], false);
+
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+        $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
+
+        $this->assertStringContainsString('.menu-farewell__rail{', $css);
+        $this->assertStringContainsString('.menu-farewell__item.is-active .menu-farewell__icon', $css);
+        $this->assertStringContainsString('font-size:clamp(46px,4.4vw,54px)', $css);
+        $this->assertStringContainsString('scroll-snap-type:x mandatory', $css);
+        $this->assertStringContainsString("document.querySelectorAll('[data-quick-access-carousel]')", $javascript);
+        $this->assertStringContainsString('currentLabel.textContent = label', $javascript);
+        $this->assertStringContainsString('programmaticScroll = true', $javascript);
+        $this->assertStringContainsString('const settleProgrammaticScroll = (delay = 120) =>', $javascript);
+        $this->assertStringContainsString('settleProgrammaticScroll(reduceMotion ? 0 : 500)', $javascript);
+        $this->assertStringNotContainsString("programmaticScroll = false;\n                updateState();", $javascript);
+        $this->assertStringContainsString("previous?.addEventListener('click', () => goTo(activeIndex - 1))", $javascript);
+        $this->assertStringContainsString("next?.addEventListener('click', () => goTo(activeIndex + 1))", $javascript);
+        $this->assertStringContainsString('activeIndex + (event.key === \'ArrowRight\' ? 1 : -1)', $javascript);
     }
 
     public function test_long_descriptions_are_clamped_in_cards_and_remain_complete_in_the_detail(): void

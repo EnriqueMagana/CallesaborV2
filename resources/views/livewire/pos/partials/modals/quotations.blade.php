@@ -3,7 +3,7 @@
     <div class="pos-modal" @click.stop>
         <div class="modal-header-pos">
             <i class="bx bx-bookmark" data-ui="xui-zbum5m"></i>
-            <h4>Pedidos guardados</h4>
+            <h4>Borradores de pedidos</h4>
             <button wire:click="$set('showQuotationsModal',false)" class="pos-btn pos-btn-secondary" data-ui="xui-1a0g5qw"><i class="bx bx-x"></i></button>
         </div>
         <div class="modal-body-pos">
@@ -14,7 +14,11 @@
                         <span data-ui="xui-18m4gf1">${{ number_format($q->total,2) }}</span>
                     </div>
                     @if($q->customer_name)<div data-ui="xui-y4gxmi"><i class="bx bx-user me-1"></i>{{ $q->customer_name }}</div>@endif
-                    <div data-ui="xui-14yui1o">{{ $q->created_at->diffForHumans() }}</div>
+                    <div data-ui="xui-14yui1o">
+                        <i class="bx {{ match($q->order_type) { 'delivery' => 'bx-cycling', 'pick_up' => 'bx-store-alt', default => 'bx-store' } }}" aria-hidden="true"></i>
+                        {{ match($q->order_type) { 'delivery' => 'Delivery', 'pick_up' => 'Para recoger', default => 'Ventanilla' } }}
+                        · {{ $q->created_at->diffForHumans() }}
+                    </div>
                     <div data-ui="xui-6889c4">
                         <button wire:click="loadQuotation({{ $q->id }})" class="pos-btn pos-btn-primary" data-ui="xui-1lde97g">
                             <i class="bx bx-upload"></i> Cargar
@@ -28,7 +32,7 @@
             @empty
                 <div data-ui="xui-ggsjjx">
                     <i class="bx bx-bookmark" data-ui="xui-qcmw2v"></i>
-                    <span data-ui="xui-1fzausk">No hay pedidos guardados</span>
+                    <span data-ui="xui-1fzausk">No hay borradores guardados</span>
                 </div>
             @endforelse
         </div>
