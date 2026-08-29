@@ -190,6 +190,41 @@ class PublicMenuTest extends TestCase
         );
     }
 
+    public function test_menu_uses_an_accessible_loader_and_progressively_preloads_images_near_the_viewport(): void
+    {
+        Product::create([
+            'name' => 'Platillo progresivo',
+            'image' => 'products/progressive.webp',
+            'price' => 95,
+            'is_active' => true,
+        ]);
+
+        $response = $this->get(route('public.menu'));
+        $css = file_get_contents(public_path('assets/css/public-menu.css'));
+        $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-menu-page-loader', false)
+            ->assertDontSee('Preparando el menú')
+            ->assertDontSee('menu-page-loader__brand', false)
+            ->assertDontSee('menu-page-loader__progress', false)
+            ->assertSee('data-menu-content', false)
+            ->assertSee('data-progressive-image', false)
+            ->assertSee('data-src="/storage/products/progressive.webp"', false)
+            ->assertSee('<noscript>', false);
+
+        $this->assertStringContainsString('.menu-page-loader{', $css);
+        $this->assertStringContainsString('.is-media-pending::after{', $css);
+        $this->assertStringContainsString('@media(prefers-reduced-motion:reduce)', $css);
+        $this->assertStringContainsString("document.querySelectorAll('[data-progressive-image]')", $javascript);
+        $this->assertStringContainsString("new IntersectionObserver", $javascript);
+        $this->assertStringContainsString('const preloadDistance = constrainedConnection ? 280 : 960', $javascript);
+        $this->assertStringContainsString("content?.setAttribute('aria-busy', 'false')", $javascript);
+        $this->assertStringContainsString("content?.setAttribute('aria-busy', 'true')", $javascript);
+        $this->assertStringContainsString('window.setTimeout(hide, 2400)', $javascript);
+    }
+
     public function test_category_navigation_tracks_the_visible_section_and_exposes_desktop_controls(): void
     {
         $response = $this->get(route('public.menu'));

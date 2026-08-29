@@ -12,6 +12,30 @@ button,input,select,textarea{font:inherit}
 .menu-skip-link,.skip-link{min-height:44px;position:fixed;z-index:1300;top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;color:#fff;border:2px solid rgba(255,255,255,.72);border-radius:12px;background:var(--menu-primary);box-shadow:0 12px 30px rgba(8,30,16,.22);font-size:.78rem;font-weight:800;line-height:1.25;transform:translateY(calc(-100% - 24px));transition:transform .18s ease}
 .menu-skip-link:focus,.menu-skip-link:focus-visible,.skip-link:focus,.skip-link:focus-visible{color:#fff;outline:3px solid #fff;outline-offset:3px;transform:translateY(0)}
 :focus-visible{outline:3px solid color-mix(in srgb,var(--menu-primary) 45%,white);outline-offset:3px}
+
+/* Progressive page and media loading for the server-rendered public menu. */
+.menu-page-loader{min-height:100vh;min-height:100dvh;position:fixed;z-index:1500;inset:0;overflow:auto;padding:max(22px,env(safe-area-inset-top)) 18px max(22px,env(safe-area-inset-bottom));color:var(--menu-text);background:#fff;opacity:1;visibility:visible;transition:opacity .28s ease,visibility .28s ease}
+.menu-page-loader.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
+.menu-page-loader__content{width:min(100%,960px);margin-inline:auto;padding-top:clamp(24px,8vh,72px)}
+.menu-page-loader__skeleton{display:grid;gap:18px}
+.menu-page-loader__search{width:min(100%,700px);height:58px;display:block;margin-inline:auto;border:1px solid var(--menu-border);border-radius:18px}
+.menu-page-loader__chips{display:flex;justify-content:center;gap:8px;overflow:hidden}
+.menu-page-loader__chips span{width:118px;height:42px;flex:0 0 auto;border-radius:999px}.menu-page-loader__chips span:nth-child(2){width:146px}.menu-page-loader__chips span:nth-child(3){width:104px}
+.menu-page-loader__cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:8px}
+.menu-page-loader__cards>span{min-width:0;overflow:hidden;border:1px solid var(--menu-border);border-radius:20px;background:#fff}
+.menu-page-loader__cards i{height:150px;display:block}.menu-page-loader__cards b,.menu-page-loader__cards small{height:12px;display:block;margin:15px 14px 0;border-radius:999px}.menu-page-loader__cards small{width:62%;height:9px;margin-block:10px 18px}
+.menu-page-loader__search,.menu-page-loader__chips span,.menu-page-loader__cards i,.menu-page-loader__cards b,.menu-page-loader__cards small,.is-media-pending::after{background:linear-gradient(100deg,#edf3ee 8%,#f8faf8 32%,#edf3ee 56%);background-size:240% 100%;animation:menu-skeleton-shimmer 1.35s ease-in-out infinite}
+[data-progressive-shell]{position:relative}
+.is-media-pending::after{position:absolute;z-index:3;inset:0;content:"";pointer-events:none}
+img[data-progressive-image]{opacity:0}
+.is-media-loaded img[data-progressive-image]{opacity:1}
+.product-card__media img[data-progressive-image]{transition:opacity .24s ease,transform .28s ease}
+.category-nav__icon img[data-progressive-image]{transition:opacity .2s ease}
+.is-media-failed img[data-progressive-image]{display:none}
+@keyframes menu-skeleton-shimmer{to{background-position:-240% 0}}
+@media(max-width:680px){.menu-page-loader{padding-inline:15px}.menu-page-loader__content{padding-top:16px}.menu-page-loader__skeleton{gap:14px}.menu-page-loader__chips{justify-content:flex-start}.menu-page-loader__cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.menu-page-loader__cards i{height:132px}}
+@media(max-width:390px){.menu-page-loader__cards i{height:118px}.menu-page-loader__cards b{margin-top:12px}}
+@media(prefers-reduced-motion:reduce){.menu-page-loader,.product-card__media img[data-progressive-image],.category-nav__icon img[data-progressive-image]{transition:none}.menu-page-loader__search,.menu-page-loader__chips span,.menu-page-loader__cards i,.menu-page-loader__cards b,.menu-page-loader__cards small,.is-media-pending::after{animation:none}}
 .menu-header{position:sticky;z-index:100;top:0;border-bottom:1px solid rgba(223,232,225,.9);background:rgba(255,255,255,.94);backdrop-filter:blur(16px)}
 .menu-header__inner{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .menu-brand{min-width:0;display:flex;align-items:center;gap:11px}

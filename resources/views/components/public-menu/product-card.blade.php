@@ -49,19 +49,22 @@
         aria-haspopup="dialog"
         data-product-detail="{{ json_encode($modalProduct, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
     ></button>
-    <div class="product-card__media">
+    <div class="product-card__media {{ $cardImage ? 'is-media-pending' : '' }}" @if($cardImage) data-progressive-shell @endif>
         @if($rank)
             <span class="product-card__rank" aria-label="Favorito número {{ $rank }}">{{ $rank }}</span>
         @endif
         @if($cardImage)
             <img
-                src="{{ Storage::url($cardImage) }}"
+                data-src="{{ Storage::url($cardImage) }}"
+                data-progressive-image
                 alt="{{ $cardName }}"
                 width="{{ $featured ? 640 : 440 }}"
                 height="{{ $featured ? 400 : 330 }}"
                 loading="lazy"
                 decoding="async"
             >
+            <noscript><img src="{{ Storage::url($cardImage) }}" alt="{{ $cardName }}"
+                    width="{{ $featured ? 640 : 440 }}" height="{{ $featured ? 400 : 330 }}"></noscript>
         @else
             <span class="product-card__placeholder" aria-hidden="true"><i class="bx bx-dish"></i></span>
         @endif

@@ -1,4 +1,150 @@
 (() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const progressiveMedia = (() => {
+        const media = [
+            ...document.querySelectorAll('[data-progressive-image]'),
+            ...document.querySelectorAll('[data-progressive-background]'),
+        ];
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        const constrainedConnection = Boolean(connection?.saveData) || /(^|-)2g$/.test(connection?.effectiveType || '');
+        const preloadDistance = constrainedConnection ? 280 : 960;
+        const pendingLoads = new WeakMap();
+
+        const completeShell = (element, loaded) => {
+            const shell = element.closest('[data-progressive-shell]');
+            if (!shell) return;
+            shell.classList.remove('is-media-pending');
+            shell.classList.toggle('is-media-loaded', loaded);
+            shell.classList.toggle('is-media-failed', !loaded);
+        };
+
+        const load = (element, priority = 'auto') => {
+            if (pendingLoads.has(element)) return pendingLoads.get(element);
+
+            const promise = new Promise((resolve) => {
+                const finish = (loaded) => {
+                    element.dataset.progressiveState = loaded ? 'loaded' : 'failed';
+                    completeShell(element, loaded);
+                    resolve(loaded);
+                };
+
+                if (element.matches('[data-progressive-image]')) {
+                    const source = element.dataset.src;
+                    if (!source) {
+                        finish(false);
+                        return;
+                    }
+
+                    element.dataset.progressiveState = 'loading';
+                    element.loading = 'eager';
+                    element.fetchPriority = priority;
+                    element.addEventListener('load', () => finish(true), { once: true });
+                    element.addEventListener('error', () => finish(false), { once: true });
+                    element.src = source;
+                    element.removeAttribute('data-src');
+                    if (element.complete) finish(element.naturalWidth > 0);
+                    return;
+                }
+
+                const source = element.dataset.backgroundSrc;
+                if (!source) {
+                    finish(false);
+                    return;
+                }
+
+                element.dataset.progressiveState = 'loading';
+                const image = new Image();
+                image.decoding = 'async';
+                image.onload = () => {
+                    element.style.backgroundImage = `url("${source.replaceAll('"', '\\"')}")`;
+                    finish(true);
+                };
+                image.onerror = () => finish(false);
+                image.src = source;
+            });
+
+            pendingLoads.set(element, promise);
+            return promise;
+        };
+
+        const initial = media
+            .filter((element) => {
+                const bounds = element.getBoundingClientRect();
+                return bounds.bottom >= -80 && bounds.top <= window.innerHeight * 1.35;
+            })
+            .slice(0, constrainedConnection ? 4 : 8);
+
+        const initialReady = Promise.allSettled(
+            initial.map((element, index) => load(element, index < 2 ? 'high' : 'auto')),
+        );
+
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) return;
+                    load(entry.target);
+                    observer.unobserve(entry.target);
+                });
+            }, { rootMargin: `${preloadDistance}px 0px`, threshold: 0.01 });
+
+            media.forEach((element) => {
+                if (!pendingLoads.has(element)) observer.observe(element);
+            });
+        } else {
+            media.forEach((element) => load(element));
+        }
+
+        return { initialReady };
+    })();
+
+    (() => {
+        const loader = document.querySelector('[data-menu-page-loader]');
+        const content = document.querySelector('[data-menu-content]');
+        if (!loader) {
+            content?.setAttribute('aria-busy', 'false');
+            return;
+        }
+        content?.setAttribute('aria-busy', 'true');
+
+        const startedAt = performance.now();
+        let hidden = false;
+        const minimumVisible = reducedMotion ? 0 : 480;
+        const exitDuration = reducedMotion ? 0 : 280;
+
+        const waitForImage = (image) => new Promise((resolve) => {
+            if (image.complete) {
+                resolve();
+                return;
+            }
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener('error', resolve, { once: true });
+        });
+
+        const criticalImages = [
+            document.querySelector('[data-menu-banner-slide].is-active img'),
+            document.querySelector('.menu-identity__brand img'),
+        ].filter(Boolean);
+
+        const hide = () => {
+            if (hidden) return;
+            hidden = true;
+            const remaining = Math.max(0, minimumVisible - (performance.now() - startedAt));
+            window.setTimeout(() => {
+                loader.classList.add('is-hidden');
+                loader.setAttribute('aria-hidden', 'true');
+                content?.setAttribute('aria-busy', 'false');
+                window.setTimeout(() => loader.remove(), exitDuration);
+            }, remaining);
+        };
+
+        Promise.allSettled([
+            progressiveMedia.initialReady,
+            ...criticalImages.map(waitForImage),
+        ]).then(hide);
+        window.setTimeout(hide, 2400);
+    })();
+
     document.querySelectorAll('[data-menu-banner-carousel]').forEach((carousel) => {
         const slides = [...carousel.querySelectorAll('[data-menu-banner-slide]')];
         const dots = [...carousel.querySelectorAll('[data-banner-dot]')];
