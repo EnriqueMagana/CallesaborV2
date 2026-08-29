@@ -1,0 +1,882 @@
+[
+    {
+        "name": "Pasta Grande",
+        "description": "Pasta Grande acompañado con 1 tipo de salsa 1 tipo de carne 1 tipo de pasta y 6 complementos que puedes seleccionar en nuestra lista.",
+        "image": "menus/1759812806-pasta grande 2.webp",
+        "price": "165.00",
+        "is_customizable": true,
+        "max_addons": 6,
+        "sort_order": 1,
+        "is_active": true
+    },
+    {
+        "name": "Pasta chica",
+        "description": "Pasta Chica acompañada con 1 tipo de salsa 1 tipo de carne 1 tipo de pasta y 3 complementos que puedes seleccionar en nuestra lista.",
+        "image": "menus/1759862503-Pasta chica.webp",
+        "price": "140.00",
+        "is_customizable": true,
+        "max_addons": 3,
+        "sort_order": 2,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa de Res",
+        "description": "Una deliciosa hamburguesa de Res preparada con ingredientes frescos y acompañada de crujientes papas a la francesa. Incluye: Pan suave y ligeramente tostado Carne 100% res, jugosa y bien sazonada Lechuga fresca Tomate en rodajas Cebolla morada Queso derretido Mayonesa Catsup Salsa búfalo Aderezos especiales de la casa Acompañada con papas a la francesa doradas al punto perfecto",
+        "image": "menus/1759813118-hamburguesa de res.webp",
+        "price": "90.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 3,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa BBQ",
+        "description": "La hamburguesa BBQ con aros de cebolla es una explosión de sabor ahumado y crujiente en cada bocado. Preparada con una jugosa carne 100% de res a la parrilla, servida en un pan artesanal suave y ligeramente tostado, lleva queso derretido, lechuga fresca, tomate en rodajas, cebolla morada y crujientes aros de cebolla empanizados. Todo se complementa con una generosa capa de salsa BBQ al estilo casero, mayonesa y nuestros aderezos especiales. Se acompaña con papas a la francesa doradas",
+        "image": "menus/1760468578-bbq.webp",
+        "price": "95.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 4,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa hawaiana",
+        "description": "Hamburguesa hawaiana con carne 100% de res, pan artesanal tostado, queso derretido, piña a la plancha, lechuga, tomate, cebolla morada, mayonesa, catsup, salsa búfalo y aderezos especiales. Acompañada con papas a la francesa.",
+        "image": "menus/1760468557-hawaiana.webp",
+        "price": "95.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 5,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa de pollo",
+        "description": "Hamburguesa de pollo con pechuga empanizada y crujiente, pan artesanal tostado, queso derretido, lechuga, tomate, cebolla morada, mayonesa, catsup, salsa búfalo y aderezos especiales. Acompañada con papas a la francesa.",
+        "image": "menus/1760468598-pollo.webp",
+        "price": "90.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 6,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa Especial",
+        "description": "Hamburguesa especial con carne 100% de res, pan artesanal tostado, queso derretido, piña a la plancha, lechuga, tomate, cebolla morada, mayonesa, catsup, salsa búfalo, aderezos especiales y aros de cebolla crujientes. Acompañada con papas Tiras Crispy",
+        "image": "menus/1760468529-hamburguesa especial.webp",
+        "price": "115.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 7,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa de la casa de Res",
+        "description": "Hamburguesa con carne de la casa 100% res, pan artesanal tostado, queso derretido, lechuga, tomate, cebolla morada, mayonesa, catsup, salsa búfalo y aderezos especiales. Acompañada con papas a la francesa.",
+        "image": "menus/1759813598-hamburguesa de res.webp",
+        "price": "95.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 8,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa de la casa de Hawaiana",
+        "description": "Hamburguesa con carne de la casa 100% res, pan artesanal tostado, queso derretido, piña a la plancha, lechuga, tomate, cebolla morada, mayonesa, catsup, salsa búfalo y aderezos especiales. Acompañada con papas a la francesa.",
+        "image": "menus/1759813620-hamburguesa de res.webp",
+        "price": "100.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 9,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa de la casa Especial",
+        "description": "Hamburguesa con carne de la casa 100% res, pan artesanal tostado, queso derretido, piña a la plancha, lechuga, tomate, cebolla morada, mayonesa, catsup, salsa búfalo, aderezos especiales y crujientes aros de cebolla. Acompañada con papas Tías Crispy",
+        "image": "menus/1759813697-hamburguesa hawaiana.webp",
+        "price": "120.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 10,
+        "is_active": true
+    },
+    {
+        "name": "Hamburguesa de la casa BBQ",
+        "description": "Hamburguesa con carne de la casa 100% res, pan artesanal tostado, queso derretido, lechuga, tomate, cebolla morada, mayonesa, salsa BBQ, aderezos especiales y crujientes aros de cebolla. Acompañada con papas a la francesa.",
+        "image": "menus/1759813763-hamburguesa hawaiana.webp",
+        "price": "100.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 11,
+        "is_active": true
+    },
+    {
+        "name": "Dedos de queso",
+        "description": "Crujientes dedos de queso, rellenos con queso fundido y cremoso, empanizados y fritos hasta obtener un dorado perfecto. Una deliciosa opción para compartir o acompañar tus platillos favoritos.",
+        "image": "menus/1759862581-Dedos de Queso.webp",
+        "price": "120.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 12,
+        "is_active": true
+    },
+    {
+        "name": "Aros de Cebolla",
+        "description": "Aros de cebolla crujientes y dorados, empanizados con una mezcla especial que les da un sabor único y una textura perfecta. Ideales para acompañar cualquier platillo o para disfrutar como snack.",
+        "image": "menus/1759813966-aros de cebolla.webp",
+        "price": "85.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 13,
+        "is_active": true
+    },
+    {
+        "name": "Frappé de caramelo",
+        "description": "Delicioso frappé de caramelo, cremoso y refrescante, preparado con café espresso, leche fría, hielo triturado y un toque dulce de salsa de caramelo que lo convierte en el placer perfecto para cualquier momento del día.",
+        "image": "menus/1759814273-fraphe de caramelo.webp",
+        "price": "75.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 14,
+        "is_active": true
+    },
+    {
+        "name": "Frappé de oreo",
+        "description": "Exquisito frappé de Oreo, cremoso y refrescante, preparado con leche fría, hielo triturado y trozos de galleta Oreo que le aportan un sabor irresistible y una textura única. Perfecto para consentirte en cualquier momento.",
+        "image": "menus/1759814346-fraphe de oreo.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 15,
+        "is_active": true
+    },
+    {
+        "name": "Frappé de gansito",
+        "description": "Delicioso frappé de Gansito, cremoso y dulce, preparado con leche fría, hielo triturado y trozos de Gansito que le dan un sabor único y una textura irresistible. Ideal para disfrutar como un postre refrescante.",
+        "image": "menus/1759814405-fraphe de gansito.webp",
+        "price": "75.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 16,
+        "is_active": true
+    },
+    {
+        "name": "Frappé de Ferrero - Nutella",
+        "description": "Exquisito frappé cremoso y decadente, preparado con leche fría, hielo triturado, trozos de chocolate Ferrero y un toque de Nutella, que juntos crean un sabor intenso y una textura irresistible. Perfecto para un momento dulce y refrescante.",
+        "image": "menus/1759862614-Frape de ferrero.webp",
+        "price": "75.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 17,
+        "is_active": true
+    },
+    {
+        "name": "Jarra de Fresa Electrica",
+        "description": "Refrescante jarra de limonada rosa, preparada con jugo natural de limón, un toque dulce y un color vibrante que invita a disfrutar cada sorbo. Ideal para compartir y refrescarte en cualquier ocasión.",
+        "image": "menus/1759814568-jarra de fresa.webp",
+        "price": "120.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 18,
+        "is_active": true
+    },
+    {
+        "name": "Jarra de Pepino Limón",
+        "description": "Refrescante jarra de pepino limón, elaborada con jugo natural de limón y rodajas frescas de pepino, combinadas para ofrecer un sabor ligero, fresco y revitalizante. Perfecta para compartir y disfrutar en cualquier momento.",
+        "image": "menus/1759881430-WhatsApp Image 2025-10-07 at 2.29.59 PM.webp",
+        "price": "100.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 19,
+        "is_active": true
+    },
+    {
+        "name": "Smoothie de Mango",
+        "description": "Delicioso smoothie de mango, cremoso y refrescante, preparado con mango fresco y natural, mezclado con hielo y un toque de dulzura para lograr un sabor tropical irresistible. Perfecto para disfrutar en cualquier momento del día.",
+        "image": "menus/1759814689-Smotthie mango.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 20,
+        "is_active": true
+    },
+    {
+        "name": "Café Americano (Caliente)",
+        "description": "Café americano, una taza de café filtrado suave y aromático, con un sabor equilibrado y una textura ligera. Perfecto para quienes disfrutan de un café clásico, ideal para empezar el día con energía",
+        "image": "menus/1759814809-WhatsApp Image 2025-10-06 at 6.26.54 PM.webp",
+        "price": "40.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 21,
+        "is_active": true
+    },
+    {
+        "name": "Café Capuccino (Caliente)",
+        "description": "Capuccino caliente, una deliciosa mezcla de espresso intenso, leche vaporizada y espuma cremosa, que ofrece un sabor suave y equilibrado con un toque aterciopelado. Perfecto para disfrutar en cualquier momento del día.",
+        "image": "menus/1759814854-WhatsApp Image 2025-10-06 at 6.26.54 PM.webp",
+        "price": "45.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 22,
+        "is_active": true
+    },
+    {
+        "name": "Coca de 500Ml",
+        "description": "Coca-Cola de 500 ml, con su sabor clásico y burbujeante que nunca pasa de moda. Perfecta para acompañar cualquier comida o para disfrutar en cualquier momento.",
+        "image": "menus/1759815122-coca.webp",
+        "price": "30.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 23,
+        "is_active": true
+    },
+    {
+        "name": "Fresa de 500Ml",
+        "description": "Bebida de fresa, dulce y refrescante, burbujas suaves que la hacen ideal para refrescarte en cualquier ocasión.",
+        "image": "menus/1759815178-fresa.webp",
+        "price": "30.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 24,
+        "is_active": true
+    },
+    {
+        "name": "Fanta de 500ML",
+        "description": "bebida gaseosa con sabor a naranja, dulce y burbujeante, perfecta para refrescar y acompañar tus comidas favoritas con un toque cítrico y divertido.",
+        "image": "menus/1759816216-fanta.webp",
+        "price": "30.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 25,
+        "is_active": true
+    },
+    {
+        "name": "Soda Italiana",
+        "description": "Refrescante, burbujeante y llena de sabor. Disfruta nuestra Soda Italiana con las bombas de sabores de tu elección: durazno, mora azul, maracuyá o frambuesa, creando la combinación perfecta para cada gusto.",
+        "image": "menus/1760470688-soda.webp",
+        "price": "60.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 26,
+        "is_active": true
+    },
+    {
+        "name": "Wafle Calle Sabor",
+        "description": "Waffle Callesabor, dos brochetas de waffle dorado y esponjoso, acompañadas con plátano y fresas frescas, y servidas con aderezos de leche condensada, miel y Nutella para un sabor dulce y delicioso en cada bocado.",
+        "image": "menus/1759815601-wafles.webp",
+        "price": "110.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 27,
+        "is_active": true
+    },
+    {
+        "name": "Boxs Snacks",
+        "description": "El Box Snack incluye papas gajo, papas a la francesa, dedos de queso, tiras crujientes y aros de cebolla, acompañado con aderezos de chipotle, catsup y ranch para darle un toque extra de sabor y variedad en cada bocado.",
+        "image": "menus/1759815770-Box Snacks.webp",
+        "price": "250.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 28,
+        "is_active": true
+    },
+    {
+        "name": "Box Sorpresa",
+        "description": "El Box Sorpresa incluye 2 hamburguesas a elegir entre res, pollo o hawaiana, acompañadas de 2 bebidas Coca-Cola en lata, papas a la francesa, dedos de queso, aros de cebolla y 1 frappé, para que disfrutes una experiencia completa y deliciosa.",
+        "image": "menus/1759815880-Box Sorpresa.webp",
+        "price": "350.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 29,
+        "is_active": true
+    },
+    {
+        "name": "Alitas 12 PZ 2 Sabores",
+        "description": "Disfruta de 12 alitas jugosas y crujientes, con la opción de elegir dos de nuestros deliciosos sabores: Jack Cajun, un toque picante y especiado, BBQ, con un sabor dulce y ahumado, o Buffalo, clásico y sabroso. Cada orden viene acompañada de salsa Buffalo y ranch, para que puedas darle ese extra de sabor en cada bocado. ¡Ideal para compartir o disfrutar en una comida llena de sabor!",
+        "image": "menus/1759863661-Alitas.webp",
+        "price": "155.00",
+        "is_customizable": true,
+        "max_addons": 2,
+        "sort_order": 30,
+        "is_active": true
+    },
+    {
+        "name": "Alitas 24 PZ 4 Sabores",
+        "description": "Saborea 24 alitas crujientes y jugosas, con la libertad de elegir hasta 4 deliciosos sabores entre nuestras opciones: Jack Cajun, picante y con un toque especiado, BBQ, dulce y ahumado, Buffalo, con el clásico toque picante, y Miel Mostaza, un balance perfecto entre lo dulce y lo ácido. Además, cada orden incluye salsa Buffalo y ranch, para darle ese toque extra de cremosidad y sabor. ¡Una experiencia única en cada mordisco!",
+        "image": "menus/1781576719-1759863661-Alitas.webp",
+        "price": "300.00",
+        "is_customizable": true,
+        "max_addons": 4,
+        "sort_order": 31,
+        "is_active": true
+    },
+    {
+        "name": "Box Calle Sabor",
+        "description": "¡La fiesta del sabor en un solo box! Disfruta de una combinación irresistible que incluye papas fritas, papas gajo, 3 dedos de queso fundido, aros de cebolla crujientes y 5 tiras de pollo empanizadas. Además, elige 6 alitas entre los sabores más sabrosos: BBQ, Jack Cajun o Buffalo.",
+        "image": "menus/1759866009-boxCalleSabor.webp",
+        "price": "350.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 32,
+        "is_active": true
+    },
+    {
+        "name": "Wafle Salado",
+        "description": "Una delicia salada que no te puedes perder. Nuestro waffle esponjoso y dorado viene cargado con jamón, tocino crujiente, huevo y queso a tu elección: Philadelphia suave y cremoso o Manchego, con ese toque clásico y fundente. Una comida rápida llena de sabor. ¡Cada bocado es puro antojo!",
+        "image": "menus/1759866271-WafleSalado.webp",
+        "price": "110.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 33,
+        "is_active": true
+    },
+    {
+        "name": "Baguette Calle Sabor",
+        "description": "Crujiente por fuera, sabroso por dentro. Disfruta de esta deliciosa baguette con tiras de pollo crispy doradas al punto, jamón de pavo ahumado, queso fundido y una mezcla fresca de vegetales. Todo esto en pan artesanal recién horneado. ¡Una explosión de sabor callejero en cada mordida!",
+        "image": "menus/1759881128-baguette callesabor.webp",
+        "price": "95.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 34,
+        "is_active": true
+    },
+    {
+        "name": "Baguette Clásico",
+        "description": "Sencillo, pero lleno de sabor. Una combinación infalible de jamón de pavo, queso y vegetales frescos, todo en un pan baguette crujiente y recién horneado. Ideal para quienes aman lo tradicional… con mucho sabor.",
+        "image": "menus/1759881211-Baguette clasico .webp",
+        "price": "85.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 35,
+        "is_active": true
+    },
+    {
+        "name": "Baguette Todito",
+        "description": "¡Para los que lo quieren todo! Este baguette viene cargado con jugoso pollo a la plancha, salami sabrosón, jamón de pavo y una mezcla fresca de vegetales, todo envuelto en pan crujiente. Un combo completo que no deja nada por fuera.",
+        "image": "menus/1759881293-Baguette todito.webp",
+        "price": "95.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 36,
+        "is_active": true
+    },
+    {
+        "name": "Frappé Mazapan",
+        "description": "Un irresistible frappé cremoso con el auténtico sabor del mazapán. Preparado con hielo frappé y leche, coronado con una galleta de chocolate y trozos de mazapán que lo hacen simplemente inigualable.",
+        "image": "menus/1760467660-mazapan.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 37,
+        "is_active": true
+    },
+    {
+        "name": "Frappé Cappuccino",
+        "description": "Disfruta el equilibrio perfecto entre el sabor intenso del café y la dulzura del chocolate. Nuestro frappé de cappuccino está preparado con café helado, leche cremosa y un toque especial de chispas de chocolate.",
+        "image": "menus/1760467758-Capuccino.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 38,
+        "is_active": true
+    },
+    {
+        "name": "Smoothie de Fresa",
+        "description": "Refresca tu día con el sabor auténtico de la fresa natural. Este smoothie está preparado con fruta fresca, leche y hielo, logrando una textura suave y cremosa que te encantará.",
+        "image": "menus/1760467897-smoothie fresa.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 39,
+        "is_active": true
+    },
+    {
+        "name": "Smoothie de Mango - Fresa",
+        "description": "Una combinación tropical que te encantará. Preparado con fruta natural de mango y fresa, este smoothie mezcla lo mejor de ambos mundos: la dulzura del mango y el toque fresco de la fresa.",
+        "image": "menus/1760467968-smoothie mango - fresa.webp",
+        "price": "85.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 40,
+        "is_active": true
+    },
+    {
+        "name": "Malteada de fresa",
+        "description": "La clásica favorita de todos. Preparada con helado cremoso y el dulce sabor de la fresa, nuestra malteada es una delicia refrescante que conquista desde el primer sorbo. Coronada con crema batida y una cereza, es el toque perfecto entre lo tradicional y lo irresistible.",
+        "image": "menus/1760468067-malteada de fresa.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 41,
+        "is_active": true
+    },
+    {
+        "name": "Malteada de Chocomilk - chocolate",
+        "description": "Para los verdaderos amantes del chocolate. Hecha con helado de chocolate, leche y cubierta con crema batida y una galleta de chocolate, cada sorbo es una explosión de sabor irresistible.",
+        "image": "menus/1760468168-malteada chocomilk chocolate.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 42,
+        "is_active": true
+    },
+    {
+        "name": "Vaso de Fresa Electrica",
+        "description": "Una bebida refrescante y llena de energía. Preparada con agua mineral, fresas naturales y zarzamoras, su sabor es una mezcla perfecta entre lo dulce, lo ácido y lo burbujeante.",
+        "image": "menus/1760468322-Fresa electrica.webp",
+        "price": "50.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 43,
+        "is_active": true
+    },
+    {
+        "name": "Vaso de Limonada Rosa",
+        "description": "Refrescante, vibrante y con un toque de dulzura que la hace única. Servida en vaso, es perfecta para disfrutar un momento ligero y lleno de sabor.",
+        "image": "menus/1760469230-vaso limonada rosa.webp",
+        "price": "45.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 44,
+        "is_active": true
+    },
+    {
+        "name": "Jarra de limonada Rosa",
+        "description": "Ideal para compartir. Nuestra Limonada Rosa en jarra combina frescura, color y ese toque dulce que la vuelve irresistible.",
+        "image": "menus/1760468499-limonada rosa.webp",
+        "price": "100.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 45,
+        "is_active": true
+    },
+    {
+        "name": "Wafle Nutella",
+        "description": "Cremoso, suave y lleno de sabor, este waffle está generosamente untado con Nutella, combinando la textura perfecta con el toque de chocolate y avellanas que todos aman.",
+        "image": "menus/1760469548-wafles hershey.webp",
+        "price": "110.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 46,
+        "is_active": true
+    },
+    {
+        "name": "Wafle Hershey",
+        "description": "Deliciosamente crujiente por fuera y suave por dentro, nuestro waffle de Hershey está cubierto con el inconfundible chocolate Hershey que lo hace irresistible.",
+        "image": "menus/1760469588-wafles hershey.webp",
+        "price": "90.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 47,
+        "is_active": true
+    },
+    {
+        "name": "Papas a la francesa",
+        "description": "Crujientes por fuera y suaves por dentro, nuestras papas fritas son el acompañamiento perfecto para cualquier antojo. Servidas calientes y recién hechas, cada bocado es pura satisfacción.",
+        "image": "menus/1760469674-papas a la francesa.webp",
+        "price": "55.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 48,
+        "is_active": true
+    },
+    {
+        "name": "Piñada",
+        "description": "Refrescante y tropical, nuestra Piñada combina la dulzura natural de la piña con la cremosidad perfecta para crear una bebida suave y deliciosa. Servida fría, es la opción ideal para disfrutar del sabor del trópico en cada sorbo. Copa de 655 ML.",
+        "image": "menus/1760469793-Piñada.webp",
+        "price": "80.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 49,
+        "is_active": true
+    },
+    {
+        "name": "🍔 Jueves de Hamburguesas 🥳",
+        "description": "¡El mejor momento de la semana para consentirte! Este jueves disfruta 2 hamburguesas por solo 140, hasta agotar existencias. Incluye papas a la francesa y aplica para nuestras deliciosas opciones: pollo, res y hawaiana.",
+        "image": "menus/1760470130-promocion 2 x 140.webp",
+        "price": "150.00",
+        "is_customizable": true,
+        "max_addons": 2,
+        "sort_order": 50,
+        "is_active": true
+    },
+    {
+        "name": "Soda italiana con Limon",
+        "description": "Refrescante, burbujeante y llena de sabor. Nuestra Soda Italiana combina el toque cítrico del limón con las bombas de sabores de tu elección: durazno, mora azul, maracuyá o frambuesa, creando una bebida única y deliciosa.",
+        "image": "menus/1760470758-soda.webp",
+        "price": "70.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 51,
+        "is_active": true
+    },
+    {
+        "name": "Vaso de Horchata",
+        "description": "Cremosa, dulce y reconfortante, nuestra Horchata es la bebida perfecta para acompañar tus comidas o disfrutar como un delicioso antojo. Cada sorbo es suavidad y sabor tradicional en su máxima expresión.",
+        "image": "menus/1760471040-vaso horchata.webp",
+        "price": "30.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 52,
+        "is_active": true
+    },
+    {
+        "name": "Vaso de Jamaica",
+        "description": "Refrescante y naturalmente delicioso, nuestro vaso de Jamaica combina sabor intenso con un toque ácido que despierta tus sentidos. Ideal para disfrutar en cualquier momento del día y refrescarte de manera natural.",
+        "image": "menus/1760471065-vaso de jamaica.webp",
+        "price": "30.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 53,
+        "is_active": true
+    },
+    {
+        "name": "Piezas de tiras",
+        "description": "Pieza adicional de tira de pollo crispy, dorada y crujiente, ideal para completar tu orden.",
+        "image": "menus/1760492636-1000194336.webp",
+        "price": "18.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 54,
+        "is_active": true
+    },
+    {
+        "name": "Pieza de aro de cebolla",
+        "description": "Pieza adicional de aro de cebolla empanizado, crujiente y recién preparado.",
+        "image": "menus/1760492694-1000194337.webp",
+        "price": "9.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 55,
+        "is_active": true
+    },
+    {
+        "name": "Pieza de dedo de queso",
+        "description": "Pieza adicional de dedo de queso empanizado, dorado por fuera y cremoso por dentro.",
+        "image": "menus/1760492748-1000194341.webp",
+        "price": "26.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 56,
+        "is_active": true
+    },
+    {
+        "name": "Orden de tiras crispy",
+        "description": "Orden de tiras de pollo crispy, crujientes y recién preparadas, ideal para compartir.",
+        "image": "menus/1760493027-1000194350.webp",
+        "price": "145.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 57,
+        "is_active": true
+    },
+    {
+        "name": "Papas Gajo",
+        "description": "Deliciosas papas cortadas en gajos, crujientes por fuera y suaves por dentro. Sazonadas con el toque perfecto de especias para realzar su sabor.",
+        "image": "menus/1760599214-1000194981.webp",
+        "price": "65.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 58,
+        "is_active": true
+    },
+    {
+        "name": "Tiras crispy bañadas en sabor",
+        "description": "Tiras crispy bañadas en salsas puede seleccionar ente 4 sabores disponibles",
+        "image": "menus/1761097414-tiras.webp",
+        "price": "155.00",
+        "is_customizable": true,
+        "max_addons": 2,
+        "sort_order": 59,
+        "is_active": true
+    },
+    {
+        "name": "Club Sandwich",
+        "description": "Club Sandwich puede seleccionar el tipo de carne entre pollo a la plancha y tiras crispy",
+        "image": "menus/1761097517-sandwich-club-1.webp",
+        "price": "90.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 60,
+        "is_active": true
+    },
+    {
+        "name": "Salsa Bufalo Extra",
+        "description": "Porción extra de salsa búfalo, con un toque picante para acompañar tus platillos.",
+        "image": "menus/1761118088-WhatsApp Image 2025-10-22 at 1.25.45 AM.webp",
+        "price": "10.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 61,
+        "is_active": true
+    },
+    {
+        "name": "Salsa Chipotle Extra",
+        "description": "Porción extra de salsa chipotle, cremosa y ligeramente picante.",
+        "image": "menus/1761118116-WhatsApp Image 2025-10-22 at 1.25.46 AM (1).webp",
+        "price": "10.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 62,
+        "is_active": true
+    },
+    {
+        "name": "Salsa Ranch Extra",
+        "description": "Porción extra de aderezo ranch, cremoso y fresco para acompañar tu orden.",
+        "image": "menus/1761118136-WhatsApp Image 2025-10-22 at 1.25.47 AM.webp",
+        "price": "10.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 63,
+        "is_active": true
+    },
+    {
+        "name": "Vaso de pepino con limon",
+        "description": "Refrescante y saludable, el vaso de pepino con limón es una bebida ideal para cualquier ocasión. Preparado con rodajas finas de pepino fresco, su sabor suave y ligeramente dulce se mezcla perfectamente con el toque ácido y revitalizante del limón.",
+        "image": "menus/1761157755-WhatsApp Image 2025-10-13 at 11.17.01 PM.webp",
+        "price": "45.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 64,
+        "is_active": true
+    },
+    {
+        "name": "Jarra de horchata",
+        "description": "Una jarra de horchata es la mezcla perfecta de cremosidad y dulzura, ideal para calmar la sed y disfrutar en cualquier momento. Hecha a base de arroz, canela y un toque de vainilla, esta bebida tradicional tiene una textura suave y un sabor delicado que reconforta al primer sorbo",
+        "image": "menus/1761158007-Copilot_20251022_123135.webp",
+        "price": "70.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 65,
+        "is_active": true
+    },
+    {
+        "name": "Jarra de jamaica",
+        "description": "Refrescante y llena de sabor, una jarra de jamaica es la bebida perfecta para disfrutar en cualquier ocasión. Elaborada con flores de hibisco, esta bebida tiene un vibrante color rojo y un sabor ligeramente ácido, con un toque de dulzura que la hace irresistible.",
+        "image": "menus/1761158085-Copilot_20251022_123353.webp",
+        "price": "70.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 66,
+        "is_active": true
+    },
+    {
+        "name": "Copa de helado",
+        "description": "Una copa de helado es el postre perfecto para consentirse en cualquier momento. Con una variedad de sabores cremosos, desde los más clásicos como vainilla y chocolate hasta opciones más innovadoras, cada bocado es una explosión de frescura y dulzura",
+        "image": "menus/1761158470-Copilot_20251022_124021.webp",
+        "price": "40.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 67,
+        "is_active": true
+    },
+    {
+        "name": "Brownie con helado",
+        "description": "Un postre irresistible que combina lo mejor de dos mundos: un brownie caliente, suave por dentro y con una ligera capa crujiente por fuera, coronado con una bola de helado cremoso que se derrite lentamente al contacto.",
+        "image": "menus/1761158717-Copilot_20251022_124318.webp",
+        "price": "80.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 68,
+        "is_active": true
+    },
+    {
+        "name": "Banana split",
+        "description": "La banana split es un postre clásico que combina lo mejor de la fruta fresca y el helado. Una base de plátano partido por la mitad sirve de soporte para una generosa porción de helado, todo cubierto con deliciosos siropes, crema batida y nueces crujientes.",
+        "image": "menus/1761158911-Copilot_20251022_124535.webp",
+        "price": "80.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 69,
+        "is_active": true
+    },
+    {
+        "name": "Cafe capuccino 3x2",
+        "description": "Promoción de tres cafés capuchino por el precio de dos, servidos calientes y cremosos.",
+        "image": "menus/1762055992-cafe.webp",
+        "price": "85.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 70,
+        "is_active": true
+    },
+    {
+        "name": "Bombas de chocolate",
+        "description": "Deliciosas esferas de chocolate rellenas de cacao y malvaviscos que se derriten al contacto con leche caliente deslactosada, creando una bebida cremosa, aromática y fácil de digerir. Ven a Calle Sabor y prueba las nuestras: una experiencia dulce, cálida y totalmente irresistible.",
+        "image": "menus/1764619904-bomba de chocolate.webp",
+        "price": "90.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 71,
+        "is_active": true
+    },
+    {
+        "name": "Chesscake",
+        "description": "Suave, cremoso y con el equilibrio perfecto entre dulzura y sabor. Nuestro cheesecake se sirve con una base crujiente y un toque especial que lo convierte en un postre irresistible. Ven a Calle Sabor y prueba el nuestro: una rebanada que enamora desde el primer bocado.",
+        "image": "menus/1764332792-1000215438.webp",
+        "price": "45.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 72,
+        "is_active": true
+    },
+    {
+        "name": "Frappé Taro",
+        "description": "Cremosa mezcla de taro y leche con un delicado dulzor y su distintivo tono lila. Refrescante, suave y sofisticado en cada sorbo.",
+        "image": "menus/1764912887-1000220155.webp",
+        "price": "75.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 73,
+        "is_active": true
+    },
+    {
+        "name": "Crepa de Nutella",
+        "description": "Delicada crepa hecha al momento, rellena con abundante Nutella cremosa que se derrite en cada bocado.",
+        "image": "menus/1764618166-nutella.webp",
+        "price": "85.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 74,
+        "is_active": true
+    },
+    {
+        "name": "Crepa Plátano con Nutella",
+        "description": "Crepa suave y recién preparada, rellena de cremosa Nutella y rodajas de plátano fresco que aportan un toque natural y dulce.",
+        "image": "menus/1764618297-platrano.webp",
+        "price": "80.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 75,
+        "is_active": true
+    },
+    {
+        "name": "Crepa especial",
+        "description": "Crepa fina y recién hecha, rellena de suaves rodajas de plátano y fresas frescas que aportan un equilibrio perfecto entre dulzura y frescura. Acompañada de una bola de helado cremoso que se funde delicadamente sobre la crepa caliente.",
+        "image": "menus/1764618481-especial.webp",
+        "price": "90.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 76,
+        "is_active": true
+    },
+    {
+        "name": "Tiras individuales bañadas en salsas",
+        "description": "Tira de pollo crispy bañada en la salsa de tu elección, crujiente y llena de sabor.",
+        "image": "menus/1774061122-1760492636-1000194336.webp",
+        "price": "20.00",
+        "is_customizable": true,
+        "max_addons": 1,
+        "sort_order": 77,
+        "is_active": true
+    },
+    {
+        "name": "Charola para 8 personas",
+        "description": "Charola surtida para ocho personas, preparada para compartir en reuniones y celebraciones.",
+        "image": "menus/1781549980-1000295145.webp",
+        "price": "1000.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 78,
+        "is_active": true
+    },
+    {
+        "name": "Charola para 15 personas",
+        "description": "Charola surtida para quince personas, ideal para reuniones, eventos y celebraciones.",
+        "image": "menus/1781550056-1000295146.webp",
+        "price": "1800.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 79,
+        "is_active": true
+    },
+    {
+        "name": "Coca-Cola en Lata",
+        "description": "Descripción: Disfruta el sabor clásico y refrescante de Coca-Cola Original en una práctica presentación en lata. Ideal para acompañar tus alimentos y disfrutar bien fría en cualquier momento.",
+        "image": "menus/1783794648-cocacola.webp",
+        "price": "18.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 80,
+        "is_active": true
+    },
+    {
+        "name": "Salsa BBQ Extra",
+        "description": "Porción extra de salsa BBQ con un sabor dulce, ahumado y ligeramente especiado. Ideal para acompañar hamburguesas, alitas, papas y tus platillos favoritos.",
+        "image": "menus/1783794697-bbq_sauce.webp",
+        "price": "10.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 81,
+        "is_active": true
+    },
+    {
+        "name": "Salsa Mango Habanero Extra",
+        "description": "Una combinación tropical de mango dulce con el toque intenso y picante del chile habanero. Ideal para acompañar alitas, boneless y darle un sabor dulce, frutal y picante a tus platillos.",
+        "image": "menus/1783794736-habanero.webp",
+        "price": "10.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 82,
+        "is_active": true
+    },
+    {
+        "name": "Salsa Jack Daniel's Extra",
+        "description": "Salsa de sabor dulce, ahumado y ligeramente caramelizado, con notas intensas que aportan un toque especial a cada bocado. Ideal para acompañar alitas, boneless, hamburguesas y carnes.",
+        "image": "menus/1783794822-jackdaniels.webp",
+        "price": "10.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 83,
+        "is_active": true
+    },
+    {
+        "name": "Latte caramelo",
+        "description": "Cremoso café latte con leche y un irresistible toque de caramelo. Suave, dulce y perfecto para disfrutar en cualquier momento.",
+        "image": "menus/1787810010-1000314796.webp",
+        "price": "75.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 84,
+        "is_active": true
+    },
+    {
+        "name": "Latte normal",
+        "description": "Café espresso combinado con leche cremosa y espumosa, logrando un sabor suave y equilibrado.",
+        "image": "menus/1787810076-1000314805.webp",
+        "price": "70.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 85,
+        "is_active": true
+    },
+    {
+        "name": "Combo latte caramelo",
+        "description": "Combo con dos bebidas latte de caramelo, cremosas y aromáticas.",
+        "image": "menus/1787853981-combolatte.webp",
+        "price": "112.50",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 86,
+        "is_active": true
+    },
+    {
+        "name": "Combo latte normal",
+        "description": "Combo con dos lattes clásicos, suaves, cremosos y recién preparados.",
+        "image": "menus/1787854026-combolatte.webp",
+        "price": "105.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 87,
+        "is_active": true
+    },
+    {
+        "name": "Combo latte combinado",
+        "description": "Combo con un latte de caramelo y un latte clásico, ideal para compartir.",
+        "image": "menus/1787854102-combolatte.webp",
+        "price": "110.00",
+        "is_customizable": false,
+        "max_addons": null,
+        "sort_order": 88,
+        "is_active": true
+    }
+]

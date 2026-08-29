@@ -17,7 +17,7 @@ class Order extends Model
         'folio',
         'customer_name', 'customer_phone', 'customer_address', 'customer_neighborhood', 'customer_references',
         'served_by', 'type', 'source', 'fulfillment', 'table_identifier', 'delivery_method',
-        'status', 'subtotal', 'total', 'notes',
+        'delivery_flow_mode', 'accounted_at', 'status', 'subtotal', 'total', 'notes',
         'cancelled_by', 'cancellation_reason', 'cancelled_at', 'paid_at',
     ];
 
@@ -27,6 +27,7 @@ class Order extends Model
         'total' => 'decimal:2',
         'cancelled_at' => 'datetime',
         'paid_at' => 'datetime',
+        'accounted_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -51,6 +52,18 @@ class Order extends Model
         }
 
         return $this->public_token;
+    }
+
+    public function isFinalizedForAccounting(): bool
+    {
+        if ($this->status === 'cancelada') {
+            return false;
+        }
+
+        return $this->status === 'pagada'
+            || ($this->type === 'delivery'
+                && $this->delivery_flow_mode === 'manual'
+                && $this->accounted_at !== null);
     }
 
     public function cashRegister(): BelongsTo
@@ -216,6 +229,13 @@ class Order extends Model
 
     public function scopeFinalizedForAccounting(Builder $query): Builder
     {
-        return $query->where('status', 'pagada');
+        return $query
+            ->where('status', '!=', 'cancelada')
+            ->where(fn (Builder $accounting) => $accounting
+                ->where('status', 'pagada')
+                ->orWhere(fn (Builder $manual) => $manual
+                    ->where('type', 'delivery')
+                    ->where('delivery_flow_mode', 'manual')
+                    ->whereNotNull('accounted_at')));
     }
 }

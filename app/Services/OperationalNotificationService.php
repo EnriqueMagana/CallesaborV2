@@ -41,17 +41,18 @@ class OperationalNotificationService
         $order->loadMissing(['mesa.currentAssignment', 'deliveryAssignment']);
 
         if ($order->status === 'lista') {
-            $event = $order->type === 'delivery' ? 'delivery.available' : 'order.ready';
+            $managedDelivery = $order->type === 'delivery' && $this->managedDelivery($order);
+            $event = $managedDelivery ? 'delivery.available' : 'order.ready';
             $this->send(
                 $event,
                 $this->category($order),
                 'high',
                 $order,
                 $this->readyRecipients($order),
-                $order->type === 'delivery' ? 'Delivery listo para recoger' : 'Pedido listo',
+                $managedDelivery ? 'Delivery listo para recoger' : 'Pedido listo',
                 $this->orderContext($order).' ya está listo.',
                 $this->urlFor($order),
-                $order->type === 'delivery' ? 'delivery' : 'ready',
+                $managedDelivery ? 'delivery' : 'ready',
                 "{$previousStatus}-lista"
             );
         } elseif ($order->status === 'en_reparto' && $order->type === 'delivery') {
@@ -72,6 +73,10 @@ class OperationalNotificationService
     {
         $assignment->loadMissing(['order', 'driver']);
         if (! $assignment->order || ! $assignment->driver) {
+            return;
+        }
+
+        if (! $this->managedDelivery($assignment->order)) {
             return;
         }
 
@@ -149,6 +154,10 @@ class OperationalNotificationService
         }
 
         if ($order->type === 'delivery') {
+            if (! $this->managedDelivery($order)) {
+                return $this->usersByRoles(array_merge(self::SUPERVISORS, ['cajero']));
+            }
+
             $assigned = $order->deliveryAssignment?->driver_id
                 ? User::query()->whereKey($order->deliveryAssignment->driver_id)->get()
                 : $this->usersByRoles(['repartidor']);
@@ -227,8 +236,17 @@ class OperationalNotificationService
             'mesa' => $order->mesa_id
                 ? route('app.mesas.ordenes', $order->mesa_id, false)
                 : route('app.ordenes.show', $order, false),
-            'delivery' => route('app.delivery', ['order' => $order->id], false),
+            'delivery' => $this->managedDelivery($order)
+                ? route('app.delivery', ['order' => $order->id], false)
+                : route('app.ordenes.show', $order, false),
             default => route('app.ordenes.show', $order, false),
         };
+    }
+
+    private function managedDelivery(Order $order): bool
+    {
+        return $order->type === 'delivery'
+            && ($order->delivery_flow_mode ?: 'managed') === 'managed'
+            && app(DeliveryModulePolicy::class)->enabled();
     }
 }

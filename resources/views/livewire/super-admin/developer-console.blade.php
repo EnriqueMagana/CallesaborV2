@@ -25,6 +25,70 @@
         </div>
     @endif
 
+    @php
+        $deliveryState = $this->deliveryModuleState;
+        $deliveryEnabled = $deliveryState['enabled'];
+        $deliveryImpact = $deliveryState['impact'];
+        $cannotDisable = $deliveryEnabled && ($deliveryImpact['assigned_orders'] > 0 || $deliveryImpact['in_route_orders'] > 0);
+        $lastDeliveryChange = $deliveryState['last_change'];
+    @endphp
+    <section class="developer-panel developer-module-control {{ $deliveryEnabled ? 'is-enabled' : 'is-manual' }}"
+        aria-labelledby="delivery-module-title">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div>
+                <span class="developer-panel__icon"><i class="bx bx-cycling" aria-hidden="true"></i></span>
+                <div>
+                    <h2 id="delivery-module-title">Gestión operativa de Delivery</h2>
+                    <p>Define si los repartidores usan asignación digital o si el efectivo se concilia directamente en el corte global.</p>
+                </div>
+            </div>
+            <span class="developer-module-control__state" role="status">
+                <i class="bx {{ $deliveryEnabled ? 'bx-check-shield' : 'bx-hand' }}" aria-hidden="true"></i>
+                {{ $deliveryEnabled ? 'Administrado' : 'Gestión manual' }}
+            </span>
+        </header>
+        <div class="developer-module-control__body">
+            <div class="developer-module-control__summary">
+                <strong>{{ $deliveryEnabled ? 'Asignación, seguimiento y mini cortes activos' : 'Sin asignaciones ni mini cortes individuales' }}</strong>
+                <p>{{ $deliveryEnabled
+                    ? 'Cada repartidor toma el pedido, confirma la entrega y entrega su arqueo a caja.'
+                    : 'Los pedidos contra entrega se contabilizan automáticamente como efectivo esperado y se cuadran con el responsable del corte.' }}</p>
+                @if($lastDeliveryChange)
+                    <small>Último cambio: {{ $lastDeliveryChange->changed_at?->format('d/m/Y H:i') }} por {{ $lastDeliveryChange->changedBy?->name ?? 'Usuario eliminado' }}.</small>
+                @endif
+            </div>
+            <dl class="developer-module-control__metrics" aria-label="Impacto del módulo Delivery en la caja activa">
+                <div><dt>Sin asignar</dt><dd>{{ $deliveryImpact['unassigned_orders'] }}</dd></div>
+                <div><dt>Asignados</dt><dd>{{ $deliveryImpact['assigned_orders'] }}</dd></div>
+                <div><dt>En ruta</dt><dd>{{ $deliveryImpact['in_route_orders'] }}</dd></div>
+                <div><dt>Manuales</dt><dd>{{ $deliveryImpact['manual_orders'] }}</dd></div>
+            </dl>
+            <div class="developer-module-control__action">
+                <button type="button" class="developer-module-switch"
+                    role="switch" aria-checked="{{ $deliveryEnabled ? 'true' : 'false' }}"
+                    aria-describedby="delivery-module-help"
+                    wire:click="confirmToggleDeliveryModule"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmToggleDeliveryModule,toggleDeliveryModule">
+                    <span aria-hidden="true"><i class="bx {{ $deliveryEnabled ? 'bx-check' : 'bx-x' }}"></i></span>
+                    <strong>{{ $deliveryEnabled ? 'Desactivar Delivery' : 'Activar Delivery' }}</strong>
+                </button>
+                <p id="delivery-module-help">
+                    @if($cannotDisable)
+                        Debes resolver los pedidos asignados o en ruta antes de desactivar el módulo.
+                    @elseif($deliveryEnabled)
+                        Los pedidos sin asignar se convertirán a gestión manual al confirmar.
+                    @else
+                        El cambio aplicará a pedidos nuevos; los manuales conservarán su historial.
+                    @endif
+                </p>
+                @error('deliveryModule')
+                    <div class="developer-module-control__error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+    </section>
+
     <section class="developer-health-grid" aria-label="Estado general de servicios">
         @php
             $healthCards = [

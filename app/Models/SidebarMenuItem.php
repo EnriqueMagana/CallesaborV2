@@ -47,6 +47,11 @@ class SidebarMenuItem extends Model
 
     private static function filterNode(self $item, ?User $user, bool $registerIsOpen): ?self
     {
+        if ($item->route_name === 'app.delivery'
+            && ! app(\App\Services\DeliveryModulePolicy::class)->enabled()) {
+            return null;
+        }
+
         $children = $item->children
             ->map(fn (self $child) => static::filterNode($child, $user, $registerIsOpen))
             ->filter()

@@ -2,7 +2,7 @@
     'business',
     'menuSettings' => null,
     'openingStatus',
-    'eyebrow' => 'Banner 1',
+    'eyebrow' => 'Bienvenido a',
     'message' => null,
     'actionLabel' => 'Explorar la carta',
     'actionHref' => null,
@@ -73,18 +73,9 @@
             @else
                 <span class="menu-brand__fallback" aria-hidden="true"><i class="bx bx-restaurant"></i></span>
             @endif
-            <span>
-                <small>Bienvenido a</small>
+            <span class="menu-identity__brand-copy">
+                <small><i class="bx bx-store-alt" aria-hidden="true"></i>{{ $eyebrow }}</small>
                 <strong>{{ $business->business_name }}</strong>
-                @if ($business->full_address)
-                    @if ($business->map_link)
-                        <a href="{{ $business->map_link }}" target="_blank" rel="noopener noreferrer"><i
-                                class="bx bx-map" aria-hidden="true"></i>{{ $business->full_address }}<i
-                                class="bx bx-link-external" aria-hidden="true"></i></a>
-                    @else
-                        <span><i class="bx bx-map" aria-hidden="true"></i>{{ $business->full_address }}</span>
-                    @endif
-                @endif
             </span>
         </div>
         <a class="menu-identity__menu-link" href="{{ $resolvedActionHref }}"><span>{{ $actionLabel }}</span><i

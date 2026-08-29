@@ -99,7 +99,7 @@ class SalesHistory extends Component
         return [
             'orders' => $orders->count(),
             'sales' => $this->canViewFinancials
-                ? (float) $orders->where('status', 'pagada')->sum('total')
+                ? (float) $orders->filter(fn (Order $order): bool => $order->isFinalizedForAccounting())->sum('total')
                 : null,
             'cancelled' => $orders->where('status', 'cancelada')->count(),
             'open' => $orders->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'en_reparto'])->count(),

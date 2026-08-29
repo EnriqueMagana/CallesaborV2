@@ -23,7 +23,9 @@ use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\QuotationItemAddon;
 use App\Models\QuotationItemIngredient;
+use App\Services\DeliveryModulePolicy;
 use App\Services\InventoryService;
+use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
 use App\Services\PromotionPricingService;
 use App\Services\ThermalTicketRenderer;
@@ -1892,8 +1894,10 @@ class PointOfSale extends Component
         };
     }
 
-    public function submitOrder(): void
-    {
+    public function submitOrder(
+        DeliveryModulePolicy $deliveryPolicy,
+        ManualDeliveryAccountingService $manualAccounting,
+    ): void {
         abort_unless(auth()->user()?->can('crear ordenes'), 403);
         if (empty($this->cart)) {
             return;
@@ -1925,12 +1929,18 @@ class PointOfSale extends Component
             return;
         }
 
-        $order = DB::transaction(function () use ($isContraEntrega) {
+        $order = DB::transaction(function () use ($isContraEntrega, $deliveryPolicy, $manualAccounting) {
             if ($this->orderType === 'delivery') {
                 $this->rememberMissingCustomerDeliveryData();
             }
 
-            $order = $this->persistOrder($this->orderType, $isContraEntrega ? 'pendiente' : 'pagada');
+            $isManualDelivery = $this->orderType === 'delivery' && ! $deliveryPolicy->enabledForUpdate();
+            $status = $isManualDelivery ? 'pendiente' : ($isContraEntrega ? 'pendiente' : 'pagada');
+            $order = $this->persistOrder(
+                $this->orderType,
+                $status,
+                $isManualDelivery ? 'manual' : null,
+            );
 
             if (! $isContraEntrega && $this->payments !== []) {
                 $timestamp = now();
@@ -1953,6 +1963,10 @@ class PointOfSale extends Component
                     'created_at' => $timestamp,
                     'updated_at' => $timestamp,
                 ])->all());
+            }
+
+            if ($isManualDelivery) {
+                $order = $manualAccounting->account($order);
             }
 
             return $order;
@@ -2551,8 +2565,10 @@ class PointOfSale extends Component
         $this->convertDeliveryOrderId = null;
     }
 
-    public function convertOrderToDelivery(): void
-    {
+    public function convertOrderToDelivery(
+        DeliveryModulePolicy $deliveryPolicy,
+        ManualDeliveryAccountingService $manualAccounting,
+    ): void {
         abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $this->validate([
             'convertDeliveryName' => 'required|string|max:120',
@@ -2564,22 +2580,38 @@ class PointOfSale extends Component
             'convertDeliveryPhone.regex' => 'El teléfono debe tener 10 dígitos.',
         ]);
 
-        $order = Order::where('cash_register_id', $this->activeCashRegister?->id)
-            ->find($this->convertDeliveryOrderId);
-        if (! $order || $order->type === 'delivery' || $order->status === 'pagada') {
+        $registerId = $this->activeCashRegister?->id;
+        $order = DB::transaction(function () use ($registerId, $deliveryPolicy, $manualAccounting): ?Order {
+            $manualMode = ! $deliveryPolicy->enabledForUpdate();
+            $lockedOrder = Order::query()
+                ->where('cash_register_id', $registerId)
+                ->lockForUpdate()
+                ->find($this->convertDeliveryOrderId);
+
+            if (! $lockedOrder || $lockedOrder->type === 'delivery' || $lockedOrder->status === 'pagada') {
+                return null;
+            }
+
+            $lockedOrder->update([
+                'type' => 'delivery',
+                'customer_name' => trim($this->convertDeliveryName),
+                'customer_phone' => trim($this->convertDeliveryPhone),
+                'customer_address' => trim($this->convertDeliveryAddress),
+                'customer_references' => trim($this->convertDeliveryReferences) ?: null,
+                'delivery_method' => $this->convertDeliveryMethod,
+                'delivery_flow_mode' => $manualMode ? 'manual' : 'managed',
+            ]);
+
+            return $manualMode
+                ? $manualAccounting->account($lockedOrder)
+                : $lockedOrder;
+        });
+
+        if (! $order) {
             $this->closeConvertDeliveryModal();
 
             return;
         }
-
-        $order->update([
-            'type' => 'delivery',
-            'customer_name' => trim($this->convertDeliveryName),
-            'customer_phone' => trim($this->convertDeliveryPhone),
-            'customer_address' => trim($this->convertDeliveryAddress),
-            'customer_references' => trim($this->convertDeliveryReferences) ?: null,
-            'delivery_method' => $this->convertDeliveryMethod,
-        ]);
 
         $this->closeConvertDeliveryModal();
         unset($this->pickupOrders, $this->deliveryOrders, $this->recentOrders);
@@ -4180,13 +4212,13 @@ HTML;
         }
     }
 
-    private function persistOrder(string $type, string $status): Order
+    private function persistOrder(string $type, string $status, ?string $deliveryFlowMode = null): Order
     {
         $this->refreshPromotionCart($this->promotionFulfillmentForOrderType($type));
         $cash = $this->activeCashRegister;
         $total = $this->cartTotal;
 
-        return DB::transaction(function () use ($cash, $total, $type, $status) {
+        return DB::transaction(function () use ($cash, $total, $type, $status, $deliveryFlowMode) {
             $order = Order::create([
                 'cash_register_id' => $cash?->id,
                 'customer_id' => $this->customerId,
@@ -4198,6 +4230,9 @@ HTML;
                 'served_by' => auth()->id(),
                 'type' => $type,
                 'delivery_method' => $type === 'delivery' ? $this->deliveryMethod : null,
+                'delivery_flow_mode' => $type === 'delivery'
+                    ? ($deliveryFlowMode ?? 'managed')
+                    : 'managed',
                 'status' => $status,
                 'subtotal' => $total,
                 'total' => $total,

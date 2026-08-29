@@ -14,10 +14,12 @@ use App\Models\OrderItemAddon;
 use App\Models\OrderItemIngredient;
 use App\Models\Product;
 use App\Models\Promotion;
+use App\Services\DeliveryModulePolicy;
 use App\Services\KioskQrCode;
+use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
-use App\Services\PromotionSelectionService;
 use App\Services\PromotionPricingService;
+use App\Services\PromotionSelectionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -771,8 +773,10 @@ class OrderWizard extends Component
         $this->step = 5;
     }
 
-    public function placeOrder(): void
-    {
+    public function placeOrder(
+        DeliveryModulePolicy $deliveryPolicy,
+        ManualDeliveryAccountingService $manualAccounting,
+    ): void {
         if ($this->submitting || $this->completedOrderId) {
             return;
         }
@@ -825,7 +829,7 @@ class OrderWizard extends Component
         $this->submitting = true;
 
         try {
-            $order = DB::transaction(function () {
+            $order = DB::transaction(function () use ($deliveryPolicy, $manualAccounting) {
                 $terminal = KioskTerminal::query()
                     ->whereKey($this->terminalId)
                     ->where('token_hash', hash('sha256', $this->terminalToken))
@@ -851,6 +855,7 @@ class OrderWizard extends Component
                 }
 
                 $isDelivery = $this->fulfillment === 'delivery';
+                $manualDelivery = $isDelivery && ! $deliveryPolicy->enabledForUpdate();
                 $customer = $this->selectedCustomerId
                     ? Customer::query()->whereKey($this->selectedCustomerId)->lockForUpdate()->first()
                     : null;
@@ -957,6 +962,7 @@ class OrderWizard extends Component
                     'mesa_id' => $mesa?->id,
                     'mesa_service_id' => $mesaService?->id,
                     'delivery_method' => $isDelivery ? 'contra_entrega' : null,
+                    'delivery_flow_mode' => $manualDelivery ? 'manual' : 'managed',
                     'source' => 'kiosk',
                     'fulfillment' => $this->fulfillment,
                     'status' => 'pendiente',
@@ -1006,6 +1012,10 @@ class OrderWizard extends Component
                             'quantity' => $ingredient['quantity'],
                         ]);
                     }
+                }
+
+                if ($manualDelivery) {
+                    $order = $manualAccounting->account($order);
                 }
 
                 return $order;

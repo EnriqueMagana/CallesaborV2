@@ -19,19 +19,13 @@
         href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
     <link rel="stylesheet"
         href="{{ asset('assets/css/public-home.css') }}?v={{ filemtime(public_path('assets/css/public-home.css')) }}">
+    <noscript><style>.home-preloader{display:none!important}</style></noscript>
     @livewireStyles
 </head>
 
 <body class="public-home" style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
     <a class="menu-skip-link" href="#experiencia">Saltar al contenido</a>
-    <div class="home-preloader" data-home-preloader role="status" aria-live="polite"
-        aria-label="Cargando {{ $business->business_name }}">
-        <div class="home-preloader__chase" aria-hidden="true">
-            @for ($dot = 0; $dot < 6; $dot++)
-                <span></span>
-            @endfor
-        </div>
-    </div>
+    <x-public-menu.page-loader :business="$business" />
     @php
         $heroSlides = collect($menuSettings->show_banners ? $menuSettings->bannerItems() : []);
     @endphp

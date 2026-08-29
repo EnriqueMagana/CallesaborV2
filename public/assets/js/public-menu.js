@@ -117,8 +117,201 @@
         }
     };
 
+    const initializeContactMaps = () => {
+        document.querySelectorAll('[data-contact-map-shell]').forEach((shell) => {
+            const frame = shell.querySelector('[data-contact-map]');
+            if (!frame || frame.dataset.mapStateBound === 'true') return;
+
+            frame.dataset.mapStateBound = 'true';
+            frame.addEventListener('load', () => {
+                shell.classList.remove('is-map-loading');
+                shell.classList.add('is-map-ready');
+            }, { once: true });
+        });
+    };
+
+    const initializeDirectionsLinks = () => {
+        document.querySelectorAll('[data-directions-link]').forEach((link) => {
+            if (link.dataset.directionsBound === 'true') return;
+            link.dataset.directionsBound = 'true';
+
+            link.addEventListener('click', (event) => {
+                if (!navigator.geolocation || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+                event.preventDefault();
+                if (link.classList.contains('is-locating')) return;
+
+                const fallbackUrl = link.href;
+                const label = link.querySelector('[data-directions-label]');
+                const help = link.querySelector('[data-directions-help]');
+                link.classList.add('is-locating');
+                link.setAttribute('aria-busy', 'true');
+                if (label) label.textContent = 'Obteniendo ubicación';
+                if (help) help.textContent = 'Preparando tu ruta…';
+
+                const navigate = (url) => window.location.assign(url);
+                const fallback = () => navigate(fallbackUrl);
+
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const route = new URL(fallbackUrl);
+                    route.searchParams.set('origin', `${position.coords.latitude},${position.coords.longitude}`);
+                    navigate(route.toString());
+                }, fallback, {
+                    enableHighAccuracy: false,
+                    maximumAge: 120000,
+                    timeout: 6000,
+                });
+            });
+        });
+    };
+
+    const initializeHoursTimeline = () => {
+        const timeline = document.querySelector('[data-hours-timeline]');
+        if (!timeline) return;
+
+        const timezone = timeline.dataset.hoursTimezone || 'America/Mexico_City';
+        const opensAt = Date.parse(timeline.dataset.hoursOpensAt || '');
+        const closesAt = Date.parse(timeline.dataset.hoursClosesAt || '');
+        const dayEnabled = timeline.dataset.hoursDayEnabled === 'true'
+            && Number.isFinite(opensAt)
+            && Number.isFinite(closesAt);
+        const clock = timeline.querySelector('[data-hours-clock]');
+        const date = timeline.querySelector('[data-hours-date]');
+        const statusLabel = timeline.querySelector('[data-hours-status-label]');
+        const statusDetail = timeline.querySelector('[data-hours-status-detail]');
+        const statusIcon = timeline.querySelector('[data-hours-status-icon]');
+        const progressLabel = timeline.querySelector('[data-hours-progress-label]');
+        const progressPercent = timeline.querySelector('[data-hours-progress-percent]');
+        const progressbar = timeline.querySelector('[data-hours-progressbar]');
+        const progressFill = timeline.querySelector('[data-hours-progress-fill]');
+        const clockFormatter = new Intl.DateTimeFormat('es-MX', {
+            timeZone: timezone,
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+        });
+        const dateFormatter = new Intl.DateTimeFormat('es-MX', {
+            timeZone: timezone,
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+        });
+        const dateKeyFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        });
+
+        const dateKey = (instant) => {
+            const parts = Object.fromEntries(
+                dateKeyFormatter.formatToParts(instant)
+                    .filter((part) => part.type !== 'literal')
+                    .map((part) => [part.type, part.value]),
+            );
+            return `${parts.year}-${parts.month}-${parts.day}`;
+        };
+        const durationLabel = (milliseconds) => {
+            const minutes = Math.max(0, Math.ceil(milliseconds / 60000));
+            const hours = Math.floor(minutes / 60);
+            const remainder = minutes % 60;
+            return [hours ? `${hours} h` : '', remainder ? `${remainder} min` : '']
+                .filter(Boolean)
+                .join(' ') || 'menos de 1 min';
+        };
+
+        const update = () => {
+            const now = new Date();
+            const timestamp = now.getTime();
+            if (timeline.dataset.hoursBusinessDate && dateKey(now) !== timeline.dataset.hoursBusinessDate) {
+                window.location.reload();
+                return;
+            }
+
+            if (clock) {
+                clock.textContent = clockFormatter.format(now);
+                clock.dateTime = now.toISOString();
+            }
+            if (date) {
+                const formattedDate = dateFormatter.format(now);
+                date.textContent = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+            }
+
+            let state = 'closed-day';
+            let progress = 0;
+            if (dayEnabled && timestamp < opensAt) {
+                state = 'upcoming';
+            } else if (dayEnabled && timestamp <= closesAt) {
+                state = 'open';
+                progress = Math.max(0, Math.min(1, (timestamp - opensAt) / Math.max(1, closesAt - opensAt)));
+            } else if (dayEnabled) {
+                state = 'closed';
+                progress = 1;
+            }
+
+            const copy = {
+                open: {
+                    label: 'Abierto ahora',
+                    detail: `Quedan ${durationLabel(closesAt - timestamp)} de servicio.`,
+                    progress: 'Jornada en curso',
+                    icon: 'bx-check-circle',
+                },
+                upcoming: {
+                    label: 'Abrimos más tarde',
+                    detail: `Abrimos en ${durationLabel(opensAt - timestamp)}.`,
+                    progress: 'La jornada comienza pronto',
+                    icon: 'bx-time',
+                },
+                closed: {
+                    label: 'Cerrado por hoy',
+                    detail: 'La jornada de hoy ha finalizado. Te esperamos en nuestra próxima apertura.',
+                    progress: 'Jornada finalizada',
+                    icon: 'bx-moon',
+                },
+                'closed-day': {
+                    label: 'Hoy no abrimos',
+                    detail: 'Consulta la semana completa para planear tu próxima visita.',
+                    progress: 'Sin servicio hoy',
+                    icon: 'bx-calendar-x',
+                },
+            }[state];
+            const percentage = Math.round(progress * 100);
+
+            timeline.classList.remove(
+                'info-status-card--open',
+                'info-status-card--upcoming',
+                'info-status-card--closed',
+                'info-status-card--closed-day',
+            );
+            timeline.classList.add(`info-status-card--${state}`);
+            timeline.dataset.hoursState = state;
+            if (statusLabel) statusLabel.textContent = copy.label;
+            if (statusDetail) statusDetail.textContent = copy.detail;
+            if (progressLabel) progressLabel.textContent = copy.progress;
+            if (progressPercent) progressPercent.textContent = `${percentage}%`;
+            if (progressFill) progressFill.style.setProperty('--hours-progress', String(progress));
+            if (progressbar) {
+                progressbar.setAttribute('aria-valuenow', String(percentage));
+                progressbar.setAttribute('aria-valuetext', `${copy.label}, ${percentage}% de la jornada`);
+            }
+            if (statusIcon) {
+                statusIcon.classList.remove('bx-check-circle', 'bx-time', 'bx-moon', 'bx-calendar-x');
+                statusIcon.classList.add(copy.icon);
+            }
+        };
+
+        update();
+        window.setInterval(update, 30000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) update();
+        });
+    };
+
     initializePreloader();
     initializeImageLoadingStates();
+    initializeContactMaps();
+    initializeDirectionsLinks();
+    initializeHoursTimeline();
 
     document.querySelectorAll('[data-menu-banner-carousel]').forEach((carousel) => {
         const slides = [...carousel.querySelectorAll('[data-menu-banner-slide]')];

@@ -14,6 +14,7 @@ class BusinessSetting extends Model
         'business_hours' => 'array',
         'gallery_paths' => 'array',
         'featured_product_ids' => 'array',
+        'delivery_management_enabled' => 'boolean',
     ];
 
     public const DEFAULT_HOURS = [

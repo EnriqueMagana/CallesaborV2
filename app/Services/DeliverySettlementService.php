@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class DeliverySettlementService
 {
+    public function __construct(private readonly DeliveryModulePolicy $policy) {}
+
     public function complete(
         CashRegister $register,
         User $driver,
@@ -19,6 +21,7 @@ class DeliverySettlementService
         ?string $notes = null,
     ): DeliverySettlement {
         return DB::transaction(function () use ($register, $driver, $actor, $declaredCash, $notes): DeliverySettlement {
+            $this->policy->assertEnabledForUpdate();
             $lockedRegister = CashRegister::query()->lockForUpdate()->findOrFail($register->id);
 
             if (! $lockedRegister->is_open) {

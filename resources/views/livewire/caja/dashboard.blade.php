@@ -87,6 +87,7 @@
             </div>
         </div>
 
+        @if($this->deliveryManagementEnabled)
         <section class="app-card delivery-reconciliation" aria-labelledby="delivery-reconciliation-title">
             <header class="delivery-reconciliation__header">
                 <div>
@@ -164,6 +165,27 @@
                 </table>
             </div>
         </section>
+        @else
+            @php $manualDelivery = $this->manualDeliverySummary; @endphp
+            <section class="app-card delivery-reconciliation delivery-reconciliation--manual" aria-labelledby="manual-delivery-title">
+                <header class="delivery-reconciliation__header">
+                    <div>
+                        <span><i class="bx bx-hand" aria-hidden="true"></i></span>
+                        <div>
+                            <div class="app-eyebrow">Caja global · Delivery</div>
+                            <h2 id="manual-delivery-title">Delivery en gestión manual</h2>
+                            <p>No se requieren asignaciones ni mini cortes. El efectivo contra entrega ya forma parte del total esperado.</p>
+                        </div>
+                    </div>
+                    <span class="app-status app-status--warning"><i class="bx bx-wallet"></i>Conciliación global</span>
+                </header>
+                <div class="delivery-manual-summary">
+                    <div><small>Pedidos contabilizados</small><strong>{{ $manualDelivery['orders'] }}</strong></div>
+                    <div><small>Efectivo esperado</small><strong>${{ number_format($manualDelivery['cash'], 2) }}</strong></div>
+                    <div><small>Venta delivery manual</small><strong>${{ number_format($manualDelivery['total'], 2) }}</strong></div>
+                </div>
+            </section>
+        @endif
 
         <div class="d-flex flex-wrap gap-3 mt-4">
             <a href="{{ route('app.pos') }}" class="btn btn-primary">
@@ -174,7 +196,7 @@
             </a>
         </div>
 
-        @if($settlementDriverId)
+        @if($this->deliveryManagementEnabled && $settlementDriverId)
             @php $settlementRow = $this->deliveryReconciliations->firstWhere('driver_id', $settlementDriverId); @endphp
             <div class="cash-cut-modal-backdrop" role="presentation" x-data x-on:keydown.escape.window="$wire.closeDeliverySettlement()">
                 <section class="cash-cut-modal delivery-settlement-modal" role="dialog" aria-modal="true" aria-labelledby="delivery-settlement-title">

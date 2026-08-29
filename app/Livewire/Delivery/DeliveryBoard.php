@@ -4,6 +4,7 @@ namespace App\Livewire\Delivery;
 
 use App\Models\CashRegister;
 use App\Models\Order;
+use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
@@ -23,6 +24,7 @@ class DeliveryBoard extends Component
 
     public function mount(): void
     {
+        app(DeliveryModulePolicy::class)->assertEnabled();
         abort_unless(auth()->user()?->can('ver delivery'), 403);
 
         $orderId = request()->integer('order');
@@ -31,7 +33,7 @@ class DeliveryBoard extends Component
         }
 
         $order = Order::query()->with('deliveryAssignment')->where('type', 'delivery')->find($orderId);
-        if (! $order) {
+        if (! $order || $order->delivery_flow_mode !== 'managed') {
             return;
         }
 
@@ -60,6 +62,7 @@ class DeliveryBoard extends Component
             ->with(['deliveryAssignment.driver', 'payments', 'kioskTerminal', 'items'])
             ->where('cash_register_id', $this->activeRegister->id)
             ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
             ->where('status', '!=', 'cancelada')
             ->oldest('created_at')
             ->get();
@@ -177,6 +180,7 @@ class DeliveryBoard extends Component
         return Order::query()
             ->where('cash_register_id', $this->activeRegister->id)
             ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
             ->findOrFail($orderId);
     }
 

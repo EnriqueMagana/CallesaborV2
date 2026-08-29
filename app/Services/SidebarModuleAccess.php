@@ -17,6 +17,10 @@ class SidebarModuleAccess
             return false;
         }
 
+        if ($routeName === 'app.delivery' && ! app(DeliveryModulePolicy::class)->enabled()) {
+            return false;
+        }
+
         $item = $this->itemForRoute($routeName);
 
         if (! $item) {

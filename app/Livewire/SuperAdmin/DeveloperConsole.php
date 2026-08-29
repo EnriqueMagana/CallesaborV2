@@ -4,11 +4,15 @@ namespace App\Livewire\SuperAdmin;
 
 use App\Mail\DeveloperTestMail;
 use App\Models\AppNotification;
+use App\Models\DeliveryModuleAudit;
 use App\Services\DeveloperDiagnosticsService;
+use App\Services\DeliveryModuleManager;
+use App\Services\DeliveryModulePolicy;
 use App\Services\Firebase\FirebaseRealtimeDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
@@ -123,12 +127,87 @@ class DeveloperConsole extends Component
         );
     }
 
+    #[Computed]
+    public function deliveryModuleState(): array
+    {
+        return [
+            'enabled' => app(DeliveryModulePolicy::class)->enabled(),
+            'impact' => app(DeliveryModuleManager::class)->impact(),
+            'last_change' => DeliveryModuleAudit::query()
+                ->with('changedBy:id,name')
+                ->latest('changed_at')
+                ->first(),
+        ];
+    }
+
+    public function confirmToggleDeliveryModule(): void
+    {
+        $this->authorizeDiagnostics();
+        $state = $this->deliveryModuleState;
+        $enable = ! $state['enabled'];
+        $impact = $state['impact'];
+
+        if (! $enable && ($impact['assigned_orders'] > 0 || $impact['in_route_orders'] > 0)) {
+            $this->addError(
+                'deliveryModule',
+                "Resuelve primero {$impact['assigned_orders']} pedido(s) asignado(s) y {$impact['in_route_orders']} en ruta.",
+            );
+
+            return;
+        }
+
+        $this->resetErrorBag('deliveryModule');
+        $message = $enable
+            ? 'Se habilitarán la asignación, el seguimiento y los mini cortes de repartidores para los pedidos nuevos.'
+            : "Se ocultará el módulo y {$impact['unassigned_orders']} pedido(s) sin asignar pasarán a gestión manual. Su efectivo se incluirá en el corte global.";
+
+        $this->dispatch(
+            'open-confirm',
+            type: $enable ? 'warning' : 'danger',
+            title: $enable ? 'Activar gestión de Delivery' : 'Desactivar gestión de Delivery',
+            message: $message,
+            action: 'toggle-delivery-module',
+            params: ['enabled' => $enable],
+            confirmText: $enable ? 'Activar módulo' : 'Usar gestión manual',
+            cancelText: 'Cancelar',
+        );
+    }
+
     #[On('modal-confirmed')]
     public function handleModalConfirmed(string $action, array $params = []): void
     {
         if ($action === 'clearFirebaseNotifications') {
             $this->clearFirebaseNotifications(app(FirebaseRealtimeDatabase::class));
+
+            return;
         }
+
+        if ($action === 'toggle-delivery-module') {
+            $this->toggleDeliveryModule((bool) ($params['enabled'] ?? false));
+        }
+    }
+
+    public function toggleDeliveryModule(bool $enabled): void
+    {
+        $this->authorizeDiagnostics();
+
+        try {
+            $result = app(DeliveryModuleManager::class)->setEnabled($enabled, auth()->user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->addError('deliveryModule', $exception->validator->errors()->first('deliveryModule'));
+
+            return;
+        }
+
+        unset($this->deliveryModuleState);
+        $converted = (int) $result['converted_orders'];
+        $this->lastAction = [
+            'ok' => true,
+            'message' => $enabled
+                ? 'Delivery administrado fue activado para los pedidos nuevos.'
+                : "Delivery manual activado. {$converted} pedido(s) se incorporaron al corte global.",
+        ];
+        $this->dispatch('sidebar-menu-updated');
     }
 
     public function testPulse(DeveloperDiagnosticsService $diagnostics): void

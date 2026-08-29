@@ -79,6 +79,37 @@ class PublicMenuTest extends TestCase
             ->assertDontSee('Hacer pedido');
     }
 
+    public function test_shared_public_identity_keeps_the_location_out_of_the_welcome_card(): void
+    {
+        $business = BusinessSetting::current();
+        $business->update([
+            'business_name' => 'Restaurante Calle Sabor',
+            'address' => 'Calle 33 x 22 A y 22',
+            'city' => 'Santiago',
+            'state' => 'Yucatán',
+            'postal_code' => '97864',
+        ]);
+
+        $response = $this->get(route('public.hours'))
+            ->assertOk()
+            ->assertSee('Información del restaurante')
+            ->assertSee('Restaurante Calle Sabor')
+            ->assertSee('Calle 33 x 22 A y 22');
+
+        $content = $response->getContent();
+        $identityStart = strpos($content, '<div class="menu-container menu-identity">');
+        $identityEnd = strpos($content, '</header>', $identityStart);
+
+        $this->assertNotFalse($identityStart);
+        $this->assertNotFalse($identityEnd);
+
+        $identity = substr($content, $identityStart, $identityEnd - $identityStart);
+
+        $this->assertStringContainsString('menu-identity__brand-copy', $identity);
+        $this->assertStringNotContainsString('Calle 33 x 22 A y 22', $identity);
+        $this->assertStringNotContainsString('bx-map', $identity);
+    }
+
     public function test_menu_places_the_mobile_quick_access_carousel_before_the_shared_footer(): void
     {
         $business = BusinessSetting::current();
@@ -443,6 +474,7 @@ class PublicMenuTest extends TestCase
 
         $homeResponse = $this->get('/')
             ->assertOk()
+            ->assertSee('data-home-preloader', false)
             ->assertSee('Reservar una mesa')
             ->assertSee(route('public.menu'), false)
             ->assertSee(route('public.hours'), false)
@@ -453,12 +485,14 @@ class PublicMenuTest extends TestCase
 
         $this->get(route('public.hours'))
             ->assertOk()
+            ->assertSee('data-home-preloader', false)
             ->assertSee('Semana completa')
             ->assertSee('Estado actual')
             ->assertSee('maps.app.goo.gl/cocina-de-barrio', false);
 
         $this->get(route('public.gallery'))
             ->assertOk()
+            ->assertSee('data-home-preloader', false)
             ->assertSee(Storage::url('business/banner.jpg'), false)
             ->assertSee(Storage::url('business/gallery/local.jpg'), false)
             ->assertSee('Terraza principal')
@@ -466,10 +500,42 @@ class PublicMenuTest extends TestCase
 
         $this->get(route('public.contact'))
             ->assertOk()
+            ->assertSee('data-home-preloader', false)
             ->assertSee(Storage::url('business/banner.jpg'), false)
             ->assertSee('5512345678')
             ->assertSee('maps.app.goo.gl/cocina-de-barrio', false)
-            ->assertSee('instagram.com/cocinadebarrio', false);
+            ->assertSee('instagram.com/cocinadebarrio', false)
+            ->assertSee('data-contact-map', false)
+            ->assertSee('google.com/maps?q=Cocina%20de%20Barrio%2C%20Av.%20Principal%20123', false)
+            ->assertSee('google.com/maps/dir/?api=1', false)
+            ->assertSee('destination=Cocina%20de%20Barrio%2C%20Av.%20Principal%20123', false)
+            ->assertSee('dir_action=navigate', false)
+            ->assertSee('Cómo llegar');
+    }
+
+    public function test_contact_map_uses_the_exact_coordinates_from_the_configured_google_maps_place(): void
+    {
+        BusinessSetting::current()->update([
+            'business_name' => 'Calle sabor',
+            'address' => 'Calle 33 x 22A y 22, colonia Santiago',
+            'city' => 'Ticul',
+            'state' => 'Yucatán',
+            'postal_code' => '97864',
+            'maps_url' => 'https://www.google.com/maps/place/Calle+sabor/@20.3911388,-89.5308667,16.25z/data=!4m5!3m4!1s0x8f5653401311ae31:0x2cafd4b14d8bec0d!8m2!3d20.3910602!4d-89.5292173',
+        ]);
+
+        $this->get(route('public.contact'))
+            ->assertOk()
+            ->assertSee('maps?q=20.3910602%2C-89.5292173', false)
+            ->assertSee('destination=20.3910602%2C-89.5292173', false)
+            ->assertSee('Calle 33 x 22A y 22, colonia Santiago, Ticul, Yucatán, 97864')
+            ->assertSee('dir_action=navigate', false)
+            ->assertSee('data-directions-link', false)
+            ->assertSee('Usar mi ubicación actual');
+
+        $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
+        $this->assertStringContainsString('navigator.geolocation.getCurrentPosition', $javascript);
+        $this->assertStringContainsString("route.searchParams.set('origin'", $javascript);
     }
 
     public function test_opening_status_supports_an_overnight_schedule(): void
@@ -491,7 +557,7 @@ class PublicMenuTest extends TestCase
 
     public function test_hours_page_displays_the_administrator_configured_opening_and_closing_times(): void
     {
-        Carbon::setTestNow('2026-08-24 10:00:00');
+        Carbon::setTestNow(Carbon::parse('2026-08-24 10:00:00', 'America/Mexico_City'));
         $business = BusinessSetting::current();
         $hours = BusinessSetting::DEFAULT_HOURS;
         $hours[0] = ['key' => 'monday', 'label' => 'Lunes', 'enabled' => true, 'opens' => '12:15', 'closes' => '21:45'];
@@ -500,11 +566,47 @@ class PublicMenuTest extends TestCase
         $this->get(route('public.hours'))
             ->assertOk()
             ->assertSee('Horario actualizado desde la administración del restaurante.')
+            ->assertSee('data-hours-timeline', false)
+            ->assertSee('Abrimos más tarde')
+            ->assertSee('10:00 a. m.')
+            ->assertSee('Lunes, 24 de agosto')
             ->assertSee('Hoy')
             ->assertSee('Abre')
-            ->assertSee('12:15')
+            ->assertSee('12:15 p. m.')
             ->assertSee('Cierra')
-            ->assertSee('21:45');
+            ->assertSee('9:45 p. m.')
+            ->assertSee('aria-valuenow="0"', false);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_hours_page_tracks_the_current_service_progress_and_closed_state(): void
+    {
+        $business = BusinessSetting::current();
+        $hours = BusinessSetting::DEFAULT_HOURS;
+        $hours[0] = ['key' => 'monday', 'label' => 'Lunes', 'enabled' => true, 'opens' => '12:00', 'closes' => '20:00'];
+        $business->update(['business_hours' => $hours]);
+
+        Carbon::setTestNow(Carbon::parse('2026-08-24 15:00:00', 'America/Mexico_City'));
+        $this->get(route('public.hours'))
+            ->assertOk()
+            ->assertSee('Abierto ahora')
+            ->assertSee('Jornada en curso')
+            ->assertSee('aria-valuenow="38"', false)
+            ->assertSee('--hours-progress: 0.375', false)
+            ->assertSee('3:00 p. m.');
+
+        Carbon::setTestNow(Carbon::parse('2026-08-24 21:00:00', 'America/Mexico_City'));
+        $this->get(route('public.hours'))
+            ->assertOk()
+            ->assertSee('Cerrado por hoy')
+            ->assertSee('Jornada finalizada')
+            ->assertSee('aria-valuenow="100"', false);
+
+        $javascript = file_get_contents(public_path('assets/js/public-menu.js'));
+        $this->assertStringContainsString('const initializeHoursTimeline = () =>', $javascript);
+        $this->assertStringContainsString('window.setInterval(update, 30000)', $javascript);
+        $this->assertStringContainsString('timeZone: timezone', $javascript);
 
         Carbon::setTestNow();
     }
