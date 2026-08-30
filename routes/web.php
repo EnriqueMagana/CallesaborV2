@@ -9,6 +9,7 @@ use App\Http\Controllers\PublicMenuController;
 use App\Http\Controllers\RealtimeNotificationSessionController;
 use App\Http\Middleware\EnforceSidebarModuleAccess;
 use App\Http\Middleware\EnsureOrderBelongsToCurrentRegister;
+use App\Http\Middleware\EnsureDeliveryModuleEnabled;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
@@ -100,7 +101,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/historial-ventas', SalesHistory::class)->middleware('can:ver reportes')->name('historial-ventas');
     Route::get('/ordenes/{order}', OrderDetail::class)->middleware('can:ver ordenes')->name('ordenes.show');
     Route::get('/pos', PointOfSale::class)->middleware('can:usar punto de venta')->name('pos');
-    Route::get('/delivery', DeliveryBoard::class)->middleware('can:ver delivery')->name('delivery');
+    Route::get('/delivery', DeliveryBoard::class)->middleware(['can:ver delivery', EnsureDeliveryModuleEnabled::class])->name('delivery');
     Route::get('/inventario', InventoryManager::class)->middleware('can:ver inventario')->name('inventario');
     Route::get('/caja', CajaDashboard::class)->middleware('can:ver caja')->name('caja');
     Route::get('/caja/corte', CorteDeCaja::class)->middleware('can:cerrar caja')->name('caja.corte');

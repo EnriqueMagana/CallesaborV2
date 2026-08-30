@@ -9,6 +9,7 @@ use App\Models\DeliverySettlement;
 use App\Models\Expense;
 use App\Models\Order;
 use App\Services\CashRegisterClosingGuard;
+use App\Services\DeliveryModulePolicy;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -87,6 +88,26 @@ class CorteDeCaja extends Component
             ->with(['driver', 'completedBy', 'assignments.order.payments'])
             ->latest('completed_at')
             ->get();
+    }
+
+    #[Computed]
+    public function deliveryManagementEnabled(): bool
+    {
+        return app(DeliveryModulePolicy::class)->enabled();
+    }
+
+    #[Computed]
+    public function manualDeliverySummary(): array
+    {
+        $orders = $this->orders
+            ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'manual');
+
+        return [
+            'orders' => $orders->count(),
+            'cash' => (float) $orders->flatMap(fn (Order $order) => $order->payments->where('method', 'efectivo'))->sum('amount'),
+            'total' => (float) $orders->sum('total'),
+        ];
     }
 
     // ────────── Totales por área y método ──────────

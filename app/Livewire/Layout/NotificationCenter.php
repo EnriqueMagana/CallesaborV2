@@ -225,7 +225,10 @@ class NotificationCenter extends Component
                 return route('app.mesas.ordenes', $order->mesa_id, false);
             }
 
-            if ($order?->type === 'delivery' && auth()->user()?->can('ver delivery')) {
+            if ($order?->type === 'delivery'
+                && ($order->delivery_flow_mode ?: 'managed') === 'managed'
+                && app(\App\Services\DeliveryModulePolicy::class)->enabled()
+                && auth()->user()?->can('ver delivery')) {
                 return route('app.delivery', ['order' => $order->id], false);
             }
 

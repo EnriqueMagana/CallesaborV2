@@ -13,14 +13,21 @@ use Illuminate\Validation\ValidationException;
 
 class DeliveryWorkflow
 {
+    public function __construct(private readonly DeliveryModulePolicy $policy) {}
+
     public function assignTo(Order $order, User $driver): DeliveryAssignment
     {
         return DB::transaction(function () use ($order, $driver): DeliveryAssignment {
+            $this->policy->assertEnabledForUpdate();
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensureOrderBelongsToOpenRegister($lockedOrder);
 
             if ($lockedOrder->type !== 'delivery') {
                 throw ValidationException::withMessages(['delivery' => 'Este pedido no corresponde a delivery.']);
+            }
+
+            if (! $this->policy->isManaged($lockedOrder)) {
+                throw ValidationException::withMessages(['delivery' => 'Este pedido pertenece a la gestión manual y no admite asignación digital.']);
             }
 
             if (! in_array($lockedOrder->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true)) {
@@ -46,6 +53,7 @@ class DeliveryWorkflow
     public function markPickedUp(Order $order, User $actor, bool $canManageAll = false): DeliveryAssignment
     {
         return DB::transaction(function () use ($order, $actor, $canManageAll): DeliveryAssignment {
+            $this->policy->assertEnabledForUpdate();
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensureOrderBelongsToOpenRegister($lockedOrder);
 
@@ -53,6 +61,10 @@ class DeliveryWorkflow
                 ->where('order_id', $lockedOrder->id)
                 ->lockForUpdate()
                 ->first();
+
+            if (! $this->policy->isManaged($lockedOrder)) {
+                throw ValidationException::withMessages(['delivery' => 'Este pedido pertenece a la gestión manual.']);
+            }
 
             if (! $assignment || $assignment->status !== 'asignado') {
                 throw ValidationException::withMessages(['delivery' => 'Este pedido no está asignado para entrega.']);
@@ -75,6 +87,7 @@ class DeliveryWorkflow
     public function markDelivered(Order $order, User $actor, bool $canManageAll = false): DeliveryAssignment
     {
         return DB::transaction(function () use ($order, $actor, $canManageAll): DeliveryAssignment {
+            $this->policy->assertEnabledForUpdate();
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             $this->ensureOrderBelongsToOpenRegister($lockedOrder);
 
@@ -82,6 +95,10 @@ class DeliveryWorkflow
                 ->where('order_id', $lockedOrder->id)
                 ->lockForUpdate()
                 ->first();
+
+            if (! $this->policy->isManaged($lockedOrder)) {
+                throw ValidationException::withMessages(['delivery' => 'Este pedido pertenece a la gestión manual.']);
+            }
 
             if (! $assignment || $assignment->status !== 'asignado') {
                 throw ValidationException::withMessages(['delivery' => 'Este pedido no tiene una entrega pendiente.']);

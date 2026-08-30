@@ -14,6 +14,10 @@ class CashRegisterClosingGuard
         $orders = Order::query()
             ->where('cash_register_id', $registerId)
             ->whereNotIn('status', ['pagada', 'cancelada'])
+            ->where(fn ($query) => $query
+                ->where('type', '!=', 'delivery')
+                ->orWhere('delivery_flow_mode', '!=', 'manual')
+                ->orWhereNull('accounted_at'))
             ->with(['mesa.area', 'seller', 'kioskTerminal', 'deliveryAssignment.driver'])
             ->orderBy('created_at')
             ->get();
@@ -21,6 +25,7 @@ class CashRegisterClosingGuard
         $unassignedDeliveries = Order::query()
             ->where('cash_register_id', $registerId)
             ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
             ->where('status', '!=', 'cancelada')
             ->whereDoesntHave('deliveryAssignment')
             ->with('kioskTerminal')

@@ -7,6 +7,7 @@ use App\Models\DeliveryAssignment;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\DeliverySettlementService;
+use App\Services\DeliveryModulePolicy;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -66,7 +67,7 @@ class Dashboard extends Component
     #[Computed]
     public function deliveryReconciliations(): Collection
     {
-        if (! $this->activeRegister) {
+        if (! $this->activeRegister || ! $this->deliveryManagementEnabled) {
             return collect();
         }
 
@@ -117,13 +118,44 @@ class Dashboard extends Component
         return Order::query()
             ->where('cash_register_id', $this->activeRegister->id)
             ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
             ->where('status', '!=', 'cancelada')
             ->whereDoesntHave('deliveryAssignment')
             ->count();
     }
 
+    #[Computed]
+    public function deliveryManagementEnabled(): bool
+    {
+        return app(DeliveryModulePolicy::class)->enabled();
+    }
+
+    #[Computed]
+    public function manualDeliverySummary(): array
+    {
+        if (! $this->activeRegister) {
+            return ['orders' => 0, 'cash' => 0.0, 'total' => 0.0];
+        }
+
+        $orders = Order::query()
+            ->where('cash_register_id', $this->activeRegister->id)
+            ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'manual')
+            ->whereNotNull('accounted_at')
+            ->where('status', '!=', 'cancelada')
+            ->with('payments')
+            ->get();
+
+        return [
+            'orders' => $orders->count(),
+            'cash' => (float) $orders->flatMap(fn (Order $order) => $order->payments->where('method', 'efectivo'))->sum('amount'),
+            'total' => (float) $orders->sum('total'),
+        ];
+    }
+
     public function openDeliverySettlement(int $driverId): void
     {
+        app(DeliveryModulePolicy::class)->assertEnabled();
         abort_unless(auth()->user()?->can('cerrar caja'), 403);
         abort_unless($this->deliveryReconciliations->contains('driver_id', $driverId), 404);
 
@@ -144,6 +176,7 @@ class Dashboard extends Component
 
     public function completeDeliverySettlement(DeliverySettlementService $service): void
     {
+        app(DeliveryModulePolicy::class)->assertEnabled();
         abort_unless(auth()->user()?->can('cerrar caja'), 403);
         abort_unless($this->activeRegister && $this->settlementDriverId, 422);
 

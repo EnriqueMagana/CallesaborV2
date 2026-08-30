@@ -8,32 +8,70 @@
 >
     <div class="menu-container info-hours info-hours--enhanced">
         <div class="info-hours__aside">
-            <section class="info-status-card info-status-card--enhanced info-status-card--{{ $openingStatus['is_open'] ? 'open' : 'closed' }}" aria-labelledby="current-hours-title">
-                <div class="info-status-card__heading">
-                    <span class="info-status-card__icon" aria-hidden="true"><i class="bx {{ $openingStatus['is_open'] ? 'bx-check-circle' : 'bx-moon' }}"></i></span>
+            <section class="info-status-card info-status-card--enhanced info-status-card--{{ $hoursTimeline['state'] }}"
+                aria-labelledby="current-hours-title"
+                data-hours-timeline
+                data-hours-state="{{ $hoursTimeline['state'] }}"
+                data-hours-timezone="{{ $hoursTimeline['timezone'] }}"
+                data-hours-business-date="{{ $hoursTimeline['business_date'] }}"
+                data-hours-day-enabled="{{ $hoursTimeline['day_enabled'] ? 'true' : 'false' }}"
+                data-hours-opens-at="{{ $hoursTimeline['opens_iso'] }}"
+                data-hours-closes-at="{{ $hoursTimeline['closes_iso'] }}">
+                <div class="info-current-time">
+                    <span class="info-current-time__icon" aria-hidden="true"><i class="bx bx-time-five"></i></span>
                     <div>
-                        <small>Estado actual</small>
-                        <h2 id="current-hours-title">{{ $openingStatus['label'] }}</h2>
-                        <p>{{ $openingStatus['detail'] }}</p>
+                        <small>Hora actual · Ciudad de México</small>
+                        <time datetime="{{ $hoursTimeline['now_iso'] }}" data-hours-clock>{{ $hoursTimeline['clock_label'] }}</time>
+                        <span data-hours-date>{{ $hoursTimeline['date_label'] }}</span>
                     </div>
                 </div>
 
-                @if($openingStatus['opens_at'] && $openingStatus['closes_at'])
-                    <div class="info-status-window" aria-label="Horario {{ $openingStatus['day_label'] }}: abre a las {{ $openingStatus['opens_at'] }} y cierra a las {{ $openingStatus['closes_at'] }}">
-                        <div>
-                            <span><i class="bx bx-sun" aria-hidden="true"></i> Abre</span>
-                            <time datetime="{{ $openingStatus['opens_at'] }}">{{ $openingStatus['opens_at'] }}</time>
+                <div class="info-status-card__heading">
+                    <span class="info-status-card__icon" aria-hidden="true"><i class="bx {{ $hoursTimeline['state'] === 'open' ? 'bx-check-circle' : ($hoursTimeline['state'] === 'upcoming' ? 'bx-time' : 'bx-moon') }}" data-hours-status-icon></i></span>
+                    <div>
+                        <small>Estado actual</small>
+                        <h2 id="current-hours-title" data-hours-status-label>{{ $hoursTimeline['status_label'] }}</h2>
+                        <p data-hours-status-detail>{{ $hoursTimeline['status_detail'] }}</p>
+                    </div>
+                </div>
+
+                @if($hoursTimeline['day_enabled'])
+                    <div class="info-service-progress">
+                        <div class="info-service-progress__heading">
+                            <span data-hours-progress-label>{{ match($hoursTimeline['state']) {
+                                'open' => 'Jornada en curso',
+                                'upcoming' => 'La jornada comienza pronto',
+                                default => 'Jornada finalizada',
+                            } }}</span>
+                            <strong data-hours-progress-percent>{{ (int) round($hoursTimeline['progress'] * 100) }}%</strong>
                         </div>
-                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
-                        <div>
-                            <span><i class="bx bx-moon" aria-hidden="true"></i> Cierra</span>
-                            <time datetime="{{ $openingStatus['closes_at'] }}">{{ $openingStatus['closes_at'] }}</time>
+                        <div class="info-service-progress__track" role="progressbar"
+                            aria-label="Progreso de la jornada de {{ strtolower($hoursTimeline['day_label']) }}"
+                            aria-valuemin="0" aria-valuemax="100"
+                            aria-valuenow="{{ (int) round($hoursTimeline['progress'] * 100) }}"
+                            aria-valuetext="{{ $hoursTimeline['status_label'] }}"
+                            data-hours-progressbar>
+                            <span style="--hours-progress: {{ $hoursTimeline['progress'] }}" data-hours-progress-fill></span>
+                        </div>
+                        <div class="info-service-progress__times">
+                            <div>
+                                <span><i class="bx bx-sun" aria-hidden="true"></i> Apertura</span>
+                                <time datetime="{{ $hoursTimeline['opens_at'] }}">{{ $hoursTimeline['opens_label'] }}</time>
+                            </div>
+                            <div>
+                                <span>Cierre <i class="bx bx-moon" aria-hidden="true"></i></span>
+                                <time datetime="{{ $hoursTimeline['closes_at'] }}">{{ $hoursTimeline['closes_label'] }}</time>
+                            </div>
                         </div>
                     </div>
                     <p class="info-status-card__note">
                         <i class="bx bx-calendar-check" aria-hidden="true"></i>
-                        Horario de {{ strtolower($openingStatus['day_label']) }}{{ $openingStatus['closes_next_day'] ? ' · cierre al día siguiente' : '' }}
+                        Jornada de {{ strtolower($hoursTimeline['day_label']) }}{{ $hoursTimeline['is_overnight'] ? ' · termina al día siguiente' : '' }}
                     </p>
+                @else
+                    <div class="info-service-progress info-service-progress--inactive">
+                        <div class="info-service-progress__empty"><i class="bx bx-calendar-x" aria-hidden="true"></i><span><strong>Sin jornada programada hoy</strong><small>Revisa abajo cuál es nuestro próximo día de servicio.</small></span></div>
+                    </div>
                 @endif
             </section>
 
@@ -65,12 +103,12 @@
                             @if($day['enabled'])
                                 <div class="info-schedule__time">
                                     <span><i class="bx bx-sun" aria-hidden="true"></i> Abre</span>
-                                    <time datetime="{{ $day['opens'] }}">{{ $day['opens'] }}</time>
+                                    <time datetime="{{ $day['opens'] }}">{{ $day['opens_label'] }}</time>
                                 </div>
                                 <i class="bx bx-right-arrow-alt info-schedule__arrow" aria-hidden="true"></i>
                                 <div class="info-schedule__time">
                                     <span><i class="bx bx-moon" aria-hidden="true"></i> Cierra</span>
-                                    <time datetime="{{ $day['closes'] }}">{{ $day['closes'] }}</time>
+                                    <time datetime="{{ $day['closes'] }}">{{ $day['closes_label'] }}</time>
                                 </div>
                                 @if($day['is_overnight'])<small class="info-schedule__overnight">Día siguiente</small>@endif
                             @else

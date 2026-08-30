@@ -21,14 +21,7 @@
 </head>
 
 <body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
-    <div class="home-preloader" data-home-preloader role="status" aria-live="polite"
-        aria-label="Cargando {{ $business->business_name }}">
-        <div class="home-preloader__chase" aria-hidden="true">
-            @for ($dot = 0; $dot < 6; $dot++)
-                <span></span>
-            @endfor
-        </div>
-    </div>
+    <x-public-menu.page-loader :business="$business" />
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
         :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />

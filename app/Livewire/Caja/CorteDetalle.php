@@ -30,7 +30,7 @@ class CorteDetalle extends Component
     public function orders()
     {
         return Order::where('cash_register_id', $this->cut->cash_register_id)
-            ->where('status', 'pagada')
+            ->finalizedForAccounting()
             ->with('payments')
             ->orderBy('id')
             ->get();

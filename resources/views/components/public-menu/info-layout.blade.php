@@ -14,8 +14,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
+    <noscript><style>.home-preloader{display:none!important}</style></noscript>
 </head>
 <body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
+    <x-public-menu.page-loader :business="$business" />
     <a class="menu-skip-link skip-link" href="#contenido">Saltar al contenido</a>
     <x-public-menu.brand-header
         :business="$business"

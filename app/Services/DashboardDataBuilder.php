@@ -72,7 +72,9 @@ class DashboardDataBuilder
 
         $periodOrders = $orders->latest()->get();
         $statusCounts = $periodOrders->countBy('status');
-        $paidOrders = $periodOrders->where('status', 'pagada');
+        $paidOrders = $periodOrders->filter(
+            fn (Order $order): bool => $order->isFinalizedForAccounting()
+        );
         $profile = $this->profileCopy($mode);
         $trend = $this->trend(
             $periodOrders,
@@ -135,7 +137,7 @@ class DashboardDataBuilder
                         (int) ($statusCounts['pendiente'] ?? 0),
                         (int) ($statusCounts['en_preparacion'] ?? 0),
                         (int) ($statusCounts['lista'] ?? 0),
-                        (int) ($statusCounts['pagada'] ?? 0),
+                        $paidOrders->count(),
                     ],
                 ],
             ],
@@ -222,7 +224,15 @@ class DashboardDataBuilder
             return [
                 $this->kpi('Listos para salir', (int) ($statuses['lista'] ?? 0), 'bx-package', 'success', 'Pedidos preparados'),
                 $this->kpi('En preparación', (int) ($statuses['en_preparacion'] ?? 0), 'bx-time-five', 'warning', 'Aún en cocina'),
-                $this->kpi('Contra entrega', $orders->where('delivery_method', 'contra_entrega')->whereNotIn('status', ['pagada', 'cancelada'])->count(), 'bx-wallet', 'primary', 'Cobro pendiente'),
+                $this->kpi(
+                    'Contra entrega',
+                    $orders->where('delivery_method', 'contra_entrega')
+                        ->filter(fn (Order $order): bool => ! $order->isFinalizedForAccounting() && $order->status !== 'cancelada')
+                        ->count(),
+                    'bx-wallet',
+                    'primary',
+                    'Cobro pendiente'
+                ),
                 $this->kpi('Entregados', $orders->whereIn('status', ['entregada', 'pagada'])->count(), 'bx-check-shield', 'info', 'En el periodo seleccionado'),
             ];
         }
@@ -263,7 +273,9 @@ class DashboardDataBuilder
             'values' => $days->map(function (Carbon $day) use ($ordersByDay, $money) {
                 $daily = $ordersByDay->get($day->toDateString(), collect());
 
-                return $money ? round((float) $daily->where('status', 'pagada')->sum('total'), 2) : $daily->count();
+                return $money
+                    ? round((float) $daily->filter(fn (Order $order): bool => $order->isFinalizedForAccounting())->sum('total'), 2)
+                    : $daily->count();
             })->all(),
             'name' => $money ? 'Ventas' : 'Pedidos',
             'money' => $money,
@@ -284,7 +296,7 @@ class DashboardDataBuilder
             DB::raw('COUNT(orders.id) as orders_count'),
         ];
         if ($financialAccess) {
-            $leaderColumns[] = DB::raw("SUM(CASE WHEN orders.status = 'pagada' THEN orders.total ELSE 0 END) as sales_total");
+            $leaderColumns[] = DB::raw("SUM(CASE WHEN orders.status = 'pagada' OR (orders.type = 'delivery' AND orders.delivery_flow_mode = 'manual' AND orders.accounted_at IS NOT NULL) THEN orders.total ELSE 0 END) as sales_total");
         }
 
         $leaders = Order::query()
@@ -325,7 +337,9 @@ class DashboardDataBuilder
             ->sortByDesc(fn (Collection $orders): int => $orders->count())
             ->keys()
             ->first();
-        $paidToday = $todayOrders->where('status', 'pagada');
+        $paidToday = $todayOrders->filter(
+            fn (Order $order): bool => $order->isFinalizedForAccounting()
+        );
 
         return [
             'leaders' => $leaders,

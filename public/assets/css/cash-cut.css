@@ -288,3 +288,5 @@ html.dark-style .cash-cut-delivery-blockers { background:#332d21; }
 html.dark-style .cash-cut-delivery-blockers>header,
 html.dark-style .cash-cut-delivery-blockers__list { border-color:#715d2c; background:#3a321f; }
 html.dark-style .cash-cut-delivery-blockers__list article { background:#28271f; }
+.delivery-manual-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:18px 22px}.delivery-manual-summary>div{display:grid;gap:4px;padding:14px 16px;border:1px solid var(--app-border,#e5e7eb);border-radius:14px;background:var(--app-surface-soft,#f8fafc)}.delivery-manual-summary small{color:var(--app-muted,#667085);font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.delivery-manual-summary strong{font-size:20px;font-variant-numeric:tabular-nums}.delivery-reconciliation--manual .delivery-reconciliation__header>div>span{background:#fff3dc;color:#81520b}
+@media(max-width:767px){.delivery-manual-summary{grid-template-columns:1fr;padding:16px}}

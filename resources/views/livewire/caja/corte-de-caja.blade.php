@@ -258,6 +258,7 @@
                     </div>
                 </section>
 
+                @if($this->deliveryManagementEnabled)
                 <section class="app-card cash-cut-card">
                     <header class="cash-cut-card__header">
                         <div><span class="cash-cut-card__icon cash-cut-card__icon--info"><i class="bx bx-cycling"></i></span><div><h2>Arqueos de delivery</h2><p>Mini cortes completados por repartidor en este turno.</p></div></div>
@@ -284,6 +285,19 @@
                         </table>
                     </div>
                 </section>
+                @else
+                    @php $manualDelivery = $this->manualDeliverySummary; @endphp
+                    <section class="app-card cash-cut-card">
+                        <header class="cash-cut-card__header">
+                            <div><span class="cash-cut-card__icon cash-cut-card__icon--info"><i class="bx bx-hand"></i></span><div><h2>Delivery en corte global</h2><p>La conciliación con los empleados se realiza manualmente; no existen mini cortes individuales.</p></div></div>
+                            <span class="app-count-pill">{{ $manualDelivery['orders'] }} pedidos</span>
+                        </header>
+                        <div class="delivery-manual-summary">
+                            <div><small>Efectivo esperado</small><strong>${{ number_format($manualDelivery['cash'], 2) }}</strong></div>
+                            <div><small>Venta contabilizada</small><strong>${{ number_format($manualDelivery['total'], 2) }}</strong></div>
+                        </div>
+                    </section>
+                @endif
 
                 <section class="app-card cash-cut-card">
                     <header class="cash-cut-card__header">
