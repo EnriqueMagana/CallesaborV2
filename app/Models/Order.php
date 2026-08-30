@@ -111,6 +111,16 @@ class Order extends Model
         return $this->hasMany(OrderPayment::class);
     }
 
+    public function changeRequests(): HasMany
+    {
+        return $this->hasMany(OrderChangeRequest::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(OrderRefund::class);
+    }
+
     public function deliveryAssignment(): HasOne
     {
         return $this->hasOne(DeliveryAssignment::class);

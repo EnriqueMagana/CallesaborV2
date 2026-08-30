@@ -21,13 +21,15 @@
                     <span><i class="bx bx-trending-down"></i></span>
                     <div><strong>Salida de caja</strong><small>Registrar un gasto</small></div>
                 </button>
+            @endcanany
+            @can('registrar movimientos de caja')
                 <button type="button" role="tab" wire:click="openOperationsModal('income')"
                     class="pos-operation-tab {{ $operationType === 'income' ? 'is-active is-income' : '' }}"
                     aria-selected="{{ $operationType === 'income' ? 'true' : 'false' }}">
                     <span><i class="bx bx-trending-up"></i></span>
                     <div><strong>Ingreso de caja</strong><small>Agregar efectivo</small></div>
                 </button>
-            @endcanany
+            @endcan
             @canany(['registrar salida de insumos', 'ajustar inventario'])
                 <button type="button" role="tab" wire:click="openOperationsModal('inventory_out')"
                     class="pos-operation-tab {{ $operationType === 'inventory_out' ? 'is-active is-inventory' : '' }}"

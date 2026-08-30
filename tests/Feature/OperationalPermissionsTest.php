@@ -4,13 +4,16 @@ namespace Tests\Feature;
 
 use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\Dashboard as CashDashboard;
-use App\Livewire\Orders\OrderDetail;
+use App\Livewire\Orders\OrderChangeRequestInbox;
+use App\Livewire\Orders\OrderChangeRequestWizard;
 use App\Livewire\Orders\OrderList;
 use App\Livewire\Pos\PointOfSale;
 use App\Models\CashRegister;
 use App\Models\InventoryItem;
 use App\Models\Order;
+use App\Models\OrderChangeRequest;
 use App\Models\OrderItem;
+use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,76 +50,86 @@ class OperationalPermissionsTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'en_preparacion']);
     }
 
-    public function test_cancel_and_permanent_delete_are_independent_order_permissions(): void
+    public function test_cancellation_requires_a_request_and_owner_approval_without_deleting_the_order(): void
     {
         [$viewer, $register, $order] = $this->orderContext(['ver ordenes']);
 
         Livewire::actingAs($viewer)
-            ->test(OrderList::class)
-            ->call('openCancelModal', $order->id)
+            ->test(OrderChangeRequestWizard::class, ['order' => $order])
             ->assertForbidden();
 
-        $canceller = $this->employee(['ver ordenes', 'cancelar ordenes']);
-        Livewire::actingAs($canceller)
-            ->test(OrderList::class)
-            ->call('openCancelModal', $order->id)
-            ->set('cancelReason', 'Solicitud del cliente')
-            ->call('confirmCancel')
+        $requester = $this->employee(['ver ordenes', 'solicitar cancelacion de ordenes']);
+        Livewire::actingAs($requester)
+            ->test(OrderChangeRequestWizard::class, ['order' => $order])
+            ->call('chooseScope', 'full')
+            ->call('selectReason', 'customer_changed_mind')
+            ->set('customerConfirmed', 'yes')
+            ->call('nextStep')
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $request = OrderChangeRequest::firstOrFail();
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'pendiente']);
+        $this->assertDatabaseHas('order_change_requests', ['id' => $request->id, 'status' => 'pending']);
+        $this->assertSame('full', data_get($request->proposed_changes, 'request_context.scope'));
+        $this->assertSame('yes', data_get($request->proposed_changes, 'request_context.customer_confirmed'));
+
+        Livewire::actingAs($requester)
+            ->test(OrderChangeRequestInbox::class)
+            ->assertForbidden();
+
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        Livewire::actingAs($owner)
+            ->test(OrderChangeRequestInbox::class)
+            ->set('selectedRequestId', $request->id)
+            ->call('approveRequest')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'cancelada']);
-
-        Livewire::actingAs($canceller)
-            ->test(OrderList::class)
-            ->call('confirmDeleteOrder', $order->id)
-            ->assertForbidden();
-
-        $deleter = $this->employee(['ver ordenes', 'eliminar ordenes']);
-        Livewire::actingAs($deleter)
-            ->test(OrderList::class)
-            ->call('handleModalConfirmed', 'deleteOrder', ['id' => $order->id])
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseMissing('orders', ['id' => $order->id]);
+        $this->assertDatabaseHas('order_change_requests', ['id' => $request->id, 'status' => 'approved', 'reviewed_by' => $owner->id]);
     }
 
-    public function test_cancel_item_and_delete_item_use_separate_permissions(): void
+    public function test_modification_request_recalculates_total_and_preserves_removed_items(): void
     {
-        [$viewer, $register, $order] = $this->orderContext(['ver ordenes']);
+        [$requester, $register, $order] = $this->orderContext(['ver ordenes', 'solicitar modificacion de ordenes']);
         $item = OrderItem::create([
             'order_id' => $order->id,
-            'product_name' => 'Producto',
+            'product_name' => 'Producto anterior',
             'product_price' => 50,
-            'quantity' => 1,
-            'subtotal' => 50,
+            'quantity' => 2,
+            'subtotal' => 100,
         ]);
+        $product = Product::create(['name' => 'Producto nuevo', 'description' => 'Producto de prueba', 'price' => 75, 'is_active' => true]);
 
-        Livewire::actingAs($viewer)
-            ->test(OrderDetail::class, ['order' => $order])
-            ->call('openCancelItemModal', $item->id)
-            ->assertForbidden();
+        Livewire::actingAs($requester)
+            ->test(OrderChangeRequestWizard::class, ['order' => $order])
+            ->call('chooseScope', 'partial')
+            ->call('adjustRequestItem', 0, -1)
+            ->call('adjustRequestItem', 0, -1)
+            ->call('addProductToRequest', $product->id)
+            ->call('selectReason', 'customer_changed_mind')
+            ->set('customerConfirmed', 'yes')
+            ->call('nextStep')
+            ->call('submit')
+            ->assertHasNoErrors();
 
-        $canceller = $this->employee(['ver ordenes', 'cancelar ordenes']);
-        Livewire::actingAs($canceller)
-            ->test(OrderDetail::class, ['order' => $order])
-            ->call('openCancelItemModal', $item->id)
-            ->call('confirmCancelItem')
+        $request = OrderChangeRequest::firstOrFail();
+        $this->assertSame('75.00', $request->proposed_total);
+        $this->assertSame('partial', data_get($request->proposed_changes, 'request_context.scope'));
+        $this->assertDatabaseHas('order_items', ['id' => $item->id, 'is_cancelled' => false]);
+
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        Livewire::actingAs($owner)
+            ->test(OrderChangeRequestInbox::class)
+            ->set('selectedRequestId', $request->id)
+            ->call('approveRequest')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('order_items', ['id' => $item->id, 'is_cancelled' => true]);
-
-        Livewire::actingAs($canceller)
-            ->test(OrderDetail::class, ['order' => $order])
-            ->call('confirmDeleteItem', $item->id)
-            ->assertForbidden();
-
-        $deleter = $this->employee(['ver ordenes', 'eliminar items de ordenes']);
-        Livewire::actingAs($deleter)
-            ->test(OrderDetail::class, ['order' => $order])
-            ->call('handleModalConfirmed', 'deleteItem', ['id' => $item->id])
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseMissing('order_items', ['id' => $item->id]);
+        $this->assertDatabaseHas('order_items', ['order_id' => $order->id, 'product_id' => $product->id, 'quantity' => 1, 'subtotal' => 75]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'subtotal' => 75, 'total' => 75]);
     }
 
     public function test_opening_cash_register_requires_the_specific_permission(): void
@@ -264,7 +277,7 @@ class OperationalPermissionsTest extends TestCase
             ->assertSet('expectedCash', 175.50);
     }
 
-    public function test_pos_exposes_the_unified_movements_center_in_the_bottom_toolbar(): void
+    public function test_pos_exposes_only_the_authorized_operational_shortcuts(): void
     {
         $employee = $this->employee(['registrar movimientos de caja', 'registrar salida de insumos']);
         $this->register($employee);
@@ -273,12 +286,27 @@ class OperationalPermissionsTest extends TestCase
             ->test(PointOfSale::class)
             ->assertSee('Movimientos')
             ->assertSee('Caja e insumos')
-            ->assertDontSee('Registrar gasto')
+            ->assertSee('Registrar gasto')
+            ->assertSee('Ingreso de caja')
+            ->assertSee('Salida de insumos')
             ->call('openOperationsModal', 'expense')
             ->assertSet('showExpenseModal', true)
             ->assertSee('Salida de caja')
             ->assertSee('Ingreso de caja')
             ->assertSee('Salida de insumos');
+    }
+
+    public function test_expense_only_permission_does_not_unlock_cash_income(): void
+    {
+        $employee = $this->employee(['registrar gastos']);
+        $this->register($employee);
+
+        Livewire::actingAs($employee)
+            ->test(PointOfSale::class)
+            ->assertSee('Registrar gasto')
+            ->assertDontSee('Ingreso de caja')
+            ->call('openOperationsModal', 'income')
+            ->assertForbidden();
     }
 
     public function test_pos_supply_outflow_updates_stock_and_keeps_an_audit_movement(): void

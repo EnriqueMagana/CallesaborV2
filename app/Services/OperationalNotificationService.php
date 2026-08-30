@@ -6,8 +6,10 @@ use App\Jobs\PublishRealtimeNotification;
 use App\Models\AppNotification;
 use App\Models\DeliveryAssignment;
 use App\Models\Order;
+use App\Models\OrderChangeRequest;
 use App\Models\User;
 use App\Notifications\OperationalNotification;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -86,7 +88,29 @@ class OperationalNotificationService
             $this->urlFor($assignment->order), 'delivery', 'assignment-'.$assignment->id);
     }
 
-    private function send(string $eventKey, string $category, string $priority, Order $subject, Collection $recipients,
+    public function orderChangeRequested(OrderChangeRequest $request): void
+    {
+        $request->loadMissing(['order', 'requester']);
+        if (! $request->order) {
+            return;
+        }
+
+        $isCancellation = $request->type === OrderChangeRequest::TYPE_CANCELLATION;
+        $this->send(
+            eventKey: $isCancellation ? 'order.cancellation_requested' : 'order.modification_requested',
+            category: 'orders',
+            priority: $isCancellation ? 'urgent' : 'high',
+            subject: $request,
+            recipients: $this->usersByRoles(['owner', 'super-admin']),
+            title: 'Solicitud: '.$request->type_label,
+            message: "Pedido #{$request->order->display_folio} · {$request->requester?->name}: {$request->reason}",
+            url: route('app.solicitudes-ordenes', ['request' => $request->id], false),
+            sound: $isCancellation ? 'alert' : 'order',
+            dedupeSuffix: 'requested'
+        );
+    }
+
+    private function send(string $eventKey, string $category, string $priority, Model $subject, Collection $recipients,
         string $title, string $message, string $url, string $sound, string $dedupeSuffix): void
     {
         if (! Schema::hasTable('notifications')) {
@@ -115,9 +139,9 @@ class OperationalNotificationService
                     'event_key' => $eventKey,
                     'category' => $category,
                     'priority' => $priority,
-                    'subject_type' => Order::class,
+                    'subject_type' => $subject::class,
                     'subject_id' => $subject->id,
-                    'dedupe_key' => "{$eventKey}:order:{$subject->id}:{$dedupeSuffix}",
+                    'dedupe_key' => "{$eventKey}:{$subject->getMorphClass()}:{$subject->id}:{$dedupeSuffix}",
                     'data' => json_encode(compact('title', 'message', 'url', 'sound'), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                     'created_at' => $now,
                     'updated_at' => $now,

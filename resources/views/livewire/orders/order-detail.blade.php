@@ -2,6 +2,7 @@
     toasts.push({ id: Date.now(), type: $event.detail.type, message: $event.detail.message });
     setTimeout(() => toasts.shift(), 3500);
 ">
+@if(session('success'))<div class="alert alert-success d-flex align-items-center gap-2" role="status"><i class="bx bx-check-circle"></i><span>{{ session('success') }}</span></div>@endif
 
 {{-- ══════════════════════════════════════════════════════════════ Page header --}}
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -17,12 +18,10 @@
         </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-        @if($order->status !== 'cancelada' && $order->status !== 'pagada')
-            @can('cancelar ordenes')
-            <button class="btn btn-sm btn-outline-danger" wire:click="openCancelModal">
-                <i class="bx bx-x-circle me-1"></i> Cancelar orden
-            </button>
-            @endcan
+        @if($order->cashRegister?->is_open && !in_array($order->status, ['cancelada', 'entregada'], true) && $order->changeRequests->where('status', 'pending')->isEmpty())
+            @if(auth()->user()?->can('solicitar modificacion de ordenes') || auth()->user()?->can('solicitar cancelacion de ordenes'))
+                <a class="btn btn-sm btn-outline-primary" href="{{ route('app.ordenes.solicitud', ['order' => $order, 'source' => 'detail']) }}"><i class="bx bx-git-compare me-1"></i>Solicitar cambio</a>
+            @endif
         @endif
     </div>
 </div>
@@ -242,20 +241,6 @@
                             <div class="small text-muted">${{ number_format($item->product_price, 2) }} c/u</div>
                             @if(!$item->is_cancelled && $order->status !== 'cancelada')
                                 <div class="d-flex gap-1 mt-1 justify-content-end">
-                                    @can('cancelar ordenes')
-                                    <button class="btn btn-sm btn-icon btn-outline-danger"
-                                            title="Cancelar ítem"
-                                            wire:click="openCancelItemModal({{ $item->id }})">
-                                        <i class="bx bx-x"></i>
-                                    </button>
-                                    @endcan
-                                    @can('eliminar items de ordenes')
-                                    <button class="btn btn-sm btn-icon btn-outline-danger"
-                                            title="Eliminar ítem"
-                                            wire:click="confirmDeleteItem({{ $item->id }})">
-                                        <i class="bx bx-trash"></i>
-                                    </button>
-                                    @endcan
                                 </div>
                             @endif
                         </div>
@@ -323,6 +308,17 @@
                         ${{ number_format($totalPaid, 2) }}
                     </span>
                 </div>
+                @if($order->refunds->isNotEmpty())
+                    <div class="mt-3 pt-3 border-top">
+                        <div class="small fw-semibold text-danger mb-2"><i class="bx bx-undo me-1"></i>Devoluciones registradas</div>
+                        @foreach($order->refunds as $refund)
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="small text-muted">{{ $refund->processed_at?->format('d/m/Y H:i') }}<br>{{ $refund->processor?->name }}{{ $refund->external_reference ? ' · Ref. '.$refund->external_reference : '' }}</span>
+                                <strong class="text-danger">−${{ number_format($refund->amount, 2) }}</strong>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
                 @endif
             </div>
         </div>
@@ -351,7 +347,7 @@
 </div>
 
 {{-- ══════════════════════════════════ MODAL: Cancel item ═════════════════════ --}}
-@if($showCancelItemModal)
+@if(false)
 <div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showCancelItemModal',false)"></div>
 <div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
     <div class="modal-dialog modal-dialog-centered" style="max-width:380px;">
@@ -376,7 +372,7 @@
 @endif
 
 {{-- ══════════════════════════════════ MODAL: Cancel order ════════════════════ --}}
-@if($showCancelModal)
+@if(false)
 <div class="modal-backdrop fade show" style="z-index:1110;" wire:click="$set('showCancelModal',false)"></div>
 <div class="modal fade show d-block" tabindex="-1" style="z-index:1115;" role="dialog">
     <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">

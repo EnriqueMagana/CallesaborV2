@@ -4,6 +4,7 @@
         toasts.push({ id: Date.now(), type: $event.detail.type, message: $event.detail.message });
         setTimeout(() => toasts.shift(), 3500);
     ">
+    @if(session('success'))<div class="alert alert-success d-flex align-items-center gap-2" role="status"><i class="bx bx-check-circle"></i><span>{{ session('success') }}</span></div>@endif
     <header class="orders-hero">
         <div class="orders-hero__content">
             <span class="orders-hero__icon" aria-hidden="true"><i class="bx bx-receipt"></i></span>
@@ -21,6 +22,7 @@
                 <strong>{{ $this->activeCashRegister?->name ?? 'Sin caja abierta' }}</strong>
             </span>
         </div>
+
     </header>
 
     <section class="orders-stats" aria-label="Resumen del turno">
@@ -157,16 +159,16 @@
                 @endif
             </div>
         @else
-            <div class="orders-table-wrap d-none d-lg-block">
+            <div class="orders-table-wrap">
                 <table class="orders-table">
                     <thead>
                         <tr>
                             <th scope="col">Orden y cliente</th>
-                            <th scope="col">Canal</th>
+                            <th scope="col" class="orders-col--secondary">Canal</th>
                             <th scope="col">Estado</th>
                             <th scope="col">Total</th>
-                            <th scope="col">Responsable</th>
-                            <th scope="col">Registro</th>
+                            <th scope="col" class="orders-col--secondary">Responsable</th>
+                            <th scope="col" class="orders-col--secondary">Registro</th>
                             <th scope="col"><span class="visually-hidden">Acciones</span></th>
                         </tr>
                     </thead>
@@ -176,12 +178,6 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
-
-            <div class="orders-mobile-list d-lg-none">
-                @foreach($this->orders as $order)
-                    @include('livewire.orders.partials.order-card', ['order' => $order])
-                @endforeach
             </div>
 
             @if($this->orders->hasPages())
@@ -216,36 +212,6 @@
                         <button type="button" class="orders-button orders-button--primary" wire:click="saveStatus" wire:loading.attr="disabled" wire:target="saveStatus">
                             <span wire:loading.remove wire:target="saveStatus"><i class="bx bx-check" aria-hidden="true"></i>Guardar estado</span>
                             <span wire:loading wire:target="saveStatus"><span class="spinner-border spinner-border-sm"></span>Guardando…</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    @if($showCancelModal)
-        <div class="modal-backdrop app-modal-backdrop fade show" wire:click="$set('showCancelModal',false)"></div>
-        <div class="modal app-modal app-modal-layer fade show d-block" tabindex="-1" role="dialog"
-            aria-modal="true" aria-labelledby="cancel-modal-title">
-            <div class="modal-dialog modal-dialog-centered app-modal-md">
-                <div class="modal-content orders-modal">
-                    <div class="orders-modal__header">
-                        <span class="orders-modal__icon orders-modal__icon--danger" aria-hidden="true"><i class="bx bx-x-circle"></i></span>
-                        <div><small>Acción sensible</small><h2 id="cancel-modal-title">Cancelar orden</h2></div>
-                        <button type="button" class="orders-modal__close" wire:click="$set('showCancelModal',false)" aria-label="Cerrar"><i class="bx bx-x"></i></button>
-                    </div>
-                    <div class="orders-modal__body">
-                        <label for="cancel-reason">Motivo de cancelación <span aria-hidden="true">*</span></label>
-                        <textarea id="cancel-reason" wire:model="cancelReason" class="@error('cancelReason') is-invalid @enderror"
-                            rows="4" placeholder="Describe brevemente por qué se cancela la orden"></textarea>
-                        @error('cancelReason') <div class="orders-field-error">{{ $message }}</div> @enderror
-                        <p>El motivo quedará registrado para fines de seguimiento.</p>
-                    </div>
-                    <div class="orders-modal__footer">
-                        <button type="button" class="orders-button orders-button--ghost" wire:click="$set('showCancelModal',false)">Volver</button>
-                        <button type="button" class="orders-button orders-button--danger" wire:click="confirmCancel" wire:loading.attr="disabled" wire:target="confirmCancel">
-                            <span wire:loading.remove wire:target="confirmCancel"><i class="bx bx-x-circle" aria-hidden="true"></i>Confirmar cancelación</span>
-                            <span wire:loading wire:target="confirmCancel"><span class="spinner-border spinner-border-sm"></span>Procesando…</span>
                         </button>
                     </div>
                 </div>

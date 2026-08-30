@@ -1,6 +1,7 @@
 <x-pos.area-panel panel="pickup" title="Pedidos no pagados" title-id="pos-window-title"
     eyebrow="Área operativa" description="Pedidos en sucursal, teléfono, WhatsApp y kiosco para recoger."
-    icon="bx-receipt" tone="window" close-label="Cerrar pedidos no pagados">
+    icon="bx-receipt" tone="window" close-label="Cerrar pedidos no pagados"
+    close-action="panels.pickup = false; $wire.closeOperationalPanels()">
         <x-slot:tools>
             <label class="pos-area-search">
                 <i class="bx bx-search"></i>

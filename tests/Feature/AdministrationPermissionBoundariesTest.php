@@ -145,13 +145,17 @@ class AdministrationPermissionBoundariesTest extends TestCase
             ->call('openCreatePerm')
             ->set('permName', 'permiso temporal de prueba')
             ->set('permGroup', 'configuracion')
+            ->set('permDescription', 'Permite ejecutar una acción temporal controlada desde configuración.')
             ->call('savePerm')
             ->assertHasNoErrors()
             ->call('openCreateRole')
             ->assertForbidden();
 
         $this->assertDatabaseHas('roles', ['name' => 'supervisor-prueba']);
-        $this->assertDatabaseHas('permissions', ['name' => 'permiso temporal de prueba']);
+        $this->assertDatabaseHas('permissions', [
+            'name' => 'permiso temporal de prueba',
+            'description' => 'Permite ejecutar una acción temporal controlada desde configuración.',
+        ]);
     }
 
     public function test_roles_page_exposes_accessible_modals_and_dark_theme_styles(): void
@@ -173,11 +177,13 @@ class AdministrationPermissionBoundariesTest extends TestCase
             ->assertSee('aria-modal="true"', false)
             ->assertSee('wire:click="closeRoleForm"', false)
             ->assertSee('id="role-name"', false)
+            ->assertSee('Permite registrar ingresos de efectivo y salidas de caja en el turno abierto.')
             ->call('closeRoleForm')
             ->assertSet('showRoleForm', false)
             ->call('openCreatePerm')
             ->assertSee('wire:click="closePermForm"', false)
             ->assertSee('id="permission-name"', false)
+            ->assertSee('id="permission-description"', false)
             ->call('closePermForm')
             ->assertSet('showPermForm', false);
 

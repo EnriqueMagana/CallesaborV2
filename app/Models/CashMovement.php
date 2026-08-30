@@ -62,6 +62,7 @@ class CashMovement extends Model
         }
 
         return match ($this->category) {
+            'reembolso_orden' => 'Reembolso de orden',
             'insumos' => 'Insumos',
             'operativo' => 'Operativo',
             'personal' => 'Personal',

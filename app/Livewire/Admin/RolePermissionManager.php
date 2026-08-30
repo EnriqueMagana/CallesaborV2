@@ -49,10 +49,12 @@ class RolePermissionManager extends Component
 
     public string $permGroup = '';
 
+    public string $permDescription = '';
+
     // ── Módulos / grupos disponibles ──────────────────────────────────
     public array $groups = [
         'punto_venta', 'usuarios', 'clientes', 'menu', 'promociones', 'ordenes', 'mesas', 'caja',
-        'reservas', 'delivery', 'inventario', 'reportes', 'configuracion', 'kiosco',
+        'reservas', 'delivery', 'inventario', 'reportes', 'configuracion', 'kiosco', 'desarrollo',
     ];
 
     public array $groupDefinitions = [
@@ -70,6 +72,7 @@ class RolePermissionManager extends Component
         'reportes' => ['label' => 'Reportes', 'icon' => 'bx-bar-chart-alt-2', 'tone' => 'secondary', 'description' => 'Indicadores, históricos y exportaciones.'],
         'configuracion' => ['label' => 'Configuración', 'icon' => 'bx-cog', 'tone' => 'secondary', 'description' => 'Negocio, navegación y reglas del sistema.'],
         'kiosco' => ['label' => 'Kioscos', 'icon' => 'bx-devices', 'tone' => 'info', 'description' => 'Terminales de autoservicio.'],
+        'desarrollo' => ['label' => 'Herramientas técnicas', 'icon' => 'bx-code-alt', 'tone' => 'danger', 'description' => 'Diagnóstico y funciones internas de alto privilegio.'],
     ];
 
     // ── Computed ──────────────────────────────────────────────────────
@@ -205,11 +208,12 @@ class RolePermissionManager extends Component
         $this->showPermForm = false;
         $this->permName = $this->selectedPerm->name;
         $this->permGroup = $this->selectedPerm->group ?? '';
+        $this->permDescription = $this->selectedPerm->description ?? '';
     }
 
     public function closePermPanel(): void
     {
-        $this->reset('permPanel', 'selectedPerm', 'showPermForm', 'permName', 'permGroup');
+        $this->reset('permPanel', 'selectedPerm', 'showPermForm', 'permName', 'permGroup', 'permDescription');
     }
 
     public function openCreatePerm(): void
@@ -219,6 +223,7 @@ class RolePermissionManager extends Component
         $this->showPermForm = true;
         $this->permName = '';
         $this->permGroup = '';
+        $this->permDescription = '';
     }
 
     public function openEditPerm(): void
@@ -241,6 +246,7 @@ class RolePermissionManager extends Component
         $this->showPermForm = false;
         $this->permName = $this->selectedPerm->name;
         $this->permGroup = $this->selectedPerm->group ?? '';
+        $this->permDescription = $this->selectedPerm->description ?? '';
     }
 
     public function savePerm(): void
@@ -255,12 +261,17 @@ class RolePermissionManager extends Component
                 Rule::unique('permissions', 'name')->ignore($this->permPanel),
             ],
             'permGroup' => ['required', 'string', Rule::in($this->groups)],
+            'permDescription' => ['required', 'string', 'min:15', 'max:600'],
+        ], [
+            'permDescription.required' => 'Explica exactamente qué acción habilita este permiso.',
+            'permDescription.min' => 'La descripción debe ser específica y tener al menos 15 caracteres.',
         ]);
 
         if ($this->permPanel) {
             $this->selectedPerm->update([
                 'name' => $this->permName,
                 'group' => $this->permGroup,
+                'description' => trim($this->permDescription),
             ]);
             $this->dispatch('notify', type: 'success', message: 'Permiso actualizado.');
         } else {
@@ -268,6 +279,7 @@ class RolePermissionManager extends Component
                 'name' => $this->permName,
                 'guard_name' => 'web',
                 'group' => $this->permGroup,
+                'description' => trim($this->permDescription),
             ]);
             $this->dispatch('notify', type: 'success', message: 'Permiso creado.');
         }

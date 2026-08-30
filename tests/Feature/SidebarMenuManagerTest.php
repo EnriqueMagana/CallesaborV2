@@ -103,6 +103,36 @@ class SidebarMenuManagerTest extends TestCase
         ]);
     }
 
+    public function test_order_request_inbox_is_visible_only_to_authorized_reviewers(): void
+    {
+        $this->assertDatabaseHas('sidebar_menu_items', [
+            'system_key' => 'operations.order-change-requests',
+            'route_name' => 'app.solicitudes-ordenes',
+            'permission' => 'revisar solicitudes de ordenes',
+        ]);
+
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $visibleRoutes = fn (User $user) => SidebarMenuItem::visibleTreeFor($user)
+            ->flatMap(fn ($root) => collect([$root])->concat($root->children)->concat($root->children->flatMap->children))
+            ->pluck('route_name');
+
+        $this->assertTrue($visibleRoutes($owner)->contains('app.solicitudes-ordenes'));
+        $this->assertFalse($visibleRoutes($admin)->contains('app.solicitudes-ordenes'));
+
+        $this->actingAs($owner)
+            ->get(route('app.solicitudes-ordenes'))
+            ->assertOk()
+            ->assertSee('Solicitudes de órdenes');
+
+        $this->actingAs($admin)
+            ->get(route('app.solicitudes-ordenes'))
+            ->assertForbidden();
+    }
+
     public function test_menu_builder_uses_the_bootstrap_paginator(): void
     {
         $view = file_get_contents(resource_path('views/livewire/menu/menu-builder.blade.php'));

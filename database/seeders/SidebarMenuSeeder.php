@@ -94,6 +94,11 @@ class SidebarMenuSeeder extends Seeder
             'icon' => 'bx-receipt', 'route_name' => 'app.ordenes', 'active_pattern' => 'app.ordenes*',
             'permission' => 'ver ordenes', 'sort_order' => 30,
         ]);
+        $this->item('operations.order-change-requests', [
+            'parent_id' => $operations->id, 'label' => 'Solicitudes de órdenes', 'type' => 'link',
+            'icon' => 'bx-shield-quarter', 'route_name' => 'app.solicitudes-ordenes', 'active_pattern' => 'app.solicitudes-ordenes*',
+            'permission' => 'revisar solicitudes de ordenes', 'sort_order' => 32,
+        ]);
         $this->item('operations.customers', [
             'parent_id' => $operations->id, 'label' => 'Mis clientes', 'type' => 'link',
             'icon' => 'bx-group', 'route_name' => 'app.clientes', 'active_pattern' => 'app.clientes*',

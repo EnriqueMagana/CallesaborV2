@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\PermissionCatalog;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -13,13 +14,19 @@ class RolesAndPermissionsSeeder extends Seeder
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
+        Permission::query()->whereIn('name', [
+            'cancelar ordenes',
+            'eliminar items de ordenes',
+            'eliminar ordenes',
+        ])->delete();
+
         $permissions = [
             'punto_venta' => ['usar punto de venta'],
             'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion', 'gestionar menu digital'],
             'promociones' => ['ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones'],
-            'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'eliminar items de ordenes', 'eliminar ordenes', 'cerrar ordenes', 'reimprimir tickets'],
+            'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'revisar solicitudes de ordenes', 'cerrar ordenes', 'reimprimir tickets'],
             'mesas' => [
                 'ver mesas',
                 'ver todas las mesas',
@@ -72,7 +79,10 @@ class RolesAndPermissionsSeeder extends Seeder
             foreach ($perms as $perm) {
                 Permission::updateOrCreate(
                     ['name' => $perm, 'guard_name' => 'web'],
-                    ['group' => $group]
+                    [
+                        'group' => $group,
+                        'description' => PermissionCatalog::description($perm),
+                    ]
                 );
             }
         }
@@ -94,6 +104,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'editar menu sidebar',
             'eliminar menu sidebar',
             'gestionar bloqueos por caja',
+            'revisar solicitudes de ordenes',
             'ver panel super admin',
             'ejecutar diagnosticos',
             'probar notificaciones',
@@ -107,7 +118,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
             'ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones',
-            'ver ordenes', 'crear ordenes', 'editar ordenes', 'cancelar ordenes', 'cerrar ordenes', 'reimprimir tickets',
+            'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'gestionar mesas', 'gestionar grupos',
@@ -129,7 +140,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $cajero->syncPermissions([
             'usar punto de venta',
             'ver clientes', 'crear clientes', 'editar clientes',
-            'ver ordenes', 'crear ordenes', 'cerrar ordenes', 'reimprimir tickets',
+            'ver ordenes', 'crear ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'cancelar divisiones mesas',
@@ -141,7 +152,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Mesero
         $mesero = Role::firstOrCreate(['name' => 'mesero', 'guard_name' => 'web']);
         $mesero->syncPermissions([
-            'ver ordenes', 'crear ordenes', 'editar ordenes', 'reimprimir tickets',
+            'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'dividir mesas', 'cancelar divisiones mesas', 'reasignar mesas', 'gestionar grupos',
         ]);
