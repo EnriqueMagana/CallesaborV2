@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -29,7 +30,7 @@ class PermissionSeederCoverageTest extends TestCase
             ],
             'inventario' => ['editar compras inventario', 'eliminar compras inventario', 'registrar salida de insumos'],
             'caja' => ['registrar gastos', 'registrar movimientos de caja'],
-            'ordenes' => ['reimprimir tickets'],
+            'ordenes' => ['reimprimir tickets', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'revisar solicitudes de ordenes'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
         ];
 
@@ -41,6 +42,10 @@ class PermissionSeederCoverageTest extends TestCase
                     'group' => $group,
                 ]);
             }
+        }
+
+        foreach (['cancelar ordenes', 'eliminar items de ordenes', 'eliminar ordenes'] as $legacyPermission) {
+            $this->assertDatabaseMissing('permissions', ['name' => $legacyPermission]);
         }
     }
 
@@ -58,6 +63,14 @@ class PermissionSeederCoverageTest extends TestCase
         $this->assertTrue(Role::findByName('cocinero')->hasPermissionTo('reimprimir tickets'));
         $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('usar punto de venta'));
         $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('reimprimir tickets'));
+        $this->assertTrue(Role::findByName('gerente')->hasPermissionTo('solicitar cancelacion de ordenes'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('solicitar modificacion de ordenes'));
+        $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('solicitar cancelacion de ordenes'));
+        $this->assertTrue(Role::findByName('super-admin')->hasPermissionTo('revisar solicitudes de ordenes'));
+        $this->assertFalse(Role::findByName('admin')->hasPermissionTo('revisar solicitudes de ordenes'));
+        $this->assertFalse(Role::findByName('gerente')->hasPermissionTo('revisar solicitudes de ordenes'));
+        $this->assertFalse(Role::findByName('cajero')->hasPermissionTo('revisar solicitudes de ordenes'));
+        $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('revisar solicitudes de ordenes'));
         $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('dividir mesas'));
         $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('cancelar divisiones mesas'));
         $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('reasignar mesas'));
@@ -66,6 +79,19 @@ class PermissionSeederCoverageTest extends TestCase
         $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('registrar gastos'));
         $this->assertFalse(Role::findByName('mesero')->hasPermissionTo('ver todas las mesas'));
         $this->assertFalse(Role::findByName('repartidor')->hasPermissionTo('editar mesas'));
+    }
+
+    public function test_every_seeded_permission_has_a_specific_description(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $permissions = Permission::query()->get(['name', 'description']);
+
+        $this->assertNotEmpty($permissions);
+        $permissions->each(function (Permission $permission): void {
+            $this->assertNotNull($permission->description, "Falta describir el permiso: {$permission->name}");
+            $this->assertGreaterThanOrEqual(15, mb_strlen($permission->description));
+        });
     }
 
     public function test_waiter_order_permissions_do_not_unlock_the_point_of_sale_module(): void

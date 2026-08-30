@@ -201,6 +201,31 @@ class KioskPosWorkflowTest extends TestCase
             ->assertSeeHtml('aria-label="1 entregas nuevas sin enviar a cocina"');
     }
 
+    public function test_operational_panels_are_exclusive_and_backend_state_is_released_when_switching(): void
+    {
+        [$user] = $this->posContext();
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openTableWorkspace')
+            ->assertSet('tableWorkspaceLoaded', true)
+            ->assertSet('deliveryPanelLoaded', false)
+            ->call('openDeliveryPanel')
+            ->assertSet('tableWorkspaceLoaded', false)
+            ->assertSet('tableTrackingLoaded', false)
+            ->assertSet('tablesBillingLoaded', false)
+            ->assertSet('deliveryPanelLoaded', true)
+            ->call('openPickupPanel')
+            ->assertSet('tableWorkspaceLoaded', false)
+            ->assertSet('deliveryPanelLoaded', false)
+            ->call('openTableWorkspace')
+            ->assertSet('tableWorkspaceLoaded', true)
+            ->call('openOperationsModal', 'expense')
+            ->assertSet('tableWorkspaceLoaded', false)
+            ->assertSet('deliveryPanelLoaded', false)
+            ->assertSet('showExpenseModal', true);
+    }
+
     public function test_desktop_pos_keeps_checkout_visible_and_exposes_operational_shortcuts(): void
     {
         $view = file_get_contents(resource_path('views/livewire/pos/point-of-sale.blade.php'));
@@ -209,7 +234,10 @@ class KioskPosWorkflowTest extends TestCase
         $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
         $header = file_get_contents(resource_path('views/livewire/pos/partials/header.blade.php'));
         $toolbar = file_get_contents(resource_path('views/livewire/pos/partials/toolbar.blade.php'));
+        $mobileNavigation = file_get_contents(resource_path('views/livewire/pos/partials/mobile-navigation.blade.php'));
+        $moreMenu = file_get_contents(resource_path('views/livewire/pos/partials/more-menu.blade.php'));
         $css = file_get_contents(public_path('assets/css/pos-modern.css'));
+        $mobileCss = file_get_contents(public_path('assets/css/pos-mobile-navigation.css'));
 
         $this->assertIsString($view);
         $this->assertIsString($cart);
@@ -217,7 +245,10 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertIsString($catalog);
         $this->assertIsString($header);
         $this->assertIsString($toolbar);
+        $this->assertIsString($mobileNavigation);
+        $this->assertIsString($moreMenu);
         $this->assertIsString($css);
+        $this->assertIsString($mobileCss);
         $this->assertStringContainsString('@keydown.window="handleKeyboardShortcut($event)"', $view);
         $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
         $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
@@ -228,8 +259,10 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertStringContainsString('cart-item__footer', $cart);
         $this->assertStringContainsString('cart-mobile-close', $cart);
         $this->assertStringContainsString('Nota para cocina', $cart);
-        $this->assertStringContainsString('aria-keyshortcuts="F3 F10"', $catalog);
-        $this->assertStringContainsString('pos-search-shortcut', $catalog);
+        $this->assertStringContainsString('aria-keyshortcuts="F3 F10"', $header);
+        $this->assertStringContainsString('x-model.debounce.160ms="catalogQuery"', $header);
+        $this->assertStringContainsString('catalogQuery', $catalog);
+        $this->assertStringNotContainsString('wire:model', $catalog);
         $this->assertStringContainsString('data-pos-saved', $header);
         $this->assertStringContainsString('>F4</kbd>', $header);
         $this->assertStringContainsString('>F5</kbd>', $checkout);
@@ -237,8 +270,51 @@ class KioskPosWorkflowTest extends TestCase
         foreach (['F6', 'F7', 'F8', 'F9', 'F11'] as $shortcut) {
             $this->assertStringContainsString('aria-keyshortcuts="'.$shortcut.'"', $toolbar);
         }
+        foreach (['Por cobrar', 'Mesas', 'Pedidos', 'Más'] as $mobileArea) {
+            $this->assertStringContainsString($mobileArea, $mobileNavigation);
+        }
+        $this->assertStringContainsString('pos-mobile-nav__cart', $mobileNavigation);
+        $this->assertStringContainsString("showOnlyPanel('pickup')", $mobileNavigation);
+        $this->assertStringContainsString("showOnlyPanel('tables')", $mobileNavigation);
+        $this->assertStringContainsString("showOnlyPanel('delivery')", $mobileNavigation);
+        $this->assertStringContainsString('pos-more-backdrop', $moreMenu);
+        $this->assertStringContainsString('role="dialog"', $moreMenu);
+        foreach (['Guardados', 'Reimprimir', 'Registrar gasto', 'Ingreso de caja', 'Salida de insumos', 'Inicio'] as $allowedMoreAction) {
+            $this->assertStringContainsString($allowedMoreAction, $moreMenu);
+        }
+        foreach (['app.clientes', 'app.historial-ventas', 'app.inventario', 'app.usuarios', 'app.reservas', 'app.ordenes', 'app.constructor-menu', 'app.configuracion-negocio'] as $removedMoreRoute) {
+            $this->assertStringNotContainsString($removedMoreRoute, $moreMenu);
+        }
+        $this->assertStringContainsString('@media (max-width: 1024px)', $mobileCss);
+        $this->assertStringContainsString('transform: translateY(-50%) scaleX(1)', $mobileCss);
+        $this->assertStringContainsString('--pos-mobile-nav-clearance:', $mobileCss);
+        $this->assertStringContainsString('--pos-more-sheet-bottom:', $mobileCss);
+        $this->assertStringContainsString('bottom: var(--pos-more-sheet-bottom)', $mobileCss);
+        $this->assertStringContainsString('.pos-floating-panel > .pos-area-panel__body:not(.pos-reprint-results-shell)', $mobileCss);
+        $this->assertStringContainsString('scroll-padding-bottom: var(--pos-mobile-nav-clearance)', $mobileCss);
+        $this->assertStringContainsString('prefers-reduced-motion: reduce', $mobileCss);
         $this->assertMatchesRegularExpression('/\.pos-cart-fixed \.cart-items,[^{]*\{[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s', $css);
         $this->assertMatchesRegularExpression('/@media \(min-width:\s*1025px\) and \(max-height:\s*760px\)/', $css);
+    }
+
+    public function test_pos_alpine_root_state_is_not_rendered_as_visible_text(): void
+    {
+        [$user] = $this->posContext();
+        $html = $this->actingAs($user)->get(route('app.pos'))->assertOk()->getContent();
+
+        $dom = new \DOMDocument();
+        $previousErrors = libxml_use_internal_errors(true);
+        $dom->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousErrors);
+
+        $xpath = new \DOMXPath($dom);
+        $root = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' pos-root ')]")->item(0);
+
+        $this->assertNotNull($root);
+        $this->assertStringContainsString('trapFocus(event, container)', $root->getAttribute('x-data'));
+        $this->assertStringContainsString('[tabindex]:not([tabindex="-1"])', $root->getAttribute('x-data'));
+        $this->assertStringNotContainsString('element.offsetParent !== null', $root->textContent);
     }
 
     public function test_kiosk_cash_on_delivery_is_visible_but_cannot_be_charged_early_in_pos(): void

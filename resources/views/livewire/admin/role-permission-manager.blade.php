@@ -172,7 +172,13 @@
                                 data-ui="xui-1wc3lz9"
                                 wire:click="selectPerm({{ $perm->id }})"
                                 aria-label="Abrir permiso {{ $perm->name }}">
-                            <span><i class="bx bx-key" aria-hidden="true"></i>{{ $perm->name }}</span>
+                            <span class="roles-permission-row__content">
+                                <i class="bx bx-key" aria-hidden="true"></i>
+                                <span>
+                                    <strong>{{ $perm->name }}</strong>
+                                    <small>{{ $perm->description ?: 'Este permiso todavía no tiene un alcance documentado.' }}</small>
+                                </span>
+                            </span>
                             <i class="bx bx-chevron-right" aria-hidden="true"></i>
                         </button>
                         @endforeach
@@ -349,13 +355,16 @@
                                         <div class="card-body py-2">
                                             <div class="d-flex flex-column gap-1">
                                                 @foreach($perms as $perm)
-                                                <label class="d-flex align-items-center gap-2 small py-1"
+                                                <label class="roles-permission-choice"
                                                        data-ui="xui-1wc3lz9">
                                                     <input type="checkbox"
                                                            wire:model.live="rolePermissions"
                                                            value="{{ $perm->name }}"
                                                            class="form-check-input" />
-                                                    {{ $perm->name }}
+                                                    <span>
+                                                        <strong>{{ $perm->name }}</strong>
+                                                        <small>{{ $perm->description ?: 'Este permiso todavía no tiene un alcance documentado.' }}</small>
+                                                    </span>
                                                 </label>
                                                 @endforeach
                                             </div>
@@ -420,6 +429,10 @@
                 </div>
 
                 <div class="modal-body roles-modal-body">
+                    <div class="roles-permission-scope">
+                        <span><i class="bx bx-info-circle" aria-hidden="true"></i> Alcance exacto</span>
+                        <p>{{ $selectedPerm->description ?: 'Este permiso todavía no tiene un alcance documentado.' }}</p>
+                    </div>
                     <p class="text-uppercase small fw-semibold text-muted mb-3">
                         <i class="bx bx-shield me-1"></i>Usado en roles
                     </p>
@@ -501,6 +514,18 @@
                                class="form-control @error('permName') is-invalid @enderror"
                                placeholder="ej: exportar reportes" />
                         @error('permName')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="mb-3">
+                        <label for="permission-description" class="form-label fw-medium">
+                            Qué permite hacer <span class="text-danger">*</span>
+                        </label>
+                        <textarea id="permission-description" wire:model="permDescription" rows="4"
+                                  class="form-control @error('permDescription') is-invalid @enderror"
+                                  placeholder="Ej. Permite registrar ingresos de efectivo en una caja abierta; no autoriza cerrar la caja."></textarea>
+                        <div class="form-text">Describe la acción, dónde se realiza y cualquier límite importante.</div>
+                        @error('permDescription')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>

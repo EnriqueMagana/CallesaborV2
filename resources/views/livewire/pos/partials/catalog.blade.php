@@ -1,30 +1,15 @@
 <div class="pos-catalog"
      x-data="{
-        query: '',
         category: null,
-        mode: $wire.entangle('catalogMode').live,
+        mode: $wire.entangle('catalogMode'),
         normalize(value) {
             return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         },
-        matches(name, categoryId) {
+        matches(name, categoryId, query) {
             const categoryMatches = this.category === null || Number(this.category) === Number(categoryId);
-            return categoryMatches && this.normalize(name).includes(this.normalize(this.query.trim()));
+            return categoryMatches && this.normalize(name).includes(this.normalize(String(query || '').trim()));
         }
      }">
-    <div class="catalog-search-bar">
-        <div class="search-wrap" :class="{ 'has-query': query }">
-            <i class="bx bx-search si-icon" aria-hidden="true"></i>
-            <input type="search" x-model.debounce.120ms="query" :aria-label="mode === 'products' ? 'Buscar platillo' : 'Buscar promoción'"
-                   class="pos-input" :placeholder="mode === 'products' ? 'Buscar platillo...' : 'Buscar promoción...'" autocomplete="off"
-                   data-pos-catalog-search aria-keyshortcuts="F3 F10" title="Buscar platillo (F3 o F10)">
-            <kbd class="pos-control-shortcut pos-search-shortcut" aria-hidden="true">F3 · F10</kbd>
-            <button type="button" class="pos-search-clear" x-show="query" x-cloak
-                    @click="query = ''" aria-label="Limpiar búsqueda">
-                <i class="bx bx-x"></i>
-            </button>
-        </div>
-    </div>
-
     <div class="pos-catalog-switcher" role="tablist" aria-label="Contenido del catálogo">
         <button type="button" class="pos-catalog-switcher__tab" @click="mode = 'products'; category = null"
                 :class="{ 'is-active': mode === 'products' }" :aria-selected="mode === 'products'" role="tab">
@@ -68,7 +53,7 @@
                     @endphp
                     <button type="button" wire:click="selectPromotionFromCatalog({{ $promotion->id }})"
                             wire:loading.attr="disabled" wire:target="selectPromotionFromCatalog({{ $promotion->id }})"
-                            wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name.' '.$promotionDescription), null)" x-cloak
+                            wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name.' '.$promotionDescription), null, catalogQuery)" x-cloak
                             class="prod-card pos-promotion-card"
                             aria-label="{{ $isAutomatic ? 'Agregar producto para' : 'Configurar' }} {{ $promotion->name }}, {{ $promotion->pricingRuleLabel() ?: 'precio $'.number_format($promotion->price, 2) }}">
                         <span class="prod-img pos-promotion-card__image">
@@ -105,7 +90,7 @@
                     $hasOptions = $product->is_customizable || $product->addon_groups_count > 0 || $product->ingredients_count > 0;
                 @endphp
                 <button type="button"
-                     x-show="matches(@js($product->name), {{ $category->id }})" x-cloak
+                     x-show="matches(@js($product->name), {{ $category->id }}, catalogQuery)" x-cloak
                      wire:click="openCustomizeModal({{ $product->id }})"
                      wire:loading.attr="disabled" wire:target="openCustomizeModal({{ $product->id }})"
                      wire:key="pos-product-{{ $product->id }}"
@@ -141,7 +126,7 @@
                 $hasOptions = $product->is_customizable || $product->addon_groups_count > 0 || $product->ingredients_count > 0;
             @endphp
             <button type="button"
-                 x-show="matches(@js($product->name), null)" x-cloak
+                 x-show="matches(@js($product->name), null, catalogQuery)" x-cloak
                  wire:click="openCustomizeModal({{ $product->id }})"
                  wire:loading.attr="disabled" wire:target="openCustomizeModal({{ $product->id }})"
                  wire:key="pos-product-{{ $product->id }}"

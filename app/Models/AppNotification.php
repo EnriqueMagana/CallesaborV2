@@ -37,6 +37,8 @@ class AppNotification extends Model
             'order.created' => 'bx-receipt',
             'order.ready' => 'bx-check-circle',
             'order.cancelled' => 'bx-x-circle',
+            'order.cancellation_requested' => 'bx-error-circle',
+            'order.modification_requested' => 'bx-edit-alt',
             'order.paid' => 'bx-wallet',
             'delivery.available' => 'bx-package',
             'delivery.assigned' => 'bx-user-check',
@@ -57,6 +59,8 @@ class AppNotification extends Model
         return match ($this->event_key) {
             'order.ready', 'delivery.available' => 'ready',
             'order.cancelled' => 'danger',
+            'order.cancellation_requested' => 'danger',
+            'order.modification_requested' => 'order',
             'order.paid', 'delivery.completed' => 'success',
             'delivery.assigned', 'delivery.picked_up' => 'delivery',
             'developer.realtime_test', 'developer.livewire_test' => 'system',

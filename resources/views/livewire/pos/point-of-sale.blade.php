@@ -2,7 +2,89 @@
 <div x-data="{
     showCart: false,
     showSaved: false,
+    showMore: false,
+    searchExpanded: false,
+    catalogQuery: '',
+    overlayTrigger: null,
     panels: { tables: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false },
+    init() {
+        this.$watch('showCart', () => this.syncOverlayLock());
+        this.$watch('showMore', () => this.syncOverlayLock());
+    },
+    syncOverlayLock() {
+        document.documentElement.classList.toggle('pos-overlay-open', this.showCart || this.showMore);
+    },
+    openCatalogSearch(selectContents = false) {
+        this.searchExpanded = true;
+        this.$nextTick(() => {
+            const input = this.$refs.catalogSearch;
+            if (!input) return;
+            input.focus({ preventScroll: true });
+            if (selectContents) input.select();
+        });
+    },
+    closeCatalogSearch(clearQuery = false) {
+        if (clearQuery) this.catalogQuery = '';
+        this.searchExpanded = false;
+        this.$nextTick(() => this.$refs.catalogSearchButton?.focus({ preventScroll: true }));
+    },
+    closeAllPanels() {
+        const hadOpenPanel = Object.values(this.panels).some(Boolean);
+        Object.keys(this.panels).forEach(panel => this.panels[panel] = false);
+        return hadOpenPanel;
+    },
+    showOnlyPanel(panel) {
+        this.showMore = false;
+        this.showCart = false;
+        this.searchExpanded = false;
+        this.closeAllPanels();
+        this.panels[panel] = true;
+    },
+    openMore(trigger) {
+        const hadOpenPanel = this.closeAllPanels();
+        this.showCart = false;
+        this.searchExpanded = false;
+        this.overlayTrigger = trigger;
+        this.showMore = true;
+        if (hadOpenPanel) this.$wire.closeOperationalPanels();
+        this.$nextTick(() => this.$refs.moreClose?.focus({ preventScroll: true }));
+    },
+    closeMore(restoreFocus = true) {
+        this.showMore = false;
+        if (restoreFocus) {
+            this.$nextTick(() => this.overlayTrigger?.focus({ preventScroll: true }));
+        }
+    },
+    toggleCart() {
+        const hadOpenPanel = this.closeAllPanels();
+        this.showMore = false;
+        this.searchExpanded = false;
+        this.showCart = !this.showCart;
+        if (hadOpenPanel) this.$wire.closeOperationalPanels();
+    },
+    closeTransientLayers() {
+        if (this.showMore) return this.closeMore();
+        if (this.showCart) {
+            this.showCart = false;
+            return;
+        }
+        if (this.searchExpanded) this.closeCatalogSearch(false);
+        else if (this.closeAllPanels()) this.$wire.closeOperationalPanels();
+    },
+    trapFocus(event, container) {
+        const items = Array.from(container.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex=&quot;-1&quot;])'))
+            .filter(element => element.offsetParent !== null);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    },
     visibleShortcutTarget(selector) {
         return Array.from(document.querySelectorAll(selector))
             .find(element => element.offsetParent !== null && !element.disabled);
@@ -47,10 +129,7 @@
         if (this.hasBlockingLayer()) return;
 
         if (isSearchShortcut) {
-            const search = this.visibleShortcutTarget('[data-pos-catalog-search]');
-            if (!search) return;
-            search.focus({ preventScroll: false });
-            search.select();
+            this.openCatalogSearch(true);
             return;
         }
 
@@ -62,7 +141,7 @@
         target.focus({ preventScroll: true });
         target.click();
     }
-}" @keydown.window="handleKeyboardShortcut($event)" class="pos-root">
+}" @keydown.window="handleKeyboardShortcut($event)" @keydown.escape.window="closeTransientLayers()" class="pos-root">
 
 {{-- Toast --}}
 <div x-data="{ show: false, msg: '', type: 'success' }"
@@ -107,8 +186,11 @@
     </div>
 </div>
 
+@include('livewire.pos.partials.mobile-navigation')
+@include('livewire.pos.partials.more-menu')
+
 {{-- Carrito overlay mobile --}}
-<div class="cart-overlay" :class="showCart ? 'show' : ''" @click="showCart = false">
+<div id="pos-mobile-cart" class="cart-overlay" :class="showCart ? 'show' : ''" @click="showCart = false">
     <div @click.stop>
         @include('livewire.pos.partials.cart')
     </div>

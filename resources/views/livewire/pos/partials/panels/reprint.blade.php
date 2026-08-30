@@ -8,7 +8,8 @@
 <x-pos.area-panel panel="reprint" title="Reimprimir tickets" title-id="pos-reprint-title"
     eyebrow="Documentos" description="Cocina imprime productos por área; Cliente muestra productos, precios y total."
     icon="bx-printer" tone="reprint" panel-class="pos-reprint-panel" body-class="pos-reprint-results-shell"
-    close-label="Cerrar Reimpresión">
+    close-label="Cerrar Reimpresión"
+    close-action="panels.reprint = false; $wire.closeOperationalPanels()">
         <x-slot:navigation>
         <div class="pos-reprint-tabs" role="tablist" aria-label="Filtrar pedidos por área">
             @foreach (['ventanilla' => ['Ventanilla', 'bx-store-alt'], 'delivery' => ['Delivery', 'bx-cycling'], 'mesas' => ['Mesas', 'bx-table']] as $type => [$label, $icon])

@@ -717,6 +717,7 @@ class PointOfSale extends Component
     public function openTableWorkspace(string $filter = 'all'): void
     {
         abort_unless(auth()->user()?->canAny(['cobrar mesas', 'editar ordenes', 'reimprimir tickets']), 403);
+        $this->resetOperationalPanelState();
         $this->tableWorkspaceLoaded = true;
         $this->tableTrackingLoaded = true;
         $this->tablesBillingLoaded = auth()->user()?->can('cobrar mesas') ?? false;
@@ -726,16 +727,7 @@ class PointOfSale extends Component
 
     public function closeTableWorkspace(): void
     {
-        $this->tableWorkspaceLoaded = false;
-        $this->tableTrackingLoaded = false;
-        $this->tablesBillingLoaded = false;
-        unset(
-            $this->tableWorkspaceAllServices,
-            $this->tableWorkspaceServices,
-            $this->tableWorkspaceCounts,
-            $this->tableTrackingServices,
-            $this->mesasPendientes,
-        );
+        $this->closeOperationalPanels();
     }
 
     public function setTableWorkspaceFilter(string $filter): void
@@ -764,14 +756,58 @@ class PointOfSale extends Component
     public function openDeliveryPanel(): void
     {
         abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        $this->resetOperationalPanelState();
         $this->deliveryPanelLoaded = true;
         unset($this->deliveryOrders);
     }
 
     public function closeDeliveryPanel(): void
     {
+        $this->closeOperationalPanels();
+    }
+
+    public function openPickupPanel(): void
+    {
+        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        $this->resetOperationalPanelState();
+    }
+
+    public function openReprintPanel(): void
+    {
+        abort_unless(auth()->user()?->can('reimprimir tickets'), 403);
+        $this->resetOperationalPanelState();
+    }
+
+    public function openSavedOrdersModal(): void
+    {
+        abort_unless(auth()->user()?->canAny(['crear ordenes', 'editar ordenes']), 403);
+        $this->resetOperationalPanelState();
+        $this->showQuotationsModal = true;
+    }
+
+    public function closeOperationalPanels(): void
+    {
+        $this->resetOperationalPanelState();
+    }
+
+    private function resetOperationalPanelState(): void
+    {
+        $this->tableWorkspaceLoaded = false;
+        $this->tableTrackingLoaded = false;
+        $this->tablesBillingLoaded = false;
         $this->deliveryPanelLoaded = false;
-        unset($this->deliveryOrders);
+
+        unset(
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
+            $this->tableTrackingServices,
+            $this->mesasPendientes,
+            $this->deliveryOrders,
+            $this->pickupOrders,
+            $this->recentOrders,
+            $this->mesaServiceHistory,
+        );
     }
 
     public function refreshTableTracking(): void
@@ -2360,12 +2396,9 @@ class PointOfSale extends Component
     {
         abort_unless(in_array($type, ['expense', 'income', 'inventory_out'], true), 404);
 
-        if ($type === 'inventory_out') {
-            $this->authorizeInventoryOutflow();
-        } else {
-            $this->authorizeCashMovement();
-        }
+        $this->authorizeOperationType($type);
 
+        $this->resetOperationalPanelState();
         $this->resetOperationForm();
         $this->operationType = $type;
         $this->showExpenseModal = true;
@@ -2381,11 +2414,7 @@ class PointOfSale extends Component
     {
         abort_unless(in_array($type, ['expense', 'income', 'inventory_out'], true), 404);
 
-        if ($type === 'inventory_out') {
-            $this->authorizeInventoryOutflow();
-        } else {
-            $this->authorizeCashMovement();
-        }
+        $this->authorizeOperationType($type);
 
         $this->resetErrorBag();
         $this->expenseCategory = $type === 'income' ? 'fondo' : 'otro';
@@ -2413,7 +2442,8 @@ class PointOfSale extends Component
 
     private function saveCashMovement(string $type): void
     {
-        $this->authorizeCashMovement();
+        abort_unless(in_array($type, ['expense', 'income'], true), 422);
+        $this->authorizeOperationType($type);
         $register = $this->activeCashRegister;
         abort_unless($register, 409, 'Abre una caja antes de registrar movimientos.');
 
@@ -2492,13 +2522,20 @@ class PointOfSale extends Component
         $this->dispatch('notify', type: 'success', message: 'Salida de insumo registrada y existencia actualizada.');
     }
 
-    private function authorizeCashMovement(): void
+    private function authorizeOperationType(string $type): void
     {
-        abort_unless(
-            auth()->user()?->can('registrar movimientos de caja')
-                || auth()->user()?->can('registrar gastos'),
-            403,
-        );
+        match ($type) {
+            'expense' => abort_unless(
+                auth()->user()?->canAny(['registrar gastos', 'registrar movimientos de caja']),
+                403,
+            ),
+            'income' => abort_unless(
+                auth()->user()?->can('registrar movimientos de caja'),
+                403,
+            ),
+            'inventory_out' => $this->authorizeInventoryOutflow(),
+            default => abort(404),
+        };
     }
 
     private function authorizeInventoryOutflow(): void

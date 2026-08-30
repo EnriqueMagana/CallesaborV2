@@ -8,8 +8,8 @@ use App\Http\Controllers\PublicInfoController;
 use App\Http\Controllers\PublicMenuController;
 use App\Http\Controllers\RealtimeNotificationSessionController;
 use App\Http\Middleware\EnforceSidebarModuleAccess;
-use App\Http\Middleware\EnsureOrderBelongsToCurrentRegister;
 use App\Http\Middleware\EnsureDeliveryModuleEnabled;
+use App\Http\Middleware\EnsureOrderBelongsToCurrentRegister;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
@@ -35,6 +35,8 @@ use App\Livewire\Mesas\GestionMesas;
 use App\Livewire\Mesas\MesaOrden;
 use App\Livewire\Mesas\MesaOrdenes;
 use App\Livewire\Mesas\SplitCuenta;
+use App\Livewire\Orders\OrderChangeRequestInbox;
+use App\Livewire\Orders\OrderChangeRequestWizard;
 use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
 use App\Livewire\Orders\SalesHistory;
@@ -97,8 +99,12 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/promociones', PromotionManager::class)->middleware('can:ver promociones')->name('promociones');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
     Route::get('/ordenes', OrderList::class)->middleware('can:ver ordenes')->name('ordenes');
+    Route::get('/solicitudes-ordenes', OrderChangeRequestInbox::class)
+        ->middleware('can:revisar solicitudes de ordenes')
+        ->name('solicitudes-ordenes');
     Route::get('/clientes', CustomerManager::class)->middleware('can:ver clientes')->name('clientes');
     Route::get('/historial-ventas', SalesHistory::class)->middleware('can:ver reportes')->name('historial-ventas');
+    Route::get('/ordenes/{order}/solicitud', OrderChangeRequestWizard::class)->middleware('can:ver ordenes')->name('ordenes.solicitud');
     Route::get('/ordenes/{order}', OrderDetail::class)->middleware('can:ver ordenes')->name('ordenes.show');
     Route::get('/pos', PointOfSale::class)->middleware('can:usar punto de venta')->name('pos');
     Route::get('/delivery', DeliveryBoard::class)->middleware(['can:ver delivery', EnsureDeliveryModuleEnabled::class])->name('delivery');
