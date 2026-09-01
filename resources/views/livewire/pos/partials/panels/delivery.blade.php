@@ -6,7 +6,7 @@
             <label class="pos-area-search">
                 <i class="bx bx-search"></i>
                 <span class="visually-hidden">Buscar pedido de delivery</span>
-                <input type="search" class="pos-input" wire:model.live.debounce.300ms="deliverySearch" placeholder="Pedido, cliente, teléfono o dirección">
+                <input type="search" class="pos-input" wire:model.live.debounce.600ms="deliverySearch" placeholder="Pedido, cliente, teléfono o dirección">
             </label>
             <div class="pos-area-summary"><strong>{{ $this->deliveryOrders->count() }}</strong><span>entregas activas</span></div>
             @if(app(\App\Services\DeliveryModulePolicy::class)->enabled())

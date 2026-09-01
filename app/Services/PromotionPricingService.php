@@ -29,29 +29,36 @@ class PromotionPricingService
 
         $rules = Promotion::query()
             ->automaticPricingAvailable($channel, null, $fulfillment)
-            ->whereIn('primary_product_id', $productIds)
+            ->where(function (Builder $eligible) use ($productIds): void {
+                $eligible->whereIn('primary_product_id', $productIds)
+                    ->orWhereHas('groups.products', fn (Builder $products) => $products->whereIn('products.id', $productIds));
+            })
+            ->with('groups.products:id,name,image,is_active,is_customizable')
             ->orderByDesc('starts_on')
             ->orderByDesc('id')
-            ->get()
-            ->groupBy('primary_product_id');
+            ->get();
 
-        foreach ($productIds as $productId) {
-            $indexes = collect($cart)->keys()->filter(fn (int $index) =>
-                (int) ($cart[$index]['product_id'] ?? 0) === $productId
-                && empty($cart[$index]['promotion_selections'])
-            )->values()->all();
+        $candidates = $rules->map(function (Promotion $promotion) use ($cart) {
+            $eligibleProductIds = $this->eligibleProductIds($promotion);
+            $indexes = $this->eligibleIndexes($cart, $eligibleProductIds);
 
-            $best = collect($rules->get($productId, collect()))
-                ->map(fn (Promotion $promotion) => [
-                    'promotion' => $promotion,
-                    'discount' => $this->potentialDiscount($promotion, $cart, $indexes),
-                ])
-                ->sortByDesc('discount')
-                ->first(fn (array $candidate) => $candidate['discount'] > 0.0);
+            return [
+                'promotion' => $promotion,
+                'eligible_product_ids' => $eligibleProductIds,
+                'indexes' => $indexes,
+                'discount' => $this->potentialDiscount($promotion, $cart, $indexes),
+            ];
+        })->filter(fn (array $candidate) => $candidate['discount'] > 0.0)
+            ->sortByDesc('discount');
 
-            if ($best) {
-                $cart = $this->applyRule($cart, $indexes, $best['promotion']);
+        $claimedProductIds = [];
+        foreach ($candidates as $candidate) {
+            if (array_intersect($claimedProductIds, $candidate['eligible_product_ids']) !== []) {
+                continue;
             }
+
+            $cart = $this->applyRule($cart, $candidate['indexes'], $candidate['promotion']);
+            $claimedProductIds = array_values(array_unique(array_merge($claimedProductIds, $candidate['eligible_product_ids'])));
         }
 
         return array_values($cart);
@@ -67,30 +74,35 @@ class PromotionPricingService
             return [];
         }
 
-        $quantities = collect($cart)
+        $productIds = collect($cart)
             ->filter(fn (array $line) => ! empty($line['product_id']) && empty($line['promotion_selections']))
-            ->groupBy(fn (array $line) => (int) $line['product_id'])
-            ->map(fn ($lines) => (int) $lines->sum(fn (array $line) => $this->quantity($line)))
-            ->filter();
+            ->pluck('product_id')->map(fn ($id) => (int) $id)->unique()->values();
 
-        if ($quantities->isEmpty()) {
+        if ($productIds->isEmpty()) {
             return [];
         }
 
         $rules = Promotion::query()
             ->automaticPricingAvailable($channel, null, $fulfillment)
             ->where('pricing_rule_type', Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT)
-            ->whereIn('primary_product_id', $quantities->keys())
-            ->with(['primaryProduct:id,name,image,is_active,is_customizable'])
+            ->where(function (Builder $eligible) use ($productIds): void {
+                $eligible->whereIn('primary_product_id', $productIds)
+                    ->orWhereHas('groups.products', fn (Builder $products) => $products->whereIn('products.id', $productIds));
+            })
+            ->with(['primaryProduct:id,name,image,is_active,is_customizable', 'groups.products:id,name,image,is_active,is_customizable'])
             ->orderByDesc('starts_on')
             ->orderByDesc('id')
-            ->get()
-            ->groupBy('primary_product_id');
+            ->get();
 
-        return $quantities->map(function (int $quantity, int $productId) use ($rules) {
-            return collect($rules->get($productId, collect()))
-                ->map(function (Promotion $promotion) use ($quantity) {
-                    $product = $promotion->primaryProduct;
+        return $rules->map(function (Promotion $promotion) use ($cart) {
+                    $eligibleProductIds = $this->eligibleProductIds($promotion);
+                    $eligibleProducts = $promotion->groups->flatMap->products
+                        ->filter(fn ($product) => $product->is_active)
+                        ->unique('id')
+                        ->values();
+                    $product = $eligibleProducts->first() ?: $promotion->primaryProduct;
+                    $quantity = collect($this->eligibleIndexes($cart, $eligibleProductIds))
+                        ->sum(fn (int $index) => $this->quantity($cart[$index]));
                     $config = $promotion->normalizedPricingRule();
                     $cycle = $config['buy_quantity'] + $config['reward_quantity'];
                     $completed = intdiv($quantity, $cycle);
@@ -111,15 +123,17 @@ class PromotionPricingService
                         'product_id' => $product->id,
                         'product_name' => $product->name,
                         'product_image' => $product->image,
+                        'eligible_product_ids' => $eligibleProductIds,
+                        'eligible_product_names' => $eligibleProducts->pluck('name')->all(),
                         'missing_quantity' => $missing,
-                        'message' => $missing === 1
-                            ? "Agrega 1 {$product->name} y activa {$promotion->pricingRuleLabel()}."
-                            : "Agrega {$missing} unidades de {$product->name} y activa {$promotion->pricingRuleLabel()}.",
+                        'message' => count($eligibleProductIds) === 1
+                            ? ($missing === 1
+                                ? "Agrega 1 {$product->name} y activa {$promotion->pricingRuleLabel()}."
+                                : "Agrega {$missing} unidades de {$product->name} y activa {$promotion->pricingRuleLabel()}.")
+                            : ($missing === 1
+                                ? 'Agrega 1 producto elegible y activa '.$promotion->pricingRuleLabel().'.'
+                                : "Agrega {$missing} productos elegibles y activa {$promotion->pricingRuleLabel()}."),
                     ];
-                })
-                ->filter()
-                ->sortByDesc(fn (array $opportunity) => $opportunity['promotion_label'])
-                ->first();
         })->filter()->values()->all();
     }
 
@@ -157,19 +171,11 @@ class PromotionPricingService
             ), 2);
         }
 
-        $cycle = $config['buy_quantity'] + $config['reward_quantity'];
-        $quantity = collect($indexes)->sum(fn (int $index) => $this->quantity($cart[$index]));
-        $applications = intdiv($quantity, $cycle);
-        if ($config['max_applications_per_order']) {
-            $applications = min($applications, $config['max_applications_per_order']);
-        }
+        $rewardUnits = $this->rewardUnitCounts($cart, $indexes, $config);
 
-        $discountedUnits = $applications * $config['reward_quantity'];
-        $basePrices = collect($indexes)->flatMap(function (int $index) use ($cart) {
-            return array_fill(0, $this->quantity($cart[$index]), $this->basePrice($cart[$index]));
-        })->sort()->take($discountedUnits);
-
-        return round((float) $basePrices->sum() * ($config['reward_discount_percentage'] / 100), 2);
+        return round((float) collect($rewardUnits)->map(
+            fn (int $units, int $index) => $units * $this->basePrice($cart[$index]) * ($config['reward_discount_percentage'] / 100)
+        )->sum(), 2);
     }
 
     private function applyRule(array $cart, array $indexes, Promotion $promotion): array
@@ -183,20 +189,12 @@ class PromotionPricingService
             return $this->applyFixedProductPriceRule($cart, $indexes, $promotion, $config);
         }
 
-        $totalQuantity = collect($indexes)->sum(fn (int $index) => $this->quantity($cart[$index]));
-        $applications = intdiv($totalQuantity, $config['buy_quantity'] + $config['reward_quantity']);
-        if ($config['max_applications_per_order']) {
-            $applications = min($applications, $config['max_applications_per_order']);
-        }
-        $remainingRewards = $applications * $config['reward_quantity'];
+        $rewardUnitsByIndex = $this->rewardUnitCounts($cart, $indexes, $config);
 
-        // Reward the cheapest eligible base units first. Add-ons are never discounted.
-        usort($indexes, fn (int $left, int $right) => $this->basePrice($cart[$left]) <=> $this->basePrice($cart[$right]));
         foreach ($indexes as $index) {
             $quantity = $this->quantity($cart[$index]);
-            $rewardUnits = min($quantity, $remainingRewards);
+            $rewardUnits = (int) ($rewardUnitsByIndex[$index] ?? 0);
             $discount = round($rewardUnits * $this->basePrice($cart[$index]) * ($config['reward_discount_percentage'] / 100), 2);
-            $remainingRewards -= $rewardUnits;
 
             if ($discount <= 0) {
                 continue;
@@ -298,5 +296,61 @@ class PromotionPricingService
     private function unitTotal(array $line): float
     {
         return round((float) ($line['unit_total'] ?? $line['price'] ?? $line['product_price'] ?? 0), 2);
+    }
+
+    private function eligibleProductIds(Promotion $promotion): array
+    {
+        if ($promotion->pricing_rule_type !== Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT) {
+            return $promotion->primary_product_id ? [(int) $promotion->primary_product_id] : [];
+        }
+
+        $promotion->loadMissing('groups.products:id');
+        $ids = $promotion->groups->flatMap->products->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $ids !== [] ? $ids : ($promotion->primary_product_id ? [(int) $promotion->primary_product_id] : []);
+    }
+
+    private function eligibleIndexes(array $cart, array $productIds): array
+    {
+        return collect($cart)->keys()->filter(fn (int $index) =>
+            in_array((int) ($cart[$index]['product_id'] ?? 0), $productIds, true)
+            && empty($cart[$index]['promotion_selections'])
+        )->values()->all();
+    }
+
+    /**
+     * Sorts eligible units from highest to lowest, forms complete cycles, and
+     * rewards the cheapest unit(s) inside each cycle. Add-ons never participate.
+     */
+    private function rewardUnitCounts(array $cart, array $indexes, array $config): array
+    {
+        $units = [];
+        foreach ($indexes as $index) {
+            for ($unit = 0; $unit < $this->quantity($cart[$index]); $unit++) {
+                $units[] = ['index' => $index, 'price' => $this->basePrice($cart[$index])];
+            }
+        }
+        usort($units, fn (array $left, array $right) => $right['price'] <=> $left['price'] ?: $left['index'] <=> $right['index']);
+
+        $cycle = $config['buy_quantity'] + $config['reward_quantity'];
+        $applications = intdiv(count($units), $cycle);
+        if ($config['max_applications_per_order']) {
+            $applications = min($applications, $config['max_applications_per_order']);
+        }
+
+        $counts = [];
+        for ($application = 0; $application < $applications; $application++) {
+            $pair = array_slice($units, $application * $cycle, $cycle);
+            $rewards = array_slice($pair, $config['buy_quantity'], $config['reward_quantity']);
+            foreach ($rewards as $reward) {
+                $counts[$reward['index']] = ($counts[$reward['index']] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
     }
 }

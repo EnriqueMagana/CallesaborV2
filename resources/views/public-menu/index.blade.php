@@ -271,6 +271,7 @@
                             <x-public-menu.product-card :product="$discountProduct" :image-override="$discountProduct->image ?: $campaign->image" :title-override="$discountProduct->name"
                                 :description-override="$discountProduct->description ?: $discountDescription" :price-override="$discountPrice" :original-price="$originalPrice" :discount-percent="$discountPercent"
                                 class="discount-product-card" role="listitem" data-discount-product-item />
+                            <span class="sr-only">{{ $discountDescription }}</span>
                         @endforeach
                     </div>
                 </section>
@@ -484,7 +485,7 @@
                     </div>
                 </div>
                 <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>El
-                        precio mostrado cubre la promoción completa</span><button type="button"
+                        precio mostrado cubre la promoción completa; los combos conservan el precio publicado</span><button type="button"
                         data-promotion-modal-close>Cerrar detalle</button></footer>
             </div>
         </dialog>

@@ -80,7 +80,7 @@
                     <div class="co-search-group">
                         <div class="co-search-wrap">
                             <i class="bx bx-search co-search-icon"></i>
-                            <input type="search" wire:model.live.debounce.450ms="customerSearch"
+                            <input type="search" wire:model.live.debounce.600ms="customerSearch"
                                 class="co-input co-search-input" placeholder="Buscar cliente en CRM…"
                                 autocomplete="off">
                         </div>
@@ -318,7 +318,7 @@
                             @if ($payMethod === 'cash')
                                 <div>
                                     <label class="co-label">Con cuánto paga</label>
-                                    <input type="number" wire:model.live.debounce.350ms="payCashReceived" class="co-input"
+                                    <input type="number" wire:model.blur="payCashReceived" class="co-input"
                                         placeholder="0.00" step="0.50" min="0">
                                 </div>
                             @elseif($payMethod === 'card')

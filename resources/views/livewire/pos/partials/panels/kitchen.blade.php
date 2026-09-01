@@ -5,7 +5,7 @@
             <label class="pos-area-search">
                 <i class="bx bx-search" data-ui="xui-r3yeoq"></i>
                 <span class="visually-hidden">Buscar órdenes de cocina</span>
-                <input type="text" wire:model.live.debounce.300ms="kitchenSearch"
+                <input type="text" wire:model.live.debounce.600ms="kitchenSearch"
                        class="pos-input" data-ui="xui-1le4og8"
                        placeholder="Buscar por mesa, cliente o # orden…">
             </label>

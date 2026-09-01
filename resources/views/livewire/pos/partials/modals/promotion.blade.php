@@ -41,3 +41,33 @@
         </section>
     </div>
 @endif
+
+@if($this->automaticPromotionPicker)
+    @php $automaticPromotion = $this->automaticPromotionPicker; $eligibleProducts = $automaticPromotion->groups->flatMap->products->unique('id')->values(); @endphp
+    <div class="pos-modal-backdrop" wire:click="closeAutomaticPromotionPicker"></div>
+    <div class="pos-modal-wrap is-open promotion-picker-wrap" role="dialog" aria-modal="true" aria-labelledby="automatic-promotion-picker-title">
+        <section class="promotion-picker">
+            <header class="promotion-picker__header">
+                <div><span><i class="bx bx-group"></i></span><div><small>Grupo promocional</small><h2 id="automatic-promotion-picker-title">{{ $automaticPromotion->name }}</h2><p>Elige cualquier artículo elegible. El descuento se calculará al completar la pareja.</p></div></div>
+                <strong>{{ $automaticPromotion->pricingRuleShortLabel() }}</strong>
+                <button type="button" wire:click="closeAutomaticPromotionPicker" aria-label="Cerrar"><i class="bx bx-x"></i></button>
+            </header>
+            <div class="promotion-picker__body">
+                <div class="promotion-picker__terms"><span><i class="bx bx-info-circle"></i>En cada pareja, el producto de menor precio recibe el beneficio.</span></div>
+                <fieldset class="promotion-picker__group">
+                    <legend><span><strong>Productos elegibles</strong><small>Puedes combinar sabores, presentaciones o repetir el mismo artículo.</small></span><b>{{ $eligibleProducts->count() }} opciones</b></legend>
+                    <div>
+                        @foreach($eligibleProducts as $product)
+                            <article class="promotion-choice">
+                                @if($product->image)<img src="{{ Storage::url($product->image) }}" alt="" width="54" height="54">@else<span><i class="bx bx-dish"></i></span>@endif
+                                <strong>{{ $product->name }} · ${{ number_format($product->price, 2) }}</strong>
+                                <div><button type="button" wire:click="addEligiblePromotionProduct({{ $automaticPromotion->id }}, {{ $product->id }})" aria-label="Agregar {{ $product->name }}"><i class="bx bx-plus"></i></button></div>
+                            </article>
+                        @endforeach
+                    </div>
+                </fieldset>
+            </div>
+            <footer class="promotion-picker__footer"><span>La promoción se aplica automáticamente en el carrito.</span><div><button type="button" class="pos-btn pos-btn-secondary" wire:click="closeAutomaticPromotionPicker">Cerrar</button></div></footer>
+        </section>
+    </div>
+@endif

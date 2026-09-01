@@ -13,9 +13,9 @@
     <div class="profile-notification-settings__grid">
         <section>
             <div class="profile-notification-settings__subheading"><i class="bx bx-volume-full"></i><span><strong>Volumen</strong><small>Nivel del sonido en este perfil.</small></span></div>
-            <label class="profile-notification-volume">
-                <span>Volumen <strong>{{ $volume }}%</strong></span>
-                <input type="range" min="0" max="100" step="5" wire:model.live="volume" onclick="window.AppNotificationSound?.unlock()" @disabled(!$soundEnabled)>
+            <label class="profile-notification-volume" x-data="{ previewVolume: @js($volume) }">
+                <span>Volumen <strong x-text="`${previewVolume}%`">{{ $volume }}%</strong></span>
+                <input type="range" min="0" max="100" step="5" x-model.number="previewVolume" x-on:change="$wire.set('volume', previewVolume)" onclick="window.AppNotificationSound?.unlock()" @disabled(!$soundEnabled)>
             </label>
             <div class="profile-notification-sounds">
                 <button type="button" onclick="window.AppNotificationSound?.unlock(); window.AppNotificationSound?.play('order', {{ $volume }})"><i class="bx bx-receipt"></i> Pedido</button>
