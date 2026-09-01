@@ -44,8 +44,6 @@ class AcceptUserInvitation extends Component
 
     public string $invalidReason = '';
 
-    public int $step = 1;
-
     public $photo = null;
 
     public string $name = '';
@@ -61,23 +59,6 @@ class AcceptUserInvitation extends Component
         $this->invitationId = $invitation->id;
         $this->token = $token;
         $this->hydrateInvitation($invitation);
-    }
-
-    public function nextStep(): void
-    {
-        if (! $this->ensureInvitationIsUsable()) {
-            return;
-        }
-
-        $this->validate($this->rulesForStep($this->step), $this->validationMessages());
-        $this->step = min(3, $this->step + 1);
-        $this->resetValidation();
-    }
-
-    public function previousStep(): void
-    {
-        $this->step = max(1, $this->step - 1);
-        $this->resetValidation();
     }
 
     public function completeRegistration(): void
@@ -140,7 +121,6 @@ class AcceptUserInvitation extends Component
 
             RateLimiter::clear($rateLimitKey);
             $this->registrationComplete = true;
-            $this->step = 3;
             $this->reset('photo', 'password', 'password_confirmation');
         } catch (ValidationException $exception) {
             if ($avatarPath) {
@@ -193,30 +173,15 @@ class AcceptUserInvitation extends Component
     }
 
     /** @return array<string, array<int, mixed>> */
-    private function rulesForStep(int $step): array
-    {
-        return match ($step) {
-            1 => [
-                'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
-                'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pM\s\'\-.]+$/u'],
-            ],
-            2 => [
-                'phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+()\s.\-]+$/'],
-            ],
-            default => [
-                'password' => ['required', 'string', 'confirmed', Password::defaults()],
-            ],
-        };
-    }
-
     /** @return array<string, array<int, mixed>> */
     private function allRules(): array
     {
-        return array_merge(
-            $this->rulesForStep(1),
-            $this->rulesForStep(2),
-            $this->rulesForStep(3),
-        );
+        return [
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pM\s\'\-.]+$/u'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+()\s.\-]+$/'],
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
+        ];
     }
 
     /** @return array<string, string> */

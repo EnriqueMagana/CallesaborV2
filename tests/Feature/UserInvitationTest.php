@@ -160,6 +160,34 @@ class UserInvitationTest extends TestCase
         ])->assertSet('invitationValid', false)->assertSee('ya fue utilizada');
     }
 
+    public function test_invitation_uses_one_form_and_keeps_loading_feedback_hidden_until_submit(): void
+    {
+        [$invitation, $token] = $this->invitation('formulario@equipo.test', 'cajero');
+
+        $this->get(route('invitations.accept', ['invitation' => $invitation, 'token' => $token]))
+            ->assertOk()
+            ->assertSee('Crea tu cuenta')
+            ->assertSee('Crear mi cuenta')
+            ->assertSee('Nombre completo')
+            ->assertSee('Correo asignado')
+            ->assertSee('Confirmar contraseña')
+            ->assertDontSee('Siguiente')
+            ->assertDontSee('invite-progress', false);
+
+        $css = file_get_contents(public_path('assets/css/login.css'));
+        $this->assertStringContainsString('.invite-submit__loading { display: none; }', $css);
+        $this->assertStringNotContainsString('.invite-next-button > span { display: inline-flex!important; }', $css);
+
+        Livewire::test(AcceptUserInvitation::class, [
+            'invitation' => $invitation,
+            'token' => $token,
+        ])->call('completeRegistration')
+            ->assertHasErrors(['name', 'password'])
+            ->assertSet('registrationComplete', false);
+
+        $this->assertNull($invitation->fresh()->accepted_at);
+    }
+
     public function test_invitation_is_rejected_at_exactly_one_hour_even_with_the_correct_token(): void
     {
         $now = CarbonImmutable::parse('2026-08-26 12:00:00');
