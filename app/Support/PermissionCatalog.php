@@ -14,6 +14,13 @@ final class PermissionCatalog
     {
         return [
             'punto_venta' => [
+                'crear ventas en punto de venta' => 'Permite confirmar desde el POS una venta nueva, generar la orden y registrar sus productos y pago inicial.',
+                'gestionar borradores en punto de venta' => 'Permite guardar, abrir, actualizar y eliminar pedidos guardados o borradores creados desde el POS.',
+                'ver pedidos en punto de venta' => 'Permite abrir en el POS los paneles operativos de pedidos por cobrar, cocina, mesas y delivery; no permite cambiar estados.',
+                'iniciar preparacion en punto de venta' => 'Permite cambiar en el POS una orden de Pendiente a En preparación y emitir su comanda inicial de cocina.',
+                'marcar pedidos listos en punto de venta' => 'Permite cambiar en el POS una orden de En preparación a Lista para cobro o entrega.',
+                'cobrar pedidos en punto de venta' => 'Permite cobrar desde el POS pedidos listos de ventanilla, recoger, kiosco o delivery y registrar sus formas de pago.',
+                'convertir pedidos a delivery en punto de venta' => 'Permite convertir desde el POS un pedido activo de ventanilla o recoger en un pedido de delivery.',
                 'usar punto de venta' => 'Permite abrir el POS, consultar el catálogo y preparar una venta; las acciones de cobro, mesas y caja requieren sus permisos propios.',
             ],
             'usuarios' => [

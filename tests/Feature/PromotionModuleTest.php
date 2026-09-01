@@ -870,9 +870,9 @@ class PromotionModuleTest extends TestCase
 
     public function test_pos_rejects_a_promotion_when_final_order_type_is_not_allowed(): void
     {
-        Permission::create(['name' => 'crear ordenes', 'guard_name' => 'web']);
+        Permission::create(['name' => 'crear ventas en punto de venta', 'guard_name' => 'web']);
         $user = User::factory()->create();
-        $user->givePermissionTo('crear ordenes');
+        $user->givePermissionTo('crear ventas en punto de venta');
         CashRegister::create([
             'name' => 'Caja validación modalidades',
             'opened_by' => $user->id,
@@ -897,9 +897,9 @@ class PromotionModuleTest extends TestCase
 
     public function test_pos_distinguishes_takeaway_pickup_and_hides_dine_in_only_promotions(): void
     {
-        Permission::create(['name' => 'crear ordenes', 'guard_name' => 'web']);
+        Permission::create(['name' => 'crear ventas en punto de venta', 'guard_name' => 'web']);
         $user = User::factory()->create();
-        $user->givePermissionTo('crear ordenes');
+        $user->givePermissionTo('crear ventas en punto de venta');
         CashRegister::create([
             'name' => 'Caja modalidades separadas',
             'opened_by' => $user->id,
@@ -1056,9 +1056,9 @@ class PromotionModuleTest extends TestCase
 
     public function test_saved_pos_order_preserves_promotion_and_selections_when_reopened(): void
     {
-        Permission::create(['name' => 'crear ordenes', 'guard_name' => 'web']);
+        Permission::create(['name' => 'gestionar borradores en punto de venta', 'guard_name' => 'web']);
         $user = User::factory()->create();
-        $user->givePermissionTo('crear ordenes');
+        $user->givePermissionTo('gestionar borradores en punto de venta');
         CashRegister::create([
             'name' => 'Caja promociones',
             'opened_by' => $user->id,
@@ -1095,9 +1095,9 @@ class PromotionModuleTest extends TestCase
 
     public function test_pos_sale_persists_promotion_snapshot_and_prints_selected_products(): void
     {
-        Permission::create(['name' => 'crear ordenes', 'guard_name' => 'web']);
+        Permission::create(['name' => 'crear ventas en punto de venta', 'guard_name' => 'web']);
         $user = User::factory()->create();
-        $user->givePermissionTo('crear ordenes');
+        $user->givePermissionTo('crear ventas en punto de venta');
         CashRegister::create([
             'name' => 'Caja venta promocional',
             'opened_by' => $user->id,
@@ -1134,9 +1134,9 @@ class PromotionModuleTest extends TestCase
 
     public function test_promotion_selections_inherit_product_areas_in_cart_and_kitchen_tickets(): void
     {
-        Permission::create(['name' => 'crear ordenes', 'guard_name' => 'web']);
+        Permission::create(['name' => 'crear ventas en punto de venta', 'guard_name' => 'web']);
         $user = User::factory()->create();
-        $user->givePermissionTo('crear ordenes');
+        $user->givePermissionTo('crear ventas en punto de venta');
         CashRegister::create([
             'name' => 'Caja áreas promocionales',
             'opened_by' => $user->id,

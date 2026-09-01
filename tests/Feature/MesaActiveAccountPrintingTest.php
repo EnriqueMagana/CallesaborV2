@@ -10,6 +10,7 @@ use App\Models\MesaAssignment;
 use App\Models\MesaSplit;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\MesaServiceManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,6 +32,7 @@ class MesaActiveAccountPrintingTest extends TestCase
     public function test_operator_can_preview_only_the_current_full_account_from_table_detail(): void
     {
         [$operator, $mesa] = $this->activeAccountContext();
+        $this->enableCustomerTicketQr();
 
         Livewire::actingAs($operator)
             ->test(GestionMesas::class)
@@ -39,12 +41,14 @@ class MesaActiveAccountPrintingTest extends TestCase
             ->assertSee('Cuenta completa')
             ->call('printActiveMesaAccount', $mesa->id)
             ->assertDispatched('mesa-account-ticket-preview', fn ($event, $params) => str_contains($params['html'] ?? '', 'Taco de prueba')
-                && str_contains($params['html'] ?? '', '120.00'));
+                && str_contains($params['html'] ?? '', '120.00')
+                && str_contains($params['html'] ?? '', 'data:image/svg+xml;base64,'));
     }
 
-    public function test_split_account_prints_each_pending_snapshot_and_rejects_paid_accounts(): void
+    public function test_split_account_reprints_a_paid_snapshot_with_its_payment_methods(): void
     {
-        [$operator, $mesa, $service] = $this->activeAccountContext();
+        [$operator, $mesa, $service, $order] = $this->activeAccountContext();
+        $this->enableCustomerTicketQr();
 
         $split = MesaSplit::create([
             'mesa_id' => $mesa->id,
@@ -64,6 +68,12 @@ class MesaActiveAccountPrintingTest extends TestCase
                     'items' => [['id' => 2, 'name' => 'Taco de Luis', 'qty' => 1, 'subtotal' => 70]],
                     'total' => 70,
                     'paid' => true,
+                    'payments' => [
+                        ['method' => 'cash', 'amount' => 30, 'cash_received' => 30, 'cash_change' => 0],
+                        ['method' => 'card', 'amount' => 40, 'card_last4' => '4242'],
+                    ],
+                    'paid_by' => $operator->id,
+                    'tracking_order_id' => $order->id,
                 ],
             ],
         ]);
@@ -80,8 +90,13 @@ class MesaActiveAccountPrintingTest extends TestCase
         Livewire::actingAs($operator)
             ->test(GestionMesas::class)
             ->call('printActiveMesaAccount', $mesa->id, $split->id, 1)
-            ->assertNotDispatched('mesa-account-ticket-preview')
-            ->assertDispatched('notify', fn ($event, $params) => str_contains($params['message'] ?? '', 'ya fue pagada'));
+            ->assertDispatched('mesa-account-ticket-preview', fn ($event, $params) => str_contains($params['html'] ?? '', 'Taco de Luis')
+                && str_contains($params['html'] ?? '', 'Efectivo')
+                && str_contains($params['html'] ?? '', '$30.00')
+                && str_contains($params['html'] ?? '', 'Tarjeta')
+                && str_contains($params['html'] ?? '', '$40.00')
+                && str_contains($params['html'] ?? '', '4242')
+                && str_contains($params['html'] ?? '', 'data:image/svg+xml;base64,'));
     }
 
     public function test_printing_requires_permission_and_an_in_account_active_service(): void
@@ -149,7 +164,22 @@ class MesaActiveAccountPrintingTest extends TestCase
             'assigned_at' => now(),
         ]);
 
-        return [$operator, $mesa->fresh(), $service->fresh()];
+        return [$operator, $mesa->fresh(), $service->fresh(), $order->fresh()];
+    }
+
+    private function enableCustomerTicketQr(): void
+    {
+        $template = TicketTemplate::current('customer');
+        $template->update([
+            'show_qr' => true,
+            'blocks' => collect($template->blocks)->map(function (array $block): array {
+                if (in_array($block['key'] ?? null, ['payments', 'qr'], true)) {
+                    $block['enabled'] = true;
+                }
+
+                return $block;
+            })->all(),
+        ]);
     }
 
     private function employee(array $permissions): User

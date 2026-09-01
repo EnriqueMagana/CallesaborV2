@@ -86,7 +86,7 @@ class TicketTemplate extends Model
             ['key' => 'items', 'label' => 'Productos', 'enabled' => $key !== 'cash_cut'],
             ['key' => 'cut_summary', 'label' => 'Resumen del corte', 'enabled' => $key === 'cash_cut'],
             ['key' => 'totals', 'label' => 'Totales', 'enabled' => ! in_array($key, ['kitchen_area', 'cash_cut'], true)],
-            ['key' => 'payments', 'label' => 'Formas de pago', 'enabled' => in_array($key, ['counter', 'delivery'], true)],
+            ['key' => 'payments', 'label' => 'Formas de pago', 'enabled' => in_array($key, ['customer', 'counter', 'delivery'], true)],
             ['key' => 'qr', 'label' => 'Código QR de seguimiento', 'enabled' => false],
             ['key' => 'footer', 'label' => 'Pie del ticket', 'enabled' => $key !== 'kitchen_area'],
         ];

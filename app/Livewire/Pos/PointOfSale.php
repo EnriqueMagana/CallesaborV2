@@ -774,7 +774,7 @@ class PointOfSale extends Component
 
     public function openDeliveryPanel(): void
     {
-        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
         $this->resetOperationalPanelState();
         $this->deliveryPanelLoaded = true;
         unset($this->deliveryOrders);
@@ -787,7 +787,7 @@ class PointOfSale extends Component
 
     public function openPickupPanel(): void
     {
-        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
         $this->resetOperationalPanelState();
     }
 
@@ -799,7 +799,7 @@ class PointOfSale extends Component
 
     public function openSavedOrdersModal(): void
     {
-        abort_unless(auth()->user()?->canAny(['crear ordenes', 'editar ordenes']), 403);
+        abort_unless(auth()->user()?->can('gestionar borradores en punto de venta'), 403);
         $this->resetOperationalPanelState();
         $this->showQuotationsModal = true;
     }
@@ -1990,7 +1990,7 @@ class PointOfSale extends Component
         DeliveryModulePolicy $deliveryPolicy,
         ManualDeliveryAccountingService $manualAccounting,
     ): void {
-        abort_unless(auth()->user()?->can('crear ordenes'), 403);
+        abort_unless(auth()->user()?->can('crear ventas en punto de venta'), 403);
         if (empty($this->cart)) {
             return;
         }
@@ -2070,7 +2070,7 @@ class PointOfSale extends Component
 
     public function submitPickupLater(): void
     {
-        abort_unless(auth()->user()?->can('crear ordenes'), 403);
+        abort_unless(auth()->user()?->can('crear ventas en punto de venta'), 403);
         if (empty($this->cart)) {
             return;
         }
@@ -2107,7 +2107,7 @@ class PointOfSale extends Component
 
     public function submitOrderLater(): void
     {
-        abort_unless(auth()->user()?->can('crear ordenes'), 403);
+        abort_unless(auth()->user()?->can('crear ventas en punto de venta'), 403);
         if (empty($this->cart)) {
             return;
         }
@@ -2139,7 +2139,7 @@ class PointOfSale extends Component
 
     public function saveQuotation(): void
     {
-        abort_unless(auth()->user()?->can('crear ordenes'), 403);
+        abort_unless(auth()->user()?->can('gestionar borradores en punto de venta'), 403);
         if (empty($this->cart)) {
             $this->dispatch('notify', type: 'warning', message: 'El carrito está vacío.');
 
@@ -2308,7 +2308,7 @@ class PointOfSale extends Component
 
     public function deleteQuotation(int $id): void
     {
-        abort_unless(auth()->user()?->can('editar ordenes'), 403);
+        abort_unless(auth()->user()?->can('gestionar borradores en punto de venta'), 403);
         Quotation::query()
             ->where('created_by', auth()->id())
             ->findOrFail($id)
@@ -2634,7 +2634,7 @@ class PointOfSale extends Component
 
     public function openConvertDeliveryModal(int $orderId): void
     {
-        abort_unless(auth()->user()?->can('editar ordenes'), 403);
+        abort_unless(auth()->user()?->can('convertir pedidos a delivery en punto de venta'), 403);
         $order = Order::with('customer')
             ->where('cash_register_id', $this->activeCashRegister?->id)
             ->findOrFail($orderId);
@@ -2662,7 +2662,7 @@ class PointOfSale extends Component
         DeliveryModulePolicy $deliveryPolicy,
         ManualDeliveryAccountingService $manualAccounting,
     ): void {
-        abort_unless(auth()->user()?->can('editar ordenes'), 403);
+        abort_unless(auth()->user()?->can('convertir pedidos a delivery en punto de venta'), 403);
         $this->validate([
             'convertDeliveryName' => 'required|string|max:120',
             'convertDeliveryPhone' => ['required', 'regex:/^[0-9]{10}$/'],
@@ -2713,7 +2713,7 @@ class PointOfSale extends Component
 
     public function openPickupPayModal(int $orderId): void
     {
-        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        abort_unless(auth()->user()?->can('cobrar pedidos en punto de venta'), 403);
         $order = Order::where('cash_register_id', $this->activeCashRegister?->id)
             ->findOrFail($orderId);
 
@@ -3230,6 +3230,8 @@ class PointOfSale extends Component
                     'order_id' => $order->id,
                     'method' => $this->mapPaymentMethod($p['method']),
                     'amount' => $amt,
+                    'card_last4' => $p['method'] === 'card' ? ($p['card_last4'] ?? null) : null,
+                    'transfer_reference' => $p['method'] === 'transfer' ? ($p['transfer_ref'] ?? null) : null,
                 ]);
                 if ($p['method'] === 'cash') {
                     $pay->update([
@@ -3263,6 +3265,7 @@ class PointOfSale extends Component
                 payments: $this->mesaPayments,
                 assignment: $assignment,
                 cashierName: auth()->user()->name,
+                trackingUrl: $this->mesaTrackingUrl($orders),
             ),
             html_cocina: '',
         );
@@ -3388,6 +3391,8 @@ class PointOfSale extends Component
                     'order_id' => $orderId,
                     'method' => $this->mapPaymentMethod($p['method']),
                     'amount' => $amt,
+                    'card_last4' => $p['method'] === 'card' ? ($p['card_last4'] ?? null) : null,
+                    'transfer_reference' => $p['method'] === 'transfer' ? ($p['transfer_ref'] ?? null) : null,
                 ]);
                 if ($p['method'] === 'cash') {
                     $pay->update([
@@ -3400,6 +3405,10 @@ class PointOfSale extends Component
 
         // Mark account paid
         $splitData[$this->mesaSplitAccountIdx]['paid'] = true;
+        $splitData[$this->mesaSplitAccountIdx]['payments'] = $this->mesaPayments;
+        $splitData[$this->mesaSplitAccountIdx]['paid_at'] = now()->toIso8601String();
+        $splitData[$this->mesaSplitAccountIdx]['paid_by'] = auth()->id();
+        $splitData[$this->mesaSplitAccountIdx]['tracking_order_id'] = array_key_first($orderAmounts);
         $allPaid = collect($splitData)->every(fn ($a) => (bool) ($a['paid'] ?? false));
         $split->update([
             'split_data' => $splitData,
@@ -3426,6 +3435,9 @@ class PointOfSale extends Component
                 payments: $this->mesaPayments,
                 assignment: $assignment,
                 cashierName: auth()->user()->name,
+                trackingUrl: $this->mesaTrackingUrl(
+                    Order::whereIn('id', array_keys($orderAmounts))->get()
+                ),
             ),
             html_cocina: '',
         );
@@ -3541,6 +3553,7 @@ class PointOfSale extends Component
         array $payments,
         ?MesaAssignment $assignment,
         string $cashierName,
+        ?string $trackingUrl = null,
     ): string {
         return app(ThermalTicketRenderer::class)->renderMesaAccount(
             $mesa,
@@ -3550,6 +3563,7 @@ class PointOfSale extends Component
             $payments,
             $assignment,
             $cashierName,
+            trackingUrl: $trackingUrl,
         );
 
         $appName = config('app.name');
@@ -3657,6 +3671,15 @@ class PointOfSale extends Component
 HTML;
     }
 
+    private function mesaTrackingUrl($orders): ?string
+    {
+        $order = collect($orders)->first();
+
+        return $order instanceof Order
+            ? route('kiosk.track', $order->ensurePublicToken())
+            : null;
+    }
+
     public function addPickupPayment(): void
     {
         // Si no ingresaron monto, usar el restante exacto
@@ -3696,7 +3719,7 @@ HTML;
 
     public function confirmPickupPayment(): void
     {
-        abort_unless(auth()->user()?->can('cerrar ordenes'), 403);
+        abort_unless(auth()->user()?->can('cobrar pedidos en punto de venta'), 403);
         $order = Order::with(['items'])
             ->where('cash_register_id', $this->activeCashRegister?->id)
             ->find($this->pickupPayOrderId);
@@ -3834,7 +3857,6 @@ HTML;
 
     public function markKitchenReady(int $orderId): void
     {
-        abort_unless(auth()->user()?->can('editar ordenes'), 403);
         $order = Order::with([
             'items.addons',
             'items.ingredients',
@@ -3850,6 +3872,10 @@ HTML;
         }
 
         $nextStatus = $order->status === 'pendiente' ? 'en_preparacion' : 'lista';
+        $requiredPermission = $nextStatus === 'en_preparacion'
+            ? 'iniciar preparacion en punto de venta'
+            : 'marcar pedidos listos en punto de venta';
+        abort_unless(auth()->user()?->can($requiredPermission), 403);
         $order->update(['status' => $nextStatus]);
         unset(
             $this->kitchenOrders,

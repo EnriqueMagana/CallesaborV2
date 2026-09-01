@@ -21,7 +21,16 @@ class RolesAndPermissionsSeeder extends Seeder
         ])->delete();
 
         $permissions = [
-            'punto_venta' => ['usar punto de venta'],
+            'punto_venta' => [
+                'usar punto de venta',
+                'crear ventas en punto de venta',
+                'gestionar borradores en punto de venta',
+                'ver pedidos en punto de venta',
+                'iniciar preparacion en punto de venta',
+                'marcar pedidos listos en punto de venta',
+                'cobrar pedidos en punto de venta',
+                'convertir pedidos a delivery en punto de venta',
+            ],
             'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion', 'gestionar menu digital'],
@@ -114,6 +123,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $gerente = Role::firstOrCreate(['name' => 'gerente', 'guard_name' => 'web']);
         $gerente->syncPermissions([
             'usar punto de venta',
+            'crear ventas en punto de venta', 'gestionar borradores en punto de venta', 'ver pedidos en punto de venta',
+            'iniciar preparacion en punto de venta', 'marcar pedidos listos en punto de venta',
+            'cobrar pedidos en punto de venta', 'convertir pedidos a delivery en punto de venta',
             'ver usuarios',
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
@@ -139,6 +151,9 @@ class RolesAndPermissionsSeeder extends Seeder
         $cajero = Role::firstOrCreate(['name' => 'cajero', 'guard_name' => 'web']);
         $cajero->syncPermissions([
             'usar punto de venta',
+            'crear ventas en punto de venta', 'gestionar borradores en punto de venta', 'ver pedidos en punto de venta',
+            'iniciar preparacion en punto de venta', 'marcar pedidos listos en punto de venta',
+            'cobrar pedidos en punto de venta', 'convertir pedidos a delivery en punto de venta',
             'ver clientes', 'crear clientes', 'editar clientes',
             'ver ordenes', 'crear ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
@@ -159,7 +174,11 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Cocinero
         $cocinero = Role::firstOrCreate(['name' => 'cocinero', 'guard_name' => 'web']);
-        $cocinero->syncPermissions(['ver ordenes', 'editar ordenes', 'reimprimir tickets', 'ver menu']);
+        $cocinero->syncPermissions([
+            'usar punto de venta', 'ver pedidos en punto de venta',
+            'iniciar preparacion en punto de venta', 'marcar pedidos listos en punto de venta',
+            'ver ordenes', 'reimprimir tickets', 'ver menu',
+        ]);
 
         // Repartidor — acceso operativo únicamente a sus entregas.
         $repartidor = Role::firstOrCreate(['name' => 'repartidor', 'guard_name' => 'web']);

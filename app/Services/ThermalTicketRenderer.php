@@ -27,7 +27,11 @@ class ThermalTicketRenderer
     ): string {
         $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'customer', 'mesa.area']);
 
-        $items = $order->items->filter(fn ($item) => ! (bool) $item->is_cancelled);
+        // La cocina nunca debe preparar partidas retiradas. En los tickets del
+        // cliente sí se conservan como evidencia, marcadas y fuera del total.
+        $items = $type === 'kitchen_area'
+            ? $order->items->filter(fn ($item) => ! (bool) $item->is_cancelled)
+            : $order->items;
 
         if ($type === 'kitchen_area') {
             $items = $this->kitchenLines($items);
@@ -84,6 +88,7 @@ class ThermalTicketRenderer
                 'name' => $item->product_name,
                 'quantity' => $item->quantity,
                 'subtotal' => (float) $item->subtotal,
+                'is_cancelled' => (bool) $item->is_cancelled,
                 'notes' => $item->notes,
                 'modifiers' => $item->addons->map(fn ($addon) => [
                     'name' => '+ '.$addon->addon_name,
@@ -237,8 +242,11 @@ class ThermalTicketRenderer
         ?MesaAssignment $assignment,
         string $cashierName,
         bool $autoPrint = true,
+        ?string $trackingUrl = null,
     ): string {
         $mesa->loadMissing('area');
+
+        $paymentPayload = $this->mesaPaymentsPayload($payments);
 
         return $this->render('customer', [
             'title' => 'TICKET DE MESA',
@@ -255,16 +263,11 @@ class ThermalTicketRenderer
                 'modifiers' => [],
                 'notes' => null,
             ])->all(),
-            'payments' => collect($payments)->map(fn ($payment) => [
-                'label' => match ($payment['method'] ?? '') {
-                    'cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia',
-                    default => ucfirst($payment['method'] ?? 'Pago'),
-                },
-                'amount' => (float) ($payment['amount'] ?? 0),
-                'change' => (float) ($payment['cash_change'] ?? 0),
-            ])->all(),
+            'payments' => $paymentPayload,
+            'paid_total' => (float) collect($paymentPayload)->sum('amount'),
+            'balance' => max(0, $total - (float) collect($paymentPayload)->sum('amount')),
             'total' => $total,
-            'tracking_url' => null,
+            'tracking_url' => $trackingUrl,
             'auto_print' => $autoPrint,
         ]);
     }
@@ -304,22 +307,13 @@ class ThermalTicketRenderer
                 'name' => $item->product_name,
                 'quantity' => $item->quantity,
                 'subtotal' => (float) $item->subtotal,
+                'is_cancelled' => (bool) $item->is_cancelled,
                 'modifiers' => [],
                 'notes' => null,
             ]))->all(),
-            'payments' => $service->orders->flatMap->payments
-                ->groupBy('method')
-                ->map(fn ($payments, $method) => [
-                    'label' => match ($method) {
-                        'efectivo' => 'Efectivo',
-                        'tarjeta' => 'Tarjeta',
-                        'transferencia' => 'Transferencia',
-                        'contra_entrega' => 'Contra entrega',
-                        default => ucfirst($method),
-                    },
-                    'amount' => (float) $payments->sum('amount'),
-                    'change' => (float) $payments->sum('change_amount'),
-                ])->values()->all(),
+            'payments' => $this->mesaPaymentsPayload($service->orders->flatMap->payments),
+            'paid_total' => (float) $service->orders->flatMap->payments->sum('amount'),
+            'balance' => max(0, (float) $service->total_snapshot - (float) $service->orders->flatMap->payments->sum('amount')),
             'total' => (float) $service->total_snapshot,
             'notes' => collect([
                 $members ? "Mesas ocupadas: {$members}" : null,
@@ -327,8 +321,57 @@ class ThermalTicketRenderer
                 $service->status === 'liberada' ? "Liberada sin cobro: {$service->close_reason}" : null,
                 "Apertura: {$service->opened_at->format('d/m/Y H:i')}",
             ])->filter()->implode(' · '),
-            'tracking_url' => null,
+            'tracking_url' => $this->trackingUrlForOrders($service->orders),
         ]);
+    }
+
+    private function mesaPaymentsPayload($payments): array
+    {
+        return collect($payments)
+            ->map(function ($payment): array {
+                $method = (string) data_get($payment, 'method', '');
+                $canonicalMethod = match ($method) {
+                    'cash', 'efectivo' => 'cash',
+                    'card', 'tarjeta' => 'card',
+                    'transfer', 'transferencia' => 'transfer',
+                    'contra_entrega' => 'contra_entrega',
+                    default => $method ?: 'other',
+                };
+
+                return [
+                    'method' => $canonicalMethod,
+                    'label' => match ($canonicalMethod) {
+                        'cash' => 'Efectivo',
+                        'card' => 'Tarjeta',
+                        'transfer' => 'Transferencia',
+                        'contra_entrega' => 'Contra entrega',
+                        default => ucfirst($method ?: 'Pago'),
+                    },
+                    'amount' => (float) data_get($payment, 'amount', 0),
+                    'change' => (float) (data_get($payment, 'cash_change') ?? data_get($payment, 'change_amount', 0)),
+                    'card_last4' => data_get($payment, 'card_last4'),
+                    'reference' => data_get($payment, 'transfer_ref') ?? data_get($payment, 'transfer_reference'),
+                ];
+            })
+            ->groupBy('method')
+            ->map(fn ($group) => [
+                'label' => $group->first()['label'],
+                'amount' => (float) $group->sum('amount'),
+                'change' => (float) $group->sum('change'),
+                'card_last4' => $group->pluck('card_last4')->filter()->unique()->implode(', '),
+                'reference' => $group->pluck('reference')->filter()->unique()->implode(', '),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function trackingUrlForOrders($orders): ?string
+    {
+        $order = collect($orders)->first();
+
+        return $order instanceof Order
+            ? route('kiosk.track', $order->ensurePublicToken())
+            : null;
     }
 
     public function renderPreview(string $type, ?TicketTemplate $template = null, ?BusinessSetting $business = null): string
