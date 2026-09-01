@@ -33,6 +33,8 @@ class PromotionManager extends Component
 
     public ?int $primaryProductId = null;
 
+    public array $eligibleProductIds = [];
+
     public int $wizardStep = 1;
 
     public string $previewDevice = 'mobile';
@@ -124,7 +126,7 @@ class PromotionManager extends Component
             ->where('is_active', true)
             ->with('category:id,name')
             ->orderBy('name')
-            ->get(['id', 'category_id', 'name', 'image']);
+            ->get(['id', 'category_id', 'name', 'image', 'price']);
     }
 
     #[Computed]
@@ -236,6 +238,15 @@ class PromotionManager extends Component
             'max_selections' => $group->max_selections,
             'product_ids' => $group->products->pluck('id')->map(fn ($id) => (int) $id)->all(),
         ])->all();
+        $this->eligibleProductIds = $promotion->groups
+            ->flatMap(fn ($group) => $group->products->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        if ($this->usesEligibleProductGroup() && $this->eligibleProductIds === [] && $this->primaryProductId) {
+            $this->eligibleProductIds = [$this->primaryProductId];
+        }
         $this->wizardStep = 1;
         $this->showEditor = true;
     }
@@ -269,11 +280,13 @@ class PromotionManager extends Component
             $this->launchOfferEnabled = false;
             $this->fulfillmentModes = Promotion::FULFILLMENT_MODES;
             $this->groups = [];
+            $this->eligibleProductIds = [];
 
             return;
         }
 
         $this->primaryProductId = null;
+        $this->eligibleProductIds = [];
         $this->pricingMechanic = $type === 'discount' ? 'percentage_discount' : 'fixed_price';
         $this->updatedPricingMechanic($this->pricingMechanic);
         $this->showOnPos = true;
@@ -296,10 +309,30 @@ class PromotionManager extends Component
         if ($mechanic === 'fixed_price' && $this->groups === []) {
             $this->addGroup();
         }
-        if ($mechanic !== 'fixed_price') {
+        if ($this->usesEligibleProductGroup()) {
+            if ($this->eligibleProductIds === [] && $this->primaryProductId) {
+                $this->eligibleProductIds = [$this->primaryProductId];
+            }
             $this->groups = [];
+        } elseif ($mechanic !== 'fixed_price') {
+            $this->groups = [];
+            $this->eligibleProductIds = [];
         }
         $this->resetValidation();
+    }
+
+    public function updatedEligibleProductIds(): void
+    {
+        $this->eligibleProductIds = collect($this->eligibleProductIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $this->primaryProductId = $this->eligibleProductIds[0] ?? null;
+        if ($this->primaryProductId) {
+            $this->updatedPrimaryProductId($this->primaryProductId);
+        }
     }
 
     public function updatedLaunchOfferEnabled(bool $enabled): void
@@ -387,6 +420,12 @@ class PromotionManager extends Component
                     'groups.*.product_ids' => ['required', 'array', 'min:1'],
                     'groups.*.product_ids.*' => ['required', 'integer', 'distinct', 'exists:products,id'],
                 ];
+            } elseif ($this->usesEligibleProductGroup()) {
+                $rules += [
+                    'eligibleProductIds' => ['required', 'array', 'min:1', 'max:100'],
+                    'eligibleProductIds.*' => ['required', 'integer', 'distinct', Rule::exists('products', 'id')->where('is_active', true)],
+                ];
+                $rules += $this->pricingRuleValidationRules();
             } else {
                 $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
                 if ($this->pricingMechanic === 'percentage_discount') {
@@ -483,6 +522,10 @@ class PromotionManager extends Component
     {
         $this->authorize($this->editingId ? 'editar promociones' : 'crear promociones');
 
+        if ($this->usesEligibleProductGroup()) {
+            $this->updatedEligibleProductIds();
+        }
+
         if (($this->presentationType === 'new' || $this->isAutomaticMechanic()) && $this->primaryProductId) {
             $productPrice = Product::query()->where('is_active', true)->find($this->primaryProductId)?->price;
             if ($productPrice !== null) {
@@ -530,6 +573,15 @@ class PromotionManager extends Component
                 'groups.*.product_ids' => ['required', 'array', 'min:1'],
                 'groups.*.product_ids.*' => ['required', 'integer', 'distinct', 'exists:products,id'],
             ];
+        } elseif ($this->usesEligibleProductGroup()) {
+            $rules += [
+                'primaryProductId' => ['required', Rule::exists('products', 'id')->where('is_active', true)],
+                'eligibleProductIds' => ['required', 'array', 'min:1', 'max:100'],
+                'eligibleProductIds.*' => ['required', 'integer', 'distinct', Rule::exists('products', 'id')->where('is_active', true)],
+                'fulfillmentModes' => ['required', 'array', 'min:1'],
+                'fulfillmentModes.*' => ['required', Rule::in(Promotion::FULFILLMENT_MODES), 'distinct'],
+            ];
+            $rules += $this->pricingRuleValidationRules();
         } else {
             $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
             $rules += [
@@ -637,7 +689,7 @@ class PromotionManager extends Component
                                 ? (int) $validated['maxApplicationsPerOrder']
                                 : null,
                             'apply_to_addons' => false,
-                            'reward_scope' => 'same_product',
+                            'reward_scope' => $this->usesEligibleProductGroup() ? 'eligible_group' : 'same_product',
                         ]))
                         : null,
                     'auto_apply' => $this->isAutomaticMechanic(),
@@ -662,7 +714,16 @@ class PromotionManager extends Component
                 ])->save();
 
                 $promotion->groups()->delete();
-                foreach (array_values($validated['groups'] ?? []) as $position => $groupData) {
+                $groupPayloads = $validated['groups'] ?? [];
+                if ($this->usesEligibleProductGroup()) {
+                    $groupPayloads = [[
+                        'name' => 'Productos elegibles',
+                        'min_selections' => 1,
+                        'max_selections' => 99,
+                        'product_ids' => $validated['eligibleProductIds'],
+                    ]];
+                }
+                foreach (array_values($groupPayloads) as $position => $groupData) {
                     $group = $promotion->groups()->create([
                         'name' => trim($groupData['name']),
                         'min_selections' => (int) $groupData['min_selections'],
@@ -718,7 +779,7 @@ class PromotionManager extends Component
     {
         $this->reset([
             'editingId', 'name', 'description', 'shortDescription', 'presentationType',
-            'primaryProductId', 'wizardStep', 'previewDevice', 'discountPercentage', 'price', 'pricingMechanic',
+            'primaryProductId', 'eligibleProductIds', 'wizardStep', 'previewDevice', 'discountPercentage', 'price', 'pricingMechanic',
             'startsOn', 'endsOn', 'weekdays', 'scheduleType', 'monthlyDay',
             'launchOfferEnabled', 'buyQuantity', 'rewardQuantity', 'rewardDiscountPercentage', 'maxApplicationsPerOrder',
             'fulfillmentModes', 'termsAndConditions', 'showOnPos', 'showOnDigitalMenu', 'showOnKiosk',
@@ -788,6 +849,11 @@ class PromotionManager extends Component
     private function isAutomaticMechanic(): bool
     {
         return in_array($this->pricingMechanic, ['fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'], true);
+    }
+
+    private function usesEligibleProductGroup(): bool
+    {
+        return in_array($this->pricingMechanic, ['two_for_one', 'second_half', 'custom_quantity'], true);
     }
 
     private function allowedPricingMechanics(): array

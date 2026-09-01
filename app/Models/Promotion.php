@@ -106,7 +106,9 @@ class Promotion extends Model
                 ? max(1, min(99, (int) $config['max_applications_per_order']))
                 : null,
             'apply_to_addons' => false,
-            'reward_scope' => 'same_product',
+            'reward_scope' => ($config['reward_scope'] ?? 'same_product') === 'eligible_group'
+                ? 'eligible_group'
+                : 'same_product',
         ];
     }
 

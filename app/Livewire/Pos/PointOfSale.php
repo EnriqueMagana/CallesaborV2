@@ -100,6 +100,8 @@ class PointOfSale extends Component
 
     public int $promotionQuantity = 1;
 
+    public ?int $automaticPromotionPickerId = null;
+
     // ─── Customize product modal ───────────────────────────────────────────────
     public bool $showCustomizeModal = false;
 
@@ -369,6 +371,23 @@ class PointOfSale extends Component
                 ->select(['products.id', 'products.category_id', 'products.name', 'products.image']),
                 'groups.products.category.printArea'])
             ->find($this->customizingPromotionId);
+    }
+
+    #[Computed]
+    public function automaticPromotionPicker(): ?Promotion
+    {
+        if (! $this->automaticPromotionPickerId) {
+            return null;
+        }
+
+        return Promotion::query()
+            ->automaticPricingAvailable('pos', null, $this->promotionFulfillmentForOrderType($this->orderType))
+            ->with([
+                'primaryProduct:id,name,image,price,is_active,is_customizable',
+                'groups.products' => fn ($query) => $query->where('is_active', true)
+                    ->select(['products.id', 'products.name', 'products.image', 'products.price', 'products.is_customizable']),
+            ])
+            ->find($this->automaticPromotionPickerId);
     }
 
     #[Computed]
@@ -1138,7 +1157,7 @@ class PointOfSale extends Component
     public function selectPromotionFromCatalog(int $promotionId): void
     {
         $fulfillment = $this->promotionFulfillmentForOrderType($this->orderType);
-        $promotion = Promotion::query()->with('primaryProduct')->find($promotionId);
+        $promotion = Promotion::query()->with(['primaryProduct', 'groups.products' => fn ($query) => $query->where('is_active', true)])->find($promotionId);
         if (! $promotion) {
             $this->dispatch('notify', type: 'warning', message: 'Esta promoción ya no está disponible.');
 
@@ -1155,13 +1174,44 @@ class PointOfSale extends Component
             ->automaticPricingAvailable('pos', null, $fulfillment)
             ->whereKey($promotionId)
             ->exists();
-        if (! $available || ! $promotion->primaryProduct?->is_active) {
+        $eligibleProducts = $promotion->groups->flatMap->products->unique('id')->values();
+        if ($eligibleProducts->isEmpty() && $promotion->primaryProduct?->is_active) {
+            $eligibleProducts = collect([$promotion->primaryProduct]);
+        }
+        if (! $available || $eligibleProducts->isEmpty()) {
             $this->dispatch('notify', type: 'warning', message: 'Esta oferta no aplica a la modalidad actual.');
 
             return;
         }
 
-        $this->openCustomizeModal($promotion->primary_product_id);
+        if ($eligibleProducts->count() > 1) {
+            $this->automaticPromotionPickerId = $promotion->id;
+            unset($this->automaticPromotionPicker);
+
+            return;
+        }
+
+        $this->openCustomizeModal((int) $eligibleProducts->first()->id);
+    }
+
+    public function closeAutomaticPromotionPicker(): void
+    {
+        $this->automaticPromotionPickerId = null;
+        unset($this->automaticPromotionPicker);
+    }
+
+    public function addEligiblePromotionProduct(int $promotionId, int $productId): void
+    {
+        abort_unless($this->automaticPromotionPickerId === $promotionId, 422);
+        $promotion = $this->automaticPromotionPicker;
+        $eligibleIds = $promotion?->groups->flatMap->products->pluck('id')->map(fn ($id) => (int) $id)->unique()->all() ?? [];
+        if ($eligibleIds === [] && $promotion?->primary_product_id) {
+            $eligibleIds = [(int) $promotion->primary_product_id];
+        }
+        abort_unless(in_array($productId, $eligibleIds, true), 422);
+
+        $this->closeAutomaticPromotionPicker();
+        $this->openCustomizeModal($productId);
     }
 
     public function completePromotionOpportunity(int $promotionId): void
@@ -1169,6 +1219,12 @@ class PointOfSale extends Component
         $opportunity = collect($this->promotionOpportunities)->firstWhere('promotion_id', $promotionId);
         if (! $opportunity) {
             $this->dispatch('notify', type: 'info', message: 'La oferta ya fue aplicada o dejó de estar disponible.');
+
+            return;
+        }
+
+        if (count($opportunity['eligible_product_ids'] ?? []) > 1) {
+            $this->selectPromotionFromCatalog($promotionId);
 
             return;
         }

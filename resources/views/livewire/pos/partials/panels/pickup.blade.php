@@ -6,7 +6,7 @@
             <label class="pos-area-search">
                 <i class="bx bx-search"></i>
                 <span class="visually-hidden">Buscar pedido de ventanilla</span>
-                <input type="search" class="pos-input" wire:model.live.debounce.300ms="pickupSearch" placeholder="Pedido, nombre o teléfono">
+                <input type="search" class="pos-input" wire:model.live.debounce.600ms="pickupSearch" placeholder="Pedido, nombre o teléfono">
             </label>
             <div class="pos-area-summary"><strong>{{ $this->pickupOrders->count() }}</strong><span>órdenes activas</span></div>
         </x-slot:tools>

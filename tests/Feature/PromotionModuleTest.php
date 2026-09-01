@@ -94,6 +94,128 @@ class PromotionModuleTest extends TestCase
         $this->assertSame(0.0, $notEligible[0]['promotion_discount']);
     }
 
+    public function test_grouped_two_for_one_pairs_different_products_and_rewards_the_cheapest_in_each_pair(): void
+    {
+        $products = collect([
+            Product::create(['name' => 'Producto A', 'price' => 50, 'is_active' => true]),
+            Product::create(['name' => 'Producto B', 'price' => 60, 'is_active' => true]),
+            Product::create(['name' => 'Producto C', 'price' => 80, 'is_active' => true]),
+            Product::create(['name' => 'Producto D', 'price' => 100, 'is_active' => true]),
+        ]);
+        $promotion = Promotion::create([
+            'name' => 'Combina cuatro bebidas 2x1',
+            'presentation_type' => 'promotion',
+            'primary_product_id' => $products->first()->id,
+            'price' => 50,
+            'pricing_rule_type' => Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
+            'pricing_rule_config' => ['buy_quantity' => 1, 'reward_quantity' => 1, 'reward_discount_percentage' => 100, 'reward_scope' => 'eligible_group'],
+            'auto_apply' => true,
+            'starts_on' => now()->subDay(),
+            'fulfillment_modes' => ['takeaway'],
+            'show_on_pos' => true,
+            'is_active' => true,
+        ]);
+        $group = $promotion->groups()->create(['name' => 'Bebidas elegibles', 'min_selections' => 1, 'max_selections' => 99]);
+        $group->products()->attach($products->pluck('id'));
+
+        $cart = $products->values()->map(fn (Product $product, int $index) => [
+            'cart_id' => 'grouped-'.$index,
+            'product_id' => $product->id,
+            'product_price' => (float) $product->price,
+            'unit_total' => (float) $product->price,
+            'quantity' => 1,
+            'subtotal' => (float) $product->price,
+        ])->all();
+        $priced = app(PromotionPricingService::class)->apply($cart, 'pos', 'takeaway');
+
+        $this->assertSame(160.0, (float) collect($priced)->sum('subtotal'));
+        $this->assertSame(130.0, (float) collect($priced)->sum('promotion_discount'));
+        $this->assertSame(50.0, (float) collect($priced)->firstWhere('product_id', $products[0]->id)['promotion_discount']);
+        $this->assertSame(80.0, (float) collect($priced)->firstWhere('product_id', $products[2]->id)['promotion_discount']);
+    }
+
+    public function test_pos_allows_choosing_different_products_from_a_second_half_price_group(): void
+    {
+        $user = User::factory()->create();
+        $normal = Product::create(['name' => 'Latte normal', 'price' => 70, 'is_active' => true]);
+        $caramel = Product::create(['name' => 'Latte caramelo', 'price' => 75, 'is_active' => true]);
+        $promotion = Promotion::create([
+            'name' => 'Segundo Latte a mitad',
+            'short_description' => 'Combina cualquier latte participante.',
+            'presentation_type' => 'promotion',
+            'primary_product_id' => $normal->id,
+            'price' => 70,
+            'pricing_rule_type' => Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
+            'pricing_rule_config' => ['buy_quantity' => 1, 'reward_quantity' => 1, 'reward_discount_percentage' => 50, 'reward_scope' => 'eligible_group'],
+            'auto_apply' => true,
+            'starts_on' => now()->subDay(),
+            'fulfillment_modes' => ['takeaway'],
+            'show_on_pos' => true,
+            'is_active' => true,
+        ]);
+        $group = $promotion->groups()->create(['name' => 'Lattes elegibles', 'min_selections' => 1, 'max_selections' => 99]);
+        $group->products()->attach([$normal->id, $caramel->id]);
+        CashRegister::create([
+            'name' => 'Caja promociones agrupadas',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+
+        Livewire::actingAs($user)->test(PointOfSale::class)
+            ->call('selectPromotionFromCatalog', $promotion->id)
+            ->assertSet('automaticPromotionPickerId', $promotion->id)
+            ->assertSee('Latte normal')
+            ->assertSee('Latte caramelo')
+            ->call('addEligiblePromotionProduct', $promotion->id, $normal->id)
+            ->assertSet('automaticPromotionPickerId', null)
+            ->call('selectPromotionFromCatalog', $promotion->id)
+            ->call('addEligiblePromotionProduct', $promotion->id, $caramel->id)
+            ->assertSet('cart.0.product_id', $normal->id)
+            ->assertSet('cart.1.product_id', $caramel->id)
+            ->assertSet('cart.0.promotion_discount', 35.0)
+            ->assertSet('cart.0.subtotal', 35.0)
+            ->assertSet('cart.1.subtotal', 75.0)
+            ->assertSet('cart.0.promotion_id', $promotion->id);
+    }
+
+    public function test_manager_persists_multiple_eligible_products_for_automatic_promotions(): void
+    {
+        Storage::fake('public');
+        Permission::create(['name' => 'ver promociones', 'guard_name' => 'web']);
+        Permission::create(['name' => 'crear promociones', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->givePermissionTo(['ver promociones', 'crear promociones']);
+        $products = collect([
+            Product::create(['name' => 'Latte normal', 'price' => 70, 'is_active' => true]),
+            Product::create(['name' => 'Latte caramelo', 'price' => 75, 'is_active' => true]),
+            Product::create(['name' => 'Latte vainilla', 'price' => 80, 'is_active' => true]),
+        ]);
+
+        Livewire::actingAs($user)->test(PromotionManager::class)
+            ->call('openCreate')
+            ->set('presentationType', 'promotion')
+            ->set('pricingMechanic', 'two_for_one')
+            ->call('nextWizardStep')
+            ->assertSee('Grupo de productos elegibles')
+            ->set('eligibleProductIds', $products->pluck('id')->all())
+            ->set('name', 'Lattes combinables 2x1')
+            ->set('shortDescription', 'Combina cualquiera de nuestros lattes participantes.')
+            ->set('image', UploadedFile::fake()->image('lattes.jpg', 1200, 400))
+            ->set('startsOn', now()->toDateString())
+            ->set('fulfillmentModes', ['takeaway'])
+            ->set('showOnDigitalMenu', false)
+            ->set('showOnKiosk', false)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $promotion = Promotion::with('groups.products')->sole();
+        $this->assertSame($products->first()->id, $promotion->primary_product_id);
+        $this->assertSame('eligible_group', $promotion->normalizedPricingRule()['reward_scope']);
+        $this->assertSame($products->pluck('id')->sort()->values()->all(), $promotion->groups->first()->products->pluck('id')->sort()->values()->all());
+    }
+
     public function test_percentage_discount_is_applied_to_the_base_product_without_discounting_addons(): void
     {
         $product = Product::create(['name' => 'Pasta especial', 'price' => 100, 'is_active' => true]);

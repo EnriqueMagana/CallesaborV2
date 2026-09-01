@@ -25,7 +25,7 @@
             <label class="pos-area-search">
                 <i class="bx bx-search"></i>
                 <span class="visually-hidden">Buscar orden para reimprimir</span>
-                <input type="search" class="pos-input" wire:model.live.debounce.300ms="reprintSearch" placeholder="Número de pedido o cliente">
+                <input type="search" class="pos-input" wire:model.live.debounce.600ms="reprintSearch" placeholder="Número de pedido o cliente">
             </label>
             <div class="pos-reprint-result-count" aria-live="polite">
                 <strong>{{ $reprintResults->count() }}</strong>

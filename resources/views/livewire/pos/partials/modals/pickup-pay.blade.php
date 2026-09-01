@@ -88,7 +88,7 @@
                             <label for="pickup-pay-amount">Monto a cobrar</label>
                             <div class="pos-payment-input">
                                 <span aria-hidden="true">$</span>
-                                <input id="pickup-pay-amount" type="number" wire:model.live="pickupPayAmount" class="pos-input"
+                                <input id="pickup-pay-amount" type="number" wire:model.blur="pickupPayAmount" class="pos-input"
                                    placeholder="{{ number_format($ppoRem, 2) }}"
                                    value="{{ $pickupPayAmount ?: number_format($ppoRem, 2) }}"
                                    step="0.01" min="0" inputmode="decimal">
@@ -99,7 +99,7 @@
                             <label for="pickup-pay-received">Efectivo recibido</label>
                             <div class="pos-payment-input">
                                 <span aria-hidden="true">$</span>
-                                <input id="pickup-pay-received" type="number" wire:model.live="pickupPayReceived" class="pos-input"
+                                <input id="pickup-pay-received" type="number" wire:model.blur="pickupPayReceived" class="pos-input"
                                    placeholder="0.00" step="0.01" min="0" inputmode="decimal">
                             </div>
                             <small>Captura lo entregado por el cliente.</small>
@@ -122,7 +122,7 @@
                     <div data-ui="xui-167pdlk">
                         <div data-ui="xui-1x8awyf">
                             <span data-ui="xui-1n7u11m">$</span>
-                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
+                            <input type="number" wire:model.blur="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
                                    placeholder="{{ number_format($ppoRem, 2) }}" step="0.01" min="0">
                             <span data-ui="xui-1p3z5bq">Monto</span>
                         </div>
@@ -136,7 +136,7 @@
                     <div data-ui="xui-167pdlk">
                         <div data-ui="xui-1x8awyf">
                             <span data-ui="xui-1n7u11m">$</span>
-                            <input type="number" wire:model.live="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
+                            <input type="number" wire:model.blur="pickupPayAmount" class="pos-input" data-ui="xui-78yyj2"
                                    placeholder="{{ number_format($ppoRem, 2) }}" step="0.01" min="0">
                             <span data-ui="xui-1p3z5bq">Monto</span>
                         </div>
