@@ -20,102 +20,93 @@
         <header class="invite-header">
             <div>
                 <span class="auth-login__eyebrow">Invitación al equipo</span>
-                <h2>Completa tu perfil</h2>
-                <p>Te registrarás con el rol <strong>{{ $roleLabel }}</strong>.</p>
+                <h2>Crea tu cuenta</h2>
+                <p>Completa tus datos una sola vez. Tu acceso tendrá el rol <strong>{{ $roleLabel }}</strong>.</p>
             </div>
             <span class="invite-role-chip"><i class="bx bx-badge-check" aria-hidden="true"></i>{{ $roleLabel }}</span>
         </header>
 
-        <ol class="invite-progress" aria-label="Progreso del registro">
-            @foreach ([1 => ['Perfil', 'bx-user'], 2 => ['Contacto', 'bx-envelope'], 3 => ['Acceso', 'bx-lock-alt']] as $number => $item)
-                <li class="{{ $step === $number ? 'is-current' : ($step > $number ? 'is-complete' : '') }}" @if ($step === $number) aria-current="step" @endif>
-                    <span><i class="bx {{ $step > $number ? 'bx-check' : $item[1] }}" aria-hidden="true"></i></span>
-                    <small>{{ $item[0] }}</small>
-                </li>
-            @endforeach
-        </ol>
-
-        <form wire:submit="completeRegistration" class="invite-form" novalidate>
-            @if ($step === 1)
-                <section class="invite-step" wire:key="invite-step-profile">
-                    <div class="invite-step__heading"><span><i class="bx bx-id-card" aria-hidden="true"></i></span><div><h3>Tu información personal</h3><p>La fotografía es opcional y podrás actualizarla posteriormente.</p></div></div>
-
-                    <label class="invite-photo" for="invite-photo">
-                        <span class="invite-photo__preview">
-                            @if ($photo)
-                                <img src="{{ $photo->temporaryUrl() }}" alt="Vista previa de tu fotografía">
-                            @else
-                                <i class="bx bx-camera" aria-hidden="true"></i>
-                            @endif
-                        </span>
-                        <span><strong>{{ $photo ? 'Cambiar fotografía' : 'Añadir fotografía' }}</strong><small>JPG, PNG o WEBP · máximo 3 MB</small></span>
-                        <input id="invite-photo" type="file" wire:model="photo" accept="image/jpeg,image/png,image/webp">
-                    </label>
-                    <div wire:loading wire:target="photo" class="invite-uploading"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Preparando imagen…</div>
+        <form wire:submit="completeRegistration" class="invite-form" novalidate
+            x-data="{ showPassword: false, showConfirmation: false, uploading: false }"
+            x-on:livewire-upload-start="uploading = true"
+            x-on:livewire-upload-finish="uploading = false"
+            x-on:livewire-upload-error="uploading = false">
+            <section class="invite-profile-summary" aria-labelledby="invite-profile-title">
+                <label class="invite-photo" for="invite-photo">
+                    <span class="invite-photo__preview">
+                        @if ($photo)
+                            <img src="{{ $photo->temporaryUrl() }}" alt="Vista previa de tu fotografía">
+                        @else
+                            <i class="bx bx-camera" aria-hidden="true"></i>
+                        @endif
+                    </span>
+                    <span><strong>{{ $photo ? 'Cambiar fotografía' : 'Añadir fotografía' }}</strong><small>Opcional · JPG, PNG o WEBP · máximo 3 MB</small></span>
+                    <i class="bx bx-upload invite-photo__action" aria-hidden="true"></i>
+                    <input id="invite-photo" type="file" wire:model="photo" accept="image/jpeg,image/png,image/webp">
+                </label>
+                <div>
+                    <h3 id="invite-profile-title">Información de tu cuenta</h3>
+                    <p>Los campos con <b>*</b> son obligatorios.</p>
+                    <div wire:loading.flex wire:target="photo" class="invite-uploading" role="status"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Preparando imagen…</div>
                     @error('photo')<p class="invite-field-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
+                </div>
+            </section>
 
-                    <label class="invite-field" for="invite-name">
-                        <span>Nombre completo <b>*</b></span>
-                        <div><i class="bx bx-user" aria-hidden="true"></i><input id="invite-name" type="text" wire:model="name" autocomplete="name" placeholder="Ej. Adriana López" autofocus></div>
-                        @error('name')<small class="invite-field-error" role="alert">{{ $message }}</small>@enderror
-                    </label>
-                </section>
-            @elseif ($step === 2)
-                <section class="invite-step" wire:key="invite-step-contact">
-                    <div class="invite-step__heading"><span><i class="bx bx-envelope" aria-hidden="true"></i></span><div><h3>Datos de contacto</h3><p>El correo proviene de la invitación y no puede modificarse.</p></div></div>
+            <div class="invite-form-grid">
+                <label class="invite-field is-full" for="invite-name">
+                    <span>Nombre completo <b>*</b></span>
+                    <div><i class="bx bx-user" aria-hidden="true"></i><input id="invite-name" type="text" wire:model="name" autocomplete="name" placeholder="Ej. Adriana López" autofocus></div>
+                    @error('name')<small class="invite-field-error" role="alert">{{ $message }}</small>@enderror
+                </label>
 
-                    <div class="invite-locked-field" aria-label="Correo electrónico asignado">
-                        <i class="bx bx-envelope" aria-hidden="true"></i>
-                        <span><small>Correo electrónico</small><strong>{{ $email }}</strong></span>
+                <div class="invite-locked-field" aria-label="Correo electrónico asignado">
+                    <i class="bx bx-envelope" aria-hidden="true"></i>
+                    <span><small>Correo asignado</small><strong>{{ $email }}</strong></span>
+                    <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                </div>
+
+                <label class="invite-field" for="invite-phone">
+                    <span>Teléfono <em>Opcional</em></span>
+                    <div><i class="bx bx-phone" aria-hidden="true"></i><input id="invite-phone" type="tel" wire:model="phone" autocomplete="tel" inputmode="tel" placeholder="Ej. 5512345678"></div>
+                    @error('phone')<small class="invite-field-error" role="alert">{{ $message }}</small>@enderror
+                </label>
+
+                <label class="invite-field" for="invite-password">
+                    <span>Contraseña <b>*</b></span>
+                    <div class="invite-password-control">
                         <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                        <input id="invite-password" x-bind:type="showPassword ? 'text' : 'password'" wire:model="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres">
+                        <button type="button" class="invite-password-toggle" x-on:click="showPassword = !showPassword" x-bind:aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'" x-bind:aria-pressed="showPassword"><i class="bx" x-bind:class="showPassword ? 'bx-hide' : 'bx-show'" aria-hidden="true"></i></button>
                     </div>
+                    @error('password')<small class="invite-field-error" role="alert">{{ $message }}</small>@enderror
+                </label>
 
-                    <label class="invite-field" for="invite-phone">
-                        <span>Teléfono <em>Opcional</em></span>
-                        <div><i class="bx bx-phone" aria-hidden="true"></i><input id="invite-phone" type="tel" wire:model="phone" autocomplete="tel" inputmode="tel" placeholder="Ej. 5512345678"></div>
-                        @error('phone')<small class="invite-field-error" role="alert">{{ $message }}</small>@enderror
-                    </label>
-                </section>
-            @else
-                <section class="invite-step" wire:key="invite-step-access">
-                    <div class="invite-step__heading"><span><i class="bx bx-shield-quarter" aria-hidden="true"></i></span><div><h3>Protege tu acceso</h3><p>Crea la contraseña con la que iniciarás sesión.</p></div></div>
+                <label class="invite-field" for="invite-password-confirmation">
+                    <span>Confirmar contraseña <b>*</b></span>
+                    <div class="invite-password-control">
+                        <i class="bx bx-check-shield" aria-hidden="true"></i>
+                        <input id="invite-password-confirmation" x-bind:type="showConfirmation ? 'text' : 'password'" wire:model="password_confirmation" autocomplete="new-password" placeholder="Repite la contraseña">
+                        <button type="button" class="invite-password-toggle" x-on:click="showConfirmation = !showConfirmation" x-bind:aria-label="showConfirmation ? 'Ocultar confirmación' : 'Mostrar confirmación'" x-bind:aria-pressed="showConfirmation"><i class="bx" x-bind:class="showConfirmation ? 'bx-hide' : 'bx-show'" aria-hidden="true"></i></button>
+                    </div>
+                </label>
+            </div>
 
-                    <div class="invite-role-summary"><i class="bx bx-badge-check" aria-hidden="true"></i><span><small>Rol asignado por administración</small><strong>{{ $roleLabel }}</strong></span></div>
+            <aside class="invite-security-summary">
+                <i class="bx bx-shield-quarter" aria-hidden="true"></i>
+                <span><strong>Acceso protegido</strong><small>El correo y el rol fueron definidos por administración y no pueden modificarse desde este enlace.</small></span>
+            </aside>
 
-                    <label class="invite-field" for="invite-password">
-                        <span>Contraseña <b>*</b></span>
-                        <div><i class="bx bx-lock-alt" aria-hidden="true"></i><input id="invite-password" type="password" wire:model="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>
-                        @error('password')<small class="invite-field-error" role="alert">{{ $message }}</small>@enderror
-                    </label>
-                    <label class="invite-field" for="invite-password-confirmation">
-                        <span>Confirmar contraseña <b>*</b></span>
-                        <div><i class="bx bx-check-shield" aria-hidden="true"></i><input id="invite-password-confirmation" type="password" wire:model="password_confirmation" autocomplete="new-password" placeholder="Repite la contraseña"></div>
-                    </label>
-                    @error('registration')<p class="invite-form-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
-                </section>
-            @endif
+            @error('registration')<p class="invite-form-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
 
-            <footer class="invite-actions">
-                @if ($step > 1)
-                    <button type="button" class="invite-back-button" wire:click="previousStep" wire:loading.attr="disabled"><i class="bx bx-arrow-back" aria-hidden="true"></i>Anterior</button>
-                @else
-                    <span></span>
-                @endif
-
-                @if ($step < 3)
-                    <button type="button" class="auth-submit invite-next-button" wire:click="nextStep" wire:loading.attr="disabled" wire:target="nextStep,photo">
-                        <span wire:loading.remove wire:target="nextStep"><span>Siguiente</span><i class="bx bx-right-arrow-alt" aria-hidden="true"></i></span>
-                        <span wire:loading wire:target="nextStep"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Validando</span>
-                    </button>
-                @else
-                    <button type="submit" class="auth-submit invite-next-button" wire:loading.attr="disabled" wire:target="completeRegistration">
-                        <span wire:loading.remove wire:target="completeRegistration"><i class="bx bx-user-check" aria-hidden="true"></i>Crear mi cuenta</span>
-                        <span wire:loading wire:target="completeRegistration"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Creando cuenta</span>
-                    </button>
-                @endif
+            <footer class="invite-actions is-single">
+                <p class="invite-expiration"><i class="bx bx-time-five" aria-hidden="true"></i>Vence el {{ $expiresAt }}</p>
+                <button type="submit" class="auth-submit invite-submit-button"
+                    x-bind:disabled="uploading"
+                    wire:loading.attr="disabled" wire:loading.class="is-loading" wire:target="completeRegistration">
+                    <span class="invite-submit__idle"><i class="bx bx-user-check" aria-hidden="true"></i>Crear mi cuenta</span>
+                    <span class="invite-submit__loading"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i>Validando información…</span>
+                </button>
             </footer>
         </form>
-
-        <p class="invite-expiration"><i class="bx bx-time-five" aria-hidden="true"></i>Esta invitación vence el {{ $expiresAt }}.</p>
     @endif
 </div>
