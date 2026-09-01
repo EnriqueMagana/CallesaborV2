@@ -236,6 +236,7 @@ class ThermalTicketRenderer
         array $payments,
         ?MesaAssignment $assignment,
         string $cashierName,
+        bool $autoPrint = true,
     ): string {
         $mesa->loadMissing('area');
 
@@ -264,6 +265,7 @@ class ThermalTicketRenderer
             ])->all(),
             'total' => $total,
             'tracking_url' => null,
+            'auto_print' => $autoPrint,
         ]);
     }
 

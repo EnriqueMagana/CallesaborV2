@@ -1129,7 +1129,12 @@
 
     {{-- ── Mesa Detail modal ── --}}
     @if ($showDetailModal && $this->detailMesa)
-        @php $dm = $this->detailMesa; @endphp
+        @php
+            $dm = $this->detailMesa;
+            $printableMesaAccount = auth()->user()?->can('reimprimir tickets')
+                ? $this->printableMesaAccount
+                : null;
+        @endphp
         <div class="mesas-modal-backdrop" wire:click.self="$set('showDetailModal', false)">
             <div class="mesas-modal mesas-modal--xl">
                 <div class="mesas-modal-header">
@@ -1167,6 +1172,12 @@
                             @click="tab = 'asignaciones'">
                             <i class="bx bx-user-pin"></i> Asignaciones
                         </button>
+                        @if ($printableMesaAccount)
+                            <button class="mesas-inner-tab" :class="{ active: tab === 'imprimir' }"
+                                @click="tab = 'imprimir'">
+                                <i class="bx bx-printer"></i> Imprimir cuenta
+                            </button>
+                        @endif
                         @if ($dm->splits->isNotEmpty())
                             <button class="mesas-inner-tab" :class="{ active: tab === 'split' }"
                                 @click="tab = 'split'" aria-label="Ver cuentas divididas">
@@ -1318,6 +1329,71 @@
                         @endif
                     </div>
 
+                    @if ($printableMesaAccount)
+                        <div x-show="tab === 'imprimir'" x-cloak>
+                            <section class="mesa-print-section" aria-labelledby="mesa-print-title">
+                                <div class="mesa-print-section__heading">
+                                    <span class="mesa-print-section__icon"><i class="bx bx-printer"></i></span>
+                                    <div>
+                                        <h6 id="mesa-print-title">Ticket de la cuenta vigente</h6>
+                                        <p>La vista previa usa el consumo actual y no registra pagos ni cambia el estado de la mesa.</p>
+                                    </div>
+                                </div>
+
+                                @if ($printableMesaAccount['is_split'])
+                                    <div class="mesa-print-accounts" aria-label="Subcuentas disponibles para imprimir">
+                                        @foreach ($printableMesaAccount['accounts'] as $account)
+                                            <article class="mesa-print-account {{ $account['paid'] ? 'is-paid' : '' }}">
+                                                <div class="mesa-print-account__status">
+                                                    <i class="bx {{ $account['paid'] ? 'bx-check-circle' : 'bx-wallet' }}"></i>
+                                                </div>
+                                                <div class="mesa-print-account__summary">
+                                                    <strong>{{ $account['label'] }}</strong>
+                                                    <small>{{ $account['item_count'] }} producto(s) · {{ $account['paid'] ? 'Pagada' : 'Pendiente de cobro' }}</small>
+                                                </div>
+                                                <strong class="mesa-print-account__total">${{ number_format($account['total'], 2) }}</strong>
+                                                @if ($account['paid'])
+                                                    <span class="mesa-print-account__locked" title="Las cuentas pagadas se consultan desde el historial">
+                                                        <i class="bx bx-lock-alt"></i> Cerrada
+                                                    </span>
+                                                @else
+                                                    <button type="button" class="btn btn-primary btn-sm"
+                                                        wire:click="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
+                                                        wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
+                                                        aria-label="Ver e imprimir {{ $account['label'] }}">
+                                                        <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><i class="bx bx-show me-1"></i> Vista previa</span>
+                                                        <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
+                                                    </button>
+                                                @endif
+                                            </article>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <article class="mesa-print-account mesa-print-account--full">
+                                        <div class="mesa-print-account__status"><i class="bx bx-receipt"></i></div>
+                                        <div class="mesa-print-account__summary">
+                                            <strong>{{ $printableMesaAccount['service_label'] }}</strong>
+                                            <small>Cuenta completa · pendiente de cobro</small>
+                                        </div>
+                                        <strong class="mesa-print-account__total">${{ number_format($printableMesaAccount['total'], 2) }}</strong>
+                                        <button type="button" class="btn btn-primary btn-sm"
+                                            wire:click="printActiveMesaAccount({{ $dm->id }})"
+                                            wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }})"
+                                            aria-label="Ver e imprimir la cuenta completa">
+                                            <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }})"><i class="bx bx-show me-1"></i> Vista previa</span>
+                                            <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
+                                        </button>
+                                    </article>
+                                @endif
+
+                                <div class="mesa-print-section__notice">
+                                    <i class="bx bx-shield-quarter"></i>
+                                    <span>Solo se muestran cuentas del servicio activo, con caja abierta y estado <strong>En cuenta</strong>.</span>
+                                </div>
+                            </section>
+                        </div>
+                    @endif
+
                     @if ($dm->splits->isNotEmpty())
                         <div x-show="tab === 'split'" x-cloak>
                             @php $detailSplit = $dm->splits->first(); @endphp
@@ -1386,6 +1462,32 @@
             </div>
         </div>
     @endif
+
+    <div class="mesa-ticket-preview-backdrop" x-data="{ open: false, html: '', title: 'Cuenta de mesa' }"
+        x-on:mesa-account-ticket-preview.window="html = $event.detail.html || ''; title = $event.detail.title || 'Cuenta de mesa'; open = true"
+        x-on:keydown.escape.window="if (open) { open = false; html = '' }" x-show="open" x-cloak
+        @click.self="open = false; html = ''" role="dialog" aria-modal="true" aria-labelledby="mesa-ticket-preview-title">
+        <section class="mesa-ticket-preview">
+            <header class="mesa-ticket-preview__header">
+                <div>
+                    <span>VISTA PREVIA</span>
+                    <h5 id="mesa-ticket-preview-title" x-text="title"></h5>
+                </div>
+                <button type="button" class="mesas-modal-close" @click="open = false; html = ''"
+                    aria-label="Cerrar vista previa"><i class="bx bx-x"></i></button>
+            </header>
+            <div class="mesa-ticket-preview__body">
+                <iframe x-ref="ticketFrame" :srcdoc="html" title="Vista previa del ticket de mesa"></iframe>
+            </div>
+            <footer class="mesa-ticket-preview__actions">
+                <button type="button" class="btn btn-outline-secondary" @click="open = false; html = ''">Cerrar</button>
+                <button type="button" class="btn btn-primary"
+                    @click="try { $refs.ticketFrame.contentWindow.print() } catch (error) {}">
+                    <i class="bx bx-printer me-1"></i> Imprimir ticket
+                </button>
+            </footer>
+        </section>
+    </div>
 
 </div>
 </div>

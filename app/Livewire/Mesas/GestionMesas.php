@@ -11,6 +11,7 @@ use App\Models\MesaSplit;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\MesaServiceManager;
+use App\Services\ThermalTicketRenderer;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -237,6 +238,36 @@ class GestionMesas extends Component
             'splits' => fn ($q) => $q->whereIn('status', ['pendiente', 'parcial'])->latest('id'),
             'orders' => fn ($q) => $q->latest()->take(20),
         ])->find($this->detailMesaId);
+    }
+
+    #[Computed]
+    public function printableMesaAccount(): ?array
+    {
+        if (! $this->detailMesaId || ! auth()->user()?->can('reimprimir tickets')) {
+            return null;
+        }
+
+        $mesa = Mesa::find($this->detailMesaId);
+        $context = $mesa ? $this->printableAccountContext($mesa) : null;
+        if (! $context) {
+            return null;
+        }
+
+        $split = $context['split'];
+
+        return [
+            'service_label' => $context['service']->service_label ?: $context['mesa']->display_name,
+            'total' => (float) $context['orders']->sum('total'),
+            'is_split' => $split !== null,
+            'split_id' => $split?->id,
+            'accounts' => collect($split?->split_data ?? [])->map(fn (array $account, int $index) => [
+                'index' => $index,
+                'label' => $account['label'] ?? 'Cuenta '.($index + 1),
+                'total' => (float) ($account['total'] ?? 0),
+                'item_count' => count($account['items'] ?? []),
+                'paid' => (bool) ($account['paid'] ?? false),
+            ])->values()->all(),
+        ];
     }
 
     #[Computed]
@@ -662,6 +693,130 @@ class GestionMesas extends Component
         $this->detailMesaId = $mesaId;
         $this->showDetailModal = true;
         unset($this->detailMesa);
+    }
+
+    public function printActiveMesaAccount(
+        int $mesaId,
+        ?int $splitId = null,
+        ?int $accountIndex = null,
+    ): void {
+        $this->requirePermission('reimprimir tickets');
+
+        $mesa = Mesa::with('currentAssignment.waiter')->find($mesaId);
+        $context = $mesa ? $this->printableAccountContext($mesa) : null;
+        if (! $context) {
+            $this->dispatch('notify', type: 'warning', message: 'Solo puedes imprimir una cuenta vigente de una mesa en estado En cuenta.');
+
+            return;
+        }
+
+        $split = $context['split'];
+        $label = $context['service']->service_label ?: $context['mesa']->display_name;
+        $items = [];
+        $total = (float) $context['orders']->sum('total');
+
+        if ($split) {
+            if ($splitId !== $split->id || $accountIndex === null) {
+                $this->dispatch('notify', type: 'warning', message: 'Selecciona una subcuenta pendiente para imprimir.');
+
+                return;
+            }
+
+            $account = ($split->split_data ?? [])[$accountIndex] ?? null;
+            if (! $account || (bool) ($account['paid'] ?? false)) {
+                $this->dispatch('notify', type: 'warning', message: 'Esta subcuenta ya fue pagada o dejó de estar disponible.');
+
+                return;
+            }
+
+            $label = (string) ($account['label'] ?? 'Cuenta '.($accountIndex + 1));
+            $items = collect($account['items'] ?? [])->map(fn (array $item) => [
+                'qty' => (float) ($item['qty'] ?? 1),
+                'name' => (string) ($item['name'] ?? 'Producto'),
+                'subtotal' => (float) ($item['subtotal'] ?? 0),
+            ])->values()->all();
+            $total = (float) ($account['total'] ?? 0);
+        } else {
+            if ($splitId !== null || $accountIndex !== null) {
+                $this->dispatch('notify', type: 'warning', message: 'La cuenta vigente ya no coincide con la selección. Actualiza el detalle e intenta de nuevo.');
+
+                return;
+            }
+
+            $items = $context['orders']->flatMap(fn (Order $order) => $order->items
+                ->reject(fn ($item) => (bool) $item->is_cancelled)
+                ->map(fn ($item) => [
+                    'qty' => (float) $item->quantity,
+                    'name' => $item->product_name,
+                    'subtotal' => (float) $item->subtotal,
+                ]))->values()->all();
+        }
+
+        if ($items === []) {
+            $this->dispatch('notify', type: 'warning', message: 'La cuenta no tiene productos vigentes para imprimir.');
+
+            return;
+        }
+
+        $assignment = $context['service']->assignments()
+            ->with('waiter')
+            ->whereNull('released_at')
+            ->latest('assigned_at')
+            ->first() ?? $mesa->currentAssignment;
+
+        $html = app(ThermalTicketRenderer::class)->renderMesaAccount(
+            mesa: $context['mesa'],
+            accountLabel: $label,
+            items: $items,
+            total: $total,
+            payments: [],
+            assignment: $assignment,
+            cashierName: auth()->user()->name,
+            autoPrint: false,
+        );
+
+        $this->dispatch(
+            'mesa-account-ticket-preview',
+            html: $html,
+            title: $label,
+        );
+    }
+
+    private function printableAccountContext(Mesa $mesa): ?array
+    {
+        if ($mesa->status !== 'en_cuenta') {
+            return null;
+        }
+
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        if (! $register) {
+            return null;
+        }
+
+        $service = app(MesaServiceManager::class)->findActiveForMesa($mesa, $register->id);
+        if (! $service || $service->status !== 'en_cuenta') {
+            return null;
+        }
+
+        $orders = $service->orders()
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->with('items')
+            ->get();
+        if ($orders->isEmpty()) {
+            return null;
+        }
+
+        $split = $service->splits()
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->latest('id')
+            ->first();
+
+        return [
+            'mesa' => $service->primaryMesa()->with('area')->first() ?? $mesa->loadMissing('area'),
+            'service' => $service,
+            'orders' => $orders,
+            'split' => $split,
+        ];
     }
 
     // ── Group ──
