@@ -65,6 +65,19 @@
                                 wire:click="markRead('{{ $notification->id }}')" aria-label="Marcar como leída"
                                 title="Marcar como leída"><i class="bx bx-check" aria-hidden="true"></i></button>
                         @endif
+                        @if ($actionLabel = $this->actionLabel($notification))
+                            <button type="button" class="notification-item__action"
+                                wire:click="performAction('{{ $notification->id }}')"
+                                wire:loading.attr="disabled" wire:target="performAction('{{ $notification->id }}')">
+                                <span wire:loading.remove wire:target="performAction('{{ $notification->id }}')">
+                                    <i class="bx {{ $notification->event_key === 'delivery.available' ? 'bx-user-check' : ($notification->subject?->type === 'mesa' ? 'bx-table' : 'bx-right-arrow-alt') }}" aria-hidden="true"></i>
+                                    {{ $actionLabel }}
+                                </span>
+                                <span wire:loading wire:target="performAction('{{ $notification->id }}')">
+                                    <i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Procesandoâ€¦
+                                </span>
+                            </button>
+                        @endif
                     </article>
                 @empty
                     <div class="notification-center__empty">

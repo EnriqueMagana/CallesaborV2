@@ -326,7 +326,7 @@ class KioskOrderTest extends TestCase
 
         $this->get(route('kiosk.track', $order->public_token))
             ->assertOk()
-            ->assertSee('Pedido #'.$order->id)
+            ->assertSee('Pedido '.$order->display_folio)
             ->assertSee('Hamburguesa clásica')
             ->assertSee('Actualizar estado')
             ->assertDontSee('Actualización automática');

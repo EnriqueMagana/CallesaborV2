@@ -229,9 +229,46 @@ class OperationalNotificationsTest extends TestCase
 
         $this->actingAs($waiter);
         Livewire::test(NotificationCenter::class)
+            ->set('open', true)
+            ->assertSee('Ir a mesa')
             ->call('openNotification', $notification->id)
             ->assertRedirect(route('app.mesas.ordenes', $mesa));
 
+        $this->assertNotNull($notification->fresh()->read_at);
+    }
+
+    public function test_driver_can_take_an_available_delivery_directly_from_the_notification(): void
+    {
+        $driver = $this->userWithRole('repartidor');
+        $register = CashRegister::query()->create([
+            'name' => 'Turno delivery directo',
+            'opened_by' => $driver->id,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $order = Order::query()->create([
+            'cash_register_id' => $register->id,
+            'served_by' => $driver->id,
+            'type' => 'delivery',
+            'delivery_flow_mode' => 'managed',
+            'status' => 'lista',
+            'subtotal' => 220,
+            'total' => 220,
+        ]);
+        $notification = $this->notificationFor($driver, 'delivery.available', 'delivery', $order);
+
+        $this->actingAs($driver);
+        Livewire::test(NotificationCenter::class)
+            ->set('open', true)
+            ->assertSee('Tomar delivery')
+            ->call('performAction', $notification->id)
+            ->assertRedirect(route('app.delivery', ['order' => $order->id]));
+
+        $this->assertDatabaseHas('delivery_assignments', [
+            'order_id' => $order->id,
+            'driver_id' => $driver->id,
+            'status' => 'asignado',
+        ]);
         $this->assertNotNull($notification->fresh()->read_at);
     }
 

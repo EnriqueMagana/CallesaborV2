@@ -179,7 +179,7 @@
                             @forelse($selectedCustomer->orders as $order)
                                 <div class="customer-recent-order">
                                     <span class="customer-recent-order__icon"><i class="bx {{ $order->type_icon }}" aria-hidden="true"></i></span>
-                                    <span><strong>Pedido #{{ $order->display_folio }}</strong><small>{{ $order->type_label }} · {{ $order->created_at->translatedFormat('d M Y, H:i') }}</small></span>
+                                    <span><strong>Pedido {{ $order->display_folio }}</strong><small>{{ $order->type_label }} · {{ $order->created_at->translatedFormat('d M Y, H:i') }}</small></span>
                                     <span class="customer-recent-order__status customer-recent-order__status--{{ $order->status_color }}">{{ $order->status_label }}</span>
                                 </div>
                             @empty

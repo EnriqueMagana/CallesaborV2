@@ -7,7 +7,9 @@ use App\Models\NotificationPreference;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\DeliveryModulePolicy;
+use App\Services\DeliveryWorkflow;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -54,6 +56,7 @@ class NotificationCenter extends Component
         }
 
         return $this->baseQuery()
+            ->with('subject')
             ->latest()
             ->limit(40)
             ->get();
@@ -138,9 +141,68 @@ class NotificationCenter extends Component
 
     public function openNotification(string $id): void
     {
-        $notification = $this->baseQuery()->whereKey($id)->firstOrFail();
+        $notification = $this->baseQuery()->with('subject')->whereKey($id)->firstOrFail();
+        $this->followNotification($notification);
+    }
+
+    public function actionLabel(AppNotification $notification): ?string
+    {
+        $order = $notification->subject;
+        if (! $order instanceof Order) {
+            return null;
+        }
+
+        $user = auth()->user();
+        if ($notification->event_key === 'delivery.available'
+            && app(DeliveryModulePolicy::class)->enabled()
+            && $user?->canAny(['tomar delivery', 'gestionar delivery'])) {
+            return 'Tomar delivery';
+        }
+
+        if ($order->type === 'mesa' && $order->mesa_id && $user?->can('ver mesas')) {
+            return 'Ir a mesa';
+        }
+
+        return $user?->canAny(['ver ordenes', 'ver pedidos en punto de venta', 'ver delivery'])
+            ? 'Abrir pedido'
+            : null;
+    }
+
+    public function performAction(string $id, DeliveryWorkflow $workflow): void
+    {
+        $notification = $this->baseQuery()->with('subject')->whereKey($id)->firstOrFail();
+        $order = $notification->subject;
+
+        if ($notification->event_key === 'delivery.available'
+            && $order instanceof Order
+            && auth()->user()?->canAny(['tomar delivery', 'gestionar delivery'])) {
+            try {
+                $workflow->assignTo($order, auth()->user());
+            } catch (ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first()
+                    ?? 'El pedido ya no estÃ¡ disponible para asignaciÃ³n.';
+                $this->dispatch('notify', type: 'warning', message: $message);
+
+                return;
+            }
+
+            $notification->update(['read_at' => $notification->read_at ?? now()]);
+            $this->closePanel();
+            unset($this->notifications, $this->unreadCount);
+            $this->redirect(route('app.delivery', ['order' => $order->id], false), navigate: true);
+
+            return;
+        }
+
+        $this->followNotification($notification);
+    }
+
+    private function followNotification(AppNotification $notification): void
+    {
         $notification->update(['read_at' => $notification->read_at ?? now()]);
         $url = $this->destinationFor($notification);
+        $this->closePanel();
+        unset($this->notifications, $this->unreadCount);
 
         if (str_starts_with($url, '/')) {
             $this->redirect($url, navigate: true);

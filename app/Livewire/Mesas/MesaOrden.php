@@ -916,7 +916,7 @@ class MesaOrden extends Component
         $this->showCartDrawer = false;
         unset($this->mesa, $this->cartTotal, $this->cartCount);
 
-        session()->flash('orderSent', "Orden #{$order->id} enviada a cocina.");
+        session()->flash('orderSent', "Orden {$order->display_folio} enviada a cocina.");
     }
 
     // ── Close mesa ──

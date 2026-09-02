@@ -105,7 +105,7 @@
                                     <span class="cash-cut-pending-item__channel is-{{ $pendingChannel[2] }}" aria-hidden="true"><i class="bx {{ $pendingChannel[1] }}"></i></span>
                                     <div class="cash-cut-pending-item__copy">
                                         <div>
-                                            <strong>Orden #{{ $pendingOrder->display_folio }}</strong>
+                                            <strong>Orden {{ $pendingOrder->display_folio }}</strong>
                                             <span class="cash-cut-pending-status">{{ $pendingOrder->status_label }}</span>
                                         </div>
                                         <p>
@@ -361,7 +361,7 @@
                         @forelse($this->orders as $order)
                             @php $cashAmount = $order->payments->where('method', 'efectivo')->sum('amount'); @endphp
                             <article class="cash-cut-order">
-                                <span class="cash-cut-order__number">#{{ $order->display_folio }}</span>
+                                <span class="cash-cut-order__number">{{ $order->display_folio }}</span>
                                 <div class="cash-cut-order__copy"><strong>{{ $order->customer_name ?: 'Anónimo' }}</strong><small>{{ $order->type_label }} · {{ $order->created_at->format('g:i A') }}</small></div>
                                 <div class="cash-cut-order__amount"><strong>${{ number_format($order->total, 2) }}</strong>@if($cashAmount > 0)<small><i class="bx bx-money"></i> Efectivo ${{ number_format($cashAmount, 2) }}</small>@endif</div>
                             </article>

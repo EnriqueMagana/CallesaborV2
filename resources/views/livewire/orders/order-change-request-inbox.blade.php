@@ -89,7 +89,7 @@
                     <tbody>
                         @forelse($this->requests as $request)
                             <tr wire:key="order-request-{{ $request->id }}" class="{{ $selectedRequestId === $request->id ? 'is-selected' : '' }}">
-                                <td data-label="Orden"><strong>#{{ $request->order?->display_folio }}</strong><small>{{ $request->order?->customer?->name ?? $request->order?->customer_name ?? 'Sin cliente' }}</small></td>
+                                <td data-label="Orden"><strong>{{ $request->order?->display_folio }}</strong><small>{{ $request->order?->customer?->name ?? $request->order?->customer_name ?? 'Sin cliente' }}</small></td>
                                 <td data-label="Solicitud"><span class="order-request-type is-{{ $request->type }}"><i class="bx {{ match($request->scope) {'full' => 'bx-x-circle', 'partial' => 'bx-minus-circle', default => 'bx-edit-alt'} }}"></i>{{ $request->type_label }}</span><small>{{ $request->created_at->format('d/m/Y H:i') }}</small></td>
                                 <td data-label="Solicitó">{{ $request->requester?->name }}</td>
                                 <td data-label="Estado"><span class="order-request-status is-{{ $request->status }}"><i class="bx {{ match($request->status) {'approved' => 'bx-check-circle', 'rejected' => 'bx-x-circle', default => 'bx-time-five'} }}"></i>{{ $request->status_label }}</span></td>
@@ -111,7 +111,7 @@
             @if($this->selectedRequest)
                 @php($review = $this->selectedRequest)
                 <header class="orders-review-heading">
-                    <span><small>{{ $review->type_label }}</small><h2 id="request-detail-title">Orden #{{ $review->order?->display_folio }}</h2></span>
+                    <span><small>{{ $review->type_label }}</small><h2 id="request-detail-title">Orden {{ $review->order?->display_folio }}</h2></span>
                     <b class="is-{{ $review->status }}">{{ $review->status_label }}</b>
                 </header>
                 <dl class="orders-review-meta">

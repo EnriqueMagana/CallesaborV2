@@ -42,7 +42,7 @@ class DeliveryModuleTest extends TestCase
 
         Livewire::actingAs($driver)
             ->test(DeliveryBoard::class)
-            ->assertSee('#'.$currentOrder->display_folio)
+            ->assertSee($currentOrder->display_folio)
             ->assertSee('Asignarme')
             ->assertSee('Ver detalles');
     }
@@ -201,10 +201,10 @@ class DeliveryModuleTest extends TestCase
             ->assertSee('$120.00')
             ->assertSee('$80.00')
             ->assertSee('$395.00')
-            ->assertSee('#'.$cashOrder->display_folio)
-            ->assertSee('#'.$transferOrder->display_folio)
-            ->assertSee('#'.$cardOrder->display_folio)
-            ->assertDontSee('#'.$hiddenOrder->display_folio)
+            ->assertSee($cashOrder->display_folio)
+            ->assertSee($transferOrder->display_folio)
+            ->assertSee($cardOrder->display_folio)
+            ->assertDontSee($hiddenOrder->display_folio)
             ->assertSee('Contra entrega siempre se contabiliza como efectivo.')
             ->assertDontSee('Conciliar')
             ->assertDontSee('Cambiar método');

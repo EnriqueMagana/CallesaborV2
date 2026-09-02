@@ -17,7 +17,7 @@
                     class="bx {{ $flowOrder->source === 'kiosk' ? 'bx-desktop' : $flowIcon ?? 'bx-receipt' }}"></i></span>
             <div>
                 <div class="pos-flow-card__eyebrow">
-                    <span>Orden #{{ $flowOrder->display_folio }}</span>
+                    <span>Orden {{ $flowOrder->display_folio }}</span>
                     <span
                         class="pos-source-chip {{ $flowOrder->source === 'kiosk' ? 'is-kiosk' : '' }}">{{ $flowSourceLabel }}</span>
                 </div>
