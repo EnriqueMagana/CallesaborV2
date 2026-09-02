@@ -12,6 +12,7 @@
             @endcan
             @can('crear menu sidebar')
                 <button type="button" class="biz-ghost-button" wire:click="createItem('section')"><i class="bx bx-heading"></i>Nueva sección</button>
+                <button type="button" class="biz-ghost-button" wire:click="createItem('group')"><i class="bx bx-folder-plus"></i>Nuevo grupo</button>
                 <button type="button" class="biz-primary-button" wire:click="createItem('link')"><i class="bx bx-plus"></i>Nuevo elemento</button>
             @endcan
         </div>
@@ -60,7 +61,7 @@
             <x-business.field label="Nombre visible" for="sidebar-label" :error="$errors->first('label')"><input id="sidebar-label" type="text" wire:model.blur="label" placeholder="Ej. Reportes de ventas" maxlength="80"></x-business.field>
             @if($type !== 'section')
                 <x-business.field label="Agrupar dentro de" for="sidebar-parent" hint="Opcional. Los grupos solo pueden estar dentro de una sección." :error="$errors->first('parentId')">
-                    <select id="sidebar-parent" wire:model="parentId"><option value="">Nivel principal</option>@foreach($this->parentOptions as $parent)<option value="{{ $parent->id }}">{{ $parent->type === 'section' ? 'Sección' : 'Grupo' }} · {{ $parent->parent ? $parent->parent->label.' / ' : '' }}{{ $parent->label }}</option>@endforeach</select>
+                    <select id="sidebar-parent" wire:model="parentId"><option value="">{{ $type === 'group' ? 'Selecciona una sección' : 'Nivel principal' }}</option>@foreach($this->parentOptions as $parent)<option value="{{ $parent->id }}">{{ $parent->type === 'section' ? 'Sección' : 'Grupo' }} · {{ $parent->parent ? $parent->parent->label.' / ' : '' }}{{ $parent->label }}</option>@endforeach</select>
                 </x-business.field>
                 @if($editingId)<p class="sidebar-move-hint"><i class="bx bx-move"></i>Cambia este campo para mover el elemento completo, incluyendo sus hijos.</p>@endif
             @endif

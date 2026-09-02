@@ -50,6 +50,17 @@
             </button>
         </li>
         @endcan
+        @can('gestionar roles')
+        <li class="nav-item">
+            <button type="button" role="tab" aria-selected="{{ $activeTab === 'notifications' ? 'true' : 'false' }}"
+                    wire:click="$set('activeTab','notifications')"
+                    class="nav-link {{ $activeTab==='notifications' ? 'active' : '' }}">
+                <span class="roles-tab__icon"><i class="bx bx-bell" aria-hidden="true"></i></span>
+                <span>Notificaciones<small>Avisos por responsabilidad</small></span>
+                <span class="roles-tab__count">{{ count(\App\Support\NotificationEventCatalog::keys()) }}</span>
+            </button>
+        </li>
+        @endcan
         @can('gestionar permisos')
         <li class="nav-item">
             <button type="button" role="tab" aria-selected="{{ $activeTab === 'permissions' ? 'true' : 'false' }}"
@@ -127,6 +138,106 @@
             <strong>Crear nuevo rol</strong>
             <small>Define responsabilidades y permisos</small>
         </button>
+    </div>
+    @endif
+    @endcan
+
+
+    {{-- ================================================================
+         TAB: NOTIFICACIONES POR ROL
+    ================================================================= --}}
+    @can('gestionar roles')
+    @if($activeTab === 'notifications')
+    <div class="roles-toolbar">
+        <div>
+            <span class="roles-toolbar__eyebrow">Matriz de avisos operativos</span>
+            <h2>Notificaciones por rol</h2>
+            <p>Selecciona un rol y define qué eventos recibirá. Sólo se habilitan avisos compatibles con sus permisos.</p>
+        </div>
+    </div>
+
+    <div class="role-notifications-layout">
+        <aside class="role-notifications-roles" aria-label="Roles disponibles">
+            <header><strong>Roles del sistema</strong><small>{{ $this->roles->count() }} disponibles</small></header>
+            <div>
+                @foreach($this->roles as $role)
+                    <button type="button"
+                            class="role-notifications-role {{ $notificationRoleId === $role->id ? 'is-active' : '' }}"
+                            wire:click="selectNotificationRole({{ $role->id }})"
+                            wire:key="notification-role-{{ $role->id }}"
+                            aria-pressed="{{ $notificationRoleId === $role->id ? 'true' : 'false' }}">
+                        <span><i class="bx bx-user" aria-hidden="true"></i></span>
+                        <span><strong>{{ str($role->name)->replace('-', ' ')->title() }}</strong><small>{{ $role->users_count }} usuario(s) · {{ $role->permissions_count }} permisos</small></span>
+                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                    </button>
+                @endforeach
+            </div>
+        </aside>
+
+        <section class="role-notifications-editor" aria-live="polite">
+            @if($this->notificationRole)
+                <form wire:submit="saveRoleNotifications">
+                    <header class="role-notifications-editor__header">
+                        <span class="roles-role-card__icon bg-label-primary"><i class="bx bx-bell" aria-hidden="true"></i></span>
+                        <div>
+                            <span class="roles-toolbar__eyebrow">Configurando</span>
+                            <h3>{{ str($this->notificationRole->name)->replace('-', ' ')->title() }}</h3>
+                            <p>{{ $notificationRoleConfigured ? 'Configuración personalizada activa.' : 'Sin configurar: conserva el comportamiento automático actual hasta que guardes.' }}</p>
+                        </div>
+                        <span class="role-notifications-status {{ $notificationRoleConfigured ? 'is-custom' : '' }}">
+                            <i class="bx {{ $notificationRoleConfigured ? 'bx-slider-alt' : 'bx-history' }}" aria-hidden="true"></i>
+                            {{ $notificationRoleConfigured ? 'Personalizado' : 'Automático' }}
+                        </span>
+                    </header>
+
+                    <div class="role-notifications-groups">
+                        @foreach($this->notificationEventGroups as $group)
+                            <fieldset class="role-notification-group">
+                                <legend><i class="bx {{ $group['icon'] }}" aria-hidden="true"></i><span><strong>{{ $group['label'] }}</strong><small>{{ $group['description'] }}</small></span></legend>
+                                <div>
+                                    @foreach($group['events'] as $eventKey => $event)
+                                        @php
+                                            $compatible = $this->roleSupportsEvent($this->notificationRole, $eventKey);
+                                        @endphp
+                                        <label class="role-notification-event {{ $compatible ? '' : 'is-disabled' }}">
+                                            <input type="checkbox" wire:model="roleNotificationEvents" value="{{ $eventKey }}" @disabled(!$compatible)>
+                                            <span class="role-notification-event__icon"><i class="bx {{ $event['icon'] }}" aria-hidden="true"></i></span>
+                                            <span class="role-notification-event__copy">
+                                                <strong>{{ $event['label'] }}</strong>
+                                                <small>{{ $event['description'] }}</small>
+                                                @if(!$compatible)
+                                                    <em><i class="bx bx-lock-alt" aria-hidden="true"></i>Requiere alguno: {{ implode(', ', $event['permissions']) }}</em>
+                                                @endif
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </fieldset>
+                        @endforeach
+                    </div>
+
+                    @error('roleNotificationEvents')<p class="role-notifications-error" role="alert">{{ $message }}</p>@enderror
+                    <footer class="role-notifications-actions">
+                        <p><i class="bx bx-info-circle" aria-hidden="true"></i>Los cambios se envían juntos al guardar; marcar opciones no genera peticiones.</p>
+                        <div>
+                            @if($notificationRoleConfigured)
+                                <button type="button" class="btn btn-outline-secondary" wire:click="restoreAutomaticRoleNotifications" wire:loading.attr="disabled">Restaurar automático</button>
+                            @endif
+                            <button type="submit" class="roles-primary-action" wire:loading.attr="disabled" wire:target="saveRoleNotifications">
+                                <span wire:loading.remove wire:target="saveRoleNotifications"><i class="bx bx-save" aria-hidden="true"></i>Guardar notificaciones</span>
+                                <span wire:loading wire:target="saveRoleNotifications">Guardando…</span>
+                            </button>
+                        </div>
+                    </footer>
+                </form>
+            @else
+                <div class="role-notifications-empty">
+                    <span><i class="bx bx-bell" aria-hidden="true"></i></span>
+                    <h3>Selecciona un rol</h3>
+                    <p>Verás todos los tipos de notificación y cuáles puede recibir según sus permisos efectivos.</p>
+                </div>
+            @endif
+        </section>
     </div>
     @endif
     @endcan

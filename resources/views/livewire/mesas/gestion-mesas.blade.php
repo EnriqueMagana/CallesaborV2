@@ -37,7 +37,7 @@
             $canDeleteMesas = $canLegacyManageMesas || $mesaUser?->can('eliminar mesas');
             $canChangeMesaStatus = $canLegacyManageMesas || $mesaUser?->can('cambiar estado mesas');
             $canManageGroups = $canLegacyManageMesas || $mesaUser?->can('gestionar grupos');
-            $canViewAllMesas = $canLegacyManageMesas || $mesaUser?->can('ver todas las mesas');
+            $canViewAllMesas = $mesaUser?->can('ver todas las mesas');
         @endphp
 
         {{-- Flash --}}

@@ -12,6 +12,8 @@ class NotificationPreference extends Model
         'order_ready' => true,
         'order_cancelled' => true,
         'order_paid' => true,
+        'order_cancellation_requested' => true,
+        'order_modification_requested' => true,
         'delivery_available' => true,
         'delivery_assigned' => true,
         'delivery_picked_up' => true,
