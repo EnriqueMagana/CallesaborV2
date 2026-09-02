@@ -31,7 +31,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'cobrar pedidos en punto de venta',
                 'convertir pedidos a delivery en punto de venta',
             ],
-            'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos'],
+            'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos', 'gestionar notificaciones por rol'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion', 'gestionar menu digital'],
             'promociones' => ['ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones'],

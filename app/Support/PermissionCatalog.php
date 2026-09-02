@@ -50,6 +50,7 @@ final class PermissionCatalog
                 'bloquear usuarios' => 'Permite bloquear o reactivar el acceso de una cuenta sin eliminarla.',
                 'gestionar roles' => 'Permite crear, editar y eliminar roles, y cambiar el conjunto de permisos asignado a cada rol.',
                 'gestionar permisos' => 'Permite crear, editar y eliminar permisos del catálogo global; puede cambiar las capacidades disponibles para todos los roles.',
+                'gestionar notificaciones por rol' => 'Permite abrir el módulo independiente de notificaciones por rol y decidir qué avisos operativos recibe cada responsabilidad; no permite editar roles ni permisos.',
             ],
             'clientes' => [
                 'ver clientes' => 'Permite consultar el directorio, historial y datos de contacto de los clientes.',

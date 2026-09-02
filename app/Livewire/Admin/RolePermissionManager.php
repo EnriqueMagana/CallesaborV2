@@ -2,10 +2,7 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\RoleNotificationSetting;
-use App\Support\NotificationEventCatalog;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -22,19 +19,12 @@ class RolePermissionManager extends Component
             403
         );
 
-        if (request()->routeIs('app.notificaciones-roles')) {
-            abort_unless(auth()->user()?->can('gestionar roles'), 403);
-            $this->activeTab = 'notifications';
-
-            return;
-        }
-
         if (! auth()->user()?->can('gestionar roles')) {
             $this->activeTab = 'permissions';
         }
     }
 
-    // ── Vista activa: 'roles' | 'notifications' | 'permissions' ───────
+    // ── Vista activa: 'roles' | 'permissions' ─────────────────────────
     public string $activeTab = 'roles';
 
     // ── Panel de rol ──────────────────────────────────────────────────
@@ -47,12 +37,6 @@ class RolePermissionManager extends Component
     public string $roleName = '';
 
     public array $rolePermissions = [];  // permisos del rol en edición
-
-    public ?int $notificationRoleId = null;
-
-    public array $roleNotificationEvents = [];
-
-    public bool $notificationRoleConfigured = false;
 
     // ── Panel de permiso ──────────────────────────────────────────────
     public ?int $permPanel = null;
@@ -108,20 +92,6 @@ class RolePermissionManager extends Component
             ->get()
             ->groupBy(fn (Permission $permission): string => $permission->group ?: 'sin_modulo')
             ->sortBy(fn ($permissions, string $group): int => $order[$group] ?? 999);
-    }
-
-    #[Computed]
-    public function notificationEventGroups(): array
-    {
-        return NotificationEventCatalog::definitions();
-    }
-
-    #[Computed]
-    public function notificationRole(): ?Role
-    {
-        return $this->notificationRoleId
-            ? Role::with(['permissions', 'users'])->find($this->notificationRoleId)
-            : null;
     }
 
     // ── Roles: acciones ───────────────────────────────────────────────
@@ -201,68 +171,6 @@ class RolePermissionManager extends Component
 
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
         $this->closeRolePanel();
-    }
-
-    public function selectNotificationRole(int $id): void
-    {
-        $this->authorizePermission('gestionar roles');
-        $role = Role::findOrFail($id);
-        $setting = RoleNotificationSetting::query()->where('role_id', $role->id)->first();
-
-        $this->notificationRoleId = $role->id;
-        $this->roleNotificationEvents = $setting?->event_keys ?? [];
-        $this->notificationRoleConfigured = $setting !== null;
-        $this->resetValidation('roleNotificationEvents');
-        unset($this->notificationRole);
-    }
-
-    public function saveRoleNotifications(): void
-    {
-        $this->authorizePermission('gestionar roles');
-        $role = Role::with('permissions')->findOrFail($this->notificationRoleId);
-        $selected = collect($this->roleNotificationEvents)
-            ->filter(fn ($eventKey): bool => is_string($eventKey))
-            ->unique()
-            ->values();
-        $unknown = $selected->diff(NotificationEventCatalog::keys());
-        $incompatible = $selected->reject(fn (string $eventKey): bool => $this->roleSupportsEvent($role, $eventKey));
-
-        if ($unknown->isNotEmpty() || $incompatible->isNotEmpty()) {
-            throw ValidationException::withMessages([
-                'roleNotificationEvents' => 'El rol no tiene los permisos necesarios para una o más notificaciones seleccionadas.',
-            ]);
-        }
-
-        RoleNotificationSetting::query()->updateOrCreate(
-            ['role_id' => $role->id],
-            ['event_keys' => $selected->all(), 'updated_by' => auth()->id()]
-        );
-
-        $this->roleNotificationEvents = $selected->all();
-        $this->notificationRoleConfigured = true;
-        unset($this->notificationRole);
-        $this->dispatch('notify', type: 'success', message: "Notificaciones de {$role->name} actualizadas.");
-    }
-
-    public function restoreAutomaticRoleNotifications(): void
-    {
-        $this->authorizePermission('gestionar roles');
-        RoleNotificationSetting::query()->where('role_id', $this->notificationRoleId)->delete();
-        $this->roleNotificationEvents = [];
-        $this->notificationRoleConfigured = false;
-        unset($this->notificationRole);
-        $this->dispatch('notify', type: 'info', message: 'El rol volvió al comportamiento automático anterior.');
-    }
-
-    public function roleSupportsEvent(Role $role, string $eventKey): bool
-    {
-        if (in_array($role->name, ['owner', 'super-admin'], true)) {
-            return true;
-        }
-
-        $permissions = NotificationEventCatalog::get($eventKey)['permissions'] ?? [];
-
-        return $permissions === [] || $role->hasAnyPermission($permissions);
     }
 
     public function confirmDeleteRole(int $id): void

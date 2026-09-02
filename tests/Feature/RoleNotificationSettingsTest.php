@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Admin\RoleNotificationManager;
 use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Profile\NotificationPreferencesForm;
 use App\Models\NotificationPreference;
@@ -77,7 +78,7 @@ class RoleNotificationSettingsTest extends TestCase
         $role = Role::create(['name' => 'consulta-basica', 'guard_name' => 'web']);
 
         Livewire::actingAs($owner)
-            ->test(RolePermissionManager::class)
+            ->test(RoleNotificationManager::class)
             ->call('selectNotificationRole', $role->id)
             ->set('roleNotificationEvents', ['delivery.available'])
             ->call('saveRoleNotifications')
@@ -93,8 +94,7 @@ class RoleNotificationSettingsTest extends TestCase
         $role = Role::create(['name' => 'capitan-de-piso', 'guard_name' => 'web']);
 
         Livewire::actingAs($owner)
-            ->test(RolePermissionManager::class)
-            ->set('activeTab', 'notifications')
+            ->test(RoleNotificationManager::class)
             ->call('selectNotificationRole', $role->id)
             ->assertSee('Capitan De Piso')
             ->assertSee('Nuevo pedido de mesa')
@@ -112,7 +112,7 @@ class RoleNotificationSettingsTest extends TestCase
             ->get(route('app.notificaciones-roles'))
             ->assertOk()
             ->assertSee('Notificaciones por rol')
-            ->assertSee('Matriz de avisos operativos')
+            ->assertSee('Administración · Comunicaciones')
             ->assertSee('Roles del sistema');
 
         $unauthorized = User::factory()->create();
@@ -120,6 +120,17 @@ class RoleNotificationSettingsTest extends TestCase
         $this->actingAs($unauthorized)
             ->get(route('app.notificaciones-roles'))
             ->assertForbidden();
+    }
+
+    public function test_role_and_permission_module_no_longer_contains_notification_configuration(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)
+            ->test(RolePermissionManager::class)
+            ->assertDontSee('Avisos por responsabilidad')
+            ->assertDontSee('Guardar notificaciones');
     }
 
     public function test_role_can_receive_table_ready_without_receiving_counter_ready(): void
