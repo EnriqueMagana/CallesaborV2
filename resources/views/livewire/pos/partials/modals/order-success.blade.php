@@ -7,7 +7,7 @@
             </div>
             <h4 data-ui="xui-impet3">¡Pedido creado!</h4>
             <p data-ui="xui-1mfwfnd">
-                Orden #{{ $lastOrderFolio ?: $lastOrderId }}
+                Orden ORD-{{ str_pad((string) ($lastOrderFolio ?: $lastOrderId), 3, '0', STR_PAD_LEFT) }}
                 @if($lastOrderType === 'pick_up') · Para recoger
                 @elseif($lastOrderType === 'delivery') · Delivery
                 @else · Ventanilla @endif

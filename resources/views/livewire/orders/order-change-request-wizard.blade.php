@@ -4,7 +4,7 @@
             <i class="bx bx-left-arrow-alt" aria-hidden="true"></i><span>Salir</span>
         </a>
         <div>
-            <p class="orders-eyebrow">Orden #{{ $order->display_folio }}</p>
+            <p class="orders-eyebrow">Orden {{ $order->display_folio }}</p>
             <h1 id="wizard-title">Solicitar un cambio</h1>
             <p>La orden permanecerá sin cambios hasta recibir autorización.</p>
         </div>
@@ -167,7 +167,7 @@
         </section>
 
         <aside class="order-wizard-order" aria-label="Resumen de la orden">
-            <header><span><small>Orden seleccionada</small><strong>#{{ $order->display_folio }}</strong></span><b class="orders-status orders-status--{{ $order->status_color }}"><i></i>{{ $order->status_label }}</b></header>
+            <header><span><small>Orden seleccionada</small><strong>{{ $order->display_folio }}</strong></span><b class="orders-status orders-status--{{ $order->status_color }}"><i></i>{{ $order->status_label }}</b></header>
             <dl><div><dt>Cliente</dt><dd>{{ $order->customer?->name ?? $order->customer_name ?? 'Sin cliente' }}</dd></div><div><dt>Canal</dt><dd>{{ $order->type_label }}</dd></div><div><dt>Artículos</dt><dd>{{ $order->items->sum('quantity') }}</dd></div><div><dt>Total</dt><dd>${{ number_format($order->total, 2) }}</dd></div></dl>
             <div class="order-wizard-order__items">@foreach($order->items as $item)<p><span>{{ $item->quantity }} × {{ $item->product_name }}</span><b>${{ number_format($item->subtotal, 2) }}</b></p>@endforeach</div>
             @if($this->isPaidOrder)

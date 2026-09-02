@@ -44,7 +44,7 @@
             <span class="delivery-bank-card__icon"><i class="bx bx-package" aria-hidden="true"></i></span>
             <div>
                 <span class="delivery-bank-card__eyebrow">Pedido</span>
-                <strong id="delivery-order-title-{{ $order->id }}">#{{ $order->display_folio }}</strong>
+                <strong id="delivery-order-title-{{ $order->id }}">{{ $order->display_folio }}</strong>
                 <time datetime="{{ $order->created_at->toIso8601String() }}">{{ $order->created_at->format('H:i') }}</time>
             </div>
         </div>

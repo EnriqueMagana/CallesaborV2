@@ -71,11 +71,21 @@ class OrderList extends Component
             ->when($register, fn ($q) => $q->where('cash_register_id', $register->id))
             ->when(! $register, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($this->search, function ($q): void {
-                $q->where(function ($q): void {
-                    $q->where('id', 'like', "%{$this->search}%")
-                        ->orWhere('customer_name', 'like', "%{$this->search}%")
-                        ->orWhere('customer_phone', 'like', "%{$this->search}%")
-                        ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$this->search}%"));
+                $rawSearch = trim($this->search);
+                $hasFolioPrefix = preg_match('/^#?ORD-/i', $rawSearch) === 1;
+                $folioSearch = preg_replace('/^#?ORD-/i', '', $rawSearch);
+                $folioSearch = ctype_digit((string) $folioSearch)
+                    ? (string) max(0, (int) $folioSearch)
+                    : null;
+
+                $q->where(function ($q) use ($rawSearch, $folioSearch, $hasFolioPrefix): void {
+                    $q->where('id', 'like', "%{$rawSearch}%")
+                        ->when($folioSearch !== null, fn ($query) => $hasFolioPrefix
+                            ? $query->orWhere('folio', (int) $folioSearch)
+                            : $query->orWhere('folio', 'like', "%{$folioSearch}%"))
+                        ->orWhere('customer_name', 'like', "%{$rawSearch}%")
+                        ->orWhere('customer_phone', 'like', "%{$rawSearch}%")
+                        ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$rawSearch}%"));
                 });
             })
             ->when($this->statusFilter, fn ($q) => $q->where('status', $this->statusFilter))

@@ -30,7 +30,7 @@
     <section class="kiosk-tracking-card">
         <div
             class="kiosk-tracking-hero {{ $effectiveStatus === 'cancelada' ? 'is-cancelled' : '' }} {{ $isDelivery ? 'is-delivery' : '' }}">
-            <span class="kiosk-eyebrow">Pedido #{{ $order->display_folio }}</span>
+            <span class="kiosk-eyebrow">Pedido {{ $order->display_folio }}</span>
             @if ($effectiveStatus === 'cancelada')
                 <div class="kiosk-tracking-icon"><i class="bx bx-x"></i></div>
                 <h1>Pedido cancelado</h1>

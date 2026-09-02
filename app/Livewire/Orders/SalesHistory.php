@@ -56,10 +56,18 @@ class SalesHistory extends Component
             ->when($this->dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $this->dateFrom))
             ->when($this->dateTo, fn ($q) => $q->whereDate('created_at', '<=', $this->dateTo))
             ->when($this->search, function ($q) {
-                $term = '%'.$this->search.'%';
-                $q->where(function ($inner) use ($term) {
+                $rawSearch = trim($this->search);
+                $term = '%'.$rawSearch.'%';
+                $hasFolioPrefix = preg_match('/^#?ORD-/i', $rawSearch) === 1;
+                $folioSearch = preg_replace('/^#?ORD-/i', '', $rawSearch);
+                $folioSearch = ctype_digit((string) $folioSearch)
+                    ? (string) max(0, (int) $folioSearch)
+                    : null;
+                $q->where(function ($inner) use ($term, $folioSearch, $hasFolioPrefix) {
                     $inner->where('id', 'like', $term)
-                        ->orWhere('folio', 'like', $term)
+                        ->when($folioSearch !== null, fn ($query) => $hasFolioPrefix
+                            ? $query->orWhere('folio', (int) $folioSearch)
+                            : $query->orWhere('folio', 'like', '%'.$folioSearch.'%'))
                         ->orWhere('customer_name', 'like', $term)
                         ->orWhere('customer_phone', 'like', $term)
                         ->orWhereHas('seller', fn ($seller) => $seller->where('name', 'like', $term))

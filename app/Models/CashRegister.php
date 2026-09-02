@@ -13,6 +13,7 @@ class CashRegister extends Model
         'initial_amount', 'final_amount',
         'declared_amount', 'difference_amount',
         'opened_at', 'closed_at', 'is_open', 'notes', 'closing_notes',
+        'next_order_folio',
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class CashRegister extends Model
         'is_open' => 'boolean',
         'opened_at' => 'datetime',
         'closed_at' => 'datetime',
+        'next_order_folio' => 'integer',
     ];
 
     public function opener(): BelongsTo

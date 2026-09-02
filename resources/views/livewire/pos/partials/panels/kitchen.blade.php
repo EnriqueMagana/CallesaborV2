@@ -53,7 +53,7 @@
                                     @endif
                                 </div>
                                 <div data-ui="xui-1j28yn7">
-                                    Orden #{{ $order->display_folio }}
+                                    Orden {{ $order->display_folio }}
                                     @if($order->source === 'kiosk' && $order->customer_name)
                                         · {{ $order->customer_name }}
                                     @elseif($order->mesa?->area)

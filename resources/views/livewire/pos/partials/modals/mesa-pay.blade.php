@@ -62,7 +62,7 @@
                     @foreach($mpOrders as $order)
                         <div data-ui="xui-bhmr11">
                             <div data-ui="xui-yfsx9h">
-                                Orden #{{ $order->display_folio }}
+                                Orden {{ $order->display_folio }}
                             </div>
                             @foreach($order->items as $item)
                                 <div data-ui="xui-1wennv6">

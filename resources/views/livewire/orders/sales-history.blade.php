@@ -36,7 +36,7 @@
             @php $statusClass = match($order->status){'pagada'=>'success','cancelada'=>'danger','lista'=>'success','en_preparacion'=>'info',default=>'warning'}; @endphp
             <article class="sales-history-row {{ $expandedOrderId === $order->id ? 'is-expanded' : '' }}" wire:key="sales-history-{{ $order->id }}">
                 <button type="button" class="sales-history-row__main" wire:click="toggleOrder({{ $order->id }})" aria-expanded="{{ $expandedOrderId === $order->id ? 'true' : 'false' }}">
-                    <span class="sales-history-row__folio">#{{ $order->display_folio }}<small>ID {{ $order->id }}</small></span>
+                    <span class="sales-history-row__folio">{{ $order->display_folio }}<small>ID {{ $order->id }}</small></span>
                     <span class="sales-history-row__identity"><strong>{{ $order->display_name }}</strong><small>{{ $order->type_label }} · {{ $order->created_at->format('d/m/Y H:i') }}</small></span>
                     <span class="sales-history-row__cell"><small>Caja</small><strong>{{ $order->cashRegister?->name ?? '—' }}</strong></span>
                     <span class="sales-history-row__cell"><small>Atendió</small><strong>{{ $order->seller?->name ?? '—' }}</strong></span>

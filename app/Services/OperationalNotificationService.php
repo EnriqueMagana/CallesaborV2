@@ -84,7 +84,7 @@ class OperationalNotificationService
 
         $recipients = $this->usersByRoles(self::SUPERVISORS)->push($assignment->driver)->unique('id');
         $this->send('delivery.assigned', 'delivery', 'high', $assignment->order, $recipients,
-            'Delivery asignado', "Pedido #{$assignment->order->display_folio} asignado a {$assignment->driver->name}.",
+            'Delivery asignado', "Pedido {$assignment->order->display_folio} asignado a {$assignment->driver->name}.",
             $this->urlFor($assignment->order), 'delivery', 'assignment-'.$assignment->id);
     }
 
@@ -103,7 +103,7 @@ class OperationalNotificationService
             subject: $request,
             recipients: $this->usersByRoles(['owner', 'super-admin']),
             title: 'Solicitud: '.$request->type_label,
-            message: "Pedido #{$request->order->display_folio} · {$request->requester?->name}: {$request->reason}",
+            message: "Pedido {$request->order->display_folio} · {$request->requester?->name}: {$request->reason}",
             url: route('app.solicitudes-ordenes', ['request' => $request->id], false),
             sound: $isCancellation ? 'alert' : 'order',
             dedupeSuffix: 'requested'
@@ -292,7 +292,7 @@ class OperationalNotificationService
             ? $order->mesa->display_name
             : $order->type_label;
 
-        return "{$label} · Pedido #{$order->display_folio}";
+        return "{$label} · Pedido {$order->display_folio}";
     }
 
     private function urlFor(Order $order): string

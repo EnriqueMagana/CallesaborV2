@@ -326,7 +326,7 @@
                                             @php($order = $row['order'])
                                             <tr>
                                                 <td data-label="Nota">
-                                                    <strong>#{{ $order->display_folio }}</strong>
+                                                    <strong>{{ $order->display_folio }}</strong>
                                                     <small>{{ $order->display_name }}</small>
                                                 </td>
                                                 <td data-label="Entrega">

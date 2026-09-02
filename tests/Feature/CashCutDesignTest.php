@@ -92,8 +92,8 @@ class CashCutDesignTest extends TestCase
 
         Livewire::test(CorteDeCaja::class)
             ->set('declaredCash', '500.00')
-            ->assertSee("Orden #{$counter->display_folio}")
-            ->assertSee("Orden #{$kiosk->display_folio}")
+            ->assertSee("Orden {$counter->display_folio}")
+            ->assertSee("Orden {$kiosk->display_folio}")
             ->assertSee('Pedidos de kiosco')
             ->assertSee('$277.50 pendientes de conciliación')
             ->call('confirmCut')
@@ -129,7 +129,7 @@ class CashCutDesignTest extends TestCase
         $component = Livewire::test(CorteDeCaja::class)
             ->set('declaredCash', '500.00')
             ->assertSee('Mesa 7')
-            ->assertSee("Orden #{$tableOrder->display_folio}")
+            ->assertSee("Orden {$tableOrder->display_folio}")
             ->assertSee('Pedidos de mesa')
             ->assertSee('Mesas pendientes de liberar')
             ->call('confirmCut')
@@ -199,7 +199,7 @@ class CashCutDesignTest extends TestCase
         Livewire::test(CorteDeCaja::class)
             ->set('declaredCash', '500.00')
             ->assertSee('Delivery sin asignar')
-            ->assertSee("Orden #{$delivery->display_folio}")
+            ->assertSee("Orden {$delivery->display_folio}")
             ->call('confirmCut')
             ->assertHasErrors(['cutBlockers']);
     }

@@ -15,7 +15,7 @@
             <h4 id="pickup-pay-modal-title">Cobrar pedido listo</h4>
             <div data-ui="xui-17xfp9b">
                 @if($ppo)
-                    <span data-ui="xui-y4gxmi">Pedido #{{ $ppo->display_folio }}</span>
+                    <span data-ui="xui-y4gxmi">Pedido {{ $ppo->display_folio }}</span>
                 @endif
                 <button type="button" class="pos-btn pos-btn-ghost" data-ui="xui-1a0g5qw" wire:click="closePickupPayModal" aria-label="Cerrar">
                     <i class="bx bx-x" data-ui="xui-miwya2"></i>

@@ -2708,7 +2708,7 @@ class PointOfSale extends Component
 
         $this->closeConvertDeliveryModal();
         unset($this->pickupOrders, $this->deliveryOrders, $this->recentOrders);
-        $this->dispatch('notify', type: 'success', message: "Pedido #{$order->id} enviado a Delivery.");
+        $this->dispatch('notify', type: 'success', message: "Pedido {$order->display_folio} enviado a Delivery.");
     }
 
     public function openPickupPayModal(int $orderId): void
@@ -3781,8 +3781,8 @@ HTML;
             $this->tableWorkspaceCounts,
         );
         $message = $mesaWasReleased
-            ? "Orden #{$order->id} cobrada. Era la última nota y la mesa quedó disponible."
-            : "Orden #{$order->id} cobrada.";
+            ? "Orden {$order->display_folio} cobrada. Era la última nota y la mesa quedó disponible."
+            : "Orden {$order->display_folio} cobrada.";
         $this->dispatch('notify', type: 'success', message: $message);
 
         // La primera impresión forma parte del cobro y no es una reimpresión.
@@ -3900,8 +3900,8 @@ HTML;
         }
 
         $message = $nextStatus === 'en_preparacion'
-            ? "Orden #{$order->id} enviada a cocina."
-            : "Orden #{$order->id} marcada como lista.";
+            ? "Orden {$order->display_folio} enviada a cocina."
+            : "Orden {$order->display_folio} marcada como lista.";
         $this->dispatch('notify', type: 'success', message: $message);
     }
 
@@ -4114,7 +4114,7 @@ HTML;
 </head>
 <body>
   <h2>{$appName}</h2>
-  <div class="center small">Pedido #{$order->id} &mdash; {$typeLabel}</div>
+  <div class="center small">Pedido {$order->display_folio} &mdash; {$typeLabel}</div>
   <div class="center small">{$now}</div>
   {$customerHtml}
   <hr>
@@ -4201,7 +4201,7 @@ HTML;
             $sections .= <<<SECTION
 <div class="ticket">
   <h2>{$appName}</h2>
-  <div class="center small">Pedido #{$order->id} &mdash; {$typeLabel}</div>
+  <div class="center small">Pedido {$order->display_folio} &mdash; {$typeLabel}</div>
   <div class="center small">{$now}</div>
   {$customerLine}
   <hr>
@@ -4520,7 +4520,7 @@ HTML;
         $this->saveCart();
         $this->resetOrderForm();
         unset($this->cartTotal, $this->cartCount, $this->activeCashRegister, $this->recentOrders);
-        $this->dispatch('notify', type: 'success', message: "Orden #{$order->id} creada.");
+        $this->dispatch('notify', type: 'success', message: "Orden {$order->display_folio} creada.");
 
         if ($openTicket) {
             $order->loadMissing([

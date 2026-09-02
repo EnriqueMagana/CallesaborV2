@@ -12,7 +12,7 @@
         </a>
         <div>
             <h4 class="fw-bold mb-0">
-                <i class="bx bx-receipt me-2 text-primary"></i>Orden #{{ $order->id }}
+                <i class="bx bx-receipt me-2 text-primary"></i>Orden {{ $order->display_folio }}
             </h4>
             <span class="badge bg-label-{{ $order->status_color }} mt-1">{{ $order->status_label }}</span>
         </div>

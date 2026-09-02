@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class Order extends Model
@@ -35,13 +36,26 @@ class Order extends Model
         static::creating(function (Order $order): void {
             $order->public_token ??= Str::random(64);
 
-            if ($order->folio || ! $order->cash_register_id) {
+            if (! $order->cash_register_id) {
                 return;
             }
 
-            $order->folio = ((int) static::query()
-                ->where('cash_register_id', $order->cash_register_id)
-                ->max('folio')) + 1;
+            DB::transaction(function () use ($order): void {
+                $register = CashRegister::query()->lockForUpdate()->findOrFail($order->cash_register_id);
+                $next = max(
+                    (int) ($register->next_order_folio ?: 1),
+                    ((int) static::query()->where('cash_register_id', $register->id)->max('folio')) + 1,
+                );
+
+                if ($order->folio) {
+                    $register->updateQuietly(['next_order_folio' => max($next, ((int) $order->folio) + 1)]);
+
+                    return;
+                }
+
+                $order->folio = $next;
+                $register->updateQuietly(['next_order_folio' => $next + 1]);
+            });
         });
     }
 
@@ -135,7 +149,7 @@ class Order extends Model
 
     public function getDisplayFolioAttribute(): string
     {
-        return (string) ($this->folio ?: $this->id);
+        return 'ORD-'.str_pad((string) ($this->folio ?: $this->id), 3, '0', STR_PAD_LEFT);
     }
 
     public function getStatusColorAttribute(): string

@@ -17,7 +17,7 @@
 <tr wire:key="order-row-{{ $order->id }}">
     <td class="orders-col--primary">
         <a href="{{ route('app.ordenes.show', $order) }}" class="orders-order-link">
-            <span>#{{ $order->display_folio }}</span>
+            <span>{{ $order->display_folio }}</span>
             <i class="bx bx-chevron-right" aria-hidden="true"></i>
         </a>
         <strong class="orders-customer-name">{{ $order->display_name }}</strong>

@@ -649,7 +649,7 @@ class KioskPosWorkflowTest extends TestCase
             ->assertSee('1 subcuenta pendiente')
             ->assertSee('Subcuenta restante sin consumo')
             ->assertDontSee('$375.00')
-            ->assertDontSee('Orden #'.$order->display_folio);
+            ->assertDontSee('Orden '.$order->display_folio);
 
         $pos->call('discardEmptyMesaAccount', $mesa->id)
             ->assertDispatched('mesa-payment-completed', mesaId: $mesa->id, released: true)

@@ -216,7 +216,7 @@ class OrderChangeRequestService
             'type' => 'expense',
             'amount' => $cashAmount,
             'category' => 'reembolso_orden',
-            'description' => "Reembolso de orden #{$order->display_folio}",
+            'description' => "Reembolso de orden {$order->display_folio}",
             'payment_method' => 'cash',
             'notes' => "Solicitud #{$request->id}: {$request->reason}",
         ]);

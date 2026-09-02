@@ -66,7 +66,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->assertSee('Grupo Terraza')
             ->assertSee('Mesa 1')
             ->assertSee('Mesa 2')
-            ->assertSee('Orden #101')
+            ->assertSee('Orden ORD-101')
             ->assertSee($service->opened_at->format('g:i A'))
             ->assertSee('18min activa')
             ->assertSee('Reimprimir cocina')

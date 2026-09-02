@@ -83,7 +83,7 @@
                     <article class="pos-reprint-order-card" wire:key="reprint-order-{{ $ro->id }}" role="listitem">
                         <div class="pos-reprint-order-card__identity">
                             <span><i class="bx {{ $reprintType === 'delivery' ? 'bx-cycling' : 'bx-store-alt' }}"></i></span>
-                            <div><strong>Orden #{{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ $ro->created_at->format('H:i') }}</small><b>${{ number_format($ro->total, 2) }}</b></div>
+                            <div><strong>Orden {{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ $ro->created_at->format('H:i') }}</small><b>${{ number_format($ro->total, 2) }}</b></div>
                         </div>
                         <div class="pos-reprint-actions">
                             <button type="button" wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-secondary"><i class="bx bx-receipt"></i>Cliente</button>

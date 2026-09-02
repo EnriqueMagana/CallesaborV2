@@ -19,7 +19,7 @@
         <header class="delivery-detail__header">
             <div>
                 <span id="delivery-detail-description">Detalle de entrega</span>
-                <h2 id="delivery-detail-title">Pedido #{{ $order->display_folio }}</h2>
+                <h2 id="delivery-detail-title">Pedido {{ $order->display_folio }}</h2>
             </div>
             <button x-ref="closeButton" type="button" class="delivery-icon-btn" wire:click="closeOrder"
                 aria-label="Cerrar detalle"><i class="bx bx-x" aria-hidden="true"></i></button>

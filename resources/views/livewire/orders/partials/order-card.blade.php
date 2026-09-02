@@ -14,7 +14,7 @@
 @endphp
 <article class="orders-mobile-card" wire:key="order-card-{{ $order->id }}">
     <header>
-        <span><small>Orden</small><strong>#{{ $order->display_folio }}</strong></span>
+        <span><small>Orden</small><strong>{{ $order->display_folio }}</strong></span>
         <span class="orders-status orders-status--{{ $statusClass }}"><i aria-hidden="true"></i>{{ $order->status_label }}</span>
     </header>
     <div class="orders-mobile-card__customer">
