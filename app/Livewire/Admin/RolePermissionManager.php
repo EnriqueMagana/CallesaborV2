@@ -36,7 +36,24 @@ class RolePermissionManager extends Component
 
     public string $roleName = '';
 
+    public string $roleIcon = 'bx-user';
+
     public array $rolePermissions = [];  // permisos del rol en edición
+
+    public array $roleIconOptions = [
+        'bx-user' => 'Persona',
+        'bx-shield' => 'Seguridad',
+        'bx-crown' => 'Dirección',
+        'bx-briefcase' => 'Gerencia',
+        'bx-money' => 'Caja',
+        'bx-store' => 'Ventanilla',
+        'bx-dish' => 'Servicio de mesa',
+        'bx-restaurant' => 'Cocina',
+        'bx-cycling' => 'Reparto',
+        'bx-headphone' => 'Atención',
+        'bx-package' => 'Inventario',
+        'bx-bar-chart-alt-2' => 'Supervisión',
+    ];
 
     // ── Panel de permiso ──────────────────────────────────────────────
     public ?int $permPanel = null;
@@ -107,7 +124,7 @@ class RolePermissionManager extends Component
 
     public function closeRolePanel(): void
     {
-        $this->reset('rolePanel', 'selectedRole', 'showRoleForm', 'roleName', 'rolePermissions');
+        $this->reset('rolePanel', 'selectedRole', 'showRoleForm', 'roleName', 'roleIcon', 'rolePermissions');
     }
 
     public function openCreateRole(): void
@@ -116,6 +133,7 @@ class RolePermissionManager extends Component
         $this->rolePanel = null;
         $this->selectedRole = null;
         $this->roleName = '';
+        $this->roleIcon = 'bx-user';
         $this->rolePermissions = [];
         $this->showRoleForm = true;
     }
@@ -125,6 +143,7 @@ class RolePermissionManager extends Component
         $this->authorizePermission('gestionar roles');
         $this->showRoleForm = true;
         $this->roleName = $this->selectedRole->name;
+        $this->roleIcon = $this->selectedRole->icon ?: 'bx-user';
     }
 
     public function closeRoleForm(): void
@@ -139,6 +158,7 @@ class RolePermissionManager extends Component
 
         $this->showRoleForm = false;
         $this->roleName = $this->selectedRole->name;
+        $this->roleIcon = $this->selectedRole->icon ?: 'bx-user';
         $this->rolePermissions = $this->selectedRole->permissions->pluck('name')->toArray();
     }
 
@@ -153,18 +173,19 @@ class RolePermissionManager extends Component
                 'max:50',
                 Rule::unique('roles', 'name')->ignore($this->rolePanel),
             ],
+            'roleIcon' => ['required', 'string', Rule::in(array_keys($this->roleIconOptions))],
         ]);
 
         if ($this->rolePanel) {
             abort_if(in_array($this->selectedRole->name, ['owner', 'super-admin'], true)
                 && $this->roleName !== $this->selectedRole->name, 403);
             // Editar
-            $this->selectedRole->update(['name' => $this->roleName]);
+            $this->selectedRole->update(['name' => $this->roleName, 'icon' => $this->roleIcon]);
             $this->selectedRole->syncPermissions($this->rolePermissions);
             $this->dispatch('notify', type: 'success', message: 'Rol actualizado.');
         } else {
             // Crear
-            $role = Role::create(['name' => $this->roleName, 'guard_name' => 'web']);
+            $role = Role::create(['name' => $this->roleName, 'guard_name' => 'web', 'icon' => $this->roleIcon]);
             $role->syncPermissions($this->rolePermissions);
             $this->dispatch('notify', type: 'success', message: 'Rol creado correctamente.');
         }

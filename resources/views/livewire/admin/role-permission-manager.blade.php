@@ -88,7 +88,7 @@
             $rc = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
             $ri = ['super-admin'=>'bx-crown','admin'=>'bx-shield','gerente'=>'bx-briefcase','cajero'=>'bx-money','mesero'=>'bx-dish','cocinero'=>'bx-restaurant'];
             $c  = $rc[$role->name] ?? 'secondary';
-            $ic = $ri[$role->name] ?? 'bx-user';
+            $ic = $role->icon ?: ($ri[$role->name] ?? 'bx-user');
         @endphp
         <button type="button" class="card roles-role-card"
                 data-ui="xui-y4ry0a"
@@ -198,7 +198,7 @@
         $rc2 = ['super-admin'=>'danger','admin'=>'primary','gerente'=>'info','cajero'=>'success','mesero'=>'warning','cocinero'=>'secondary'];
         $ri2 = ['super-admin'=>'bx-crown','admin'=>'bx-shield','gerente'=>'bx-briefcase','cajero'=>'bx-money','mesero'=>'bx-dish','cocinero'=>'bx-restaurant'];
         $mc  = $rc2[$selectedRole->name] ?? 'secondary';
-        $mic = $ri2[$selectedRole->name] ?? 'bx-user';
+        $mic = $selectedRole->icon ?: ($ri2[$selectedRole->name] ?? 'bx-user');
     @endphp
     <div class="modal-backdrop fade show roles-modal-backdrop" data-ui="xui-1mk4i26" wire:click="closeRolePanel"></div>
     <div class="modal fade show d-block roles-modal-layer" tabindex="-1" data-ui="xui-n1v1df"
@@ -328,6 +328,23 @@
                             @error('roleName')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                        </div>
+
+                        <div class="col-12">
+                            <fieldset class="roles-icon-fieldset">
+                                <legend class="form-label fw-medium">Icono del rol</legend>
+                                <p>Identifica visualmente esta responsabilidad en el directorio de roles.</p>
+                                <div class="roles-icon-options">
+                                    @foreach($roleIconOptions as $icon => $label)
+                                        <label class="roles-icon-choice" title="{{ $label }}">
+                                            <input type="radio" wire:model="roleIcon" value="{{ $icon }}">
+                                            <span><i class="bx {{ $icon }}" aria-hidden="true"></i></span>
+                                            <small>{{ $label }}</small>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                @error('roleIcon')<div class="text-danger small mt-2" role="alert">{{ $message }}</div>@enderror
+                            </fieldset>
                         </div>
 
                         {{-- Permisos por grupo --}}

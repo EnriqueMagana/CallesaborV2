@@ -23,17 +23,62 @@
         @endif
     </div>
 
-    <div class="cat-tabs" role="tablist" aria-label="Categorías del menú" x-show="mode === 'products'" x-cloak>
-        <button type="button" @click="category = null" :class="{ 'active': category === null }"
-                class="cat-tab" role="tab" :aria-selected="category === null">Todos</button>
-        @foreach($this->allCategories as $cat)
-            <button type="button" @click="category = {{ $cat->id }}"
-                    :class="{ 'active': category === {{ $cat->id }} }"
-                    class="cat-tab" role="tab" :aria-selected="category === {{ $cat->id }}">
-                @if($cat->icon)<i class="bx {{ $cat->icon }}" aria-hidden="true"></i>@endif
-                {{ $cat->name }}
-            </button>
-        @endforeach
+    <div class="pos-category-navigation" x-show="mode === 'products'" x-cloak
+         x-data="{
+            canScrollBack: false,
+            canScrollForward: false,
+            observer: null,
+            init() {
+                this.$nextTick(() => {
+                    this.updateScrollState();
+                    this.observer = new ResizeObserver(() => this.updateScrollState());
+                    this.observer.observe(this.$refs.categoryRail);
+                });
+            },
+            destroy() { this.observer?.disconnect(); },
+            updateScrollState() {
+                const rail = this.$refs.categoryRail;
+                if (!rail) return;
+                this.canScrollBack = rail.scrollLeft > 3;
+                this.canScrollForward = rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 3;
+            },
+            scrollCategories(direction) {
+                const rail = this.$refs.categoryRail;
+                rail?.scrollBy({ left: direction * Math.max(220, rail.clientWidth * .72), behavior: 'smooth' });
+            },
+            handleCategoryWheel(event) {
+                const rail = this.$refs.categoryRail;
+                if (!rail || rail.scrollWidth <= rail.clientWidth || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+                event.preventDefault();
+                rail.scrollLeft += event.deltaY;
+            },
+            revealCategory(button) {
+                this.$nextTick(() => button.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }));
+            }
+         }">
+        <button type="button" class="pos-category-navigation__control is-back"
+                x-show="canScrollBack" x-transition.opacity @click="scrollCategories(-1)"
+                aria-label="Ver categorías anteriores" title="Categorías anteriores">
+            <i class="bx bx-chevron-left" aria-hidden="true"></i>
+        </button>
+        <div class="cat-tabs" x-ref="categoryRail" role="tablist" aria-label="Categorías del menú"
+             @scroll.passive="updateScrollState" @wheel="handleCategoryWheel($event)">
+            <button type="button" @click="category = null; revealCategory($el)" :class="{ 'active': category === null }"
+                    class="cat-tab" role="tab" :aria-selected="category === null">Todos</button>
+            @foreach($this->allCategories as $cat)
+                <button type="button" @click="category = {{ $cat->id }}; revealCategory($el)"
+                        :class="{ 'active': category === {{ $cat->id }} }"
+                        class="cat-tab" role="tab" :aria-selected="category === {{ $cat->id }}">
+                    @if($cat->icon)<i class="bx {{ $cat->icon }}" aria-hidden="true"></i>@endif
+                    {{ $cat->name }}
+                </button>
+            @endforeach
+        </div>
+        <button type="button" class="pos-category-navigation__control is-forward"
+                x-show="canScrollForward" x-transition.opacity @click="scrollCategories(1)"
+                aria-label="Ver más categorías" title="Más categorías">
+            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+        </button>
     </div>
 
     @if($this->activePromotions->isNotEmpty())

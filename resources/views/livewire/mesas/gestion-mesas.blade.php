@@ -280,7 +280,7 @@
                                     $activeSplit = $firstMesa->splits->first();
                                 @endphp
                                 {{-- GROUP CARD --}}
-                                <div class="mesa-card mesa-card-group status-{{ $firstMesa->status }}"
+                                <div class="mesa-card mesa-card-group status-{{ $firstMesa->status }} {{ $tab === 'todas' ? 'mesa-card--directory' : '' }}"
                                     x-data="{ open: false }" :class="{ 'menu-open': open }">
 
                                     <div class="mesa-card-topbar">
@@ -319,11 +319,32 @@
                                                 ${{ number_format($activeOrders->sum('total'), 2) }}
                                             </div>
                                         @endif
+                                        @if ($tab === 'todas')
+                                            @php $directoryWaiter = $firstMesa->currentAssignment?->waiter; @endphp
+                                            <div class="mesa-staff-overview {{ $directoryWaiter ? '' : 'is-unassigned' }}">
+                                                <div class="mesa-staff-overview__avatar">
+                                                    @if ($directoryWaiter?->avatar)
+                                                        <img src="{{ Storage::url($directoryWaiter->avatar) }}" alt="Foto de {{ $directoryWaiter->name }}" width="52" height="52" loading="lazy" decoding="async">
+                                                    @elseif($directoryWaiter)
+                                                        <span>{{ strtoupper(substr($directoryWaiter->name, 0, 1)) }}</span>
+                                                    @else
+                                                        <i class="bx bx-user-x" aria-hidden="true"></i>
+                                                    @endif
+                                                </div>
+                                                <div class="mesa-staff-overview__copy">
+                                                    <small>{{ $directoryWaiter ? 'Responsable de la mesa' : 'Atención pendiente' }}</small>
+                                                    <strong>{{ $directoryWaiter?->name ?? 'Sin empleado asignado' }}</strong>
+                                                    <span><i class="bx {{ $directoryWaiter ? 'bx-radio-circle-marked' : 'bx-error-circle' }}" aria-hidden="true"></i>{{ $directoryWaiter ? 'En servicio' : 'Requiere asignación' }}</span>
+                                                </div>
+                                            </div>
+                                        @endif
                                     </div>
 
                                     <div class="mesa-card-footer">
                                         @if ($firstMesa->currentAssignment)
-                                            @if ($tab === 'mis_mesas' && $firstMesa->status === 'ocupada' && $mesaUser?->can('ordenar mesas'))
+                                            @if ($tab === 'todas')
+                                                <div class="mesa-assignment-state"><i class="bx bx-check-shield" aria-hidden="true"></i>Responsable asignado</div>
+                                            @elseif ($tab === 'mis_mesas' && $firstMesa->status === 'ocupada' && $mesaUser?->can('ordenar mesas'))
                                                 <button class="btn-asignarme" data-ui="xui-18yv2pi"
                                                     wire:click="goToOrden({{ $firstMesa->id }})">
                                                     <i class="bx bx-receipt"></i> Ordenar
@@ -443,7 +464,7 @@
                             @elseif(!$mesa->mesa_group_id)
                                 {{-- SINGLE CARD --}}
                                 @php $activeSplit = $mesa->splits->first(); @endphp
-                                <div class="mesa-card status-{{ $mesa->status }}" x-data="{ open: false }"
+                                <div class="mesa-card status-{{ $mesa->status }} {{ $tab === 'todas' ? 'mesa-card--directory' : '' }}" x-data="{ open: false }"
                                     :class="{ 'menu-open': open }">
 
                                     <div class="mesa-card-topbar">
@@ -483,11 +504,32 @@
                                                 ${{ number_format($mesa->activeOrders->sum('total'), 2) }}
                                             </div>
                                         @endif
+                                        @if ($tab === 'todas')
+                                            @php $directoryWaiter = $mesa->currentAssignment?->waiter; @endphp
+                                            <div class="mesa-staff-overview {{ $directoryWaiter ? '' : 'is-unassigned' }}">
+                                                <div class="mesa-staff-overview__avatar">
+                                                    @if ($directoryWaiter?->avatar)
+                                                        <img src="{{ Storage::url($directoryWaiter->avatar) }}" alt="Foto de {{ $directoryWaiter->name }}" width="52" height="52" loading="lazy" decoding="async">
+                                                    @elseif($directoryWaiter)
+                                                        <span>{{ strtoupper(substr($directoryWaiter->name, 0, 1)) }}</span>
+                                                    @else
+                                                        <i class="bx bx-user-x" aria-hidden="true"></i>
+                                                    @endif
+                                                </div>
+                                                <div class="mesa-staff-overview__copy">
+                                                    <small>{{ $directoryWaiter ? 'Responsable de la mesa' : 'Atención pendiente' }}</small>
+                                                    <strong>{{ $directoryWaiter?->name ?? 'Sin empleado asignado' }}</strong>
+                                                    <span><i class="bx {{ $directoryWaiter ? 'bx-radio-circle-marked' : 'bx-error-circle' }}" aria-hidden="true"></i>{{ $directoryWaiter ? 'En servicio' : 'Requiere asignación' }}</span>
+                                                </div>
+                                            </div>
+                                        @endif
                                     </div>
 
                                     <div class="mesa-card-footer">
                                         @if ($mesa->currentAssignment)
-                                            @if ($tab === 'mis_mesas' && $mesa->status === 'ocupada' && $mesaUser?->can('ordenar mesas'))
+                                            @if ($tab === 'todas')
+                                                <div class="mesa-assignment-state"><i class="bx bx-check-shield" aria-hidden="true"></i>Responsable asignado</div>
+                                            @elseif ($tab === 'mis_mesas' && $mesa->status === 'ocupada' && $mesaUser?->can('ordenar mesas'))
                                                 <button class="btn-asignarme" data-ui="xui-18yv2pi"
                                                     wire:click="goToOrden({{ $mesa->id }})">
                                                     <i class="bx bx-receipt"></i> Ordenar

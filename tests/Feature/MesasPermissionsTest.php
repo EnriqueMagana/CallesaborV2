@@ -294,6 +294,26 @@ class MesasPermissionsTest extends TestCase
             ->assertHasNoErrors();
     }
 
+    public function test_all_tables_directory_prominently_displays_the_assigned_employees_profile(): void
+    {
+        $area = $this->area();
+        $waiter = $this->employee(['ver mesas']);
+        $waiter->update(['name' => 'Mariana Salón', 'avatar' => 'avatars/mariana.webp']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $waiter);
+        $supervisor = $this->employee(['ver mesas', 'ver todas las mesas']);
+
+        Livewire::actingAs($supervisor)
+            ->test(GestionMesas::class)
+            ->call('setTab', 'todas')
+            ->assertSee('mesa-card--directory', false)
+            ->assertSee('mesa-staff-overview', false)
+            ->assertSee('Responsable de la mesa')
+            ->assertSee('Mariana Salón')
+            ->assertSee('storage/avatars/mariana.webp', false)
+            ->assertSee('En servicio');
+    }
+
     public function test_table_detail_cannot_be_opened_by_id_without_visibility_permission(): void
     {
         $area = $this->area();

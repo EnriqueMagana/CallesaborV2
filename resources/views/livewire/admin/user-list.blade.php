@@ -200,7 +200,7 @@
                     @foreach($this->roles as $role)
                         <label class="users-role-option {{ in_array($role->name, $selectedRoles) ? 'is-selected' : '' }}">
                             <input type="checkbox" wire:model.live="selectedRoles" value="{{ $role->name }}">
-                            <span class="users-role-option-icon"><i class="bx bx-shield-quarter"></i></span>
+                            <span class="users-role-option-icon"><i class="bx {{ $role->icon ?: 'bx-shield-quarter' }}"></i></span>
                             <span><strong>{{ str($role->name)->replace('-', ' ')->title() }}</strong><small>{{ $role->permissions->count() }} permisos configurados</small></span>
                             <i class="bx bx-check-circle users-role-check"></i>
                         </label>
