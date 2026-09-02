@@ -143,7 +143,7 @@ class SidebarMenuManagerTest extends TestCase
         $this->assertDatabaseHas('sidebar_menu_items', [
             'system_key' => 'admin.role-notifications',
             'route_name' => 'app.notificaciones-roles',
-            'permission' => 'gestionar roles',
+            'permission' => 'gestionar notificaciones por rol',
             'is_active' => true,
         ]);
     }

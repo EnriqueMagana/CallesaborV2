@@ -17,6 +17,7 @@ use App\Livewire\Admin\BusinessSettingsManager;
 use App\Livewire\Admin\DigitalMenuManager;
 use App\Livewire\Admin\KioskSettings;
 use App\Livewire\Admin\PromotionManager;
+use App\Livewire\Admin\RoleNotificationManager;
 use App\Livewire\Admin\RolePermissionManager;
 use App\Livewire\Admin\UserList;
 use App\Livewire\Auth\AcceptUserInvitation;
@@ -88,8 +89,8 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/usuarios', UserList::class)->middleware('can:ver usuarios')->name('usuarios');
     Route::get('/roles-permisos', RolePermissionManager::class)->name('roles-permisos');
-    Route::get('/notificaciones-roles', RolePermissionManager::class)
-        ->middleware('can:gestionar roles')
+    Route::get('/notificaciones-roles', RoleNotificationManager::class)
+        ->middleware('can:gestionar notificaciones por rol')
         ->name('notificaciones-roles');
     Route::get('/kioscos', KioskSettings::class)->middleware('can:gestionar kioscos')->name('kioscos');
     Route::get('/kioscos/{terminal}/abrir', KioskLaunchController::class)->middleware('can:gestionar kioscos')->name('kioscos.open');
