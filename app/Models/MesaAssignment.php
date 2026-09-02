@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class MesaAssignment extends Model
 {
     protected $fillable = [
-        'mesa_id', 'mesa_service_id', 'user_id', 'assigned_by',
+        'mesa_id', 'mesa_service_id', 'user_id', 'assignment_type', 'assigned_by',
         'released_by', 'assigned_at', 'released_at', 'release_reason',
     ];
 
@@ -47,6 +47,11 @@ class MesaAssignment extends Model
         return $this->released_at === null;
     }
 
+    public function getAssignmentTypeLabelAttribute(): string
+    {
+        return $this->assignment_type === 'support' ? 'Apoyo' : 'Responsable';
+    }
+
     public function getDurationAttribute(): string
     {
         $end = $this->released_at ?? now();
@@ -55,6 +60,7 @@ class MesaAssignment extends Model
         if ($diff->h > 0) {
             return "{$diff->h}h {$diff->i}min";
         }
+
         return "{$diff->i}min";
     }
 }

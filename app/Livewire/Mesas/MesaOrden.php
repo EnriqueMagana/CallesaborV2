@@ -12,8 +12,8 @@ use App\Models\OrderItemIngredient;
 use App\Models\Product;
 use App\Models\Promotion;
 use App\Services\MesaServiceManager;
-use App\Services\PromotionSelectionService;
 use App\Services\PromotionPricingService;
+use App\Services\PromotionSelectionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -65,13 +65,12 @@ class MesaOrden extends Component
 
     public function mount(Mesa $mesa): void
     {
-        $assignment = $mesa->currentAssignment;
         $user = auth()->user();
 
         abort_unless($user?->can('ordenar mesas'), 403);
 
         if (! $user->hasAnyRole(['admin', 'super-admin', 'gerente', 'cajero'])) {
-            if (! $assignment || $assignment->user_id !== $user->id) {
+            if (! $mesa->hasActiveAssignmentFor($user->id)) {
                 session()->flash('error', 'No tienes acceso a esta mesa.');
                 $this->redirect(route('app.mesas'));
 
@@ -95,6 +94,7 @@ class MesaOrden extends Component
         return Mesa::with([
             'area',
             'currentAssignment.waiter',
+            'activeAssignments.waiter',
         ])->findOrFail($this->mesaId);
     }
 

@@ -87,6 +87,7 @@ final class PermissionCatalog
             'mesas' => [
                 'ver mesas' => 'Permite consultar el mapa de mesas y las cuentas visibles para el usuario.',
                 'ver todas las mesas' => 'Permite consultar mesas y cuentas asignadas a cualquier integrante del personal.',
+                'ver historial completo de asignaciones mesas' => 'Permite consultar asignaciones y liberaciones de mesas de cajas anteriores; sin este permiso solo se muestra la caja abierta.',
                 'asignar mesas' => 'Permite tomar una mesa disponible y asignársela al usuario actual.',
                 'ordenar mesas' => 'Permite abrir y agregar productos a órdenes vinculadas con una mesa.',
                 'cerrar mesas' => 'Permite solicitar el cierre de una cuenta de mesa para que quede lista para cobro.',

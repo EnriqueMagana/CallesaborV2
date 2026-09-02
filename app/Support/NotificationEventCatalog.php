@@ -18,6 +18,10 @@ class NotificationEventCatalog
                 'events' => [
                     'table.order_created' => self::event('Nuevo pedido de mesa', 'Avisa cuando se envía a cocina un pedido nuevo desde una mesa.', ['ver mesas', 'ver pedidos en punto de venta'], 'bx-dish'),
                     'table.order_ready' => self::event('Pedido de mesa listo', 'Avisa al personal responsable cuando cocina termina un pedido de mesa.', ['ver mesas', 'ver pedidos en punto de venta'], 'bx-check-circle'),
+                    'table.help_requested' => self::event('Solicitud de apoyo en mesa', 'Avisa a un mesero cuando otro integrante solicita su ayuda en una mesa o grupo.', ['ver mesas'], 'bx-user-plus'),
+                    'table.help_accepted' => self::event('Apoyo aceptado', 'Confirma al solicitante que el mesero invitado se incorporó al servicio.', ['ver mesas'], 'bx-user-check'),
+                    'table.help_declined' => self::event('Apoyo rechazado', 'Avisa al solicitante que el mesero invitado no puede incorporarse.', ['ver mesas'], 'bx-user-x'),
+                    'table.support_assigned' => self::event('Asignación como apoyo', 'Avisa a un mesero cuando el responsable lo agrega directamente al equipo de una mesa.', ['ver mesas'], 'bx-group'),
                 ],
             ],
             'counter' => [

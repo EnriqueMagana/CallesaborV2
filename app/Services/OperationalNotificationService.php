@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Jobs\PublishRealtimeNotification;
 use App\Models\AppNotification;
 use App\Models\DeliveryAssignment;
+use App\Models\Mesa;
+use App\Models\MesaHelpRequest;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
 use App\Models\User;
@@ -21,7 +23,7 @@ class OperationalNotificationService
 
     public function orderCreated(Order $order): void
     {
-        $order->loadMissing(['mesa.currentAssignment', 'seller']);
+        $order->loadMissing(['mesa.activeAssignments', 'seller']);
         $category = $this->category($order);
 
         $this->send(
@@ -40,7 +42,7 @@ class OperationalNotificationService
 
     public function orderStatusChanged(Order $order, string $previousStatus): void
     {
-        $order->loadMissing(['mesa.currentAssignment', 'deliveryAssignment']);
+        $order->loadMissing(['mesa.activeAssignments', 'deliveryAssignment']);
 
         if ($order->status === 'lista') {
             $managedDelivery = $order->type === 'delivery' && $this->managedDelivery($order);
@@ -110,15 +112,85 @@ class OperationalNotificationService
         );
     }
 
+    public function mesaHelpRequested(MesaHelpRequest $request): void
+    {
+        $request->loadMissing(['mesa.area', 'group', 'requester', 'requestedUser']);
+        if (! $request->requestedUser || ! $request->mesa) {
+            return;
+        }
+
+        $target = $request->scope === 'group' && $request->group
+            ? "el grupo {$request->group->name}"
+            : $request->mesa->display_name;
+
+        $this->send(
+            eventKey: 'table.help_requested',
+            category: 'tables',
+            priority: 'high',
+            subject: $request,
+            recipients: collect([$request->requestedUser]),
+            title: 'Solicitud de apoyo en mesas',
+            message: "{$request->requester?->name} solicita apoyo en {$target}.",
+            url: route('app.mesas', ['help_request' => $request->id], false),
+            sound: 'order',
+            dedupeSuffix: 'requested',
+            resolveByRole: false,
+        );
+    }
+
+    public function mesaHelpResponded(MesaHelpRequest $request): void
+    {
+        $request->loadMissing(['mesa', 'requester', 'requestedUser']);
+        if (! $request->requester || ! $request->mesa) {
+            return;
+        }
+
+        $accepted = $request->status === MesaHelpRequest::STATUS_ACCEPTED;
+        $this->send(
+            eventKey: $accepted ? 'table.help_accepted' : 'table.help_declined',
+            category: 'tables',
+            priority: 'normal',
+            subject: $request,
+            recipients: collect([$request->requester]),
+            title: $accepted ? 'Apoyo confirmado' : 'Apoyo no disponible',
+            message: "{$request->requestedUser?->name} ".($accepted ? 'aceptó' : 'rechazó')." apoyar en {$request->mesa->display_name}.",
+            url: route('app.mesas', [], false),
+            sound: $accepted ? 'success' : 'alert',
+            dedupeSuffix: 'responded-'.$request->status,
+            resolveByRole: false,
+        );
+    }
+
+    public function mesaSupportAssigned(Mesa $mesa, User $waiter, User $assigner, bool $group): void
+    {
+        $mesa->loadMissing('group');
+        $target = $group && $mesa->group ? "el grupo {$mesa->group->name}" : $mesa->display_name;
+        $this->send(
+            eventKey: 'table.support_assigned',
+            category: 'tables',
+            priority: 'high',
+            subject: $mesa,
+            recipients: collect([$waiter]),
+            title: 'Te agregaron a un equipo de mesa',
+            message: "{$assigner->name} te agregó como apoyo en {$target}.",
+            url: route('app.mesas', [], false),
+            sound: 'order',
+            dedupeSuffix: 'support-'.$waiter->id.'-'.Str::uuid(),
+            resolveByRole: false,
+        );
+    }
+
     private function send(string $eventKey, string $category, string $priority, Model $subject, Collection $recipients,
-        string $title, string $message, string $url, string $sound, string $dedupeSuffix): void
+        string $title, string $message, string $url, string $sound, string $dedupeSuffix, bool $resolveByRole = true): void
     {
         if (! Schema::hasTable('notifications')) {
             return;
         }
 
         $settingKey = str_replace('.', '_', $eventKey);
-        $recipients = app(RoleNotificationRecipientResolver::class)->resolve($eventKey, $recipients);
+        if ($resolveByRole) {
+            $recipients = app(RoleNotificationRecipientResolver::class)->resolve($eventKey, $recipients);
+        }
 
         $actorId = auth()->id();
         $now = now();
@@ -217,7 +289,10 @@ class OperationalNotificationService
 
     private function waitersFor(Order $order): Collection
     {
-        $ids = collect([$order->served_by, $order->mesa?->currentAssignment?->user_id])->filter()->unique();
+        $ids = collect([$order->served_by])
+            ->merge($order->mesa?->activeAssignments?->pluck('user_id') ?? [])
+            ->filter()
+            ->unique();
 
         return User::query()->whereKey($ids)->get();
     }
