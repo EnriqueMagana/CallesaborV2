@@ -68,7 +68,7 @@
                             data-role-name="{{ str($role->name)->lower() }}"
                             x-show="$el.dataset.roleName.includes(roleSearch.trim().toLowerCase())"
                             aria-pressed="{{ $notificationRoleId === $role->id ? 'true' : 'false' }}">
-                        <span><i class="bx bx-user" aria-hidden="true"></i></span>
+                        <span><i class="bx {{ $role->icon ?: 'bx-user' }}" aria-hidden="true"></i></span>
                         <span>
                             <strong>{{ str($role->name)->replace('-', ' ')->title() }}</strong>
                             <small>{{ $role->users_count }} usuario(s) · {{ $role->permissions_count }} permisos</small>
@@ -83,7 +83,7 @@
             @if($this->notificationRole)
                 <form wire:submit="saveRoleNotifications">
                     <header class="role-notifications-editor__header">
-                        <span class="roles-role-card__icon bg-label-primary"><i class="bx bx-bell" aria-hidden="true"></i></span>
+                        <span class="roles-role-card__icon bg-label-primary"><i class="bx {{ $this->notificationRole->icon ?: 'bx-bell' }}" aria-hidden="true"></i></span>
                         <div>
                             <span class="roles-toolbar__eyebrow">Configurando avisos para</span>
                             <h2>{{ str($this->notificationRole->name)->replace('-', ' ')->title() }}</h2>

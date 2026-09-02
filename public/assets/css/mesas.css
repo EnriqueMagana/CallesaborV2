@@ -502,6 +502,21 @@
   border-radius: 8px;
 }
 
+.mesa-card--directory { min-height: 286px; background: linear-gradient(155deg, var(--c-surface) 0%, color-mix(in srgb, var(--status-color, var(--c-primary)) 4%, var(--c-surface)) 100%); }
+.mesa-staff-overview { min-width: 0; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 11px; align-items: center; margin-top: 12px; padding: 10px; border: 1px solid color-mix(in srgb, var(--status-color, var(--c-primary)) 18%, var(--c-border)); border-radius: 14px; background: color-mix(in srgb, var(--c-surface) 92%, var(--status-color, var(--c-primary))); }
+.mesa-staff-overview__avatar { width: 52px; height: 52px; display: grid; place-items: center; overflow: hidden; border: 3px solid var(--c-surface); border-radius: 16px; background: var(--c-primary); color: #fff; box-shadow: 0 5px 14px rgba(40, 35, 65, .16); font-size: 1rem; font-weight: 800; }
+.mesa-staff-overview__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.mesa-staff-overview__avatar i { font-size: 23px; }
+.mesa-staff-overview__copy { min-width: 0; display: flex; flex-direction: column; }
+.mesa-staff-overview__copy small { color: var(--c-text-muted); font-size: .62rem; font-weight: 750; letter-spacing: .055em; text-transform: uppercase; }
+.mesa-staff-overview__copy strong { overflow: hidden; color: var(--c-text); font-size: .82rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.mesa-staff-overview__copy span { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; color: #138a50; font-size: .67rem; font-weight: 750; }
+.mesa-staff-overview.is-unassigned { border-style: dashed; background: var(--c-bg); }
+.mesa-staff-overview.is-unassigned .mesa-staff-overview__avatar { background: #8a8493; }
+.mesa-staff-overview.is-unassigned .mesa-staff-overview__copy span { color: #a15c00; }
+.mesa-assignment-state { min-width: 0; display: inline-flex; align-items: center; gap: 5px; color: var(--c-text-muted); font-size: .7rem; font-weight: 700; }
+.mesa-assignment-state i { color: #15945a; font-size: 17px; }
+
 /* ── Card Footer ── */
 .mesa-card-footer {
   padding: 8px 14px 10px;
@@ -1599,6 +1614,12 @@
   .mesa-card { padding: 0; }
   .mesa-card-topbar { padding: 7px 10px 4px; gap: 4px; }
   .mesa-card-body { padding: 6px 10px 8px; }
+  .mesa-card--directory { min-height: 270px; }
+  .mesa-staff-overview { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; margin-top: 8px; padding: 8px; }
+  .mesa-staff-overview__avatar { width: 44px; height: 44px; border-radius: 13px; }
+  .mesa-staff-overview__copy small { font-size: .55rem; }
+  .mesa-staff-overview__copy strong { font-size: .72rem; }
+  .mesa-staff-overview__copy span { font-size: .6rem; }
   .mesa-card-footer {
     padding: 7px 10px 8px;
     display: grid;

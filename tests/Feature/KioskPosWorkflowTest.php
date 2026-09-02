@@ -304,12 +304,26 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertMatchesRegularExpression('/@media \(min-width:\s*1025px\) and \(max-height:\s*760px\)/', $css);
     }
 
+    public function test_product_categories_have_mouse_touch_and_keyboard_scroll_controls(): void
+    {
+        [$user] = $this->posContext();
+
+        $this->actingAs($user)
+            ->get(route('app.pos'))
+            ->assertOk()
+            ->assertSee('pos-category-navigation', false)
+            ->assertSee('Ver categorías anteriores')
+            ->assertSee('Ver más categorías')
+            ->assertSee('handleCategoryWheel', false)
+            ->assertSee('scrollCategories', false);
+    }
+
     public function test_pos_alpine_root_state_is_not_rendered_as_visible_text(): void
     {
         [$user] = $this->posContext();
         $html = $this->actingAs($user)->get(route('app.pos'))->assertOk()->getContent();
 
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
         $previousErrors = libxml_use_internal_errors(true);
         $dom->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
         libxml_clear_errors();

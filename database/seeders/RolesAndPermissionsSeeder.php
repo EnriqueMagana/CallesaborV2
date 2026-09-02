@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Support\PermissionCatalog;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -183,6 +184,21 @@ class RolesAndPermissionsSeeder extends Seeder
         // Repartidor — acceso operativo únicamente a sus entregas.
         $repartidor = Role::firstOrCreate(['name' => 'repartidor', 'guard_name' => 'web']);
         $repartidor->syncPermissions(['ver delivery', 'tomar delivery', 'entregar delivery']);
+
+        if (Schema::hasColumn('roles', 'icon')) {
+            foreach ([
+                'super-admin' => 'bx-crown',
+                'owner' => 'bx-crown',
+                'admin' => 'bx-shield',
+                'gerente' => 'bx-briefcase',
+                'cajero' => 'bx-money',
+                'mesero' => 'bx-dish',
+                'cocinero' => 'bx-restaurant',
+                'repartidor' => 'bx-cycling',
+            ] as $roleName => $icon) {
+                Role::query()->where('name', $roleName)->whereNull('icon')->update(['icon' => $icon]);
+            }
+        }
 
         $this->command->info('✅ Roles y permisos creados correctamente.');
     }

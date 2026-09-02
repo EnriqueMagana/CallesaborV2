@@ -807,6 +807,24 @@
     font-size: 1.2rem;
 }
 
+.roles-icon-fieldset { min-width: 0; margin: 0; padding: 16px; border: 1px solid #e2deec; border-radius: 16px; background: #faf9ff; }
+.roles-icon-fieldset > legend { width: auto; float: none; margin: 0 0 2px; padding: 0; color: #28233c; font-size: .9rem; }
+.roles-icon-fieldset > p { margin: 0 0 13px; color: #746d82; font-size: .75rem; }
+.roles-icon-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 9px; }
+.roles-icon-choice { position: relative; min-width: 0; min-height: 82px; display: grid; place-items: center; align-content: center; gap: 5px; margin: 0; padding: 9px 6px; border: 1px solid #ddd8e7; border-radius: 13px; background: #fff; color: #655e72; cursor: pointer; transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease, color .18s ease; }
+.roles-icon-choice input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.roles-icon-choice > span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: #f0edff; color: #6554e8; }
+.roles-icon-choice i { font-size: 21px; }
+.roles-icon-choice small { overflow: hidden; max-width: 100%; font-size: .63rem; font-weight: 700; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.roles-icon-choice:hover { border-color: #b9aff5; color: #403656; }
+.roles-icon-choice:has(input:checked) { border-color: #6956e8; background: #f1eeff; color: #4434b8; box-shadow: 0 0 0 2px rgba(105, 86, 232, .14); }
+.roles-icon-choice:has(input:focus-visible) { outline: 3px solid rgba(105, 86, 232, .28); outline-offset: 2px; }
+html.dark-style .roles-icon-fieldset { border-color: #484252; background: #292630; }
+html.dark-style .roles-icon-fieldset > legend { color: #f5f2fa; }
+html.dark-style .roles-icon-fieldset > p { color: #bdb6c8; }
+html.dark-style .roles-icon-choice { border-color: #504a59; background: #312e38; color: #d9d4e1; }
+html.dark-style .roles-icon-choice:has(input:checked) { border-color: #8b7cf6; background: #3b345b; color: #fff; }
+
 .roles-risk-badge {
     color: var(--app-danger, #c43e4f);
 }
