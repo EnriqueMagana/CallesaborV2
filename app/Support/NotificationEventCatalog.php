@@ -11,13 +11,40 @@ class NotificationEventCatalog
     public static function definitions(): array
     {
         return [
-            'orders' => [
-                'label' => 'Pedidos',
-                'icon' => 'bx-receipt',
-                'description' => 'Altas, preparación, cobro y excepciones de pedidos.',
+            'tables' => [
+                'label' => 'Mesas',
+                'icon' => 'bx-table',
+                'description' => 'Pedidos creados por meseros y avisos cuando cocina los termina.',
                 'events' => [
-                    'order.created' => self::event('Pedido nuevo', 'Avisa cuando se registra un pedido nuevo de ventanilla, recoger, kiosco, mesa o delivery.', ['ver ordenes', 'ver mesas', 'ver pedidos en punto de venta'], 'bx-plus-circle'),
-                    'order.ready' => self::event('Pedido listo', 'Avisa cuando cocina termina un pedido y queda listo para entregar o cobrar.', ['ver ordenes', 'ver mesas', 'ver pedidos en punto de venta'], 'bx-check-circle'),
+                    'table.order_created' => self::event('Nuevo pedido de mesa', 'Avisa cuando se envía a cocina un pedido nuevo desde una mesa.', ['ver mesas', 'ver pedidos en punto de venta'], 'bx-dish'),
+                    'table.order_ready' => self::event('Pedido de mesa listo', 'Avisa al personal responsable cuando cocina termina un pedido de mesa.', ['ver mesas', 'ver pedidos en punto de venta'], 'bx-check-circle'),
+                ],
+            ],
+            'counter' => [
+                'label' => 'Ventanilla y recoger',
+                'icon' => 'bx-store-alt',
+                'description' => 'Pedidos capturados en el punto de venta para entrega en mostrador.',
+                'events' => [
+                    'counter.order_created' => self::event('Nuevo pedido de ventanilla', 'Avisa cuando se registra una venta nueva para entrega inmediata en ventanilla.', ['ver pedidos en punto de venta', 'ver ordenes'], 'bx-receipt'),
+                    'counter.order_ready' => self::event('Pedido de ventanilla listo', 'Avisa cuando cocina termina un pedido que debe entregarse en ventanilla.', ['ver pedidos en punto de venta', 'ver ordenes'], 'bx-check-circle'),
+                    'pickup.order_created' => self::event('Nuevo pedido para recoger', 'Avisa cuando se registra un pedido que el cliente recogerá posteriormente.', ['ver pedidos en punto de venta', 'ver ordenes'], 'bx-package'),
+                    'pickup.order_ready' => self::event('Pedido para recoger listo', 'Avisa cuando el pedido ya puede entregarse al cliente que pasa a recoger.', ['ver pedidos en punto de venta', 'ver ordenes'], 'bx-check-double'),
+                ],
+            ],
+            'kiosk' => [
+                'label' => 'Kiosco',
+                'icon' => 'bx-devices',
+                'description' => 'Pedidos capturados desde terminales de autoservicio.',
+                'events' => [
+                    'kiosk.order_created' => self::event('Nuevo pedido de kiosco', 'Avisa cuando un cliente confirma un pedido desde un kiosco.', ['gestionar kioscos', 'ver pedidos en punto de venta', 'ver ordenes'], 'bx-devices'),
+                    'kiosk.order_ready' => self::event('Pedido de kiosco listo', 'Avisa cuando cocina termina un pedido originado en un kiosco.', ['gestionar kioscos', 'ver pedidos en punto de venta', 'ver ordenes'], 'bx-check-circle'),
+                ],
+            ],
+            'orders' => [
+                'label' => 'Seguimiento general',
+                'icon' => 'bx-receipt',
+                'description' => 'Cancelaciones, cobros y excepciones aplicables a cualquier canal.',
+                'events' => [
                     'order.cancelled' => self::event('Pedido cancelado', 'Avisa cuando una orden cambia al estado cancelada.', ['ver ordenes', 'ver mesas', 'ver pedidos en punto de venta'], 'bx-x-circle'),
                     'order.paid' => self::event('Pedido cobrado', 'Confirma cuando un pedido queda pagado y finaliza su ciclo de cobro.', ['ver ordenes', 'ver caja', 'ver pedidos en punto de venta'], 'bx-credit-card'),
                 ],
@@ -36,7 +63,9 @@ class NotificationEventCatalog
                 'icon' => 'bx-cycling',
                 'description' => 'Disponibilidad, asignación y seguimiento de entregas administradas.',
                 'events' => [
-                    'delivery.available' => self::event('Delivery disponible', 'Avisa cuando un pedido está listo para que un repartidor lo tome.', ['ver delivery'], 'bx-package'),
+                    'delivery.order_created' => self::event('Nuevo pedido de delivery', 'Avisa cuando se registra un nuevo pedido con entrega a domicilio.', ['ver delivery', 'ver pedidos en punto de venta', 'ver ordenes'], 'bx-plus-circle'),
+                    'delivery.order_ready' => self::event('Pedido de delivery listo', 'Avisa cuando un delivery directo queda preparado sin usar la asignación administrada.', ['ver pedidos en punto de venta', 'ver ordenes', 'ver caja'], 'bx-check-circle'),
+                    'delivery.available' => self::event('Nuevo pedido en espera para tomar (delivery)', 'Avisa cuando un delivery administrado está listo y disponible para que un repartidor lo tome.', ['ver delivery'], 'bx-package'),
                     'delivery.assigned' => self::event('Delivery asignado', 'Avisa cuando una entrega se asigna a un repartidor.', ['ver delivery'], 'bx-user-check'),
                     'delivery.picked_up' => self::event('Delivery recogido', 'Avisa cuando el repartidor recoge el pedido y comienza el trayecto.', ['ver delivery', 'ver ordenes', 'ver caja'], 'bx-run'),
                     'delivery.completed' => self::event('Delivery completado', 'Confirma que la entrega terminó y el pedido quedó liquidado.', ['ver delivery', 'ver ordenes', 'ver caja'], 'bx-home-heart'),

@@ -3,6 +3,7 @@
 namespace App\Livewire\Profile;
 
 use App\Models\NotificationPreference;
+use App\Support\NotificationEventCatalog;
 use Livewire\Component;
 
 class NotificationPreferencesForm extends Component
@@ -65,39 +66,17 @@ class NotificationPreferencesForm extends Component
 
     public function eventOptions(): array
     {
-        $all = [
-            'order_created' => ['bx-receipt', 'Pedidos nuevos', 'Nuevos pedidos relacionados con tu operación.'],
-            'order_ready' => ['bx-check-circle', 'Pedidos listos', 'Avisos cuando cocina termina un pedido.'],
-            'order_cancelled' => ['bx-error-circle', 'Cancelaciones', 'Incidencias bajo tu responsabilidad.'],
-            'order_paid' => ['bx-credit-card', 'Pedidos cobrados', 'Confirmaciones de cierre y cobro.'],
-            'order_cancellation_requested' => ['bx-error-circle', 'Solicitudes de cancelación', 'Solicitudes pendientes que requieren autorización.'],
-            'order_modification_requested' => ['bx-edit-alt', 'Solicitudes de modificación', 'Cambios de productos pendientes de autorización.'],
-            'delivery_available' => ['bx-cycling', 'Delivery disponible', 'Pedidos listos para que un repartidor los tome.'],
-            'delivery_assigned' => ['bx-user-check', 'Delivery asignado', 'Confirmaciones de asignación de entrega.'],
-            'delivery_picked_up' => ['bx-package', 'Delivery recogido', 'Seguimiento cuando el pedido sale a reparto.'],
-            'delivery_completed' => ['bx-home-heart', 'Delivery completado', 'Confirmación final de la entrega.'],
-        ];
+        $user = auth()->user();
 
-        $roles = auth()->user()->getRoleNames();
-        if ($roles->intersect(['owner', 'super-admin', 'admin', 'gerente'])->isNotEmpty()) {
-            return $all;
-        }
-
-        $keys = collect();
-        if ($roles->contains('cocinero')) {
-            $keys->push('order_created', 'order_cancelled');
-        }
-        if ($roles->contains('mesero')) {
-            $keys->push('order_created', 'order_ready', 'order_cancelled');
-        }
-        if ($roles->contains('cajero')) {
-            $keys->push('order_created', 'order_ready', 'order_cancelled', 'order_paid', 'delivery_picked_up', 'delivery_completed');
-        }
-        if ($roles->contains('repartidor')) {
-            $keys->push('delivery_available', 'delivery_assigned');
-        }
-
-        return collect($all)->only($keys->unique())->all();
+        return collect(NotificationEventCatalog::all())
+            ->filter(fn (array $event): bool => $user->canAny($event['permissions']))
+            ->mapWithKeys(fn (array $event, string $eventKey): array => [
+                str_replace('.', '_', $eventKey) => [
+                    $event['icon'],
+                    $event['label'],
+                    $event['description'],
+                ],
+            ])->all();
     }
 
     public function render()

@@ -6,6 +6,7 @@ use App\Models\AppNotification;
 use App\Models\NotificationPreference;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\DeliveryModulePolicy;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -227,13 +228,21 @@ class NotificationCenter extends Component
 
             if ($order?->type === 'delivery'
                 && ($order->delivery_flow_mode ?: 'managed') === 'managed'
-                && app(\App\Services\DeliveryModulePolicy::class)->enabled()
+                && app(DeliveryModulePolicy::class)->enabled()
                 && auth()->user()?->can('ver delivery')) {
                 return route('app.delivery', ['order' => $order->id], false);
             }
 
             if ($order && auth()->user()?->can('ver ordenes')) {
                 return route('app.ordenes.show', $order, false);
+            }
+
+            if ($order && auth()->user()?->can('ver pedidos en punto de venta')) {
+                return route('app.pos', [], false);
+            }
+
+            if ($order) {
+                return route('app.dashboard', [], false);
             }
         }
 

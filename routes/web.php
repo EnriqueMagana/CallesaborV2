@@ -88,6 +88,9 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/usuarios', UserList::class)->middleware('can:ver usuarios')->name('usuarios');
     Route::get('/roles-permisos', RolePermissionManager::class)->name('roles-permisos');
+    Route::get('/notificaciones-roles', RolePermissionManager::class)
+        ->middleware('can:gestionar roles')
+        ->name('notificaciones-roles');
     Route::get('/kioscos', KioskSettings::class)->middleware('can:gestionar kioscos')->name('kioscos');
     Route::get('/kioscos/{terminal}/abrir', KioskLaunchController::class)->middleware('can:gestionar kioscos')->name('kioscos.open');
     Route::get('/configuracion-negocio', BusinessSettingsManager::class)->name('configuracion-negocio');

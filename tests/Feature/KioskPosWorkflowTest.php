@@ -251,6 +251,8 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertIsString($mobileCss);
         $this->assertStringContainsString('@keydown.window="handleKeyboardShortcut($event)"', $view);
         $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
+        $this->assertStringContainsString('@resize.window.debounce.150ms="syncSearchBreakpoint()"', $view);
+        $this->assertStringContainsString('if (!this.isDesktop) this.searchExpanded = false;', $view);
         $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
         $this->assertStringNotContainsString('data-pos-save-cart', $cart);
         $this->assertStringContainsString('data-pos-save-draft', $checkout);
@@ -260,6 +262,9 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertStringContainsString('cart-mobile-close', $cart);
         $this->assertStringContainsString('Nota para cocina', $cart);
         $this->assertStringContainsString('aria-keyshortcuts="F3 F10"', $header);
+        $this->assertStringContainsString("'is-expanded': isCatalogSearchExpanded()", $header);
+        $this->assertStringContainsString('pos-header-search__shortcut', $header);
+        $this->assertStringContainsString('<kbd>F3</kbd><span aria-hidden="true">o</span><kbd>F10</kbd>', $header);
         $this->assertStringContainsString('x-model.debounce.160ms="catalogQuery"', $header);
         $this->assertStringContainsString('catalogQuery', $catalog);
         $this->assertStringNotContainsString('wire:model', $catalog);
@@ -286,6 +291,8 @@ class KioskPosWorkflowTest extends TestCase
             $this->assertStringNotContainsString($removedMoreRoute, $moreMenu);
         }
         $this->assertStringContainsString('@media (max-width: 1024px)', $mobileCss);
+        $this->assertMatchesRegularExpression('/@media \(min-width:\s*1025px\)[\s\S]*?\.pos-header-search__trigger\s*\{\s*display:\s*none;/', $mobileCss);
+        $this->assertMatchesRegularExpression('/@media \(min-width:\s*1025px\)[\s\S]*?\.pos-header-search__field\s*\{[^}]*position:\s*relative;[^}]*opacity:\s*1;[^}]*visibility:\s*visible;/', $mobileCss);
         $this->assertStringContainsString('transform: translateY(-50%) scaleX(1)', $mobileCss);
         $this->assertStringContainsString('--pos-mobile-nav-clearance:', $mobileCss);
         $this->assertStringContainsString('--pos-more-sheet-bottom:', $mobileCss);

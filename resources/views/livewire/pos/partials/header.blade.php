@@ -13,10 +13,11 @@
         </div>
     </div>
     <div class="pos-header-right">
-        <div class="pos-header-search" :class="{ 'is-expanded': searchExpanded, 'has-query': catalogQuery.trim() }"
-            @click.outside="if (searchExpanded) closeCatalogSearch(false)">
+        <div class="pos-header-search"
+            :class="{ 'is-expanded': isCatalogSearchExpanded(), 'is-desktop': isDesktop, 'has-query': catalogQuery.trim() }"
+            @click.outside="if (!isDesktop && searchExpanded) closeCatalogSearch(false)">
             <button type="button" class="pos-header-search__trigger" x-ref="catalogSearchButton"
-                @click="openCatalogSearch(false)" :aria-expanded="searchExpanded.toString()"
+                @click="openCatalogSearch(false)" :aria-expanded="isCatalogSearchExpanded().toString()"
                 aria-controls="pos-header-catalog-search" aria-label="Buscar en el catálogo"
                 title="Buscar platillo (F3 o F10)">
                 <i class="bx bx-search" aria-hidden="true"></i>
@@ -24,18 +25,23 @@
                 <span class="pos-header-search__status" x-show="catalogQuery.trim()" x-cloak aria-hidden="true"></span>
             </button>
             <div id="pos-header-catalog-search" class="pos-header-search__field"
-                :aria-hidden="(!searchExpanded).toString()">
+                :aria-hidden="(!isCatalogSearchExpanded()).toString()">
                 <i class="bx bx-search" aria-hidden="true"></i>
                 <label for="pos-catalog-search" class="visually-hidden">Buscar platillo o promoción</label>
                 <input id="pos-catalog-search" type="search" x-ref="catalogSearch"
                     x-model.debounce.160ms="catalogQuery"
                     @keydown.escape.stop="closeCatalogSearch(false)"
-                    :tabindex="searchExpanded ? 0 : -1"
+                    :tabindex="isCatalogSearchExpanded() ? 0 : -1"
                     class="pos-header-search__input" placeholder="Buscar platillo..." autocomplete="off"
                     data-pos-catalog-search aria-keyshortcuts="F3 F10">
+                <button type="button" class="pos-header-search__shortcut" @click="openCatalogSearch(true)"
+                    :tabindex="isDesktop ? 0 : -1" aria-label="Enfocar búsqueda; atajos F3 o F10"
+                    title="Enfocar búsqueda (F3 o F10)">
+                    <kbd>F3</kbd><span aria-hidden="true">o</span><kbd>F10</kbd>
+                </button>
                 <button type="button" class="pos-header-search__close"
-                    @click="closeCatalogSearch(true)" :tabindex="searchExpanded ? 0 : -1"
-                    aria-label="Limpiar búsqueda y cerrar">
+                    @click="closeCatalogSearch(true)" :tabindex="isCatalogSearchExpanded() ? 0 : -1"
+                    :aria-label="isDesktop ? 'Limpiar búsqueda' : 'Limpiar búsqueda y cerrar'">
                     <i class="bx bx-x" aria-hidden="true"></i>
                 </button>
             </div>

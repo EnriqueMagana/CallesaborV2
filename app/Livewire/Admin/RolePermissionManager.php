@@ -22,12 +22,19 @@ class RolePermissionManager extends Component
             403
         );
 
+        if (request()->routeIs('app.notificaciones-roles')) {
+            abort_unless(auth()->user()?->can('gestionar roles'), 403);
+            $this->activeTab = 'notifications';
+
+            return;
+        }
+
         if (! auth()->user()?->can('gestionar roles')) {
             $this->activeTab = 'permissions';
         }
     }
 
-    // ── Vista activa: 'roles' | 'permissions' ─────────────────────────
+    // ── Vista activa: 'roles' | 'notifications' | 'permissions' ───────
     public string $activeTab = 'roles';
 
     // ── Panel de rol ──────────────────────────────────────────────────

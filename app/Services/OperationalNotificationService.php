@@ -25,7 +25,7 @@ class OperationalNotificationService
         $category = $this->category($order);
 
         $this->send(
-            eventKey: 'order.created',
+            eventKey: $this->createdEventKey($order),
             category: $category,
             priority: 'high',
             subject: $order,
@@ -44,14 +44,14 @@ class OperationalNotificationService
 
         if ($order->status === 'lista') {
             $managedDelivery = $order->type === 'delivery' && $this->managedDelivery($order);
-            $event = $managedDelivery ? 'delivery.available' : 'order.ready';
+            $event = $managedDelivery ? 'delivery.available' : $this->readyEventKey($order);
             $this->send(
                 $event,
                 $this->category($order),
                 'high',
                 $order,
                 $this->readyRecipients($order),
-                $managedDelivery ? 'Delivery listo para recoger' : 'Pedido listo',
+                $managedDelivery ? 'Nuevo delivery listo para tomar' : $this->readyTitle($order),
                 $this->orderContext($order).' ya está listo.',
                 $this->urlFor($order),
                 $managedDelivery ? 'delivery' : 'ready',
@@ -238,11 +238,51 @@ class OperationalNotificationService
 
     private function createdTitle(Order $order): string
     {
+        if ($order->source === 'kiosk') {
+            return 'Nuevo pedido de kiosco';
+        }
+
         return match ($order->type) {
             'mesa' => 'Nuevo pedido de mesa',
             'delivery' => 'Nuevo pedido de delivery',
-            'pick_up', 'ventanilla' => 'Nuevo pedido para llevar',
+            'pick_up' => 'Nuevo pedido para recoger',
+            'ventanilla' => 'Nuevo pedido de ventanilla',
             default => 'Nuevo pedido',
+        };
+    }
+
+    private function readyTitle(Order $order): string
+    {
+        return match ($this->orderChannel($order)) {
+            'table' => 'Pedido de mesa listo',
+            'pickup' => 'Pedido para recoger listo',
+            'kiosk' => 'Pedido de kiosco listo',
+            'delivery' => 'Pedido de delivery listo',
+            default => 'Pedido de ventanilla listo',
+        };
+    }
+
+    private function createdEventKey(Order $order): string
+    {
+        return $this->orderChannel($order).'.order_created';
+    }
+
+    private function readyEventKey(Order $order): string
+    {
+        return $this->orderChannel($order).'.order_ready';
+    }
+
+    private function orderChannel(Order $order): string
+    {
+        if ($order->source === 'kiosk') {
+            return 'kiosk';
+        }
+
+        return match ($order->type) {
+            'mesa' => 'table',
+            'pick_up' => 'pickup',
+            'delivery' => 'delivery',
+            default => 'counter',
         };
     }
 
