@@ -34,6 +34,16 @@ class AppNotification extends Model
     public function getIconAttribute(): string
     {
         return match ($this->event_key) {
+            'table.order_created' => 'bx-dish',
+            'table.order_ready' => 'bx-check-circle',
+            'counter.order_created' => 'bx-receipt',
+            'counter.order_ready' => 'bx-check-circle',
+            'pickup.order_created' => 'bx-package',
+            'pickup.order_ready' => 'bx-check-double',
+            'kiosk.order_created' => 'bx-devices',
+            'kiosk.order_ready' => 'bx-check-circle',
+            'delivery.order_created' => 'bx-cycling',
+            'delivery.order_ready' => 'bx-check-circle',
             'order.created' => 'bx-receipt',
             'order.ready' => 'bx-check-circle',
             'order.cancelled' => 'bx-x-circle',
@@ -57,7 +67,8 @@ class AppNotification extends Model
     public function getToneAttribute(): string
     {
         return match ($this->event_key) {
-            'order.ready', 'delivery.available' => 'ready',
+            'table.order_ready', 'counter.order_ready', 'pickup.order_ready', 'kiosk.order_ready',
+            'delivery.order_ready', 'order.ready', 'delivery.available' => 'ready',
             'order.cancelled' => 'danger',
             'order.cancellation_requested' => 'danger',
             'order.modification_requested' => 'order',

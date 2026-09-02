@@ -35,6 +35,11 @@ class SidebarMenuSeeder extends Seeder
             'parent_id' => $administration->id, 'label' => 'Roles y permisos', 'type' => 'link',
             'icon' => 'bx-shield-quarter', 'route_name' => 'app.roles-permisos', 'permission' => 'gestionar roles', 'sort_order' => 20,
         ]);
+        $this->item('admin.role-notifications', [
+            'parent_id' => $administration->id, 'label' => 'Notificaciones por rol', 'type' => 'link',
+            'icon' => 'bx-bell', 'route_name' => 'app.notificaciones-roles',
+            'active_pattern' => 'app.notificaciones-roles', 'permission' => 'gestionar roles', 'sort_order' => 25,
+        ]);
         $configuration = $this->item('group.configuration', [
             'parent_id' => $administration->id, 'label' => 'Configuración', 'type' => 'group',
             'icon' => 'bx-cog', 'sort_order' => 30,

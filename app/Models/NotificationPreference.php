@@ -8,8 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class NotificationPreference extends Model
 {
     public const DEFAULT_EVENTS = [
-        'order_created' => true,
-        'order_ready' => true,
+        'table_order_created' => true,
+        'table_order_ready' => true,
+        'counter_order_created' => true,
+        'counter_order_ready' => true,
+        'pickup_order_created' => true,
+        'pickup_order_ready' => true,
+        'kiosk_order_created' => true,
+        'kiosk_order_ready' => true,
+        'delivery_order_created' => true,
+        'delivery_order_ready' => true,
         'order_cancelled' => true,
         'order_paid' => true,
         'order_cancellation_requested' => true,

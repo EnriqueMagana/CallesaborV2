@@ -4,15 +4,33 @@
     showSaved: false,
     showMore: false,
     searchExpanded: false,
+    isDesktop: window.matchMedia('(min-width: 1025px)').matches,
     catalogQuery: '',
     overlayTrigger: null,
     panels: { tables: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false },
     init() {
         this.$watch('showCart', () => this.syncOverlayLock());
         this.$watch('showMore', () => this.syncOverlayLock());
+        this.syncSearchBreakpoint();
     },
     syncOverlayLock() {
         document.documentElement.classList.toggle('pos-overlay-open', this.showCart || this.showMore);
+    },
+    syncSearchBreakpoint() {
+        const wasDesktop = this.isDesktop;
+        this.isDesktop = window.matchMedia('(min-width: 1025px)').matches;
+
+        if (this.isDesktop) {
+            this.searchExpanded = true;
+        } else if (wasDesktop) {
+            this.searchExpanded = false;
+        }
+    },
+    isCatalogSearchExpanded() {
+        return this.isDesktop || this.searchExpanded;
+    },
+    collapseCatalogSearch() {
+        if (!this.isDesktop) this.searchExpanded = false;
     },
     openCatalogSearch(selectContents = false) {
         this.searchExpanded = true;
@@ -25,6 +43,11 @@
     },
     closeCatalogSearch(clearQuery = false) {
         if (clearQuery) this.catalogQuery = '';
+        if (this.isDesktop) {
+            this.searchExpanded = true;
+            this.$nextTick(() => this.$refs.catalogSearch?.focus({ preventScroll: true }));
+            return;
+        }
         this.searchExpanded = false;
         this.$nextTick(() => this.$refs.catalogSearchButton?.focus({ preventScroll: true }));
     },
@@ -36,14 +59,14 @@
     showOnlyPanel(panel) {
         this.showMore = false;
         this.showCart = false;
-        this.searchExpanded = false;
+        this.collapseCatalogSearch();
         this.closeAllPanels();
         this.panels[panel] = true;
     },
     openMore(trigger) {
         const hadOpenPanel = this.closeAllPanels();
         this.showCart = false;
-        this.searchExpanded = false;
+        this.collapseCatalogSearch();
         this.overlayTrigger = trigger;
         this.showMore = true;
         if (hadOpenPanel) this.$wire.closeOperationalPanels();
@@ -58,7 +81,7 @@
     toggleCart() {
         const hadOpenPanel = this.closeAllPanels();
         this.showMore = false;
-        this.searchExpanded = false;
+        this.collapseCatalogSearch();
         this.showCart = !this.showCart;
         if (hadOpenPanel) this.$wire.closeOperationalPanels();
     },
@@ -68,7 +91,7 @@
             this.showCart = false;
             return;
         }
-        if (this.searchExpanded) this.closeCatalogSearch(false);
+        if (!this.isDesktop && this.searchExpanded) this.closeCatalogSearch(false);
         else if (this.closeAllPanels()) this.$wire.closeOperationalPanels();
     },
     trapFocus(event, container) {
@@ -141,7 +164,8 @@
         target.focus({ preventScroll: true });
         target.click();
     }
-}" @keydown.window="handleKeyboardShortcut($event)" @keydown.escape.window="closeTransientLayers()" class="pos-root">
+}" @resize.window.debounce.150ms="syncSearchBreakpoint()"
+    @keydown.window="handleKeyboardShortcut($event)" @keydown.escape.window="closeTransientLayers()" class="pos-root">
 
 {{-- Toast --}}
 <div x-data="{ show: false, msg: '', type: 'success' }"

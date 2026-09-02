@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\RolePermissionManager;
+use App\Livewire\Profile\NotificationPreferencesForm;
+use App\Models\NotificationPreference;
 use App\Models\Order;
 use App\Models\RoleNotificationSetting;
 use App\Models\User;
@@ -29,7 +31,7 @@ class RoleNotificationSettingsTest extends TestCase
         $role->givePermissionTo('ver ordenes');
         $recipient = User::factory()->create();
         $recipient->assignRole($role);
-        RoleNotificationSetting::create(['role_id' => $role->id, 'event_keys' => ['order.created']]);
+        RoleNotificationSetting::create(['role_id' => $role->id, 'event_keys' => ['counter.order_created']]);
 
         $actor = User::factory()->create();
         $actor->assignRole('cocinero');
@@ -41,7 +43,7 @@ class RoleNotificationSettingsTest extends TestCase
 
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $recipient->id,
-            'event_key' => 'order.created',
+            'event_key' => 'counter.order_created',
         ]);
     }
 
@@ -64,7 +66,7 @@ class RoleNotificationSettingsTest extends TestCase
 
         $this->assertDatabaseMissing('notifications', [
             'notifiable_id' => $owner->id,
-            'event_key' => 'order.created',
+            'event_key' => 'counter.order_created',
         ]);
     }
 
@@ -95,7 +97,138 @@ class RoleNotificationSettingsTest extends TestCase
             ->set('activeTab', 'notifications')
             ->call('selectNotificationRole', $role->id)
             ->assertSee('Capitan De Piso')
-            ->assertSee('Pedido nuevo')
+            ->assertSee('Nuevo pedido de mesa')
+            ->assertSee('Nuevo pedido de ventanilla')
+            ->assertSee('Nuevo pedido en espera para tomar (delivery)')
             ->assertSee('Solicitud de cancelación');
+    }
+
+    public function test_role_notification_module_opens_the_notification_editor_directly(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        $this->actingAs($owner)
+            ->get(route('app.notificaciones-roles'))
+            ->assertOk()
+            ->assertSee('Notificaciones por rol')
+            ->assertSee('Matriz de avisos operativos')
+            ->assertSee('Roles del sistema');
+
+        $unauthorized = User::factory()->create();
+
+        $this->actingAs($unauthorized)
+            ->get(route('app.notificaciones-roles'))
+            ->assertForbidden();
+    }
+
+    public function test_role_can_receive_table_ready_without_receiving_counter_ready(): void
+    {
+        $role = Role::create(['name' => 'capitan-mesas', 'guard_name' => 'web']);
+        $role->givePermissionTo('ver mesas');
+        $recipient = User::factory()->create();
+        $recipient->assignRole($role);
+        RoleNotificationSetting::create([
+            'role_id' => $role->id,
+            'event_keys' => ['table.order_ready'],
+        ]);
+
+        $actor = User::factory()->create();
+        $actor->assignRole('cocinero');
+        $this->actingAs($actor);
+
+        $tableOrder = new Order([
+            'served_by' => $recipient->id,
+            'type' => 'mesa',
+            'status' => 'lista',
+            'subtotal' => 80,
+            'total' => 80,
+        ]);
+        $tableOrder->id = 903;
+        app(OperationalNotificationService::class)->orderStatusChanged($tableOrder, 'en_preparacion');
+
+        $counterOrder = new Order([
+            'type' => 'ventanilla',
+            'status' => 'lista',
+            'subtotal' => 90,
+            'total' => 90,
+        ]);
+        $counterOrder->id = 904;
+        app(OperationalNotificationService::class)->orderStatusChanged($counterOrder, 'en_preparacion');
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $recipient->id,
+            'event_key' => 'table.order_ready',
+            'subject_id' => 903,
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'notifiable_id' => $recipient->id,
+            'event_key' => 'counter.order_ready',
+            'subject_id' => 904,
+        ]);
+    }
+
+    public function test_notification_catalog_exposes_events_according_to_dynamic_role_permissions(): void
+    {
+        $tableRole = Role::create(['name' => 'monitor-mesas', 'guard_name' => 'web']);
+        $tableRole->givePermissionTo('ver mesas');
+        $tableUser = User::factory()->create();
+        $tableUser->assignRole($tableRole);
+
+        Livewire::actingAs($tableUser)
+            ->test(NotificationPreferencesForm::class)
+            ->assertSee('Nuevo pedido de mesa')
+            ->assertSee('Pedido de mesa listo')
+            ->assertDontSee('Nuevo pedido de ventanilla')
+            ->assertDontSee('Nuevo pedido en espera para tomar (delivery)');
+
+        $deliveryRole = Role::create(['name' => 'monitor-delivery', 'guard_name' => 'web']);
+        $deliveryRole->givePermissionTo('ver delivery');
+        $deliveryUser = User::factory()->create();
+        $deliveryUser->assignRole($deliveryRole);
+
+        Livewire::actingAs($deliveryUser)
+            ->test(NotificationPreferencesForm::class)
+            ->assertSee('Nuevo pedido de delivery')
+            ->assertSee('Nuevo pedido en espera para tomar (delivery)')
+            ->assertDontSee('Pedido de mesa listo');
+    }
+
+    public function test_legacy_general_preferences_are_expanded_without_losing_their_value(): void
+    {
+        $role = Role::create(['name' => 'rol-legado', 'guard_name' => 'web']);
+        $setting = RoleNotificationSetting::create([
+            'role_id' => $role->id,
+            'event_keys' => ['order.created', 'order.ready', 'order.cancelled'],
+        ]);
+        $user = User::factory()->create();
+        $preference = NotificationPreference::create([
+            'user_id' => $user->id,
+            'event_preferences' => [
+                'order_created' => false,
+                'order_ready' => true,
+                'order_cancelled' => true,
+            ],
+        ]);
+
+        $migration = require database_path('migrations/2026_09_02_000003_expand_role_notification_event_keys.php');
+        $migration->up();
+
+        $events = $setting->fresh()->event_keys;
+        $this->assertNotContains('order.created', $events);
+        $this->assertNotContains('order.ready', $events);
+        $this->assertContains('table.order_created', $events);
+        $this->assertContains('counter.order_created', $events);
+        $this->assertContains('table.order_ready', $events);
+        $this->assertContains('kiosk.order_ready', $events);
+        $this->assertContains('order.cancelled', $events);
+
+        $savedPreferences = $preference->fresh()->event_preferences;
+        $this->assertArrayNotHasKey('order_created', $savedPreferences);
+        $this->assertArrayNotHasKey('order_ready', $savedPreferences);
+        $this->assertFalse($savedPreferences['table_order_created']);
+        $this->assertFalse($savedPreferences['delivery_order_created']);
+        $this->assertTrue($savedPreferences['table_order_ready']);
+        $this->assertTrue($savedPreferences['delivery_order_ready']);
     }
 }

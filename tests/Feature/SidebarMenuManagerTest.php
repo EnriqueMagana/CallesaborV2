@@ -137,6 +137,17 @@ class SidebarMenuManagerTest extends TestCase
         ]);
     }
 
+    public function test_sidebar_seed_registers_the_role_notification_module(): void
+    {
+        $this->assertTrue(app('router')->has('app.notificaciones-roles'));
+        $this->assertDatabaseHas('sidebar_menu_items', [
+            'system_key' => 'admin.role-notifications',
+            'route_name' => 'app.notificaciones-roles',
+            'permission' => 'gestionar roles',
+            'is_active' => true,
+        ]);
+    }
+
     public function test_order_request_inbox_is_visible_only_to_authorized_reviewers(): void
     {
         $this->assertDatabaseHas('sidebar_menu_items', [

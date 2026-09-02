@@ -49,10 +49,10 @@ class OperationalNotificationsTest extends TestCase
 
         app(OperationalNotificationService::class)->orderCreated($order);
 
-        $this->assertDatabaseHas('notifications', ['notifiable_id' => $owner->id, 'event_key' => 'order.created', 'category' => 'tables']);
-        $this->assertDatabaseHas('notifications', ['notifiable_id' => $waiter->id, 'event_key' => 'order.created', 'category' => 'tables']);
-        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $driver->id, 'event_key' => 'order.created']);
-        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $cook->id, 'event_key' => 'order.created']);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $owner->id, 'event_key' => 'table.order_created', 'category' => 'tables']);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $waiter->id, 'event_key' => 'table.order_created', 'category' => 'tables']);
+        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $driver->id, 'event_key' => 'table.order_created']);
+        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $cook->id, 'event_key' => 'table.order_created']);
     }
 
     public function test_driver_is_not_notified_until_delivery_is_ready(): void
@@ -72,7 +72,7 @@ class OperationalNotificationsTest extends TestCase
         $order->folio = 18;
 
         app(OperationalNotificationService::class)->orderCreated($order);
-        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $driver->id, 'event_key' => 'order.created']);
+        $this->assertDatabaseMissing('notifications', ['notifiable_id' => $driver->id, 'event_key' => 'delivery.order_created']);
 
         $order->status = 'lista';
         app(OperationalNotificationService::class)->orderStatusChanged($order, 'en_preparacion');
@@ -99,7 +99,49 @@ class OperationalNotificationsTest extends TestCase
         $service->orderCreated($order);
         $service->orderCreated($order);
 
-        $this->assertSame(1, $owner->fresh()->notifications()->where('event_key', 'order.created')->count());
+        $this->assertSame(1, $owner->fresh()->notifications()->where('event_key', 'counter.order_created')->count());
+    }
+
+    public function test_created_and_ready_events_are_separated_by_operational_channel(): void
+    {
+        $owner = $this->userWithRole('owner');
+        $actor = $this->userWithRole('cocinero');
+        $this->actingAs($actor);
+        $service = app(OperationalNotificationService::class);
+
+        $channels = [
+            ['id' => 510, 'type' => 'mesa', 'source' => null, 'created' => 'table.order_created', 'ready' => 'table.order_ready'],
+            ['id' => 511, 'type' => 'ventanilla', 'source' => null, 'created' => 'counter.order_created', 'ready' => 'counter.order_ready'],
+            ['id' => 512, 'type' => 'pick_up', 'source' => null, 'created' => 'pickup.order_created', 'ready' => 'pickup.order_ready'],
+            ['id' => 513, 'type' => 'ventanilla', 'source' => 'kiosk', 'created' => 'kiosk.order_created', 'ready' => 'kiosk.order_ready'],
+            ['id' => 514, 'type' => 'delivery', 'source' => null, 'created' => 'delivery.order_created', 'ready' => 'delivery.order_ready'],
+        ];
+
+        foreach ($channels as $channel) {
+            $order = new Order([
+                'type' => $channel['type'],
+                'source' => $channel['source'],
+                'delivery_flow_mode' => $channel['type'] === 'delivery' ? 'direct' : null,
+                'status' => 'pendiente',
+                'subtotal' => 100,
+                'total' => 100,
+            ]);
+            $order->id = $channel['id'];
+            $service->orderCreated($order);
+            $order->status = 'lista';
+            $service->orderStatusChanged($order, 'en_preparacion');
+
+            $this->assertDatabaseHas('notifications', [
+                'notifiable_id' => $owner->id,
+                'subject_id' => $channel['id'],
+                'event_key' => $channel['created'],
+            ]);
+            $this->assertDatabaseHas('notifications', [
+                'notifiable_id' => $owner->id,
+                'subject_id' => $channel['id'],
+                'event_key' => $channel['ready'],
+            ]);
+        }
     }
 
     public function test_user_can_read_notifications_from_the_center(): void
@@ -245,8 +287,8 @@ class OperationalNotificationsTest extends TestCase
         $this->actingAs($waiter);
 
         Livewire::test(NotificationPreferencesForm::class)
-            ->assertSee('Pedidos listos')
-            ->assertDontSee('Delivery disponible')
+            ->assertSee('Pedido de mesa listo')
+            ->assertDontSee('Nuevo pedido en espera para tomar (delivery)')
             ->set('soundEnabled', false)
             ->set('volume', 35)
             ->set('quietHoursEnabled', true)

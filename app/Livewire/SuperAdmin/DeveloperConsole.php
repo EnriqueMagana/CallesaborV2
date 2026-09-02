@@ -5,13 +5,14 @@ namespace App\Livewire\SuperAdmin;
 use App\Mail\DeveloperTestMail;
 use App\Models\AppNotification;
 use App\Models\DeliveryModuleAudit;
-use App\Services\DeveloperDiagnosticsService;
 use App\Services\DeliveryModuleManager;
 use App\Services\DeliveryModulePolicy;
+use App\Services\DeveloperDiagnosticsService;
 use App\Services\Firebase\FirebaseRealtimeDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -70,8 +71,7 @@ class DeveloperConsole extends Component
     public function testRealtimeNotification(
         DeveloperDiagnosticsService $diagnostics,
         FirebaseRealtimeDatabase $firebase,
-    ): void
-    {
+    ): void {
         $this->authorizeNotificationTests();
         $result = $diagnostics->createTestNotification(auth()->user(), true);
         $this->lastAction = [
@@ -193,7 +193,7 @@ class DeveloperConsole extends Component
 
         try {
             $result = app(DeliveryModuleManager::class)->setEnabled($enabled, auth()->user());
-        } catch (\Illuminate\Validation\ValidationException $exception) {
+        } catch (ValidationException $exception) {
             $this->addError('deliveryModule', $exception->validator->errors()->first('deliveryModule'));
 
             return;
@@ -309,9 +309,10 @@ class DeveloperConsole extends Component
                 ->limit(10)
                 ->get(),
             'responsibilityMatrix' => [
-                ['event' => 'Pedido nuevo', 'key' => 'order.created', 'recipients' => 'Supervisión, cocina, caja y mesero responsable'],
-                ['event' => 'Pedido de mesa listo', 'key' => 'order.ready', 'recipients' => 'Mesero responsable y supervisión'],
-                ['event' => 'Delivery disponible', 'key' => 'delivery.available', 'recipients' => 'Repartidor asignado, caja y supervisión'],
+                ['event' => 'Nuevo pedido de mesa', 'key' => 'table.order_created', 'recipients' => 'Roles configurados con acceso a Mesas o pedidos del POS'],
+                ['event' => 'Pedido de mesa listo', 'key' => 'table.order_ready', 'recipients' => 'Mesero responsable y roles configurados compatibles'],
+                ['event' => 'Nuevo pedido de ventanilla', 'key' => 'counter.order_created', 'recipients' => 'Roles configurados con acceso a Órdenes o pedidos del POS'],
+                ['event' => 'Delivery en espera para tomar', 'key' => 'delivery.available', 'recipients' => 'Roles configurados con acceso a Delivery'],
                 ['event' => 'Cancelación', 'key' => 'order.cancelled', 'recipients' => 'Responsables operativos y supervisión'],
             ],
         ])->layout('layouts.app');
