@@ -18,7 +18,12 @@ class PermissionSeederCoverageTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $expected = [
-            'punto_venta' => ['usar punto de venta'],
+            'punto_venta' => [
+                'usar punto de venta', 'crear ventas en punto de venta',
+                'gestionar borradores en punto de venta', 'ver pedidos en punto de venta',
+                'iniciar preparacion en punto de venta', 'marcar pedidos listos en punto de venta',
+                'cobrar pedidos en punto de venta', 'convertir pedidos a delivery en punto de venta',
+            ],
             'mesas' => [
                 'crear areas de mesas', 'editar areas de mesas', 'eliminar areas de mesas',
                 'crear mesas', 'editar mesas', 'eliminar mesas', 'cambiar estado mesas',
@@ -62,6 +67,11 @@ class PermissionSeederCoverageTest extends TestCase
         $this->assertFalse(Role::findByName('cajero')->hasPermissionTo('eliminar clientes'));
         $this->assertTrue(Role::findByName('cocinero')->hasPermissionTo('reimprimir tickets'));
         $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('usar punto de venta'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('iniciar preparacion en punto de venta'));
+        $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('marcar pedidos listos en punto de venta'));
+        $this->assertTrue(Role::findByName('cocinero')->hasPermissionTo('usar punto de venta'));
+        $this->assertTrue(Role::findByName('cocinero')->hasPermissionTo('ver pedidos en punto de venta'));
+        $this->assertFalse(Role::findByName('cocinero')->hasPermissionTo('crear ventas en punto de venta'));
         $this->assertTrue(Role::findByName('mesero')->hasPermissionTo('reimprimir tickets'));
         $this->assertTrue(Role::findByName('gerente')->hasPermissionTo('solicitar cancelacion de ordenes'));
         $this->assertTrue(Role::findByName('cajero')->hasPermissionTo('solicitar modificacion de ordenes'));

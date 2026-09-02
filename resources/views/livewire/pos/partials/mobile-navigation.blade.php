@@ -1,5 +1,5 @@
 <nav class="pos-mobile-nav" aria-label="Navegación principal del punto de venta">
-    @can('cerrar ordenes')
+    @can('ver pedidos en punto de venta')
         <button type="button" class="pos-mobile-nav__item is-pickup"
             :class="panels.pickup ? 'is-active' : ''"
             @click="showOnlyPanel('pickup'); $wire.openPickupPanel()"
@@ -42,7 +42,7 @@
         @endif
     </button>
 
-    @can('cerrar ordenes')
+    @can('ver pedidos en punto de venta')
         <button type="button" class="pos-mobile-nav__item is-delivery"
             :class="panels.delivery ? 'is-active' : ''"
             @click="showOnlyPanel('delivery'); $wire.openDeliveryPanel()"

@@ -102,6 +102,7 @@
 
                     {{-- Actions --}}
                     <div data-ui="xui-6bm9x1">
+                        @can($order->status === 'pendiente' ? 'iniciar preparacion en punto de venta' : 'marcar pedidos listos en punto de venta')
                         <button wire:click="markKitchenReady({{ $order->id }})"
                                 wire:loading.attr="disabled" wire:target="markKitchenReady({{ $order->id }})"
                                 class="pos-btn pos-btn-primary"
@@ -111,12 +112,15 @@
                             <span wire:loading.remove wire:target="markKitchenReady({{ $order->id }})">{{ $order->status === 'pendiente' ? 'Iniciar preparación' : 'Marcar como listo' }}</span>
                             <span wire:loading wire:target="markKitchenReady({{ $order->id }})">Actualizando…</span>
                         </button>
+                        @endcan
+                        @can('reimprimir tickets')
                         <button wire:click="reprintKitchenOrder({{ $order->id }})"
                                 class="pos-btn pos-btn-ghost"
                                 data-ui="xui-1jziqnb"
                                 title="Solo reimprimir">
                             <i class="bx bx-refresh"></i>
                         </button>
+                        @endcan
                     </div>
                 </div>
                 @endforeach

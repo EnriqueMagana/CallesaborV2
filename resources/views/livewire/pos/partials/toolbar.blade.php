@@ -1,5 +1,5 @@
 <nav class="pos-toolbar-bottom" aria-label="Áreas del punto de venta">
-    @can('cerrar ordenes')
+    @can('ver pedidos en punto de venta')
     <button type="button" class="tb-btn tb-btn--window" :class="panels.pickup ? 'is-active' : ''"
         @click="showOnlyPanel('pickup'); $wire.openPickupPanel()" data-pos-panel="pickup" aria-keyshortcuts="F6"
         aria-label="Abrir pedidos no pagados" title="Abrir pedidos por cobrar (F6)">
@@ -25,7 +25,7 @@
     </button>
     @endcanany
 
-    @can('cerrar ordenes')
+    @can('ver pedidos en punto de venta')
     <button type="button" class="tb-btn tb-btn--delivery" :class="panels.delivery ? 'is-active' : ''"
         @click="showOnlyPanel('delivery'); $wire.openDeliveryPanel()" data-pos-panel="delivery" aria-keyshortcuts="F8"
         aria-label="Abrir pedidos para entrega a domicilio" title="Abrir Delivery (F8)">

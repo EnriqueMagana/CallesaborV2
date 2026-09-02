@@ -10,6 +10,7 @@ use App\Livewire\Orders\OrderList;
 use App\Livewire\Pos\PointOfSale;
 use App\Models\CashRegister;
 use App\Models\InventoryItem;
+use App\Models\MesaService;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
 use App\Models\OrderItem;
@@ -93,6 +94,15 @@ class OperationalPermissionsTest extends TestCase
     public function test_modification_request_recalculates_total_and_preserves_removed_items(): void
     {
         [$requester, $register, $order] = $this->orderContext(['ver ordenes', 'solicitar modificacion de ordenes']);
+        $service = MesaService::create([
+            'cash_register_id' => $register->id,
+            'opened_by' => $requester->id,
+            'status' => 'en_cuenta',
+            'service_label' => 'Mesa de prueba',
+            'total_snapshot' => 100,
+            'opened_at' => now(),
+        ]);
+        $order->update(['mesa_service_id' => $service->id]);
         $item = OrderItem::create([
             'order_id' => $order->id,
             'product_name' => 'Producto anterior',
@@ -130,6 +140,7 @@ class OperationalPermissionsTest extends TestCase
         $this->assertDatabaseHas('order_items', ['id' => $item->id, 'is_cancelled' => true]);
         $this->assertDatabaseHas('order_items', ['order_id' => $order->id, 'product_id' => $product->id, 'quantity' => 1, 'subtotal' => 75]);
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'subtotal' => 75, 'total' => 75]);
+        $this->assertDatabaseHas('mesa_services', ['id' => $service->id, 'total_snapshot' => 75]);
     }
 
     public function test_opening_cash_register_requires_the_specific_permission(): void
@@ -182,7 +193,7 @@ class OperationalPermissionsTest extends TestCase
         ]);
     }
 
-    public function test_creating_an_order_requires_crear_ordenes(): void
+    public function test_creating_an_order_from_pos_requires_its_specific_permission(): void
     {
         $withoutPermission = $this->employee([]);
         $this->register($withoutPermission);
@@ -207,7 +218,7 @@ class OperationalPermissionsTest extends TestCase
             ->call('submitOrder')
             ->assertForbidden();
 
-        $creator = $this->employee(['crear ordenes']);
+        $creator = $this->employee(['crear ventas en punto de venta']);
         Livewire::actingAs($creator)
             ->test(PointOfSale::class)
             ->set('cart', $cart)
@@ -342,7 +353,7 @@ class OperationalPermissionsTest extends TestCase
         ]);
     }
 
-    public function test_reprint_and_kitchen_status_are_independent_permissions(): void
+    public function test_reprint_and_each_pos_kitchen_transition_are_independent_permissions(): void
     {
         [$viewer, $register, $order] = $this->orderContext([]);
 
@@ -359,13 +370,23 @@ class OperationalPermissionsTest extends TestCase
             ->call('markKitchenReady', $order->id)
             ->assertForbidden();
 
-        $editor = $this->employee(['editar ordenes']);
-        Livewire::actingAs($editor)
+        $starter = $this->employee(['iniciar preparacion en punto de venta']);
+        Livewire::actingAs($starter)
+            ->test(PointOfSale::class)
+            ->call('markKitchenReady', $order->id)
+            ->assertHasNoErrors()
+            ->call('markKitchenReady', $order->id)
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'en_preparacion']);
+
+        $finisher = $this->employee(['marcar pedidos listos en punto de venta']);
+        Livewire::actingAs($finisher)
             ->test(PointOfSale::class)
             ->call('markKitchenReady', $order->id)
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'en_preparacion']);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'lista']);
     }
 
     public function test_print_routes_require_reprint_permission(): void
@@ -401,7 +422,7 @@ class OperationalPermissionsTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_charging_a_ready_order_requires_cerrar_ordenes(): void
+    public function test_charging_a_ready_order_requires_the_specific_pos_permission(): void
     {
         [$employee, $register, $order] = $this->orderContext([], ['status' => 'lista']);
 
@@ -410,7 +431,7 @@ class OperationalPermissionsTest extends TestCase
             ->call('openPickupPayModal', $order->id)
             ->assertForbidden();
 
-        $cashier = $this->employee(['cerrar ordenes']);
+        $cashier = $this->employee(['cobrar pedidos en punto de venta']);
         Livewire::actingAs($cashier)
             ->test(PointOfSale::class)
             ->call('openPickupPayModal', $order->id)

@@ -1349,22 +1349,16 @@
                                                 </div>
                                                 <div class="mesa-print-account__summary">
                                                     <strong>{{ $account['label'] }}</strong>
-                                                    <small>{{ $account['item_count'] }} producto(s) · {{ $account['paid'] ? 'Pagada' : 'Pendiente de cobro' }}</small>
+                                                    <small>{{ $account['item_count'] }} producto(s) · {{ $account['paid'] ? 'Pagada · reimpresión disponible' : 'Pendiente de cobro' }}</small>
                                                 </div>
                                                 <strong class="mesa-print-account__total">${{ number_format($account['total'], 2) }}</strong>
-                                                @if ($account['paid'])
-                                                    <span class="mesa-print-account__locked" title="Las cuentas pagadas se consultan desde el historial">
-                                                        <i class="bx bx-lock-alt"></i> Cerrada
-                                                    </span>
-                                                @else
-                                                    <button type="button" class="btn btn-primary btn-sm"
-                                                        wire:click="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
-                                                        wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
-                                                        aria-label="Ver e imprimir {{ $account['label'] }}">
-                                                        <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><i class="bx bx-show me-1"></i> Vista previa</span>
-                                                        <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
-                                                    </button>
-                                                @endif
+                                                <button type="button" class="btn {{ $account['paid'] ? 'btn-outline-primary' : 'btn-primary' }} btn-sm"
+                                                    wire:click="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
+                                                    wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
+                                                    aria-label="Ver e imprimir {{ $account['label'] }}">
+                                                    <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><i class="bx {{ $account['paid'] ? 'bx-printer' : 'bx-show' }} me-1"></i> {{ $account['paid'] ? 'Reimprimir' : 'Vista previa' }}</span>
+                                                    <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
+                                                </button>
                                             </article>
                                         @endforeach
                                     </div>

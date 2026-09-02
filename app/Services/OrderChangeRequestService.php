@@ -356,6 +356,14 @@ class OrderChangeRequestService
 
         $subtotal = (float) OrderItem::query()->where('order_id', $order->id)->where('is_cancelled', false)->sum('subtotal');
         $order->update(['subtotal' => round($subtotal, 2), 'total' => round($subtotal, 2)]);
+
+        if ($order->mesa_service_id) {
+            $order->mesaService()->update([
+                'total_snapshot' => round((float) Order::query()
+                    ->where('mesa_service_id', $order->mesa_service_id)
+                    ->sum('total'), 2),
+            ]);
+        }
     }
 
     private function snapshot(Order $order): array

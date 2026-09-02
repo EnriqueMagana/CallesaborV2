@@ -714,6 +714,9 @@ class GestionMesas extends Component
         $label = $context['service']->service_label ?: $context['mesa']->display_name;
         $items = [];
         $total = (float) $context['orders']->sum('total');
+        $payments = [];
+        $cashierName = auth()->user()->name;
+        $trackingOrder = $context['orders']->first();
 
         if ($split) {
             if ($splitId !== $split->id || $accountIndex === null) {
@@ -723,8 +726,8 @@ class GestionMesas extends Component
             }
 
             $account = ($split->split_data ?? [])[$accountIndex] ?? null;
-            if (! $account || (bool) ($account['paid'] ?? false)) {
-                $this->dispatch('notify', type: 'warning', message: 'Esta subcuenta ya fue pagada o dejó de estar disponible.');
+            if (! $account) {
+                $this->dispatch('notify', type: 'warning', message: 'Esta subcuenta dejó de estar disponible.');
 
                 return;
             }
@@ -736,6 +739,10 @@ class GestionMesas extends Component
                 'subtotal' => (float) ($item['subtotal'] ?? 0),
             ])->values()->all();
             $total = (float) ($account['total'] ?? 0);
+            $payments = (array) ($account['payments'] ?? []);
+            $cashierName = User::find($account['paid_by'] ?? null)?->name ?? $cashierName;
+            $trackingOrder = $context['orders']->firstWhere('id', (int) ($account['tracking_order_id'] ?? 0))
+                ?? $trackingOrder;
         } else {
             if ($splitId !== null || $accountIndex !== null) {
                 $this->dispatch('notify', type: 'warning', message: 'La cuenta vigente ya no coincide con la selección. Actualiza el detalle e intenta de nuevo.');
@@ -769,10 +776,13 @@ class GestionMesas extends Component
             accountLabel: $label,
             items: $items,
             total: $total,
-            payments: [],
+            payments: $payments,
             assignment: $assignment,
-            cashierName: auth()->user()->name,
+            cashierName: $cashierName,
             autoPrint: false,
+            trackingUrl: $trackingOrder instanceof Order
+                ? route('kiosk.track', $trackingOrder->ensurePublicToken())
+                : null,
         );
 
         $this->dispatch(

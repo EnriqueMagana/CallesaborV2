@@ -45,7 +45,7 @@
             <i class="bx bx-home-alt"></i>
             <span>Dashboard</span>
         </a>
-        @canany(['crear ordenes', 'editar ordenes'])
+        @can('gestionar borradores en punto de venta')
             <button type="button" class="btn-header-action btn-header-saved"
                 @click="closeAllPanels(); showCart = false; showMore = false; showSaved = true; $wire.openSavedOrdersModal()"
                 data-pos-saved aria-keyshortcuts="F4"
@@ -54,7 +54,7 @@
                 <span>Guardados</span>
                 <kbd class="pos-control-shortcut" aria-hidden="true">F4</kbd>
             </button>
-        @endcanany
+        @endcan
         <div class="pos-register-status" data-ui="xui-h2y0md">
             <i class="bx bx-lock-open-alt"></i>
             <span>{{ $this->activeCashRegister->name }}</span>

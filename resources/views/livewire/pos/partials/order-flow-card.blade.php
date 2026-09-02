@@ -61,11 +61,13 @@
     @if ($showKitchenActions)
     <div class="pos-flow-card__actions">
         @if ($flowOrder->status === 'pendiente')
-            @can('editar ordenes')
+            @can('iniciar preparacion en punto de venta')
             <button type="button" wire:click="markKitchenReady({{ $flowOrder->id }})" wire:loading.attr="disabled"
                 wire:target="markKitchenReady({{ $flowOrder->id }})" class="pos-btn pos-btn-primary">
                 <i class="bx bx-printer"></i> Imprimir cocina
             </button>
+            @endcan
+            @can('convertir pedidos a delivery en punto de venta')
             @if ($canConvertToDelivery)
                 <button type="button" wire:click="openConvertDeliveryModal({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-secondary pos-btn-convert-delivery"><i class="bx bx-cycling"></i> Enviar a
@@ -73,7 +75,7 @@
             @endif
             @endcan
         @elseif ($flowOrder->status === 'en_preparacion')
-            @can('editar ordenes')
+            @can('marcar pedidos listos en punto de venta')
             <button type="button" wire:click="markKitchenReady({{ $flowOrder->id }})" wire:loading.attr="disabled"
                 wire:target="markKitchenReady({{ $flowOrder->id }})" class="pos-btn pos-btn-primary">
                 <i class="bx bx-check-circle"></i> Marcar listo
@@ -85,7 +87,7 @@
                 <i class="bx bx-printer"></i> Cocina
             </button>
             @endcan
-            @can('editar ordenes')
+            @can('convertir pedidos a delivery en punto de venta')
             @if ($canConvertToDelivery)
                 <button type="button" wire:click="openConvertDeliveryModal({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-secondary pos-btn-convert-delivery"><i class="bx bx-cycling"></i> Enviar a
@@ -103,7 +105,7 @@
                 </button>
                 @endcan
             @else
-                @can('cerrar ordenes')
+                @can('cobrar pedidos en punto de venta')
                 <button type="button" wire:click="openPickupPayModal({{ $flowOrder->id }})"
                     class="pos-btn pos-btn-primary">
                     <i class="bx bx-dollar-circle"></i> Cobrar ahora
@@ -115,7 +117,7 @@
                     <i class="bx bx-printer"></i> Cocina
                 </button>
                 @endcan
-                @can('editar ordenes')
+                @can('convertir pedidos a delivery en punto de venta')
                 @if ($canConvertToDelivery)
                     <button type="button" wire:click="openConvertDeliveryModal({{ $flowOrder->id }})"
                         class="pos-btn pos-btn-secondary pos-btn-convert-delivery"><i class="bx bx-cycling"></i> Enviar

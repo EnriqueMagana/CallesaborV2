@@ -32,14 +32,14 @@
         </header>
 
         <div class="pos-more-grid">
-            @canany(['crear ordenes', 'editar ordenes'])
+            @can('gestionar borradores en punto de venta')
                 <button type="button" class="pos-more-action" data-tone="violet"
                     @click="closeMore(false); showSaved = true; $wire.openSavedOrdersModal()"
                     wire:loading.attr="disabled" wire:target="openSavedOrdersModal">
                     <span class="pos-more-action__icon"><i class="bx bx-bookmark" aria-hidden="true"></i></span>
                     <strong>Guardados</strong><small>Retomar borradores</small>
                 </button>
-            @endcanany
+            @endcan
 
             @can('reimprimir tickets')
                 <button type="button" class="pos-more-action" data-tone="blue"

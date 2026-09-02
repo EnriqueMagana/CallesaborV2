@@ -26,6 +26,8 @@ hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-note, .ticket-sub { padding-left: 8px; font-size: .9em; }
 .ticket-item { margin-bottom: 6px; }
 .ticket-item-main { font-size: 1.02em; }
+.ticket-item--cancelled .ticket-item-main { opacity: .72; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.ticket-item-cancelled-note { font-weight: 700; letter-spacing: .02em; }
 .ticket-items-font-courier .ticket-items { font-family: "Courier New", monospace; }
 .ticket-items-font-arial .ticket-items { font-family: Arial, sans-serif; }
 .ticket-items-font-verdana .ticket-items { font-family: Verdana, sans-serif; }
