@@ -118,6 +118,7 @@ class OperationalNotificationService
         }
 
         $settingKey = str_replace('.', '_', $eventKey);
+        $recipients = app(RoleNotificationRecipientResolver::class)->resolve($eventKey, $recipients);
 
         $actorId = auth()->id();
         $now = now();

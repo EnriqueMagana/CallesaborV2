@@ -278,12 +278,49 @@ class MesasPermissionsTest extends TestCase
             ->call('setTab', 'todas')
             ->assertForbidden();
 
+        $legacyManager = $this->employee(['ver mesas', 'gestionar mesas']);
+        Livewire::actingAs($legacyManager)
+            ->test(GestionMesas::class)
+            ->assertDontSee('Todas las Mesas')
+            ->call('setTab', 'todas')
+            ->assertForbidden();
+
         $supervisor = $this->employee(['ver mesas', 'ver todas las mesas']);
         Livewire::actingAs($supervisor)
             ->test(GestionMesas::class)
             ->assertSee('Todas las Mesas')
             ->call('setTab', 'todas')
             ->assertSet('tab', 'todas')
+            ->assertHasNoErrors();
+    }
+
+    public function test_table_detail_cannot_be_opened_by_id_without_visibility_permission(): void
+    {
+        $area = $this->area();
+        $viewer = $this->employee(['ver mesas']);
+        $otherWaiter = $this->employee(['ver mesas']);
+        $ownMesa = $this->mesa($area, status: 'ocupada');
+        $otherMesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($ownMesa, $viewer);
+        $this->assign($otherMesa, $otherWaiter);
+
+        Livewire::actingAs($viewer)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $ownMesa->id)
+            ->assertSet('detailMesaId', $ownMesa->id)
+            ->assertSet('showDetailModal', true)
+            ->assertHasNoErrors();
+
+        Livewire::actingAs($viewer)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $otherMesa->id)
+            ->assertForbidden();
+
+        $supervisor = $this->employee(['ver mesas', 'ver todas las mesas']);
+        Livewire::actingAs($supervisor)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $otherMesa->id)
+            ->assertSet('detailMesaId', $otherMesa->id)
             ->assertHasNoErrors();
     }
 

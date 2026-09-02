@@ -185,7 +185,26 @@ class SidebarMenuManager extends Component
         $this->authorizeAction('crear menu sidebar');
         $this->resetEditor();
         $this->type = in_array($type, ['section', 'group', 'link'], true) ? $type : 'link';
-        $this->parentId = $parentId;
+        $this->parentId = $parentId ?? $this->suggestedParentId($this->type);
+    }
+
+    public function updatedType(string $type): void
+    {
+        if (! in_array($type, ['section', 'group', 'link'], true)) {
+            return;
+        }
+
+        if ($type === 'section') {
+            $this->parentId = null;
+        } elseif ($type === 'group') {
+            $parent = $this->parentId ? SidebarMenuItem::find($this->parentId) : null;
+            $this->parentId = $parent?->type === 'section'
+                ? $parent->id
+                : $this->suggestedParentId('group');
+        }
+
+        $this->resetValidation(['parentId', 'routeName']);
+        unset($this->parentOptions, $this->canRequireOpenRegister);
     }
 
     public function editItem(int $id): void
@@ -221,9 +240,11 @@ class SidebarMenuManager extends Component
             'url' => 'nullable|string|max:255',
             'activePattern' => 'nullable|string|max:160',
             'permission' => 'nullable|string|max:160|exists:permissions,name',
-            'parentId' => 'nullable|integer|exists:sidebar_menu_items,id',
+            'parentId' => [Rule::requiredIf($this->type === 'group'), 'nullable', 'integer', 'exists:sidebar_menu_items,id'],
             'isActive' => 'boolean',
             'requiresOpenRegister' => 'boolean',
+        ], [
+            'parentId.required' => 'Selecciona la sección donde debe aparecer el nuevo grupo.',
         ]);
 
         if ($this->type === 'link' && ! $this->routeName && ! $this->url) {
@@ -368,6 +389,20 @@ class SidebarMenuManager extends Component
         }
 
         return false;
+    }
+
+    private function suggestedParentId(string $type): ?int
+    {
+        if ($type !== 'group') {
+            return null;
+        }
+
+        return SidebarMenuItem::query()
+            ->where('type', 'section')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
     }
 
     private function decorateSiblings($siblings)

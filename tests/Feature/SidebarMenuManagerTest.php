@@ -78,6 +78,40 @@ class SidebarMenuManagerTest extends TestCase
         $this->assertDatabaseMissing('sidebar_menu_items', ['id' => $link->id]);
     }
 
+    public function test_new_group_action_selects_a_section_and_creates_the_group(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)
+            ->test(SidebarMenuManager::class)
+            ->call('createItem', 'group')
+            ->assertSet('type', 'group')
+            ->assertNotSet('parentId', null)
+            ->set('label', 'Operación nocturna')
+            ->set('icon', 'bx-folder')
+            ->call('saveItem')
+            ->assertHasNoErrors();
+
+        $group = SidebarMenuItem::where('label', 'Operación nocturna')->firstOrFail();
+        $this->assertSame('group', $group->type);
+        $this->assertSame('section', $group->parent->type);
+    }
+
+    public function test_group_cannot_be_saved_without_a_section(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)
+            ->test(SidebarMenuManager::class)
+            ->call('createItem', 'group')
+            ->set('parentId', null)
+            ->set('label', 'Grupo huérfano')
+            ->call('saveItem')
+            ->assertHasErrors(['parentId']);
+    }
+
     public function test_sidebar_tree_hides_links_when_user_lacks_the_required_permission(): void
     {
         $user = User::factory()->create();

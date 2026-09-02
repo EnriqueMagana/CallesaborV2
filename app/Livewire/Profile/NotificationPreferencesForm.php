@@ -70,6 +70,8 @@ class NotificationPreferencesForm extends Component
             'order_ready' => ['bx-check-circle', 'Pedidos listos', 'Avisos cuando cocina termina un pedido.'],
             'order_cancelled' => ['bx-error-circle', 'Cancelaciones', 'Incidencias bajo tu responsabilidad.'],
             'order_paid' => ['bx-credit-card', 'Pedidos cobrados', 'Confirmaciones de cierre y cobro.'],
+            'order_cancellation_requested' => ['bx-error-circle', 'Solicitudes de cancelación', 'Solicitudes pendientes que requieren autorización.'],
+            'order_modification_requested' => ['bx-edit-alt', 'Solicitudes de modificación', 'Cambios de productos pendientes de autorización.'],
             'delivery_available' => ['bx-cycling', 'Delivery disponible', 'Pedidos listos para que un repartidor los tome.'],
             'delivery_assigned' => ['bx-user-check', 'Delivery asignado', 'Confirmaciones de asignación de entrega.'],
             'delivery_picked_up' => ['bx-package', 'Delivery recogido', 'Seguimiento cuando el pedido sale a reparto.'],

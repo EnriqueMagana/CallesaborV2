@@ -22,7 +22,11 @@ class GestionMesas extends Component
         $this->requirePermission('ver mesas');
 
         $user = auth()->user();
-        if ($user?->hasRole('mesero') && ! $user->hasAnyRole(['cajero', 'gerente', 'admin', 'super-admin'])) {
+        if (
+            $user
+            && ! $user->can('ver todas las mesas')
+            && MesaAssignment::where('user_id', $user->id)->whereNull('released_at')->exists()
+        ) {
             $this->tab = 'mis_mesas';
         }
     }
@@ -227,7 +231,7 @@ class GestionMesas extends Component
             return null;
         }
 
-        return Mesa::with([
+        $mesa = Mesa::with([
             'area',
             'group.mesas',
             'assignments.waiter',
@@ -238,6 +242,12 @@ class GestionMesas extends Component
             'splits' => fn ($q) => $q->whereIn('status', ['pendiente', 'parcial'])->latest('id'),
             'orders' => fn ($q) => $q->latest()->take(20),
         ])->find($this->detailMesaId);
+
+        if ($mesa) {
+            $this->authorizeMesaVisibility($mesa);
+        }
+
+        return $mesa;
     }
 
     #[Computed]
@@ -248,6 +258,9 @@ class GestionMesas extends Component
         }
 
         $mesa = Mesa::find($this->detailMesaId);
+        if ($mesa) {
+            $this->authorizeMesaVisibility($mesa);
+        }
         $context = $mesa ? $this->printableAccountContext($mesa) : null;
         if (! $context) {
             return null;
@@ -690,7 +703,9 @@ class GestionMesas extends Component
     public function openDetail(int $mesaId): void
     {
         $this->requirePermission('ver mesas');
-        $this->detailMesaId = $mesaId;
+        $mesa = Mesa::findOrFail($mesaId);
+        $this->authorizeMesaVisibility($mesa);
+        $this->detailMesaId = $mesa->id;
         $this->showDetailModal = true;
         unset($this->detailMesa);
     }
@@ -703,6 +718,9 @@ class GestionMesas extends Component
         $this->requirePermission('reimprimir tickets');
 
         $mesa = Mesa::with('currentAssignment.waiter')->find($mesaId);
+        if ($mesa) {
+            $this->authorizeMesaVisibility($mesa);
+        }
         $context = $mesa ? $this->printableAccountContext($mesa) : null;
         if (! $context) {
             $this->dispatch('notify', type: 'warning', message: 'Solo puedes imprimir una cuenta vigente de una mesa en estado En cuenta.');
@@ -1112,9 +1130,47 @@ class GestionMesas extends Component
         $user = auth()->user();
 
         abort_unless(
-            $user && ($user->can('ver todas las mesas') || $user->can('gestionar mesas')),
+            $user && $user->can('ver todas las mesas'),
             403
         );
+    }
+
+    private function authorizeMesaVisibility(Mesa $mesa): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user && $user->can('ver mesas'), 403);
+
+        if ($user->can('ver todas las mesas')) {
+            return;
+        }
+
+        $visibleMesaIds = MesaAssignment::query()
+            ->where('user_id', $user->id)
+            ->whereNull('released_at')
+            ->pluck('mesa_id');
+
+        if ($visibleMesaIds->contains($mesa->id)) {
+            return;
+        }
+
+        if ($mesa->mesa_group_id) {
+            $hasAssignedGroupMember = Mesa::query()
+                ->where('mesa_group_id', $mesa->mesa_group_id)
+                ->whereIn('id', $visibleMesaIds)
+                ->exists();
+
+            if ($hasAssignedGroupMember) {
+                return;
+            }
+        }
+
+        $isKioskMesa = $mesa->orders()
+            ->where('source', 'kiosk')
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->exists();
+
+        abort_unless($isKioskMesa, 403);
     }
 
     public function render()
