@@ -9,6 +9,7 @@ use App\Models\AppNotification;
 use App\Models\Area;
 use App\Models\CashRegister;
 use App\Models\Mesa;
+use App\Models\MesaAssignment;
 use App\Models\NotificationPreference;
 use App\Models\Order;
 use App\Models\User;
@@ -53,6 +54,44 @@ class OperationalNotificationsTest extends TestCase
         $this->assertDatabaseHas('notifications', ['notifiable_id' => $waiter->id, 'event_key' => 'table.order_created', 'category' => 'tables']);
         $this->assertDatabaseMissing('notifications', ['notifiable_id' => $driver->id, 'event_key' => 'table.order_created']);
         $this->assertDatabaseMissing('notifications', ['notifiable_id' => $cook->id, 'event_key' => 'table.order_created']);
+    }
+
+    public function test_table_support_waiters_receive_ready_notifications(): void
+    {
+        $cook = $this->userWithRole('cocinero');
+        $primary = $this->userWithRole('mesero');
+        $support = $this->userWithRole('mesero');
+        $area = Area::create(['name' => 'Terraza']);
+        $mesa = Mesa::create(['area_id' => $area->id, 'number' => 9, 'capacity' => 4, 'status' => 'ocupada']);
+        foreach ([[$primary, 'primary'], [$support, 'support']] as [$waiter, $type]) {
+            MesaAssignment::create([
+                'mesa_id' => $mesa->id,
+                'user_id' => $waiter->id,
+                'assignment_type' => $type,
+                'assigned_by' => $primary->id,
+                'assigned_at' => now(),
+            ]);
+        }
+
+        $order = new Order([
+            'mesa_id' => $mesa->id,
+            'served_by' => $primary->id,
+            'type' => 'mesa',
+            'status' => 'lista',
+            'subtotal' => 120,
+            'total' => 120,
+        ]);
+        $order->id = 910;
+        $order->folio = 10;
+        $order->setRelation('mesa', $mesa->load('activeAssignments'));
+
+        $this->actingAs($cook);
+        app(OperationalNotificationService::class)->orderStatusChanged($order, 'en_preparacion');
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $support->id,
+            'event_key' => 'table.order_ready',
+        ]);
     }
 
     public function test_driver_is_not_notified_until_delivery_is_ready(): void

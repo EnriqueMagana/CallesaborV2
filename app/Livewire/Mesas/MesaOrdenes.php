@@ -14,13 +14,12 @@ class MesaOrdenes extends Component
     public function mount(Mesa $mesa): void
     {
         $user = auth()->user();
-        $assignment = $mesa->currentAssignment;
-
         abort_unless($user?->can('ver mesas'), 403);
 
-        if (!$user->hasAnyRole(['admin', 'super-admin', 'gerente', 'cajero'])) {
-            if (!$assignment || $assignment->user_id !== $user->id) {
+        if (! $user->hasAnyRole(['admin', 'super-admin', 'gerente', 'cajero'])) {
+            if (! $mesa->hasActiveAssignmentFor($user->id)) {
                 $this->redirect(route('app.mesas'));
+
                 return;
             }
         }
@@ -31,7 +30,7 @@ class MesaOrdenes extends Component
     #[Computed]
     public function mesa(): Mesa
     {
-        return Mesa::with(['area', 'currentAssignment.waiter'])->findOrFail($this->mesaId);
+        return Mesa::with(['area', 'currentAssignment.waiter', 'activeAssignments.waiter'])->findOrFail($this->mesaId);
     }
 
     #[Computed]
@@ -42,10 +41,10 @@ class MesaOrdenes extends Component
             'items.ingredients',
             'seller',
         ])
-        ->where('mesa_id', $this->mesaId)
-        ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-        ->latest()
-        ->get();
+            ->where('mesa_id', $this->mesaId)
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->latest()
+            ->get();
     }
 
     public function goBack(): void

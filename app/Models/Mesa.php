@@ -33,7 +33,39 @@ class Mesa extends Model
 
     public function currentAssignment(): HasOne
     {
-        return $this->hasOne(MesaAssignment::class)->whereNull('released_at')->latest('assigned_at');
+        return $this->hasOne(MesaAssignment::class)
+            ->where('assignment_type', 'primary')
+            ->whereNull('released_at')
+            ->latest('assigned_at');
+    }
+
+    public function activeAssignments(): HasMany
+    {
+        return $this->hasMany(MesaAssignment::class)
+            ->whereNull('released_at')
+            ->orderByRaw("CASE WHEN assignment_type = 'primary' THEN 0 ELSE 1 END")
+            ->orderBy('assigned_at');
+    }
+
+    public function supportAssignments(): HasMany
+    {
+        return $this->hasMany(MesaAssignment::class)
+            ->where('assignment_type', 'support')
+            ->whereNull('released_at')
+            ->orderBy('assigned_at');
+    }
+
+    public function hasActiveAssignmentFor(int $userId): bool
+    {
+        $mesaIds = $this->mesa_group_id
+            ? self::query()->where('mesa_group_id', $this->mesa_group_id)->pluck('id')
+            : collect([$this->id]);
+
+        return MesaAssignment::query()
+            ->whereIn('mesa_id', $mesaIds)
+            ->where('user_id', $userId)
+            ->whereNull('released_at')
+            ->exists();
     }
 
     public function orders(): HasMany

@@ -13,6 +13,9 @@ use App\Models\Category;
 use App\Models\Ingredient;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
+use App\Models\MesaGroup;
+use App\Models\MesaHelpRequest;
+use App\Models\MesaService;
 use App\Models\MesaSplit;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -266,6 +269,26 @@ class MesasPermissionsTest extends TestCase
             ->assertDontSee('wire:click="openDetail('.$otherMesa->id.')"', false);
     }
 
+    public function test_dedicated_waiter_always_lands_on_my_tables_even_with_broad_visibility(): void
+    {
+        $waiter = $this->employee(['ver mesas', 'ver todas las mesas']);
+        $waiter->assignRole('mesero');
+
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->assertSet('tab', 'mis_mesas');
+    }
+
+    public function test_waiter_entry_preference_does_not_override_a_cashier_combined_role(): void
+    {
+        $cashierWaiter = $this->employee(['ver mesas', 'ver todas las mesas']);
+        $cashierWaiter->assignRole(['mesero', 'cajero']);
+
+        Livewire::actingAs($cashierWaiter)
+            ->test(GestionMesas::class)
+            ->assertSet('tab', 'disponibles');
+    }
+
     public function test_viewing_all_active_tables_requires_its_own_permission(): void
     {
         $area = $this->area();
@@ -373,6 +396,225 @@ class MesasPermissionsTest extends TestCase
             ->assertRedirect(route('app.mesas.split', $splitMesa));
 
         $this->assertSame('en_cuenta', $splitMesa->fresh()->status);
+    }
+
+    public function test_close_choice_replaces_table_detail_instead_of_stacking_modals(): void
+    {
+        $area = $this->area();
+        $waiter = $this->employee(['ver mesas', 'cerrar mesas']);
+        $waiter->assignRole('mesero');
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $waiter);
+
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $mesa->id)
+            ->assertSet('showDetailModal', true)
+            ->call('openCloseMesa', $mesa->id)
+            ->assertSet('showDetailModal', false)
+            ->assertSet('detailMesaId', null)
+            ->assertSet('showCloseModal', true)
+            ->assertSee('Cuenta completa');
+    }
+
+    public function test_primary_waiter_can_add_support_without_losing_responsibility(): void
+    {
+        $area = $this->area();
+        $primary = $this->employee(['ver mesas', 'ordenar mesas']);
+        $primary->assignRole('mesero');
+        $support = $this->employee(['ver mesas', 'ordenar mesas']);
+        $support->assignRole('mesero');
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $primary);
+
+        Livewire::actingAs($primary)
+            ->test(GestionMesas::class)
+            ->call('openServiceTeam', $mesa->id)
+            ->set('serviceTeamWaiterIds', [$support->id])
+            ->call('addSupportWaiters')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('mesa_assignments', [
+            'mesa_id' => $mesa->id,
+            'user_id' => $support->id,
+            'assignment_type' => 'support',
+            'released_at' => null,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $support->id,
+            'event_key' => 'table.support_assigned',
+        ]);
+        $this->assertSame($primary->id, $mesa->fresh()->currentAssignment?->user_id);
+
+        Livewire::actingAs($support)
+            ->test(MesaOrden::class, ['mesa' => $mesa])
+            ->assertSet('mesaId', $mesa->id);
+    }
+
+    public function test_requested_support_is_only_assigned_after_acceptance_and_covers_the_group(): void
+    {
+        $area = $this->area();
+        $group = MesaGroup::create(['area_id' => $area->id, 'name' => 'Terraza unida']);
+        $primary = $this->employee(['ver mesas', 'ordenar mesas']);
+        $primary->assignRole('mesero');
+        $support = $this->employee(['ver mesas', 'ordenar mesas']);
+        $support->assignRole('mesero');
+        $firstMesa = $this->mesa($area, status: 'ocupada');
+        $secondMesa = $this->mesa($area, status: 'ocupada');
+        $firstMesa->update(['mesa_group_id' => $group->id]);
+        $secondMesa->update(['mesa_group_id' => $group->id]);
+        $this->assign($firstMesa, $primary);
+
+        Livewire::actingAs($primary)
+            ->test(GestionMesas::class)
+            ->call('openServiceTeam', $firstMesa->id)
+            ->set('serviceTeamWaiterIds', [$support->id])
+            ->set('serviceTeamApplyToGroup', true)
+            ->set('serviceTeamMessage', 'Apoyo para tomar bebidas')
+            ->call('requestTableSupport')
+            ->assertHasNoErrors();
+
+        $request = MesaHelpRequest::query()->firstOrFail();
+        $this->assertSame(MesaHelpRequest::STATUS_PENDING, $request->status);
+        $this->assertDatabaseMissing('mesa_assignments', [
+            'user_id' => $support->id,
+            'assignment_type' => 'support',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $support->id,
+            'event_key' => 'table.help_requested',
+        ]);
+
+        Livewire::actingAs($support)
+            ->test(GestionMesas::class)
+            ->assertSee('Apoyo para tomar bebidas')
+            ->call('respondToHelpRequest', $request->id, true)
+            ->assertHasNoErrors();
+
+        $this->assertSame(MesaHelpRequest::STATUS_ACCEPTED, $request->fresh()->status);
+        $this->assertSame(2, MesaAssignment::query()
+            ->whereIn('mesa_id', [$firstMesa->id, $secondMesa->id])
+            ->where('user_id', $support->id)
+            ->where('assignment_type', 'support')
+            ->whereNull('released_at')
+            ->count());
+    }
+
+    public function test_table_menu_exposes_help_as_a_quick_action_for_the_service_team(): void
+    {
+        $area = $this->area();
+        $waiter = $this->employee(['ver mesas', 'ordenar mesas']);
+        $waiter->assignRole('mesero');
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $waiter);
+
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->assertSee('Solicitar ayuda')
+            ->assertSee('Agregar apoyo a la mesa')
+            ->call('openServiceTeam', $mesa->id)
+            ->assertSet('showServiceTeamModal', true)
+            ->assertSet('serviceTeamMesaId', $mesa->id)
+            ->assertHasNoErrors();
+    }
+
+    public function test_assignment_history_is_limited_to_the_open_register_without_full_history_permission(): void
+    {
+        $area = $this->area();
+        $viewer = $this->employee(['ver mesas', 'ver todas las mesas']);
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $pastWaiter = $this->employee(['ver mesas']);
+        $currentWaiter = $this->employee(['ver mesas']);
+        $pastRegister = CashRegister::create([
+            'name' => 'Caja anterior',
+            'opened_by' => $viewer->id,
+            'initial_amount' => 0,
+            'opened_at' => now()->subDay(),
+            'is_open' => false,
+        ]);
+        $currentRegister = $this->openRegister($viewer);
+        $pastService = $this->mesaService($mesa, $pastRegister, $viewer, 'Servicio anterior');
+        $currentService = $this->mesaService($mesa, $currentRegister, $viewer, 'Servicio vigente');
+
+        MesaAssignment::create([
+            'mesa_id' => $mesa->id,
+            'mesa_service_id' => $pastService->id,
+            'user_id' => $pastWaiter->id,
+            'assignment_type' => 'primary',
+            'assigned_by' => $viewer->id,
+            'assigned_at' => now()->subDay(),
+            'released_by' => $viewer->id,
+            'released_at' => now()->subDay()->addHour(),
+        ]);
+        MesaAssignment::create([
+            'mesa_id' => $mesa->id,
+            'mesa_service_id' => $currentService->id,
+            'user_id' => $currentWaiter->id,
+            'assignment_type' => 'primary',
+            'assigned_by' => $viewer->id,
+            'assigned_at' => now(),
+        ]);
+
+        $scopedComponent = Livewire::actingAs($viewer)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $mesa->id)
+            ->assertSee('Actividad de la caja abierta');
+
+        $this->assertSame(
+            [$currentWaiter->id],
+            $scopedComponent->get('detailMesa')->assignments->pluck('user_id')->all(),
+        );
+
+        $viewer->givePermissionTo($this->permission('ver historial completo de asignaciones mesas'));
+
+        $fullComponent = Livewire::actingAs($viewer->fresh())
+            ->test(GestionMesas::class)
+            ->call('openDetail', $mesa->id)
+            ->assertSee('Historial completo');
+
+        $this->assertEqualsCanonicalizing(
+            [$currentWaiter->id, $pastWaiter->id],
+            $fullComponent->get('detailMesa')->assignments->pluck('user_id')->all(),
+        );
+    }
+
+    public function test_active_order_trace_shows_creator_photo_status_and_reception_time(): void
+    {
+        $area = $this->area();
+        $waiter = $this->employee(['ver mesas']);
+        $waiter->forceFill(['avatar' => 'avatars/mesero-prueba.webp'])->save();
+        $mesa = $this->mesa($area, status: 'ocupada');
+        $this->assign($mesa, $waiter);
+        $register = $this->openRegister($waiter);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $mesa->id,
+            'served_by' => $waiter->id,
+            'type' => 'mesa',
+            'status' => 'pendiente',
+            'subtotal' => 85,
+            'total' => 85,
+        ]);
+        $order->forceFill([
+            'created_at' => now()->startOfDay()->setTime(14, 25),
+            'updated_at' => now()->startOfDay()->setTime(14, 25),
+        ])->saveQuietly();
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Platillo trazable',
+            'product_price' => 85,
+            'quantity' => 1,
+            'subtotal' => 85,
+        ]);
+
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $mesa->id)
+            ->assertSee('Levantó la orden')
+            ->assertSee($waiter->name)
+            ->assertSee('Pendiente')
+            ->assertSee('Recibida 14:25 h')
+            ->assertSee('avatars/mesero-prueba.webp', false);
     }
 
     public function test_table_order_accepts_more_than_two_different_products(): void
@@ -717,6 +959,18 @@ class MesasPermissionsTest extends TestCase
             'initial_amount' => 0,
             'opened_at' => now(),
             'is_open' => true,
+        ]);
+    }
+
+    private function mesaService(Mesa $mesa, CashRegister $register, User $opener, string $label): MesaService
+    {
+        return MesaService::create([
+            'cash_register_id' => $register->id,
+            'primary_mesa_id' => $mesa->id,
+            'opened_by' => $opener->id,
+            'status' => 'abierta',
+            'service_label' => $label,
+            'opened_at' => $register->opened_at,
         ]);
     }
 }

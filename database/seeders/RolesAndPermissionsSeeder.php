@@ -40,6 +40,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'mesas' => [
                 'ver mesas',
                 'ver todas las mesas',
+                'ver historial completo de asignaciones mesas',
                 'asignar mesas',       // asignarse a una mesa disponible
                 'ordenar mesas',       // crear órdenes desde una mesa (mesero)
                 'cerrar mesas',        // cerrar cuenta (mesero solicita cobro)
@@ -132,7 +133,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
             'ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones',
             'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
-            'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
+            'ver mesas', 'ver todas las mesas', 'ver historial completo de asignaciones mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'gestionar mesas', 'gestionar grupos',
             'crear areas de mesas', 'editar areas de mesas', 'eliminar areas de mesas',

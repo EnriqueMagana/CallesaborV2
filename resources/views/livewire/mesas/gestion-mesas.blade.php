@@ -78,6 +78,41 @@
             </div>
         </div>
 
+        @if ($this->pendingHelpRequests->isNotEmpty())
+            <section class="mesa-help-inbox" aria-labelledby="mesa-help-inbox-title">
+                <div class="mesa-help-inbox__heading">
+                    <span><i class="bx bx-user-plus" aria-hidden="true"></i></span>
+                    <div>
+                        <h5 id="mesa-help-inbox-title">Solicitudes de apoyo</h5>
+                        <p>Confirma sólo las mesas que puedes atender en este momento.</p>
+                    </div>
+                    <strong>{{ $this->pendingHelpRequests->count() }}</strong>
+                </div>
+                <div class="mesa-help-inbox__list">
+                    @foreach ($this->pendingHelpRequests as $helpRequest)
+                        <article class="mesa-help-request" wire:key="mesa-help-request-{{ $helpRequest->id }}">
+                            <div class="mesa-help-request__avatar">
+                                @if ($helpRequest->requester?->avatar)
+                                    <img src="{{ Storage::url($helpRequest->requester->avatar) }}" alt="Foto de {{ $helpRequest->requester->name }}" width="44" height="44">
+                                @else
+                                    <span>{{ strtoupper(substr($helpRequest->requester?->name ?? 'M', 0, 1)) }}</span>
+                                @endif
+                            </div>
+                            <div class="mesa-help-request__copy">
+                                <strong>{{ $helpRequest->requester?->name ?? 'Un compañero' }} solicita apoyo</strong>
+                                <span>{{ $helpRequest->scope === 'group' ? ($helpRequest->group?->name ?? 'Grupo de mesas') : $helpRequest->mesa?->display_name }}</span>
+                                @if ($helpRequest->message)<small>{{ $helpRequest->message }}</small>@endif
+                            </div>
+                            <div class="mesa-help-request__actions">
+                                <button type="button" class="btn btn-outline-secondary" wire:click="respondToHelpRequest({{ $helpRequest->id }}, false)" wire:loading.attr="disabled" wire:target="respondToHelpRequest({{ $helpRequest->id }}, false)">No puedo</button>
+                                <button type="button" class="btn btn-primary" wire:click="respondToHelpRequest({{ $helpRequest->id }}, true)" wire:loading.attr="disabled" wire:target="respondToHelpRequest({{ $helpRequest->id }}, true)"><i class="bx bx-check me-1"></i>Aceptar</button>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         {{-- ══════════════════ TABS ══════════════════ --}}
         <div class="mesas-tabs-bar">
             <div class="mesas-tabs">
@@ -334,7 +369,8 @@
                                                 <div class="mesa-staff-overview__copy">
                                                     <small>{{ $directoryWaiter ? 'Responsable de la mesa' : 'Atención pendiente' }}</small>
                                                     <strong>{{ $directoryWaiter?->name ?? 'Sin empleado asignado' }}</strong>
-                                                    <span><i class="bx {{ $directoryWaiter ? 'bx-radio-circle-marked' : 'bx-error-circle' }}" aria-hidden="true"></i>{{ $directoryWaiter ? 'En servicio' : 'Requiere asignación' }}</span>
+                                                    @php $groupSupportCount = $firstMesa->activeAssignments->where('assignment_type', 'support')->unique('user_id')->count(); @endphp
+                                                    <span><i class="bx {{ $directoryWaiter ? 'bx-radio-circle-marked' : 'bx-error-circle' }}" aria-hidden="true"></i>{{ $directoryWaiter ? ($groupSupportCount ? "En servicio · {$groupSupportCount} apoyo(s)" : 'En servicio') : 'Requiere asignación' }}</span>
                                                 </div>
                                             </div>
                                         @endif
@@ -395,6 +431,17 @@
                                                     @click="open=false">
                                                     <i class="bx bx-info-circle"></i> Detalle
                                                 </button>
+                                                @if (
+                                                    in_array($firstMesa->status, ['ocupada', 'en_cuenta']) &&
+                                                        ($mesaUser?->can('reasignar mesas') ||
+                                                            $groupMesas->flatMap->activeAssignments->contains('user_id', $mesaUser?->id)))
+                                                    <button class="mesa-action-help" wire:click="openServiceTeam({{ $firstMesa->id }})"
+                                                        wire:loading.attr="disabled" wire:target="openServiceTeam"
+                                                        @click="open=false">
+                                                        <i class="bx bx-user-plus"></i>
+                                                        <span><strong>Solicitar ayuda</strong>
+                                                    </button>
+                                                @endif
                                                 @if ($firstMesa->status === 'ocupada')
                                                     @can('ordenar mesas')
                                                         <button wire:click="goToOrden({{ $firstMesa->id }})"
@@ -519,7 +566,8 @@
                                                 <div class="mesa-staff-overview__copy">
                                                     <small>{{ $directoryWaiter ? 'Responsable de la mesa' : 'Atención pendiente' }}</small>
                                                     <strong>{{ $directoryWaiter?->name ?? 'Sin empleado asignado' }}</strong>
-                                                    <span><i class="bx {{ $directoryWaiter ? 'bx-radio-circle-marked' : 'bx-error-circle' }}" aria-hidden="true"></i>{{ $directoryWaiter ? 'En servicio' : 'Requiere asignación' }}</span>
+                                                    @php $supportCount = $mesa->activeAssignments->where('assignment_type', 'support')->count(); @endphp
+                                                    <span><i class="bx {{ $directoryWaiter ? 'bx-radio-circle-marked' : 'bx-error-circle' }}" aria-hidden="true"></i>{{ $directoryWaiter ? ($supportCount ? "En servicio · {$supportCount} apoyo(s)" : 'En servicio') : 'Requiere asignación' }}</span>
                                                 </div>
                                             </div>
                                         @endif
@@ -584,6 +632,17 @@
                                                     @click="open=false">
                                                     <i class="bx bx-info-circle"></i> Ver detalle
                                                 </button>
+                                                @if (
+                                                    in_array($mesa->status, ['ocupada', 'en_cuenta']) &&
+                                                        ($mesaUser?->can('reasignar mesas') ||
+                                                            $mesa->activeAssignments->contains('user_id', $mesaUser?->id)))
+                                                    <button class="mesa-action-help" wire:click="openServiceTeam({{ $mesa->id }})"
+                                                        wire:loading.attr="disabled" wire:target="openServiceTeam"
+                                                        @click="open=false">
+                                                        <i class="bx bx-user-plus"></i>
+                                                        <span><strong>Solicitar ayuda</strong><small>Agregar apoyo a la mesa</small></span>
+                                                    </button>
+                                                @endif
                                                 @if ($mesa->status === 'ocupada')
                                                     @can('ordenar mesas')
                                                         <button wire:click="goToOrden({{ $mesa->id }})"
@@ -809,6 +868,84 @@
                     </button>
                 </div>
             </div>
+        </div>
+    @endif
+
+    {{-- ── Collaborative service team modal ── --}}
+    @if ($showServiceTeamModal && $this->serviceTeamMesa)
+        @php
+            $teamMesa = $this->serviceTeamMesa;
+            $activeTeam = $this->serviceTeamAssignments;
+            $activeTeamUserIds = $activeTeam->pluck('user_id');
+            $availableSupportWaiters = $this->waiters->reject(fn ($waiter) => $waiter->id === $mesaUser?->id || $activeTeamUserIds->contains($waiter->id));
+        @endphp
+        <div class="mesas-modal-backdrop mesas-modal-backdrop--team" wire:click.self="closeServiceTeam" x-data x-init="$nextTick(() => $refs.teamClose.focus())" @keydown.escape.window="$wire.closeServiceTeam()">
+            <section class="mesas-modal mesas-modal--service-team" role="dialog" aria-modal="true" aria-labelledby="service-team-title" aria-describedby="service-team-description">
+                <div class="mesas-modal-header">
+                    <div>
+                        <span class="mesas-modal-eyebrow">Atención colaborativa</span>
+                        <h5 id="service-team-title">Equipo de {{ $teamMesa->display_name }}</h5>
+                    </div>
+                    <button type="button" class="mesas-modal-close" wire:click="closeServiceTeam" x-ref="teamClose" aria-label="Cerrar gestión del equipo"><i class="bx bx-x"></i></button>
+                </div>
+                <div class="mesas-modal-body">
+                    <p id="service-team-description" class="text-muted">Agrega apoyo inmediatamente o envía una solicitud que el mesero deberá aceptar.</p>
+
+                    <div class="mesa-team-current" aria-label="Integrantes actuales">
+                        @foreach ($activeTeam as $memberAssignment)
+                            <div class="mesa-team-current__member" title="{{ $memberAssignment->assignment_type_label }}: {{ $memberAssignment->waiter?->name }}">
+                                @if ($memberAssignment->waiter?->avatar)
+                                    <img src="{{ Storage::url($memberAssignment->waiter->avatar) }}" alt="Foto de {{ $memberAssignment->waiter->name }}" width="42" height="42">
+                                @else
+                                    <span>{{ strtoupper(substr($memberAssignment->waiter?->name ?? 'M', 0, 1)) }}</span>
+                                @endif
+                                <small>{{ $memberAssignment->waiter?->name }}</small>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if ($teamMesa->mesa_group_id)
+                        <label class="mesa-team-scope">
+                            <input type="checkbox" wire:model="serviceTeamApplyToGroup">
+                            <span><i class="bx bx-merge"></i></span>
+                            <span><strong>Aplicar a todo el grupo</strong><small>El mesero podrá atender cualquiera de las mesas agrupadas.</small></span>
+                        </label>
+                    @endif
+
+                    <fieldset class="mesa-team-picker">
+                        <legend>Selecciona meseros disponibles</legend>
+                        @forelse ($availableSupportWaiters as $waiter)
+                            <label class="mesa-team-option">
+                                <input type="checkbox" wire:model="serviceTeamWaiterIds" value="{{ $waiter->id }}">
+                                <span class="mesa-team-option__avatar">
+                                    @if ($waiter->avatar)
+                                        <img src="{{ Storage::url($waiter->avatar) }}" alt="" width="44" height="44" loading="lazy">
+                                    @else
+                                        <span>{{ strtoupper(substr($waiter->name, 0, 1)) }}</span>
+                                    @endif
+                                </span>
+                                <span><strong>{{ $waiter->name }}</strong><small>Disponible para seleccionar</small></span>
+                                <i class="bx bx-check-circle" aria-hidden="true"></i>
+                            </label>
+                        @empty
+                            <div class="mesa-team-picker__empty"><i class="bx bx-check-shield"></i><span>Todo el personal disponible ya participa en este servicio.</span></div>
+                        @endforelse
+                    </fieldset>
+                    @error('serviceTeamWaiterIds')<div class="text-danger small mt-2" role="alert">{{ $message }}</div>@enderror
+
+                    <label class="mesa-team-message">
+                        <span>Mensaje para la solicitud <small>(opcional)</small></span>
+                        <input type="text" class="form-control" wire:model="serviceTeamMessage" maxlength="255" placeholder="Ej. Necesito apoyo para tomar bebidas">
+                    </label>
+                </div>
+                <div class="mesas-modal-actions mesas-modal-actions--team">
+                    <button type="button" class="btn btn-outline-secondary" wire:click="closeServiceTeam">Cancelar</button>
+                    <button type="button" class="btn btn-outline-primary" wire:click="requestTableSupport" wire:loading.attr="disabled" wire:target="requestTableSupport" @disabled($availableSupportWaiters->isEmpty())><i class="bx bx-bell me-1"></i>Solicitar ayuda</button>
+                    @if ($this->canDirectlyManageServiceTeam)
+                        <button type="button" class="btn btn-primary" wire:click="addSupportWaiters" wire:loading.attr="disabled" wire:target="addSupportWaiters" @disabled($availableSupportWaiters->isEmpty())><i class="bx bx-user-plus me-1"></i>Agregar al equipo</button>
+                    @endif
+                </div>
+            </section>
         </div>
     @endif
 
@@ -1240,12 +1377,16 @@
                                 @foreach ($dm->activeOrders as $order)
                                     <div class="detail-order-row">
                                         <div class="detail-order-header">
-                                            <span class="fw-semibold">#{{ $order->id }} ·
-                                                {{ $order->display_name }}</span>
+                                            <span class="detail-order-title">
+                                                <strong>{{ $order->display_folio }}</strong>
+                                                <small>{{ $order->display_name }}</small>
+                                            </span>
                                             <span
                                                 class="badge bg-label-{{ $order->status_color }}">{{ $order->status_label }}</span>
-                                            <span
-                                                class="text-muted small ms-auto">{{ $order->created_at->diffForHumans() }}</span>
+                                            <span class="detail-order-received" title="{{ $order->created_at->format('d/m/Y H:i:s') }}">
+                                                <i class="bx bx-time-five" aria-hidden="true"></i>
+                                                Recibida {{ $order->created_at->format('H:i') }} h
+                                            </span>
                                         </div>
                                         <div class="detail-order-items">
                                             @foreach ($order->items as $item)
@@ -1258,10 +1399,20 @@
                                             @endforeach
                                         </div>
                                         <div class="detail-order-footer">
-                                            <span class="fw-bold">Total:
-                                                ${{ number_format($order->total, 2) }}</span>
-                                            <span class="text-muted small">Atendido por:
-                                                {{ $order->seller?->name ?? '–' }}</span>
+                                            <div class="detail-order-audit">
+                                                <div class="detail-order-audit__avatar">
+                                                    @if ($order->seller?->avatar)
+                                                        <img src="{{ Storage::url($order->seller->avatar) }}"
+                                                            alt="Foto de {{ $order->seller->name }}" width="38" height="38" loading="lazy">
+                                                    @elseif ($order->seller)
+                                                        <span>{{ strtoupper(substr($order->seller->name, 0, 1)) }}</span>
+                                                    @else
+                                                        <i class="bx bx-desktop" aria-hidden="true"></i>
+                                                    @endif
+                                                </div>
+                                                <span><small>Levantó la orden</small><strong>{{ $order->seller?->name ?? 'Sistema' }}</strong></span>
+                                            </div>
+                                            <span class="detail-order-total"><small>Total</small><strong>${{ number_format($order->total, 2) }}</strong></span>
                                         </div>
                                     </div>
                                 @endforeach
@@ -1312,9 +1463,17 @@
 
                     {{-- Historial de asignaciones --}}
                     <div x-show="tab === 'asignaciones'">
+                        <div class="mesa-assignment-scope">
+                            <i class="bx {{ $mesaUser?->can('ver historial completo de asignaciones mesas') ? 'bx-archive' : 'bx-lock-alt' }}" aria-hidden="true"></i>
+                            <span>
+                                <strong>{{ $mesaUser?->can('ver historial completo de asignaciones mesas') ? 'Historial completo' : 'Actividad de la caja abierta' }}</strong>
+                                <small>{{ $mesaUser?->can('ver historial completo de asignaciones mesas') ? 'Incluye asignaciones y liberaciones de turnos anteriores.' : 'Las asignaciones de cajas anteriores requieren el permiso de historial completo.' }}</small>
+                            </span>
+                        </div>
+
                         @if ($dm->assignments->isEmpty())
                             <div class="mesas-empty mesas-empty--sm">
-                                <p>Sin historial de asignaciones.</p>
+                                <p>Sin asignaciones visibles en este alcance.</p>
                             </div>
                         @else
                             <div class="detail-history-list">
@@ -1333,7 +1492,7 @@
                                                 <span
                                                     class="fw-semibold">{{ $asgn->waiter?->name ?? 'Desconocido' }}</span>
                                                 @if ($asgn->is_active)
-                                                    <span class="badge bg-label-success">Activo</span>
+                                                    <span class="badge bg-label-success">{{ $asgn->assignment_type_label }} activo</span>
                                                 @else
                                                     <span class="badge bg-label-secondary">Finalizado</span>
                                                 @endif
