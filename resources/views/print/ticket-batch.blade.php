@@ -18,9 +18,11 @@
         : (int) $template->font_size;
     $configuredPrinterDpi = (string) ($template->options['printer_dpi'] ?? 'auto');
     $printerDpi = in_array($configuredPrinterDpi, ['auto', '203', '300'], true) ? $configuredPrinterDpi : 'auto';
-    $informationFontClass = $template->key === 'kitchen_area' ? 'ticket-info-kitchen' : 'ticket-info-readable';
+    $configuredInformationFont = (string) ($business->ticket_font_family ?: 'arial');
+    $informationFont = in_array($configuredInformationFont, ['arial', 'verdana', 'courier', 'system'], true) ? $configuredInformationFont : 'arial';
+    $informationFontSize = min(16, max(9, (int) ($business->ticket_font_size ?: 12)));
 @endphp
-<body data-printer-dpi="{{ $printerDpi }}" class="ticket-document {{ $informationFontClass }} ticket-dpi-{{ $printerDpi }} ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
+<body data-printer-dpi="{{ $printerDpi }}" class="ticket-document ticket-info-font-{{ $informationFont }} ticket-info-size-{{ $informationFontSize }} ticket-dpi-{{ $printerDpi }} ticket-paper-{{ $template->paper_width_mm }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
     @foreach($payloads as $payload)
         @php $qrDataUri = null; @endphp
         <main class="ticket-sheet ticket-page">

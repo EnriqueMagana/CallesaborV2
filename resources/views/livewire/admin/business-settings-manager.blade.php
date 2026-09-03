@@ -488,18 +488,41 @@
                     </div>
                 @endif
                 <fieldset class="ticket-settings-group">
+                    <legend>Tipografía global</legend>
+                    <p class="ticket-group-help">Se aplica al encabezado, datos, mesa, delivery, pagos y totales de todos los tickets. Los productos conservan su formato y los productos de cocina mantienen sus controles independientes.</p>
+                    <div class="ticket-format-grid">
+                        <x-business.field label="Fuente global" for="global-ticket-font">
+                            <select id="global-ticket-font" wire:model.live="globalTicketFontFamily">
+                                @foreach (\App\Livewire\Admin\BusinessSettingsManager::GLOBAL_TICKET_FONTS as $fontKey => $fontLabel)
+                                    <option value="{{ $fontKey }}">{{ $fontLabel }}</option>
+                                @endforeach
+                            </select>
+                        </x-business.field>
+                        <x-business.field label="Tamaño global" for="global-ticket-font-size"
+                            hint="No modifica el tamaño de los productos.">
+                            <select id="global-ticket-font-size" wire:model.live="globalTicketFontSize">
+                                @for ($size = 9; $size <= 16; $size++)
+                                    <option value="{{ $size }}">{{ $size }} px</option>
+                                @endfor
+                            </select>
+                        </x-business.field>
+                        <div class="d-flex align-items-end">
+                            <button type="button" class="biz-ghost-button" wire:click="saveGlobalTicketTypography"
+                                wire:loading.attr="disabled" wire:target="saveGlobalTicketTypography">
+                                <span wire:loading.remove wire:target="saveGlobalTicketTypography"><i class="bx bx-font"></i>Aplicar a todos</span>
+                                <span wire:loading wire:target="saveGlobalTicketTypography">Aplicando…</span>
+                            </button>
+                        </div>
+                    </div>
+                </fieldset>
+                <fieldset class="ticket-settings-group">
                     <legend>Formato de impresión</legend>
                     <div class="ticket-format-grid"><x-business.field label="Ancho" for="paper-width"><select
                                 id="paper-width" wire:model.live="paperWidth">
                                 <option value="80">80 mm</option>
                                 <option value="58">58 mm</option>
-                            </select></x-business.field><x-business.field label="Tamaño de letra"
-                            for="font-size"><select id="font-size" wire:model.live="fontSize">
-                                @for ($size = 9; $size <= 16; $size++)
-                                    <option value="{{ $size }}">{{ $size }} px</option>
-                                @endfor
                             </select>
-                        </x-business.field><x-business.field label="Margen" for="ticket-margin"><select
+                            </x-business.field><x-business.field label="Margen" for="ticket-margin"><select
                                 id="ticket-margin" wire:model.live="marginMm">
                                 @for ($margin = 2; $margin <= 6; $margin++)
                                     <option value="{{ $margin }}">{{ $margin }} mm</option>
@@ -610,7 +633,7 @@
                     </div><span class="ticket-live-chip"><i class="bx bx-radio-circle-marked"></i>En vivo</span>
                 </header>
                 <div class="ticket-preview-stage" wire:loading.class="is-loading"
-                    wire:target="selectType,toggleBlock,moveBlock,paperWidth,fontSize,marginMm,printerDpi,showLogo,showQr,logoWidthMm,itemFontFamily,itemFontSize"><iframe
+                    wire:target="selectType,toggleBlock,moveBlock,paperWidth,marginMm,printerDpi,globalTicketFontFamily,globalTicketFontSize,showLogo,showQr,logoWidthMm,itemFontFamily,itemFontSize"><iframe
                         title="Vista previa de {{ $ticketTypes[$selectedType]['name'] }}"
                         srcdoc="{{ $this->previewHtml }}"></iframe></div>
             </aside>

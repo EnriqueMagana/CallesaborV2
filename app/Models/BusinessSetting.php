@@ -15,6 +15,7 @@ class BusinessSetting extends Model
         'gallery_paths' => 'array',
         'featured_product_ids' => 'array',
         'delivery_management_enabled' => 'boolean',
+        'ticket_font_size' => 'integer',
     ];
 
     public const DEFAULT_HOURS = [

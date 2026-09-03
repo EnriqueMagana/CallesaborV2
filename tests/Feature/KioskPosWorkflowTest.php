@@ -1001,7 +1001,9 @@ class KioskPosWorkflowTest extends TestCase
             ->call('addPickupPayment')
             ->call('confirmPickupPayment')
             ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'VENTANILLA DESDE TICKET MAKER')
-                && str_contains($params['html_cliente'] ?? '', 'ticket-paper-58 ticket-font-15 ticket-margin-2')
+                && str_contains($params['html_cliente'] ?? '', 'ticket-info-font-arial ticket-info-size-12')
+                && str_contains($params['html_cliente'] ?? '', 'ticket-paper-58 ticket-margin-2')
+                && str_contains($params['html_cliente'] ?? '', 'ticket-items-size-15')
                 && ! str_contains($params['html_cliente'] ?? '', 'PLANTILLA CLIENTE INCORRECTA')
                 && ! str_contains($params['html_cliente'] ?? '', 'window.print()'));
     }

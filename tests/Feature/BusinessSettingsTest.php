@@ -63,6 +63,10 @@ class BusinessSettingsTest extends TestCase
             ->call('saveBusiness')
             ->assertHasNoErrors()
             ->call('setTab', 'tickets')
+            ->set('globalTicketFontFamily', 'verdana')
+            ->set('globalTicketFontSize', 15)
+            ->call('saveGlobalTicketTypography')
+            ->assertHasNoErrors()
             ->set('paperWidth', 58)
             ->set('fontSize', 14)
             ->set('printerDpi', '203')
@@ -76,6 +80,8 @@ class BusinessSettingsTest extends TestCase
             'platform_name' => 'Calle Sabor POS',
             'rfc' => 'CSB010101ABC',
             'maps_url' => 'https://maps.app.goo.gl/calle-sabor',
+            'ticket_font_family' => 'verdana',
+            'ticket_font_size' => 15,
         ]);
         $this->assertDatabaseHas('ticket_templates', [
             'key' => 'customer',
@@ -113,8 +119,39 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringContainsString('data:image/svg+xml;base64,', $html);
         $this->assertStringContainsString('assets/css/ticket-print.css', $html);
         $this->assertStringContainsString('data-printer-dpi="auto"', $html);
-        $this->assertStringContainsString('ticket-info-readable', $html);
+        $this->assertStringContainsString('ticket-info-font-arial', $html);
+        $this->assertStringContainsString('ticket-info-size-12', $html);
         $this->assertStringNotContainsString('<style', $html);
+    }
+
+    public function test_global_typography_applies_to_every_ticket_without_overriding_kitchen_items(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)
+            ->test(BusinessSettingsManager::class)
+            ->call('setTab', 'tickets')
+            ->set('globalTicketFontFamily', 'verdana')
+            ->set('globalTicketFontSize', 14)
+            ->call('saveGlobalTicketTypography')
+            ->assertHasNoErrors();
+
+        $business = BusinessSetting::current()->fresh();
+        foreach (array_keys(TicketTemplate::TYPES) as $type) {
+            $html = app(ThermalTicketRenderer::class)->renderPreview(
+                $type,
+                new TicketTemplate(TicketTemplate::defaultsFor($type)),
+                $business,
+            );
+
+            $this->assertStringContainsString('ticket-info-font-verdana', $html);
+            $this->assertStringContainsString('ticket-info-size-14', $html);
+
+            if ($type === 'kitchen_area') {
+                $this->assertStringContainsString('ticket-items-font-courier ticket-items-size-18', $html);
+            }
+        }
     }
 
     public function test_ticket_dates_are_presented_in_the_configured_business_timezone(): void
@@ -157,8 +194,8 @@ class BusinessSettingsTest extends TestCase
         );
 
         $this->assertStringContainsString('Mesa 4', $preview);
-        $this->assertStringContainsString('ticket-info-kitchen', $preview);
-        $this->assertStringNotContainsString('ticket-info-readable', $preview);
+        $this->assertStringContainsString('ticket-info-font-arial', $preview);
+        $this->assertStringContainsString('ticket-info-size-12', $preview);
         $this->assertStringContainsString('ticket-items-font-courier ticket-items-size-18', $preview);
         $this->assertStringContainsString('Entregar todos los platillos juntos.', $preview);
         $this->assertStringContainsString('Sin cebolla; término medio.', $preview);
@@ -348,7 +385,8 @@ class BusinessSettingsTest extends TestCase
 
         $html = app(ThermalTicketRenderer::class)->renderCashCut($cut);
 
-        $this->assertStringContainsString('ticket-paper-58 ticket-font-15 ticket-margin-2', $html);
+        $this->assertStringContainsString('ticket-info-font-arial ticket-info-size-12', $html);
+        $this->assertStringContainsString('ticket-paper-58 ticket-margin-2', $html);
         $this->assertStringNotContainsString('VENTAS POR CANAL', $html);
         $this->assertStringContainsString('window.print()', $html);
         $this->assertLessThan(
