@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\ThermalTicketRenderer;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -64,6 +65,7 @@ class BusinessSettingsTest extends TestCase
             ->call('setTab', 'tickets')
             ->set('paperWidth', 58)
             ->set('fontSize', 14)
+            ->set('printerDpi', '203')
             ->set('logoWidthMm', 30)
             ->set('showQr', true)
             ->call('saveTemplate')
@@ -82,6 +84,7 @@ class BusinessSettingsTest extends TestCase
             'show_qr' => true,
         ]);
         $this->assertSame(30, TicketTemplate::current('customer')->options['logo_width_mm']);
+        $this->assertSame('203', TicketTemplate::current('customer')->options['printer_dpi']);
     }
 
     public function test_renderer_uses_blocks_business_data_and_qr_without_inline_css(): void
@@ -109,7 +112,39 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringContainsString('PTR010101AA1', $html);
         $this->assertStringContainsString('data:image/svg+xml;base64,', $html);
         $this->assertStringContainsString('assets/css/ticket-print.css', $html);
+        $this->assertStringContainsString('data-printer-dpi="auto"', $html);
         $this->assertStringNotContainsString('<style', $html);
+    }
+
+    public function test_ticket_dates_are_presented_in_the_configured_business_timezone(): void
+    {
+        config(['app.business_timezone' => 'Asia/Tokyo']);
+
+        $user = User::factory()->create();
+        $register = CashRegister::create([
+            'name' => 'Caja zona horaria',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'served_by' => $user->id,
+            'type' => 'ventanilla',
+            'status' => 'pagada',
+            'subtotal' => 50,
+            'total' => 50,
+        ]);
+        $order->forceFill([
+            'created_at' => CarbonImmutable::parse('2026-09-02 00:30:00', 'UTC'),
+            'updated_at' => CarbonImmutable::parse('2026-09-02 00:30:00', 'UTC'),
+        ])->saveQuietly();
+
+        $html = app(ThermalTicketRenderer::class)->renderOrder($order->fresh(), 'counter', autoPrint: false);
+
+        $this->assertStringContainsString('02/09/2026 09:30', $html);
+        $this->assertStringNotContainsString('02/09/2026 00:30', $html);
     }
 
     public function test_kitchen_area_ticket_includes_table_and_order_and_item_notes(): void

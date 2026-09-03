@@ -16,6 +16,8 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 
 class ThermalTicketRenderer
 {
@@ -76,7 +78,7 @@ class ThermalTicketRenderer
                 default => 'RECIBO DE VENTA',
             },
             'folio' => $order->display_folio,
-            'date' => $order->created_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i'),
+            'date' => $this->businessDate($order->created_at) ?? $this->businessNow(),
             'customer' => $order->display_name,
             'served_by' => $order->seller?->name,
             'table' => $order->table_identifier ?: $order->mesa?->display_name,
@@ -215,10 +217,10 @@ class ThermalTicketRenderer
         return $this->render('inventory_purchase', [
             'title' => 'LISTA DE COMPRA DE INSUMOS',
             'folio' => $purchase->folio,
-            'date' => $purchase->issued_at?->format('d/m/Y H:i'),
+            'date' => $this->businessDate($purchase->issued_at),
             'requested_by' => $purchase->requester?->name ?: 'Sin asignar',
             'received_by' => $purchase->receiver?->name,
-            'received_at' => $purchase->received_at?->format('d/m/Y H:i'),
+            'received_at' => $this->businessDate($purchase->received_at),
             'status' => $purchase->status,
             'notes' => $purchase->notes,
             'items' => $purchase->items->map(fn ($line) => [
@@ -251,7 +253,7 @@ class ThermalTicketRenderer
         return $this->render('customer', [
             'title' => 'TICKET DE MESA',
             'folio' => $accountLabel,
-            'date' => now()->format('d/m/Y H:i'),
+            'date' => $this->businessNow(),
             'table' => $mesa->display_name,
             'area' => $mesa->area?->name,
             'served_by' => $assignment?->waiter?->name,
@@ -298,7 +300,7 @@ class ThermalTicketRenderer
         return $this->render('customer', [
             'title' => $service->status === 'pagada' ? 'HISTÓRICO DE MESA' : 'AUDITORÍA DE MESA',
             'folio' => $service->service_label,
-            'date' => ($service->closed_at ?? $service->updated_at)->format('d/m/Y H:i'),
+            'date' => $this->businessDate($service->closed_at ?? $service->updated_at),
             'table' => $service->service_label,
             'area' => $areas ?: $service->primaryMesa?->area?->name,
             'served_by' => $service->opener_name_snapshot ?: 'Sin asignar',
@@ -319,7 +321,7 @@ class ThermalTicketRenderer
                 $members ? "Mesas ocupadas: {$members}" : null,
                 $splitLabels ? "Subcuentas cobradas: {$splitLabels}" : null,
                 $service->status === 'liberada' ? "Liberada sin cobro: {$service->close_reason}" : null,
-                "Apertura: {$service->opened_at->format('d/m/Y H:i')}",
+                'Apertura: '.$this->businessDate($service->opened_at),
             ])->filter()->implode(' · '),
             'tracking_url' => $this->trackingUrlForOrders($service->orders),
         ]);
@@ -390,7 +392,7 @@ class ThermalTicketRenderer
             return $this->render($type, [
                 'title' => 'LISTA DE COMPRA DE INSUMOS',
                 'folio' => 'CMP-2607-000018',
-                'date' => now()->format('d/m/Y H:i'),
+                'date' => $this->businessNow(),
                 'requested_by' => 'Usuario de almacén',
                 'status' => 'pending',
                 'notes' => 'Comprar con el proveedor habitual.',
@@ -407,7 +409,7 @@ class ThermalTicketRenderer
         return $this->render($type, [
             'title' => TicketTemplate::TYPES[$type]['name'] ?? 'Ticket',
             'folio' => '001',
-            'date' => now()->format('d/m/Y H:i'),
+            'date' => $this->businessNow(),
             'customer' => 'Cliente de ejemplo',
             'served_by' => 'Usuario de caja',
             'cashier' => 'Usuario de caja',
@@ -437,8 +439,8 @@ class ThermalTicketRenderer
         return [
             'folio' => $cut->folio,
             'register' => $cut->cashRegister?->name ?? 'Caja',
-            'opened_at' => $cut->cashRegister?->opened_at?->format('d/m/Y g:i A'),
-            'closed_at' => $cut->generated_at?->format('d/m/Y g:i A'),
+            'opened_at' => $this->businessDate($cut->cashRegister?->opened_at, 'd/m/Y g:i A'),
+            'closed_at' => $this->businessDate($cut->generated_at, 'd/m/Y g:i A'),
             'cashier' => $cut->generator?->name ?? 'Sin asignar',
             'channels' => collect($channels)->map(fn (array $channel) => array_merge($channel, [
                 'total' => $channel['cash'] + $channel['card'] + $channel['transfer'],
@@ -457,7 +459,7 @@ class ThermalTicketRenderer
             'declared_cash' => (float) $cut->declared_cash,
             'difference' => (float) $cut->difference,
             'notes' => $cut->cashRegister?->closing_notes,
-            'generated_at' => $cut->generated_at?->format('d/m/Y g:i A'),
+            'generated_at' => $this->businessDate($cut->generated_at, 'd/m/Y g:i A'),
         ];
     }
 
@@ -471,7 +473,7 @@ class ThermalTicketRenderer
 
         return [
             'folio' => 'COR-00018', 'register' => 'Caja principal',
-            'opened_at' => now()->subHours(8)->format('d/m/Y g:i A'), 'closed_at' => now()->format('d/m/Y g:i A'),
+            'opened_at' => now($this->businessTimezone())->subHours(8)->format('d/m/Y g:i A'), 'closed_at' => $this->businessNow('d/m/Y g:i A'),
             'cashier' => 'María González', 'channels' => $channels,
             'payment_methods' => [
                 ['label' => 'Efectivo', 'amount' => 2040.00],
@@ -481,8 +483,25 @@ class ThermalTicketRenderer
             'sales_total' => 3245.50, 'initial_amount' => 500.00, 'cash_sales' => 2040.00, 'cash_incomes' => 0.00,
             'cash_expenses' => 180.00, 'expected_cash' => 2360.00, 'declared_cash' => 2350.00,
             'difference' => -10.00, 'notes' => 'Diferencia revisada por gerencia.',
-            'generated_at' => now()->format('d/m/Y g:i A'),
+            'generated_at' => $this->businessNow('d/m/Y g:i A'),
         ];
+    }
+
+    private function businessTimezone(): string
+    {
+        return (string) config('app.business_timezone', 'America/Mexico_City');
+    }
+
+    private function businessNow(string $format = 'd/m/Y H:i'): string
+    {
+        return now($this->businessTimezone())->format($format);
+    }
+
+    private function businessDate(?DateTimeInterface $date, string $format = 'd/m/Y H:i'): ?string
+    {
+        return $date
+            ? CarbonImmutable::instance($date)->setTimezone($this->businessTimezone())->format($format)
+            : null;
     }
 
     public function render(string $type, array $payload, ?TicketTemplate $template = null, ?BusinessSetting $business = null): string

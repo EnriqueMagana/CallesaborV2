@@ -16,8 +16,10 @@
     $itemFontSize = $template->key === 'kitchen_area'
         ? min(28, max(12, (int) ($template->options['item_font_size'] ?? 18)))
         : (int) $template->font_size;
+    $configuredPrinterDpi = (string) ($template->options['printer_dpi'] ?? 'auto');
+    $printerDpi = in_array($configuredPrinterDpi, ['auto', '203', '300'], true) ? $configuredPrinterDpi : 'auto';
 @endphp
-<body class="ticket-document ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
+<body data-printer-dpi="{{ $printerDpi }}" class="ticket-document ticket-dpi-{{ $printerDpi }} ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
     <main class="ticket-sheet">
         @foreach($template->blocks as $block)
             @if(($block['enabled'] ?? false) && in_array($block['key'] ?? '', ['header','business','order_meta','delivery','items','cut_summary','cut_meta','cut_sales_channels','cut_payment_methods','cut_cash_movements','cut_reconciliation','cut_notes','totals','payments','qr','footer','inventory_purchase_meta','inventory_purchase_items','inventory_purchase_notes'], true))
