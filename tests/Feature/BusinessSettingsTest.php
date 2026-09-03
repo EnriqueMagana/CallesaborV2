@@ -337,6 +337,10 @@ class BusinessSettingsTest extends TestCase
 
         $this->assertStringContainsString('VENTAS POR CANAL', $html);
         $this->assertStringContainsString('RESUMEN POR FORMA DE PAGO', $html);
+        $this->assertStringContainsString('aria-label="Formas de pago de Ventanilla"', $html);
+        $this->assertStringContainsString('ticket-cut-method-row', $html);
+        $this->assertStringContainsString('Transferencia', $html);
+        $this->assertStringNotContainsString(' · Tarjeta', $html);
         $this->assertStringContainsString('MOVIMIENTOS DE EFECTIVO', $html);
         $this->assertStringContainsString('CONCILIACI', $html);
         $this->assertStringContainsString('Caja principal', $html);
