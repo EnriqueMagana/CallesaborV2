@@ -439,8 +439,8 @@ class ThermalTicketRenderer
         return [
             'folio' => $cut->folio,
             'register' => $cut->cashRegister?->name ?? 'Caja',
-            'opened_at' => $this->businessDate($cut->cashRegister?->opened_at, 'd/m/Y g:i A'),
-            'closed_at' => $this->businessDate($cut->generated_at, 'd/m/Y g:i A'),
+            'opened_at' => $this->businessDate($cut->cashRegister?->opened_at, 'd/m/Y h:i A'),
+            'closed_at' => $this->businessDate($cut->generated_at, 'd/m/Y h:i A'),
             'cashier' => $cut->generator?->name ?? 'Sin asignar',
             'channels' => collect($channels)->map(fn (array $channel) => array_merge($channel, [
                 'total' => $channel['cash'] + $channel['card'] + $channel['transfer'],
@@ -459,7 +459,7 @@ class ThermalTicketRenderer
             'declared_cash' => (float) $cut->declared_cash,
             'difference' => (float) $cut->difference,
             'notes' => $cut->cashRegister?->closing_notes,
-            'generated_at' => $this->businessDate($cut->generated_at, 'd/m/Y g:i A'),
+            'generated_at' => $this->businessDate($cut->generated_at, 'd/m/Y h:i A'),
         ];
     }
 
@@ -473,7 +473,7 @@ class ThermalTicketRenderer
 
         return [
             'folio' => 'COR-00018', 'register' => 'Caja principal',
-            'opened_at' => now($this->businessTimezone())->subHours(8)->format('d/m/Y g:i A'), 'closed_at' => $this->businessNow('d/m/Y g:i A'),
+            'opened_at' => now($this->businessTimezone())->subHours(8)->format('d/m/Y h:i A'), 'closed_at' => $this->businessNow('d/m/Y h:i A'),
             'cashier' => 'María González', 'channels' => $channels,
             'payment_methods' => [
                 ['label' => 'Efectivo', 'amount' => 2040.00],
@@ -483,7 +483,7 @@ class ThermalTicketRenderer
             'sales_total' => 3245.50, 'initial_amount' => 500.00, 'cash_sales' => 2040.00, 'cash_incomes' => 0.00,
             'cash_expenses' => 180.00, 'expected_cash' => 2360.00, 'declared_cash' => 2350.00,
             'difference' => -10.00, 'notes' => 'Diferencia revisada por gerencia.',
-            'generated_at' => $this->businessNow('d/m/Y g:i A'),
+            'generated_at' => $this->businessNow('d/m/Y h:i A'),
         ];
     }
 
@@ -492,12 +492,12 @@ class ThermalTicketRenderer
         return (string) config('app.business_timezone', 'America/Mexico_City');
     }
 
-    private function businessNow(string $format = 'd/m/Y H:i'): string
+    private function businessNow(string $format = 'd/m/Y h:i A'): string
     {
         return now($this->businessTimezone())->format($format);
     }
 
-    private function businessDate(?DateTimeInterface $date, string $format = 'd/m/Y H:i'): ?string
+    private function businessDate(?DateTimeInterface $date, string $format = 'd/m/Y h:i A'): ?string
     {
         return $date
             ? CarbonImmutable::instance($date)->setTimezone($this->businessTimezone())->format($format)

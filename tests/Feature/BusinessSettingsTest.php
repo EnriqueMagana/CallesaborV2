@@ -113,6 +113,7 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringContainsString('data:image/svg+xml;base64,', $html);
         $this->assertStringContainsString('assets/css/ticket-print.css', $html);
         $this->assertStringContainsString('data-printer-dpi="auto"', $html);
+        $this->assertStringContainsString('ticket-info-readable', $html);
         $this->assertStringNotContainsString('<style', $html);
     }
 
@@ -143,7 +144,7 @@ class BusinessSettingsTest extends TestCase
 
         $html = app(ThermalTicketRenderer::class)->renderOrder($order->fresh(), 'counter', autoPrint: false);
 
-        $this->assertStringContainsString('02/09/2026 09:30', $html);
+        $this->assertStringContainsString('02/09/2026 09:30 AM', $html);
         $this->assertStringNotContainsString('02/09/2026 00:30', $html);
     }
 
@@ -156,6 +157,8 @@ class BusinessSettingsTest extends TestCase
         );
 
         $this->assertStringContainsString('Mesa 4', $preview);
+        $this->assertStringContainsString('ticket-info-kitchen', $preview);
+        $this->assertStringNotContainsString('ticket-info-readable', $preview);
         $this->assertStringContainsString('ticket-items-font-courier ticket-items-size-18', $preview);
         $this->assertStringContainsString('Entregar todos los platillos juntos.', $preview);
         $this->assertStringContainsString('Sin cebolla; término medio.', $preview);
