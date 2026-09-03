@@ -197,56 +197,47 @@
                         </div>
                     </div>
                 @elseif($orderType === 'delivery' && in_array($deliveryMethod, ['cash', 'card', 'transfer']))
-                    {{-- Delivery pagado en línea (tarjeta/transferencia): un solo pago, sin efectivo --}}
+                    {{-- Delivery anticipado: el método seleccionado registra un único pago al confirmar. --}}
+                    @php
+                        $advancePayment = match ($deliveryMethod) {
+                            'cash' => ['label' => 'Efectivo en local', 'icon' => 'bx-money'],
+                            'card' => ['label' => 'Tarjeta en local', 'icon' => 'bx-credit-card'],
+                            default => ['label' => 'Transferencia', 'icon' => 'bx-transfer-alt'],
+                        };
+                    @endphp
                     <div class="co-section-title" data-ui="xui-12bzlse">Pago anticipado</div>
                     <div data-ui="xui-1s5jbyx">
                         <div class="pay-methods" data-ui="xui-w2df8o">
-                            <button wire:click="$set('payMethod','cash')"
-                                class="pay-btn {{ $payMethod === 'cash' ? 'active' : '' }}">
-                                <i class="bx bx-money" aria-hidden="true"></i>
-                                <div class="pay-label">Efectivo</div>
-                            </button>
-                            <button wire:click="$set('payMethod','card')"
-                                class="pay-btn {{ $payMethod === 'card' ? 'active' : '' }}">
-                                <i class="bx bx-credit-card" aria-hidden="true"></i>
-                                <div class="pay-label">Tarjeta</div>
-                            </button>
-                            <button wire:click="$set('payMethod','transfer')"
-                                class="pay-btn {{ $payMethod === 'transfer' ? 'active' : '' }}">
-                                <i class="bx bx-transfer-alt" aria-hidden="true"></i>
-                                <div class="pay-label">Transferencia</div>
-                            </button>
+                            <div class="pay-btn active" role="status">
+                                <i class="bx {{ $advancePayment['icon'] }}" aria-hidden="true"></i>
+                                <div class="pay-label">{{ $advancePayment['label'] }}</div>
+                            </div>
                         </div>
                         <div class="co-grid" data-ui="xui-3ocpgz">
                             <div>
-                                <label class="co-label">Monto</label>
-                                <input type="number" wire:model="payAmount" class="co-input"
-                                    placeholder="{{ number_format($this->cartTotal, 2) }}" step="0.01"
-                                    min="0">
+                                <label class="co-label">Total que se registrará</label>
+                                <div class="co-input d-flex align-items-center fw-semibold" aria-label="Total del pago anticipado">
+                                    ${{ number_format($this->cartTotal, 2) }}
+                                </div>
                             </div>
-                            @if ($payMethod === 'card')
+                            @if ($deliveryMethod === 'card')
                                 <div>
                                     <label class="co-label">Últimos 4 dígitos</label>
                                     <input type="text" wire:model="payCardLast4" class="co-input"
-                                        placeholder="0000" maxlength="4">
+                                        placeholder="Opcional" maxlength="4" inputmode="numeric">
                                 </div>
-                            @elseif($payMethod === 'transfer')
+                            @elseif($deliveryMethod === 'transfer')
                                 <div>
                                     <label class="co-label">Referencia</label>
                                     <input type="text" wire:model="payTransferRef" class="co-input"
-                                        placeholder="Núm. referencia">
+                                        placeholder="Folio o referencia (opcional)" maxlength="120">
                                 </div>
                             @endif
                         </div>
-                        @if (!empty($payments))
-                            <div data-ui="xui-itl3ia">
-                                <span data-ui="xui-168ppgz">Pago registrado</span>
-                                <strong>${{ number_format($this->paidTotal, 2) }}</strong>
-                            </div>
-                        @endif
-                        <button wire:click="addPayment" class="pos-btn pos-btn-secondary" data-ui="xui-9wgym">
-                            Registrar pago
-                        </button>
+                        <div data-ui="xui-itl3ia">
+                            <span data-ui="xui-168ppgz">Se registrará automáticamente al confirmar el pedido.</span>
+                            <strong>${{ number_format($this->cartTotal, 2) }}</strong>
+                        </div>
                     </div>
                 @else
                     {{-- Ventanilla: flujo normal con efectivo, tarjeta y transferencia --}}

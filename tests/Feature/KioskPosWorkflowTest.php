@@ -853,6 +853,53 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
     }
 
+    public function test_delivery_transfer_is_registered_when_confirming_without_a_second_payment_step(): void
+    {
+        [$user] = $this->posContext();
+        $product = Product::create([
+            'name' => 'Delivery por transferencia',
+            'price' => 30,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->set('orderType', 'delivery')
+            ->set('deliveryMethod', 'transfer')
+            ->set('customerName', 'Cliente transferencia')
+            ->set('customerPhone', '9991112233')
+            ->set('customerAddress', 'Calle 20 #10')
+            ->set('customerNeighborhood', 'Centro')
+            ->set('payTransferRef', 'TRX-DELIVERY-30')
+            ->set('cart', [[
+                'cart_id' => 'delivery-transfer-test',
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_price' => 30,
+                'quantity' => 1,
+                'subtotal' => 30,
+                'notes' => '',
+                'addons' => [],
+                'ingredients' => [],
+            ]])
+            ->call('openCheckoutModal')
+            ->assertSee('Se registrará automáticamente al confirmar el pedido.')
+            ->assertDontSee('Registrar pago')
+            ->call('submitOrder')
+            ->assertHasNoErrors()
+            ->assertSet('showOrderSuccess', true);
+
+        $order = Order::query()->latest('id')->firstOrFail();
+        $this->assertSame('delivery', $order->type);
+        $this->assertSame('transfer', $order->delivery_method);
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id,
+            'method' => 'transferencia',
+            'amount' => 30,
+            'transfer_reference' => 'TRX-DELIVERY-30',
+        ]);
+    }
+
     public function test_pos_layout_does_not_load_the_admin_menu_controller(): void
     {
         [$user] = $this->posContext();
