@@ -6,6 +6,7 @@ use App\Models\CashMovement;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\Discount;
 use App\Models\InventoryItem;
 use App\Models\Mesa;
 use App\Models\MesaAssignment;
@@ -23,7 +24,9 @@ use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\QuotationItemAddon;
 use App\Models\QuotationItemIngredient;
+use App\Models\User;
 use App\Services\DeliveryModulePolicy;
+use App\Services\DiscountPricingService;
 use App\Services\InventoryService;
 use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
@@ -69,6 +72,10 @@ class PointOfSale extends Component
     public string $customerReferences = '';
 
     public string $customerSearch = '';
+
+    public ?int $discountEmployeeId = null;
+
+    public string $checkoutIdentityType = 'customer';
 
     // ─── New customer inline ───────────────────────────────────────────────────
     public bool $showAddCustomerModal = false;
@@ -431,6 +438,73 @@ class PointOfSale extends Component
     }
 
     #[Computed]
+    public function cartDiscountTotal(): float
+    {
+        return round((float) collect($this->cart)->sum('discount_amount'), 2);
+    }
+
+    #[Computed]
+    public function checkoutIdentitySearchResults()
+    {
+        $search = trim($this->customerSearch);
+        if (mb_strlen($search) < 2) {
+            return collect();
+        }
+
+        if ($this->checkoutIdentityType === 'employee') {
+            if (! auth()->user()?->can('aplicar descuentos')) {
+                return collect();
+            }
+
+            return User::query()
+                ->whereNull('banned_at')
+                ->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                })
+                ->orderBy('name')
+                ->limit(8)
+                ->get(['id', 'name', 'email', 'phone']);
+        }
+
+        return Customer::query()
+            ->where(function ($query) use ($search): void {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            })
+            ->orderBy('name')
+            ->limit(8)
+            ->get();
+    }
+
+    #[Computed]
+    public function selectedDiscountEmployee(): ?User
+    {
+        if (! $this->discountEmployeeId || ! auth()->user()?->can('aplicar descuentos')) {
+            return null;
+        }
+
+        return User::query()
+            ->whereKey($this->discountEmployeeId)
+            ->whereNull('banned_at')
+            ->first(['id', 'name', 'email', 'phone']);
+    }
+
+    #[Computed]
+    public function employeeDiscountTotal(): float
+    {
+        return round((float) collect($this->cart)
+            ->filter(fn (array $item): bool => in_array(
+                data_get($item, 'discount_snapshot.audience'),
+                [Discount::AUDIENCE_EMPLOYEES, Discount::AUDIENCE_SELECTED_EMPLOYEES],
+                true
+            ))
+            ->sum('discount_amount'), 2);
+    }
+
+    #[Computed]
     public function cartCount(): int
     {
         return collect($this->cart)->sum('quantity');
@@ -483,18 +557,6 @@ class PointOfSale extends Component
     public function paymentRemaining(): float
     {
         return max(0, round($this->cartTotal - $this->paidTotal, 2));
-    }
-
-    #[Computed]
-    public function customerSearchResults()
-    {
-        if (strlen($this->customerSearch) < 2) {
-            return collect();
-        }
-
-        return Customer::where('name', 'like', "%{$this->customerSearch}%")
-            ->orWhere('phone', 'like', "%{$this->customerSearch}%")
-            ->limit(8)->get();
     }
 
     #[Computed]
@@ -1109,12 +1171,20 @@ class PointOfSale extends Component
 
     private function saveCart(): void
     {
+        $discounts = app(DiscountPricingService::class);
+        $this->cart = $discounts->clear($this->cart);
         $this->cart = app(PromotionPricingService::class)->apply(
             $this->cart,
             'pos',
             $this->promotionFulfillmentForOrderType($this->orderType)
         );
-        unset($this->cartTotal, $this->cartCount, $this->promotionOpportunities);
+        $this->cart = $discounts->apply(
+            $this->cart,
+            $this->promotionFulfillmentForOrderType($this->orderType),
+            $this->customerId,
+            $this->validDiscountEmployeeId(),
+        );
+        unset($this->cartTotal, $this->cartCount, $this->cartDiscountTotal, $this->employeeDiscountTotal, $this->promotionOpportunities);
         Session::put('pos_cart_'.auth()->id(), $this->cart);
     }
 
@@ -1841,6 +1911,8 @@ class PointOfSale extends Component
     public function selectCustomer(int $id): void
     {
         $customer = Customer::findOrFail($id);
+        $this->checkoutIdentityType = 'customer';
+        $this->discountEmployeeId = null;
         $this->customerId = $customer->id;
         $this->customerName = $customer->name;
         $this->customerPhone = $customer->phone ?? '';
@@ -1848,7 +1920,9 @@ class PointOfSale extends Component
         $this->customerNeighborhood = $customer->neighborhood ?? '';
         $this->customerReferences = $customer->references ?? '';
         $this->customerSearch = '';
-        unset($this->customerSearchResults);
+        unset($this->checkoutIdentitySearchResults, $this->selectedDiscountEmployee);
+        $this->saveCart();
+        $this->syncPendingPaymentAmount();
     }
 
     public function clearCustomer(): void
@@ -1859,11 +1933,90 @@ class PointOfSale extends Component
         $this->customerAddress = '';
         $this->customerNeighborhood = '';
         $this->customerReferences = '';
+        $this->customerSearch = '';
+        unset($this->checkoutIdentitySearchResults);
+        $this->saveCart();
+        $this->syncPendingPaymentAmount();
+    }
+
+    public function setCheckoutIdentityType(string $type): void
+    {
+        abort_unless(in_array($type, ['customer', 'employee'], true), 404);
+        if ($type === 'employee') {
+            abort_unless(auth()->user()?->can('aplicar descuentos'), 403);
+        }
+
+        if ($this->checkoutIdentityType === $type) {
+            return;
+        }
+
+        $this->checkoutIdentityType = $type;
+        $this->customerId = null;
+        $this->discountEmployeeId = null;
+        $this->customerName = '';
+        $this->customerPhone = '';
+        $this->customerAddress = '';
+        $this->customerNeighborhood = '';
+        $this->customerReferences = '';
+        $this->customerSearch = '';
+        unset($this->checkoutIdentitySearchResults, $this->selectedDiscountEmployee);
+        $this->saveCart();
+        $this->syncPendingPaymentAmount();
+    }
+
+    public function selectCheckoutIdentity(int $id): void
+    {
+        if ($this->checkoutIdentityType === 'employee') {
+            $this->selectDiscountEmployee($id);
+
+            return;
+        }
+
+        $this->selectCustomer($id);
+    }
+
+    public function selectDiscountEmployee(int $employeeId): void
+    {
+        abort_unless(auth()->user()?->can('aplicar descuentos'), 403);
+
+        $employee = User::query()
+            ->whereKey($employeeId)
+            ->whereNull('banned_at')
+            ->firstOrFail(['id', 'name', 'email', 'phone']);
+
+        $this->checkoutIdentityType = 'employee';
+        $this->customerId = null;
+        $this->discountEmployeeId = $employee->id;
+        $this->customerName = $employee->name;
+        $this->customerPhone = $employee->phone ?? '';
+        $this->customerAddress = '';
+        $this->customerNeighborhood = '';
+        $this->customerReferences = '';
+        $this->customerSearch = '';
+        unset($this->checkoutIdentitySearchResults, $this->selectedDiscountEmployee);
+        $this->saveCart();
+        $this->syncPendingPaymentAmount();
+    }
+
+    public function clearDiscountEmployee(): void
+    {
+        abort_unless(auth()->user()?->can('aplicar descuentos'), 403);
+
+        $this->discountEmployeeId = null;
+        $this->customerName = '';
+        $this->customerPhone = '';
+        $this->customerAddress = '';
+        $this->customerNeighborhood = '';
+        $this->customerReferences = '';
+        $this->customerSearch = '';
+        unset($this->checkoutIdentitySearchResults, $this->selectedDiscountEmployee);
+        $this->saveCart();
+        $this->syncPendingPaymentAmount();
     }
 
     public function updatedCustomerSearch(): void
     {
-        unset($this->customerSearchResults);
+        unset($this->checkoutIdentitySearchResults);
     }
 
     public function openAddCustomerModal(): void
@@ -2188,14 +2341,17 @@ class PointOfSale extends Component
                     'quotation_id' => $quotation->id,
                     'product_id' => $item['product_id'],
                     'promotion_id' => $item['promotion_id'] ?? null,
+                    'discount_id' => $item['discount_id'] ?? null,
                     'product_name' => $item['product_name'],
                     'product_price' => $item['product_price'],
                     'quantity' => $item['quantity'],
                     'subtotal' => $item['subtotal'],
                     'promotion_discount' => $item['promotion_discount'] ?? 0,
+                    'discount_amount' => $item['discount_amount'] ?? 0,
                     'notes' => $item['notes'] ?: null,
                     'promotion_selections' => $item['promotion_selections'] ?? null,
                     'promotion_rule_snapshot' => $item['promotion_rule_snapshot'] ?? null,
+                    'discount_snapshot' => $item['discount_snapshot'] ?? null,
                 ]);
 
                 foreach ($item['addons'] as $a) {
@@ -2259,6 +2415,7 @@ class PointOfSale extends Component
                 'cart_id' => Str::uuid()->toString(),
                 'product_id' => $item->product_id,
                 'promotion_id' => $item->promotion_id,
+                'discount_id' => $item->discount_id,
                 'product_name' => $item->product_name,
                 'product_price' => (float) $item->product_price,
                 'product_image' => $item->promotion_id
@@ -2269,11 +2426,13 @@ class PointOfSale extends Component
                 'unit_total' => $unitTotal,
                 'subtotal' => $unitTotal * $item->quantity,
                 'promotion_discount' => (float) ($item->promotion_discount ?? 0),
+                'discount_amount' => (float) ($item->discount_amount ?? 0),
                 'notes' => $item->notes ?? '',
                 'addons' => $addons,
                 'ingredients' => $ingredients,
                 'promotion_selections' => $item->promotion_selections ?? [],
                 'promotion_rule_snapshot' => $item->promotion_rule_snapshot,
+                'discount_snapshot' => $item->discount_snapshot,
                 'auto_promotion_applied' => filled($item->promotion_rule_snapshot),
             ];
         }
@@ -2288,7 +2447,6 @@ class PointOfSale extends Component
         $this->cart = is_array($savedCart) && $savedCart !== []
             ? $this->restoreDraftCart($savedCart)
             : $newCart;
-        $this->saveCart();
 
         if ($draftState === [] && $quotation->customer_id) {
             $this->customerId = $quotation->customer_id;
@@ -2301,6 +2459,7 @@ class PointOfSale extends Component
             $this->customerName = $quotation->customer_name;
             $this->customerPhone = $quotation->customer_phone ?? '';
         }
+        $this->saveCart();
         $this->quotationName = $quotation->name ?? '';
         $this->quotationNotes = $quotation->notes ?? '';
 
@@ -2344,6 +2503,8 @@ class PointOfSale extends Component
                 'neighborhood' => $this->customerNeighborhood,
                 'references' => $this->customerReferences,
                 'search' => $this->customerSearch,
+                'identity_type' => $this->checkoutIdentityType,
+                'discount_employee_id' => $this->discountEmployeeId,
             ],
             'payment' => [
                 'payments' => $this->payments,
@@ -2387,6 +2548,15 @@ class PointOfSale extends Component
         $this->customerNeighborhood = (string) ($customer['neighborhood'] ?? '');
         $this->customerReferences = (string) ($customer['references'] ?? '');
         $this->customerSearch = (string) ($customer['search'] ?? '');
+        $savedEmployeeId = filter_var($customer['discount_employee_id'] ?? null, FILTER_VALIDATE_INT);
+        $this->discountEmployeeId = auth()->user()?->can('aplicar descuentos') && $savedEmployeeId
+            && User::query()->whereKey($savedEmployeeId)->whereNull('banned_at')->exists()
+                ? (int) $savedEmployeeId
+                : null;
+        $savedIdentityType = (string) ($customer['identity_type'] ?? '');
+        $this->checkoutIdentityType = $this->discountEmployeeId
+            ? 'employee'
+            : ($savedIdentityType === 'employee' && auth()->user()?->can('aplicar descuentos') ? 'employee' : 'customer');
 
         $this->payments = collect(is_array($payment['payments'] ?? null) ? $payment['payments'] : [])
             ->filter(fn ($item) => is_array($item)
@@ -2403,7 +2573,7 @@ class PointOfSale extends Component
         $this->payCardLast4 = (string) ($payment['card_last4'] ?? '');
         $this->payTransferRef = (string) ($payment['transfer_reference'] ?? '');
 
-        unset($this->customerSearchResults, $this->paidTotal, $this->paymentRemaining);
+        unset($this->checkoutIdentitySearchResults, $this->paidTotal, $this->paymentRemaining);
     }
 
     private function restoreDraftCart(array $savedCart): array
@@ -2417,6 +2587,11 @@ class PointOfSale extends Component
                 $item['promotion_selections'] = is_array($item['promotion_selections'] ?? null)
                     ? $item['promotion_selections']
                     : [];
+                $item['discount_id'] = $item['discount_id'] ?? null;
+                $item['discount_amount'] = (float) ($item['discount_amount'] ?? 0);
+                $item['discount_snapshot'] = is_array($item['discount_snapshot'] ?? null)
+                    ? $item['discount_snapshot']
+                    : null;
 
                 return $item;
             })
@@ -4437,6 +4612,7 @@ HTML;
             $order = Order::create([
                 'cash_register_id' => $cash?->id,
                 'customer_id' => $this->customerId,
+                'discount_beneficiary_user_id' => $this->validDiscountEmployeeId(),
                 'customer_name' => $this->customerName ?: null,
                 'customer_phone' => $this->customerPhone ?: null,
                 'customer_address' => $type === 'delivery' ? $this->formattedCustomerDeliveryAddress() : null,
@@ -4464,14 +4640,17 @@ HTML;
                     'order_id' => $order->id,
                     'product_id' => $item['product_id'],
                     'promotion_id' => $item['promotion_id'] ?? null,
+                    'discount_id' => $item['discount_id'] ?? null,
                     'product_name' => $item['product_name'],
                     'product_price' => $item['product_price'],
                     'quantity' => $item['quantity'],
                     'subtotal' => $item['subtotal'],
                     'promotion_discount' => $item['promotion_discount'] ?? 0,
+                    'discount_amount' => $item['discount_amount'] ?? 0,
                     'notes' => $item['notes'] ?: null,
                     'promotion_selections' => $item['promotion_selections'] ?? null,
                     'promotion_rule_snapshot' => $item['promotion_rule_snapshot'] ?? null,
+                    'discount_snapshot' => $item['discount_snapshot'] ?? null,
                 ]);
 
                 foreach ($item['addons'] as $addon) {
@@ -4641,13 +4820,33 @@ HTML;
         $this->customerNeighborhood = '';
         $this->customerReferences = '';
         $this->customerSearch = '';
+        $this->discountEmployeeId = null;
+        $this->checkoutIdentityType = 'customer';
         $this->payments = [];
         $this->payMethod = 'cash';
         $this->payAmount = '';
         $this->payCashReceived = '';
         $this->payCardLast4 = '';
         $this->payTransferRef = '';
-        unset($this->paidTotal, $this->paymentRemaining, $this->customerSearchResults);
+        unset($this->paidTotal, $this->paymentRemaining, $this->checkoutIdentitySearchResults);
+    }
+
+    private function validDiscountEmployeeId(): ?int
+    {
+        if (! $this->discountEmployeeId || ! auth()->user()?->can('aplicar descuentos')) {
+            return null;
+        }
+
+        return User::query()->whereKey($this->discountEmployeeId)->whereNull('banned_at')->exists()
+            ? $this->discountEmployeeId
+            : null;
+    }
+
+    private function syncPendingPaymentAmount(): void
+    {
+        $remaining = max(0, $this->cartTotal - collect($this->payments)->sum('amount'));
+        $this->payAmount = number_format($remaining, 2, '.', '');
+        unset($this->paidTotal, $this->paymentRemaining);
     }
 
     public function startNewSale(): void

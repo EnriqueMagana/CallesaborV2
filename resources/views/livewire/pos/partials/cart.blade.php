@@ -119,6 +119,9 @@
                     @if(!empty($item['promotion_discount']))
                         <div class="pos-cart-promotion-saving"><i class="bx bx-purchase-tag-alt"></i><span>{{ data_get($item, 'promotion_rule_snapshot.label', 'Promoción automática') }}</span><strong>−${{ number_format($item['promotion_discount'], 2) }}</strong></div>
                     @endif
+                    @if(!empty($item['discount_amount']))
+                        <div class="pos-cart-discount-saving"><i class="bx bx-purchase-tag-alt"></i><span>{{ data_get($item, 'discount_snapshot.name', 'Descuento automático') }}</span><strong>−${{ number_format($item['discount_amount'], 2) }}</strong></div>
+                    @endif
 
                     <div class="cart-item__footer">
                         <div class="cart-qty-controls" aria-label="Cantidad de {{ $item['product_name'] }}">
@@ -176,6 +179,9 @@
                     <span>{{ $cartUnitCount }} {{ $cartUnitCount === 1 ? 'artículo' : 'artículos' }}</span>
                     <span>Total a cobrar</span>
                 </div>
+                @if($this->cartDiscountTotal > 0)
+                    <div class="total-row pos-discount-total"><span>Descuento automático</span><span>−${{ number_format($this->cartDiscountTotal, 2) }}</span></div>
+                @endif
                 <div class="total-row main">
                     <span>Total</span>
                     <span>${{ number_format($this->cartTotal, 2) }}</span>

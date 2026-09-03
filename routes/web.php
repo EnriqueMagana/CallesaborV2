@@ -15,6 +15,7 @@ use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use App\Livewire\Admin\BusinessSettingsManager;
 use App\Livewire\Admin\DigitalMenuManager;
+use App\Livewire\Admin\DiscountManager;
 use App\Livewire\Admin\KioskSettings;
 use App\Livewire\Admin\PromotionManager;
 use App\Livewire\Admin\RoleNotificationManager;
@@ -105,6 +106,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
         ->name('super-admin.environment');
     Route::get('/menu-digital', DigitalMenuManager::class)->middleware('can:gestionar menu digital')->name('menu-digital');
     Route::get('/promociones', PromotionManager::class)->middleware('can:ver promociones')->name('promociones');
+    Route::get('/descuentos', DiscountManager::class)->middleware('can:ver descuentos')->name('descuentos');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
     Route::get('/ordenes', OrderList::class)->middleware('can:ver ordenes')->name('ordenes');
     Route::get('/solicitudes-ordenes', OrderChangeRequestInbox::class)

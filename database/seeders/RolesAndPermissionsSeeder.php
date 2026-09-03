@@ -36,6 +36,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion', 'gestionar menu digital'],
             'promociones' => ['ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones'],
+            'descuentos' => ['ver descuentos', 'crear descuentos', 'editar descuentos', 'eliminar descuentos'],
             'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'revisar solicitudes de ordenes', 'cerrar ordenes', 'reimprimir tickets'],
             'mesas' => [
                 'ver mesas',
@@ -134,6 +135,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
             'ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones',
+            'ver descuentos', 'crear descuentos', 'editar descuentos', 'eliminar descuentos',
             'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'ver todas las mesas', 'ver historial completo de asignaciones mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',

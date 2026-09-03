@@ -61,61 +61,7 @@
                     </div>
                 </div>
 
-                {{-- Cliente --}}
-                <div class="co-section-title"><i class="bx bx-user me-1"></i>Cliente</div>
-                @if ($customerId)
-                    <div data-ui="xui-232dwh">
-                        <div data-ui="xui-1l6bmjz">
-                            <span data-ui="xui-1vhwqlq">{{ strtoupper(substr($customerName, 0, 1)) }}</span>
-                        </div>
-                        <div data-ui="xui-1vcuwtj">
-                            <div data-ui="xui-d4ici8">{{ $customerName }}</div>
-                            <div data-ui="xui-17weutf">{{ $customerPhone }}</div>
-                        </div>
-                        <button wire:click="clearCustomer" data-ui="xui-65xspq">
-                            <i class="bx bx-x"></i> Cambiar
-                        </button>
-                    </div>
-                @else
-                    <div class="co-search-group">
-                        <div class="co-search-wrap">
-                            <i class="bx bx-search co-search-icon"></i>
-                            <input type="search" wire:model.live.debounce.600ms="customerSearch"
-                                class="co-input co-search-input" placeholder="Buscar cliente en CRM…"
-                                autocomplete="off">
-                        </div>
-                        <button wire:click="openAddCustomerModal" class="pos-btn pos-btn-primary co-search-btn">
-                            <i class="bx bx-user-plus"></i>
-                            <span>Nuevo</span>
-                        </button>
-                    </div>
-
-                    @if (strlen(trim($customerSearch)) >= 2 && $this->customerSearchResults->count() > 0)
-                        <div class="co-search-results">
-                            @foreach ($this->customerSearchResults as $cs)
-                                <button wire:click="selectCustomer({{ $cs->id }})" class="co-search-result-row">
-                                    <div class="co-avatar">{{ strtoupper(substr($cs->name, 0, 1)) }}</div>
-                                    <div>
-                                        <div class="co-result-name">{{ $cs->name }}</div>
-                                        <div class="co-result-meta">{{ $cs->phone }}</div>
-                                    </div>
-                                </button>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    <div class="co-grid">
-                        <div>
-                            <label class="co-label">Nombre</label>
-                            <input type="text" wire:model="customerName" class="co-input"
-                                placeholder="Nombre del cliente">
-                        </div>
-                        <div>
-                            <label class="co-label">Teléfono</label>
-                            <input type="tel" wire:model="customerPhone" class="co-input" placeholder="+52 999…">
-                        </div>
-                    </div>
-                @endif
+                @include('livewire.pos.partials.checkout-identity')
 
                 @if ($orderType === 'delivery')
                     <div class="co-grid">
