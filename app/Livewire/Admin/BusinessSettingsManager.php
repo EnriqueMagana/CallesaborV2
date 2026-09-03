@@ -26,6 +26,13 @@ class BusinessSettingsManager extends Component
         'system' => 'Sistema',
     ];
 
+    public const GLOBAL_TICKET_FONTS = [
+        'arial' => 'Arial · recomendada para térmica',
+        'verdana' => 'Verdana · amplia y legible',
+        'courier' => 'Courier New · estilo ticket',
+        'system' => 'Fuente del sistema',
+    ];
+
     public const PRINTER_DPI_OPTIONS = [
         'auto' => 'Auto (recomendado)',
         '203' => '203 DPI · POS térmica estándar',
@@ -115,6 +122,10 @@ class BusinessSettingsManager extends Component
     public int $marginMm = 4;
 
     public string $printerDpi = 'auto';
+
+    public string $globalTicketFontFamily = 'arial';
+
+    public int $globalTicketFontSize = 12;
 
     public int $logoWidthMm = 42;
 
@@ -412,6 +423,34 @@ class BusinessSettingsManager extends Component
         session()->flash('success', 'Plantilla de ticket guardada.');
     }
 
+    public function saveGlobalTicketTypography(): void
+    {
+        $this->authorizeManage();
+        $this->validate([
+            'globalTicketFontFamily' => 'required|in:arial,verdana,courier,system',
+            'globalTicketFontSize' => 'required|integer|min:9|max:16',
+        ]);
+
+        BusinessSetting::current()->update([
+            'ticket_font_family' => $this->globalTicketFontFamily,
+            'ticket_font_size' => $this->globalTicketFontSize,
+            'updated_by' => auth()->id(),
+        ]);
+
+        unset($this->previewHtml);
+        session()->flash('success', 'Tipografía global de tickets actualizada.');
+    }
+
+    public function updatedGlobalTicketFontFamily(): void
+    {
+        unset($this->previewHtml);
+    }
+
+    public function updatedGlobalTicketFontSize(): void
+    {
+        unset($this->previewHtml);
+    }
+
     public function toggleBlock(int $index): void
     {
         if (isset($this->blocks[$index])) {
@@ -493,6 +532,8 @@ class BusinessSettingsManager extends Component
             'city' => $this->city,
             'state' => $this->state,
             'postal_code' => $this->postalCode,
+            'ticket_font_family' => $this->globalTicketFontFamily,
+            'ticket_font_size' => $this->globalTicketFontSize,
         ]);
 
         return app(ThermalTicketRenderer::class)->renderPreview($this->selectedType, $template, $business);
@@ -519,6 +560,11 @@ class BusinessSettingsManager extends Component
         $this->mapsUrl = $setting->maps_url ?? '';
         $this->logoPath = $setting->logo_path;
         $this->ticketLogoPath = $setting->ticket_logo_path;
+        $configuredTicketFont = (string) ($setting->ticket_font_family ?: 'arial');
+        $this->globalTicketFontFamily = array_key_exists($configuredTicketFont, self::GLOBAL_TICKET_FONTS)
+            ? $configuredTicketFont
+            : 'arial';
+        $this->globalTicketFontSize = min(16, max(9, (int) ($setting->ticket_font_size ?: 12)));
         $this->bannerPath = $setting->banner_path;
         $this->businessHours = $setting->business_hours ?: BusinessSetting::DEFAULT_HOURS;
         $this->primaryColor = $setting->primary_color ?: '#15803d';
