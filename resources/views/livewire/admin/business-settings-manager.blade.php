@@ -505,6 +505,13 @@
                                     <option value="{{ $margin }}">{{ $margin }} mm</option>
                                 @endfor
                             </select>
+                        </x-business.field><x-business.field label="DPI de impresora" for="printer-dpi"
+                            hint="Auto respeta el controlador. 203 DPI es el estándar habitual en impresoras térmicas POS.">
+                            <select id="printer-dpi" wire:model.live="printerDpi">
+                                @foreach (\App\Livewire\Admin\BusinessSettingsManager::PRINTER_DPI_OPTIONS as $dpi => $label)
+                                    <option value="{{ $dpi }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
                         </x-business.field></div>
                     <div class="ticket-toggle-grid"><label><input type="checkbox" wire:model.live="showLogo"><span><i
                                     class="bx bx-image"></i><strong>Mostrar logo</strong><small>Usa el logo térmico
@@ -590,7 +597,7 @@
                         maxlength="240" rows="3"></textarea>
                 </x-business.field>
                 <footer class="biz-form-actions">
-                    <p><i class="bx bx-printer"></i>Predeterminado recomendado: 80 mm.</p><button type="submit"
+                    <p><i class="bx bx-printer"></i>Predeterminado POS: 80 mm y DPI automático (203 DPI habitual).</p><button type="submit"
                         class="biz-primary-button" wire:loading.attr="disabled" wire:target="saveTemplate"><span
                             wire:loading.remove wire:target="saveTemplate"><i class="bx bx-save"></i>Guardar
                             plantilla</span><span wire:loading wire:target="saveTemplate">Guardando…</span></button>
@@ -603,7 +610,7 @@
                     </div><span class="ticket-live-chip"><i class="bx bx-radio-circle-marked"></i>En vivo</span>
                 </header>
                 <div class="ticket-preview-stage" wire:loading.class="is-loading"
-                    wire:target="selectType,toggleBlock,moveBlock,paperWidth,fontSize,marginMm,showLogo,showQr,logoWidthMm,itemFontFamily,itemFontSize"><iframe
+                    wire:target="selectType,toggleBlock,moveBlock,paperWidth,fontSize,marginMm,printerDpi,showLogo,showQr,logoWidthMm,itemFontFamily,itemFontSize"><iframe
                         title="Vista previa de {{ $ticketTypes[$selectedType]['name'] }}"
                         srcdoc="{{ $this->previewHtml }}"></iframe></div>
             </aside>

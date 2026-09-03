@@ -40,6 +40,7 @@ class TicketTemplate extends Model
                 'footer_text' => 'Documento de control interno',
                 'blocks' => self::cashCutBlocks(),
                 'options' => [
+                    'printer_dpi' => 'auto',
                     'show_rfc' => true,
                     'show_phone' => true,
                     'show_address' => true,
@@ -69,6 +70,7 @@ class TicketTemplate extends Model
                     ['key' => 'footer', 'label' => 'Pie del ticket', 'enabled' => true],
                 ],
                 'options' => [
+                    'printer_dpi' => 'auto',
                     'show_rfc' => true,
                     'show_phone' => true,
                     'show_address' => true,
@@ -103,6 +105,7 @@ class TicketTemplate extends Model
             'footer_text' => $key === 'kitchen_area' ? '' : '¡Gracias por tu preferencia!',
             'blocks' => $blocks,
             'options' => [
+                'printer_dpi' => 'auto',
                 'show_rfc' => true,
                 'show_phone' => true,
                 'show_address' => true,

@@ -16,8 +16,10 @@
     $itemFontSize = $template->key === 'kitchen_area'
         ? min(28, max(12, (int) ($template->options['item_font_size'] ?? 18)))
         : (int) $template->font_size;
+    $configuredPrinterDpi = (string) ($template->options['printer_dpi'] ?? 'auto');
+    $printerDpi = in_array($configuredPrinterDpi, ['auto', '203', '300'], true) ? $configuredPrinterDpi : 'auto';
 @endphp
-<body class="ticket-document ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
+<body data-printer-dpi="{{ $printerDpi }}" class="ticket-document ticket-dpi-{{ $printerDpi }} ticket-paper-{{ $template->paper_width_mm }} ticket-font-{{ $template->font_size }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
     @foreach($payloads as $payload)
         @php $qrDataUri = null; @endphp
         <main class="ticket-sheet ticket-page">

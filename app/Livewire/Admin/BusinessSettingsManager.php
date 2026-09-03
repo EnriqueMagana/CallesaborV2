@@ -26,6 +26,12 @@ class BusinessSettingsManager extends Component
         'system' => 'Sistema',
     ];
 
+    public const PRINTER_DPI_OPTIONS = [
+        'auto' => 'Auto (recomendado)',
+        '203' => '203 DPI · POS térmica estándar',
+        '300' => '300 DPI · Alta resolución',
+    ];
+
     public string $activeTab = 'business';
 
     public string $businessSection = 'identity';
@@ -107,6 +113,8 @@ class BusinessSettingsManager extends Component
     public int $fontSize = 12;
 
     public int $marginMm = 4;
+
+    public string $printerDpi = 'auto';
 
     public int $logoWidthMm = 42;
 
@@ -367,6 +375,7 @@ class BusinessSettingsManager extends Component
             'paperWidth' => 'required|in:58,80',
             'fontSize' => 'required|integer|min:9|max:16',
             'marginMm' => 'required|integer|min:2|max:6',
+            'printerDpi' => 'required|in:auto,203,300',
             'logoWidthMm' => 'required|integer|in:12,18,24,30,36,42,48,54',
             'itemFontFamily' => 'required|in:courier,arial,verdana,system',
             'itemFontSize' => 'required|integer|min:12|max:28',
@@ -388,6 +397,7 @@ class BusinessSettingsManager extends Component
             'footer_text' => trim($this->footerText) ?: null,
             'blocks' => array_values($this->blocks),
             'options' => [
+                'printer_dpi' => $this->printerDpi,
                 'show_rfc' => $this->showRfc,
                 'show_phone' => $this->showPhone,
                 'show_address' => $this->showAddress,
@@ -460,6 +470,7 @@ class BusinessSettingsManager extends Component
             'footer_text' => $this->footerText,
             'blocks' => $this->blocks,
             'options' => [
+                'printer_dpi' => $this->printerDpi,
                 'show_rfc' => $this->showRfc,
                 'show_phone' => $this->showPhone,
                 'show_address' => $this->showAddress,
@@ -527,6 +538,8 @@ class BusinessSettingsManager extends Component
         $this->paperWidth = (int) $template->paper_width_mm;
         $this->fontSize = (int) $template->font_size;
         $this->marginMm = (int) $template->margin_mm;
+        $configuredDpi = (string) ($template->options['printer_dpi'] ?? 'auto');
+        $this->printerDpi = array_key_exists($configuredDpi, self::PRINTER_DPI_OPTIONS) ? $configuredDpi : 'auto';
         $this->showLogo = $template->show_logo;
         $this->showQr = $template->show_qr;
         $this->qrLabel = $template->qr_label ?? '';
