@@ -8,6 +8,7 @@ use App\Models\CashRegister;
 use App\Models\Mesa;
 use App\Models\MesaGroup;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\MesaServiceManager;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -47,7 +48,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
         $service->refresh();
 
         foreach ([101, 104, 106] as $folio) {
-            Order::create([
+            $order = Order::create([
                 'cash_register_id' => $register->id,
                 'mesa_id' => $first->id,
                 'mesa_service_id' => $service->id,
@@ -57,6 +58,13 @@ class GroupedMesaServiceWorkflowTest extends TestCase
                 'status' => 'lista',
                 'subtotal' => 50,
                 'total' => 50,
+            ]);
+            OrderItem::create([
+                'order_id' => $order->id,
+                'product_name' => "Producto {$folio}",
+                'product_price' => 50,
+                'quantity' => 1,
+                'subtotal' => 50,
             ]);
         }
 
@@ -71,6 +79,10 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->assertSee('18min activa')
             ->assertSee('Reimprimir cocina')
             ->assertSee('Cuenta lista para cobrar')
+            ->assertSee('Imprimir cuenta global')
+            ->call('openActiveMesaAccountTicket', $service->id)
+            ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'Grupo Terraza')
+                && str_contains($params['html_cliente'] ?? '', '150.00'))
             ->call('openMesaPayModal', $first->id)
             ->set('mesaPayAmount', '150')
             ->set('mesaPayReceived', '150')

@@ -166,8 +166,8 @@
                             <div class="pos-tracking-empty-orders"><i class="bx bx-time-five"></i>Servicio abierto, todavía sin comandas.</div>
                         @endif
 
-                        @if ($service->status === 'en_cuenta' && auth()->user()?->can('cobrar mesas'))
-                            @if ($activeSplit && $serviceTotal > 0.009)
+                        @if ($service->status === 'en_cuenta' && auth()->user()?->canAny(['cobrar mesas', 'reimprimir tickets']))
+                            @if ($activeSplit && $serviceTotal > 0.009 && auth()->user()?->can('cobrar mesas'))
                                 <section class="pos-table-split-list pos-table-split-list--primary" aria-label="Subcuentas pendientes">
                                     <div class="pos-table-split-list__title">
                                         <span><i class="bx bx-git-branch"></i> Cobrar cuenta dividida</span>
@@ -194,25 +194,41 @@
 
                             <footer class="pos-table-group__footer pos-workspace-service__footer">
                                 <div class="pos-table-group__close-copy">
-                                    <strong>{{ $serviceTotal <= 0.009 ? 'Servicio sin consumo' : ($allOrdersReady ? 'Cuenta lista para cobrar' : 'Esperando comandas') }}</strong>
-                                    <small>{{ $serviceTotal <= 0.009 ? 'Cancela el servicio o reabre la mesa.' : ($allOrdersReady ? 'Elige cobro completo o una subcuenta.' : 'Marca todas las órdenes como listas antes de cobrar.') }}</small>
+                                    @can('cobrar mesas')
+                                        <strong>{{ $serviceTotal <= 0.009 ? 'Servicio sin consumo' : ($allOrdersReady ? 'Cuenta lista para cobrar' : 'Esperando comandas') }}</strong>
+                                        <small>{{ $serviceTotal <= 0.009 ? 'Cancela el servicio o reabre la mesa.' : ($allOrdersReady ? 'Elige cobro completo o una subcuenta.' : 'Marca todas las órdenes como listas antes de cobrar.') }}</small>
+                                    @else
+                                        <strong>Cuenta vigente</strong>
+                                        <small>Consulta o imprime la venta global sin modificar el servicio.</small>
+                                    @endcan
                                 </div>
                                 <div class="pos-workspace-service__actions">
-                                    @if ($primaryMesa)
-                                        <button type="button" wire:click="reopenMesa({{ $primaryMesa->id }})" class="pos-btn pos-btn-secondary">
-                                            <i class="bx bx-lock-open-alt"></i><span>Reabrir</span>
+                                    @can('reimprimir tickets')
+                                        <button type="button" wire:click="openActiveMesaAccountTicket({{ $service->id }})"
+                                            wire:loading.attr="disabled" wire:target="openActiveMesaAccountTicket({{ $service->id }})"
+                                            class="pos-btn pos-btn-secondary">
+                                            <i class="bx bx-printer"></i>
+                                            <span wire:loading.remove wire:target="openActiveMesaAccountTicket({{ $service->id }})">Imprimir cuenta global</span>
+                                            <span wire:loading wire:target="openActiveMesaAccountTicket({{ $service->id }})">Preparando</span>
                                         </button>
-                                        @if ($serviceTotal <= 0.009)
-                                            <button type="button" wire:click="requestDiscardEmptyMesaAccount({{ $primaryMesa->id }})" class="pos-btn pos-btn-danger">
-                                                <i class="bx bx-x-circle"></i><span>Cancelar servicio</span>
+                                    @endcan
+                                    @can('cobrar mesas')
+                                        @if ($primaryMesa)
+                                            <button type="button" wire:click="reopenMesa({{ $primaryMesa->id }})" class="pos-btn pos-btn-secondary">
+                                                <i class="bx bx-lock-open-alt"></i><span>Reabrir</span>
                                             </button>
-                                        @elseif (! $activeSplit)
-                                            <button type="button" wire:click="openMesaPayModal({{ $primaryMesa->id }})"
-                                                class="pos-btn pos-btn-primary" {{ $allOrdersReady ? '' : 'disabled' }}>
-                                                <i class="bx bx-dollar-circle"></i><span>Cobrar mesa</span>
-                                            </button>
+                                            @if ($serviceTotal <= 0.009)
+                                                <button type="button" wire:click="requestDiscardEmptyMesaAccount({{ $primaryMesa->id }})" class="pos-btn pos-btn-danger">
+                                                    <i class="bx bx-x-circle"></i><span>Cancelar servicio</span>
+                                                </button>
+                                            @elseif (! $activeSplit)
+                                                <button type="button" wire:click="openMesaPayModal({{ $primaryMesa->id }})"
+                                                    class="pos-btn pos-btn-primary" {{ $allOrdersReady ? '' : 'disabled' }}>
+                                                    <i class="bx bx-dollar-circle"></i><span>Cobrar mesa</span>
+                                                </button>
+                                            @endif
                                         @endif
-                                    @endif
+                                    @endcan
                                 </div>
                             </footer>
                         @elseif ($service->status === 'abierta')

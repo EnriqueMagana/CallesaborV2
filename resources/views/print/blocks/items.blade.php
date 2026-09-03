@@ -9,7 +9,7 @@
                 @endunless
             </div>
             @if ($isCancelled)
-                <div class="ticket-note ticket-item-cancelled-note">CANCELADO · NO SE COBRARÁ</div>
+                <div class="ticket-note ticket-item-cancelled-note">RETIRADO · NO SE COBRARÁ</div>
             @endif
             @foreach ($item['modifiers'] ?? [] as $modifier)
                 <div class="ticket-row ticket-sub"><span>{{ $modifier['name'] }}</span>

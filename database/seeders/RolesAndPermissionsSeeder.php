@@ -83,6 +83,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'ver panel super admin',
                 'ejecutar diagnosticos',
                 'probar notificaciones',
+                'gestionar variables de entorno',
             ],
         ];
 
@@ -119,6 +120,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver panel super admin',
             'ejecutar diagnosticos',
             'probar notificaciones',
+            'gestionar variables de entorno',
         ])->get());
 
         // Gerente

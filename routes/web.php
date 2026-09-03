@@ -44,6 +44,7 @@ use App\Livewire\Orders\SalesHistory;
 use App\Livewire\Pos\PointOfSale;
 use App\Livewire\Reservas\CalendarioReservas;
 use App\Livewire\SuperAdmin\DeveloperConsole;
+use App\Livewire\SuperAdmin\EnvironmentSettings;
 use App\Models\CashRegisterCut;
 use App\Models\Order;
 use App\Models\Reservation;
@@ -99,6 +100,9 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
     Route::get('/super-admin', DeveloperConsole::class)
         ->middleware('can:ver panel super admin')
         ->name('super-admin');
+    Route::get('/super-admin/environment', EnvironmentSettings::class)
+        ->middleware(['can:gestionar variables de entorno', 'password.confirm'])
+        ->name('super-admin.environment');
     Route::get('/menu-digital', DigitalMenuManager::class)->middleware('can:gestionar menu digital')->name('menu-digital');
     Route::get('/promociones', PromotionManager::class)->middleware('can:ver promociones')->name('promociones');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');
