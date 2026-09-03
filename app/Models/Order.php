@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 class Order extends Model
 {
     protected $fillable = [
-        'cash_register_id', 'kiosk_terminal_id', 'public_token', 'customer_id', 'mesa_id',
+        'cash_register_id', 'kiosk_terminal_id', 'public_token', 'customer_id', 'discount_beneficiary_user_id', 'mesa_id',
         'mesa_service_id',
         'folio',
         'customer_name', 'customer_phone', 'customer_address', 'customer_neighborhood', 'customer_references',
@@ -103,6 +103,11 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function discountBeneficiary(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'discount_beneficiary_user_id');
     }
 
     public function seller(): BelongsTo

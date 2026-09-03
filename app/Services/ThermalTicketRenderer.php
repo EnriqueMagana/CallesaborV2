@@ -107,6 +107,10 @@ class ThermalTicketRenderer
                     'name' => '• Oferta: '.data_get($item->promotion_rule_snapshot, 'label', 'promoción automática')
                         .' (-$'.number_format((float) $item->promotion_discount, 2).')',
                     'price' => 0,
+                ]))->when($type !== 'kitchen_area' && (float) ($item->discount_amount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
+                    'name' => '• Descuento: '.data_get($item->discount_snapshot, 'name', 'descuento automático')
+                        .' (-$'.number_format((float) $item->discount_amount, 2).')',
+                    'price' => 0,
                 ]))->values()->all(),
             ])->values()->all(),
             'total' => (float) $order->total,
@@ -189,6 +193,9 @@ class ThermalTicketRenderer
                     'price' => (float) $ingredient->extra_price * max(1, (int) $ingredient->quantity),
                 ]))->when((float) ($item->promotion_discount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
                     'name' => '• Oferta: '.data_get($item->promotion_rule_snapshot, 'label', 'promoción automática'),
+                    'price' => 0,
+                ]))->when((float) ($item->discount_amount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
+                    'name' => '• Descuento: '.data_get($item->discount_snapshot, 'name', 'descuento automático'),
                     'price' => 0,
                 ]))->values()->all(),
                 'print_area_name' => $item->product?->category?->printArea?->name
