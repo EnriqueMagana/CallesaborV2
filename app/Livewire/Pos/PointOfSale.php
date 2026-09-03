@@ -2000,6 +2000,10 @@ class PointOfSale extends Component
 
         $isContraEntrega = $this->orderType === 'delivery' && $this->deliveryMethod === 'contra_entrega';
 
+        if ($this->orderType === 'delivery' && ! $isContraEntrega) {
+            $this->prepareDeliveryAdvancePayment();
+        }
+
         if (! $isContraEntrega) {
             $paid = collect($this->payments)->sum('amount');
             if ($paid < $this->cartTotal - 0.01) {
@@ -2422,17 +2426,52 @@ class PointOfSale extends Component
 
     public function updatedDeliveryMethod(): void
     {
-        // Sincroniza el método de pago cuando se selecciona tarjeta/transfer en delivery
-        if ($this->deliveryMethod === 'card') {
-            $this->payMethod = 'card';
-        } elseif ($this->deliveryMethod === 'transfer') {
-            $this->payMethod = 'transfer';
-        } elseif ($this->deliveryMethod === 'cash') {
-            $this->payMethod = 'cash';
+        if (in_array($this->deliveryMethod, ['cash', 'card', 'transfer'], true)) {
+            $this->payMethod = $this->deliveryMethod;
         }
-        // Limpia pagos previos al cambiar método de entrega
+
         $this->payments = [];
-        $this->payAmount = '';
+        $this->payAmount = $this->deliveryMethod === 'contra_entrega'
+            ? ''
+            : number_format($this->cartTotal, 2, '.', '');
+        $this->payCashReceived = '';
+        $this->payCardLast4 = '';
+        $this->payTransferRef = '';
+        unset($this->paidTotal, $this->paymentRemaining);
+    }
+
+    private function prepareDeliveryAdvancePayment(): void
+    {
+        if (! in_array($this->deliveryMethod, ['cash', 'card', 'transfer'], true)) {
+            return;
+        }
+
+        $this->payMethod = $this->deliveryMethod;
+        $existingPayment = count($this->payments) === 1
+            && ($this->payments[0]['method'] ?? null) === $this->deliveryMethod
+                ? $this->payments[0]
+                : [];
+        $payment = array_merge($existingPayment, [
+            'method' => $this->deliveryMethod,
+            'amount' => round($this->cartTotal, 2),
+        ]);
+
+        if ($this->deliveryMethod === 'cash') {
+            $payment['cash_received'] = round($this->cartTotal, 2);
+            $payment['cash_change'] = 0;
+        } elseif ($this->deliveryMethod === 'card') {
+            if (filled($this->payCardLast4) || ! array_key_exists('card_last4', $payment)) {
+                $payment['card_last4'] = trim($this->payCardLast4);
+            }
+        } else {
+            if (filled($this->payTransferRef) || ! array_key_exists('transfer_ref', $payment)) {
+                $payment['transfer_ref'] = trim($this->payTransferRef);
+            }
+        }
+
+        $this->payments = [$payment];
+        $this->payAmount = number_format($this->cartTotal, 2, '.', '');
+        unset($this->paidTotal, $this->paymentRemaining);
     }
 
     public function updatedReprintType(): void
