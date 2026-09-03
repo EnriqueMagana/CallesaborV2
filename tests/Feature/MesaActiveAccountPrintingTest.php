@@ -40,9 +40,14 @@ class MesaActiveAccountPrintingTest extends TestCase
             ->assertSee('Imprimir cuenta')
             ->assertSee('Cuenta completa')
             ->call('printActiveMesaAccount', $mesa->id)
-            ->assertDispatched('mesa-account-ticket-preview', fn ($event, $params) => str_contains($params['html'] ?? '', 'Taco de prueba')
-                && str_contains($params['html'] ?? '', '120.00')
-                && str_contains($params['html'] ?? '', 'data:image/svg+xml;base64,'));
+            ->assertSet('showMesaTicketPreview', true)
+            ->assertSet('mesaTicketPreviewTitle', $mesa->display_name)
+            ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Taco de prueba')
+                && str_contains($html, '120.00')
+                && str_contains($html, 'data:image/svg+xml;base64,'))
+            ->call('closeMesaTicketPreview')
+            ->assertSet('showMesaTicketPreview', false)
+            ->assertSet('mesaTicketPreviewHtml', '');
     }
 
     public function test_split_account_reprints_a_paid_snapshot_with_its_payment_methods(): void
@@ -84,19 +89,21 @@ class MesaActiveAccountPrintingTest extends TestCase
             ->assertSee('Cliente Ana')
             ->assertSee('Cliente Luis')
             ->call('printActiveMesaAccount', $mesa->id, $split->id, 0)
-            ->assertDispatched('mesa-account-ticket-preview', fn ($event, $params) => str_contains($params['html'] ?? '', 'Taco de Ana')
-                && ! str_contains($params['html'] ?? '', 'Taco de Luis'));
+            ->assertSet('showMesaTicketPreview', true)
+            ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Taco de Ana')
+                && ! str_contains($html, 'Taco de Luis'));
 
         Livewire::actingAs($operator)
             ->test(GestionMesas::class)
             ->call('printActiveMesaAccount', $mesa->id, $split->id, 1)
-            ->assertDispatched('mesa-account-ticket-preview', fn ($event, $params) => str_contains($params['html'] ?? '', 'Taco de Luis')
-                && str_contains($params['html'] ?? '', 'Efectivo')
-                && str_contains($params['html'] ?? '', '$30.00')
-                && str_contains($params['html'] ?? '', 'Tarjeta')
-                && str_contains($params['html'] ?? '', '$40.00')
-                && str_contains($params['html'] ?? '', '4242')
-                && str_contains($params['html'] ?? '', 'data:image/svg+xml;base64,'));
+            ->assertSet('showMesaTicketPreview', true)
+            ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Taco de Luis')
+                && str_contains($html, 'Efectivo')
+                && str_contains($html, '$30.00')
+                && str_contains($html, 'Tarjeta')
+                && str_contains($html, '$40.00')
+                && str_contains($html, '4242')
+                && str_contains($html, 'data:image/svg+xml;base64,'));
     }
 
     public function test_printing_requires_permission_and_an_in_account_active_service(): void
@@ -115,7 +122,7 @@ class MesaActiveAccountPrintingTest extends TestCase
         Livewire::actingAs($operator)
             ->test(GestionMesas::class)
             ->call('printActiveMesaAccount', $mesa->id)
-            ->assertNotDispatched('mesa-account-ticket-preview')
+            ->assertSet('showMesaTicketPreview', false)
             ->assertDispatched('notify');
     }
 

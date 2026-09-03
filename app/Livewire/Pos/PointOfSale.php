@@ -3956,6 +3956,63 @@ HTML;
         );
     }
 
+    public function openActiveMesaAccountTicket(int $serviceId): void
+    {
+        abort_unless(auth()->user()?->can('reimprimir tickets'), 403);
+
+        $service = MesaService::query()
+            ->where('cash_register_id', $this->activeCashRegister?->id)
+            ->where('status', 'en_cuenta')
+            ->with([
+                'primaryMesa.area',
+                'primaryMesa.currentAssignment.waiter',
+                'assignments' => fn ($query) => $query
+                    ->with('waiter')
+                    ->whereNull('released_at')
+                    ->latest('assigned_at'),
+                'orders' => fn ($query) => $query
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->with(['items', 'payments'])
+                    ->oldest('created_at'),
+            ])
+            ->findOrFail($serviceId);
+
+        $mesa = $service->primaryMesa;
+        $items = $service->orders->flatMap(fn (Order $order) => $order->items
+            ->reject(fn (OrderItem $item) => (bool) $item->is_cancelled)
+            ->map(fn (OrderItem $item) => [
+                'qty' => (float) $item->quantity,
+                'name' => $item->product_name,
+                'subtotal' => (float) $item->subtotal,
+            ]))->values()->all();
+
+        if (! $mesa || $items === []) {
+            $this->dispatch('notify', type: 'warning', message: 'La cuenta vigente no tiene productos disponibles para imprimir.');
+
+            return;
+        }
+
+        $trackingOrder = $service->orders->first();
+        $assignment = $service->assignments->first() ?? $mesa->currentAssignment;
+
+        $this->dispatch('pos-reprint-show',
+            html_cliente: app(ThermalTicketRenderer::class)->renderMesaAccount(
+                mesa: $mesa,
+                accountLabel: $service->service_label ?: $mesa->display_name,
+                items: $items,
+                total: (float) $service->orders->sum('total'),
+                payments: $service->orders->flatMap->payments->values()->all(),
+                assignment: $assignment,
+                cashierName: auth()->user()->name,
+                autoPrint: false,
+                trackingUrl: $trackingOrder instanceof Order
+                    ? route('kiosk.track', $trackingOrder->ensurePublicToken())
+                    : null,
+            ),
+            html_cocina: '',
+        );
+    }
+
     private function dispatchOrderTicketPreview(Order $order): void
     {
         $this->dispatch('pos-reprint-show',

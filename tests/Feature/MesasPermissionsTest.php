@@ -289,6 +289,46 @@ class MesasPermissionsTest extends TestCase
             ->assertSet('tab', 'disponibles');
     }
 
+    public function test_waiter_mobile_view_is_compact_and_uses_a_stable_centered_action_menu(): void
+    {
+        $waiter = $this->employee(['ver mesas']);
+        $waiter->assignRole('mesero');
+        $mesa = $this->mesa($this->area(), status: 'ocupada');
+        $this->assign($mesa, $waiter);
+
+        Livewire::actingAs($waiter)
+            ->test(GestionMesas::class)
+            ->assertSee('mesas-page-header--mobile-hidden', false)
+            ->assertSee('mesas-bottom-nav', false)
+            ->assertSee('mesa-action-backdrop', false);
+
+        $view = file_get_contents(resource_path('views/livewire/mesas/gestion-mesas.blade.php'));
+        $styles = file_get_contents(public_path('assets/css/mesas.css'));
+
+        $this->assertIsString($view);
+        $this->assertIsString($styles);
+        $this->assertStringNotContainsString('@click="try {', $view);
+        $this->assertStringContainsString('@click="$refs.ticketFrame?.contentWindow?.print()"', $view);
+        $this->assertMatchesRegularExpression(
+            '/\.mesas-bottom-nav\s*\{[^}]*border-radius:\s*24px;/s',
+            $styles,
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.mesa-action-menu\s*\{[^}]*top:\s*50%;[^}]*transform:\s*translateY\(-50%\);/s',
+            $styles,
+        );
+    }
+
+    public function test_mobile_management_header_remains_available_to_table_editors(): void
+    {
+        $editor = $this->employee(['ver mesas', 'editar mesas']);
+
+        Livewire::actingAs($editor)
+            ->test(GestionMesas::class)
+            ->assertDontSee('mesas-page-header--mobile-hidden', false)
+            ->assertSee('Gestión de Mesas');
+    }
+
     public function test_viewing_all_active_tables_requires_its_own_permission(): void
     {
         $area = $this->area();

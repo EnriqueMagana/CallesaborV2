@@ -102,6 +102,14 @@ class GestionMesas extends Component
 
     public ?int $detailMesaId = null;
 
+    // La vista previa vive en Livewire para no depender de transportar todo el
+    // HTML del ticket mediante un evento del navegador.
+    public bool $showMesaTicketPreview = false;
+
+    public string $mesaTicketPreviewHtml = '';
+
+    public string $mesaTicketPreviewTitle = 'Cuenta de mesa';
+
     // ── Collaborative service team ──
     public bool $showServiceTeamModal = false;
 
@@ -1111,11 +1119,17 @@ class GestionMesas extends Component
                 : null,
         );
 
-        $this->dispatch(
-            'mesa-account-ticket-preview',
-            html: $html,
-            title: $label,
-        );
+        $this->mesaTicketPreviewHtml = $html;
+        $this->mesaTicketPreviewTitle = $label;
+        $this->showMesaTicketPreview = true;
+
+    }
+
+    public function closeMesaTicketPreview(): void
+    {
+        $this->showMesaTicketPreview = false;
+        $this->mesaTicketPreviewHtml = '';
+        $this->mesaTicketPreviewTitle = 'Cuenta de mesa';
     }
 
     private function printableAccountContext(Mesa $mesa): ?array

@@ -6,6 +6,11 @@
             <p>Observabilidad, salud de servicios y pruebas controladas antes de producción.</p>
         </div>
         <div class="developer-console__hero-actions">
+            @can('gestionar variables de entorno')
+                <a href="{{ route('app.super-admin.environment') }}" class="developer-button developer-button--secondary">
+                    <i class="bx bx-slider-alt" aria-hidden="true"></i> Variables de entorno
+                </a>
+            @endcan
             <a href="{{ route('pulse') }}" target="_blank" rel="noopener" class="developer-button developer-button--secondary">
                 <i class="bx bx-pulse" aria-hidden="true"></i> Abrir Laravel Pulse
             </a>

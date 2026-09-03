@@ -38,6 +38,7 @@
             $canChangeMesaStatus = $canLegacyManageMesas || $mesaUser?->can('cambiar estado mesas');
             $canManageGroups = $canLegacyManageMesas || $mesaUser?->can('gestionar grupos');
             $canViewAllMesas = $mesaUser?->can('ver todas las mesas');
+            $showMobileMesaHeader = $canCreateAreas || $canEditAreas || $canCreateMesas || $canEditMesas;
         @endphp
 
         {{-- Flash --}}
@@ -49,7 +50,7 @@
         @endif
 
         {{-- ══════════════════ PAGE HEADER ══════════════════ --}}
-        <div class="mesas-page-header">
+        <div class="mesas-page-header {{ $showMobileMesaHeader ? '' : 'mesas-page-header--mobile-hidden' }}">
             <div class="mesas-page-title">
                 <i class="bx bx-table mesas-page-icon"></i>
                 <div>
@@ -206,10 +207,10 @@
 
             {{-- Group action --}}
             @if ($canManageGroups)
-                <div class="ms-auto">
-                    <button class="btn btn-outline-secondary btn-sm"
+                <div class="ms-auto mesas-group-action">
+                    <button class="btn btn-outline-secondary btn-sm" aria-label="Agrupar mesas"
                         wire:click="openGroupModal({{ $areaFilter }})">
-                        <i class="bx bx-merge me-1"></i> Agrupar mesas
+                        <i class="bx bx-merge"></i><span>Agrupar mesas</span>
                     </button>
                 </div>
             @endif
@@ -426,7 +427,9 @@
                                                 title="Más acciones">
                                                 <i class="bx bx-dots-vertical-rounded"></i>
                                             </button>
-                                            <div class="mesa-action-menu" x-cloak x-show="open" x-transition>
+                                            <button type="button" class="mesa-action-backdrop" x-cloak x-show="open"
+                                                @click="open=false" aria-label="Cerrar menú de acciones"></button>
+                                            <div class="mesa-action-menu" x-cloak x-show="open">
                                                 <button wire:click="openDetail({{ $firstMesa->id }})"
                                                     @click="open=false">
                                                     <i class="bx bx-info-circle"></i> Detalle
@@ -627,7 +630,9 @@
                                                 title="Más acciones">
                                                 <i class="bx bx-dots-vertical-rounded"></i>
                                             </button>
-                                            <div class="mesa-action-menu" x-cloak x-show="open" x-transition>
+                                            <button type="button" class="mesa-action-backdrop" x-cloak x-show="open"
+                                                @click="open=false" aria-label="Cerrar menú de acciones"></button>
+                                            <div class="mesa-action-menu" x-cloak x-show="open">
                                                 <button wire:click="openDetail({{ $mesa->id }})"
                                                     @click="open=false">
                                                     <i class="bx bx-info-circle"></i> Ver detalle
@@ -740,38 +745,38 @@
     </div>
 
     {{-- ══ MOBILE BOTTOM NAV ══ --}}
-    <div class="mesas-bottom-nav">
+    <nav class="mesas-bottom-nav" aria-label="Vistas de mesas">
         <div class="mesas-bottom-nav-inner">
             <button class="mbn-item {{ $tab === 'disponibles' ? 'active' : '' }}" wire:click="setTab('disponibles')"
-                wire:loading.attr="disabled" wire:target="setTab">
-                <i class="bx bx-check-circle"></i>
-                Libres
+                wire:loading.attr="disabled" wire:target="setTab" @if ($tab === 'disponibles') aria-current="page" @endif>
+                <span class="mbn-icon"><i class="bx bx-check-circle"></i></span>
+                <span>Libres</span>
             </button>
             <button class="mbn-item {{ $tab === 'mis_mesas' ? 'active' : '' }}" wire:click="setTab('mis_mesas')"
-                wire:loading.attr="disabled" wire:target="setTab">
+                wire:loading.attr="disabled" wire:target="setTab" @if ($tab === 'mis_mesas') aria-current="page" @endif>
                 @if ($this->myActiveMesaCount > 0)
                     <span class="mbn-badge">{{ $this->myActiveMesaCount }}</span>
                 @endif
-                <i class="bx bx-user-check"></i>
-                Mis Mesas
+                <span class="mbn-icon"><i class="bx bx-user-check"></i></span>
+                <span>Mis mesas</span>
             </button>
             <button class="mbn-item {{ $tab === 'kiosko' ? 'active' : '' }}" wire:click="setTab('kiosko')"
-                wire:loading.attr="disabled" wire:target="setTab">
+                wire:loading.attr="disabled" wire:target="setTab" @if ($tab === 'kiosko') aria-current="page" @endif>
                 @if ($this->kioskCount > 0)
                     <span class="mbn-badge">{{ $this->kioskCount }}</span>
                 @endif
-                <i class="bx bx-desktop"></i>
-                Kiosko
+                <span class="mbn-icon"><i class="bx bx-desktop"></i></span>
+                <span>Kiosco</span>
             </button>
             @if ($canViewAllMesas)
                 <button class="mbn-item {{ $tab === 'todas' ? 'active' : '' }}" wire:click="setTab('todas')"
-                    wire:loading.attr="disabled" wire:target="setTab">
-                    <i class="bx bx-grid-alt"></i>
-                    Todas
+                    wire:loading.attr="disabled" wire:target="setTab" @if ($tab === 'todas') aria-current="page" @endif>
+                    <span class="mbn-icon"><i class="bx bx-grid-alt"></i></span>
+                    <span>Todas</span>
                 </button>
             @endif
         </div>
-    </div>
+    </nav>
 
     {{-- ══════════════════════════════════════════════
          MODALS
@@ -1658,31 +1663,35 @@
         </div>
     @endif
 
-    <div class="mesa-ticket-preview-backdrop" x-data="{ open: false, html: '', title: 'Cuenta de mesa' }"
-        x-on:mesa-account-ticket-preview.window="html = $event.detail.html || ''; title = $event.detail.title || 'Cuenta de mesa'; open = true"
-        x-on:keydown.escape.window="if (open) { open = false; html = '' }" x-show="open" x-cloak
-        @click.self="open = false; html = ''" role="dialog" aria-modal="true" aria-labelledby="mesa-ticket-preview-title">
-        <section class="mesa-ticket-preview">
-            <header class="mesa-ticket-preview__header">
-                <div>
-                    <span>VISTA PREVIA</span>
-                    <h5 id="mesa-ticket-preview-title" x-text="title"></h5>
+    @if ($showMesaTicketPreview)
+        <div class="mesa-ticket-preview-backdrop" x-data
+            x-on:keydown.escape.window="$wire.closeMesaTicketPreview()"
+            wire:click.self="closeMesaTicketPreview" role="dialog" aria-modal="true"
+            aria-labelledby="mesa-ticket-preview-title">
+            <section class="mesa-ticket-preview">
+                <header class="mesa-ticket-preview__header">
+                    <div>
+                        <span>VISTA PREVIA</span>
+                        <h5 id="mesa-ticket-preview-title">{{ $mesaTicketPreviewTitle }}</h5>
+                    </div>
+                    <button type="button" class="mesas-modal-close" wire:click="closeMesaTicketPreview"
+                        aria-label="Cerrar vista previa"><i class="bx bx-x"></i></button>
+                </header>
+                <div class="mesa-ticket-preview__body">
+                    <iframe x-ref="ticketFrame" srcdoc="{{ $mesaTicketPreviewHtml }}"
+                        title="Vista previa del ticket de mesa"></iframe>
                 </div>
-                <button type="button" class="mesas-modal-close" @click="open = false; html = ''"
-                    aria-label="Cerrar vista previa"><i class="bx bx-x"></i></button>
-            </header>
-            <div class="mesa-ticket-preview__body">
-                <iframe x-ref="ticketFrame" :srcdoc="html" title="Vista previa del ticket de mesa"></iframe>
-            </div>
-            <footer class="mesa-ticket-preview__actions">
-                <button type="button" class="btn btn-outline-secondary" @click="open = false; html = ''">Cerrar</button>
-                <button type="button" class="btn btn-primary"
-                    @click="try { $refs.ticketFrame.contentWindow.print() } catch (error) {}">
-                    <i class="bx bx-printer me-1"></i> Imprimir ticket
-                </button>
-            </footer>
-        </section>
-    </div>
+                <footer class="mesa-ticket-preview__actions">
+                    <button type="button" class="btn btn-outline-secondary"
+                        wire:click="closeMesaTicketPreview">Cerrar</button>
+                    <button type="button" class="btn btn-primary"
+                        x-on:click="$refs.ticketFrame.contentWindow.print()">
+                        <i class="bx bx-printer me-1"></i> Imprimir ticket
+                    </button>
+                </footer>
+            </section>
+        </div>
+    @endif
 
 </div>
 </div>

@@ -34,7 +34,7 @@ final class PermissionCatalog
                 'abrir caja' => 'Permite iniciar la caja y dejarla disponible para ventas desde el punto de venta.',
                 'cerrar caja' => 'Permite cerrar el turno de caja y registrar el corte final desde el punto de venta.',
                 'aplicar descuentos' => 'Permite aplicar descuentos manuales durante el cobro de una venta.',
-                'registrar movimientos de caja' => 'Permite registrar ingresos y salidas de efectivo durante la operación del punto de venta.',
+                'registrar movimientos de caja' => 'Permite registrar ingresos de efectivo y salidas de caja en el turno abierto.',
                 'ver mesas' => 'Permite consultar el mapa de mesas y las cuentas activas para atender servicio desde el punto de venta.',
                 'asignar mesas' => 'Permite tomar una mesa disponible y abrir un servicio desde el punto de venta.',
                 'ordenar mesas' => 'Permite crear y agregar productos a una cuenta de mesa desde el punto de venta.',
@@ -160,6 +160,7 @@ final class PermissionCatalog
                 'ver panel super admin' => 'Permite acceder al panel técnico de superadministración y sus herramientas internas.',
                 'ejecutar diagnosticos' => 'Permite ejecutar diagnósticos técnicos del sistema y consultar sus resultados.',
                 'probar notificaciones' => 'Permite enviar notificaciones de prueba desde las herramientas técnicas.',
+                'gestionar variables de entorno' => 'Permite modificar una lista controlada de variables técnicas, credenciales, idioma y zona horaria; nunca permite consultar secretos existentes ni cambiar APP_KEY.',
             ],
         ];
     }

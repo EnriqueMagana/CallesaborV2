@@ -111,12 +111,13 @@ class MesaTicketPaymentDetailsTest extends TestCase
             ->call('openDetail', $mesa->id)
             ->assertSee('Pagada · reimpresión disponible')
             ->call('printActiveMesaAccount', $mesa->id, $split->id, 0)
-            ->assertDispatched('mesa-account-ticket-preview', fn ($event, $params) => str_contains($params['html'] ?? '', 'Efectivo')
-                && str_contains($params['html'] ?? '', '$20.00')
-                && str_contains($params['html'] ?? '', 'Tarjeta')
-                && str_contains($params['html'] ?? '', '$40.00')
-                && str_contains($params['html'] ?? '', '1111')
-                && str_contains($params['html'] ?? '', 'data:image/svg+xml;base64,'));
+            ->assertSet('showMesaTicketPreview', true)
+            ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Efectivo')
+                && str_contains($html, '$20.00')
+                && str_contains($html, 'Tarjeta')
+                && str_contains($html, '$40.00')
+                && str_contains($html, '1111')
+                && str_contains($html, 'data:image/svg+xml;base64,'));
     }
 
     public function test_table_history_marks_removed_items_and_excludes_them_from_the_total(): void

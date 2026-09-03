@@ -148,10 +148,16 @@ class SidebarMenuSeeder extends Seeder
             'icon' => 'bx-code-alt', 'route_name' => 'app.super-admin', 'active_pattern' => 'app.super-admin',
             'permission' => 'ver panel super admin', 'sort_order' => 10, 'is_system' => true,
         ]);
+        $this->item('development.environment', [
+            'parent_id' => $development->id, 'label' => 'Variables de entorno', 'type' => 'link',
+            'icon' => 'bx-slider-alt', 'route_name' => 'app.super-admin.environment',
+            'active_pattern' => 'app.super-admin.environment', 'permission' => 'gestionar variables de entorno',
+            'sort_order' => 20, 'is_system' => true,
+        ]);
         $this->item('development.pulse', [
             'parent_id' => $development->id, 'label' => 'Laravel Pulse', 'type' => 'link',
             'icon' => 'bx-pulse', 'route_name' => 'pulse',
-            'permission' => 'ver panel super admin', 'sort_order' => 20, 'is_system' => true,
+            'permission' => 'ver panel super admin', 'sort_order' => 30, 'is_system' => true,
         ]);
 
         $account = $this->item('section.account', [
