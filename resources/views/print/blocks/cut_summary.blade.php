@@ -2,8 +2,8 @@
 @php $cut = $payload['cut']; @endphp
 <section class="ticket-cut">
     <div class="ticket-row"><span>Caja</span><strong>{{ $cut->cashRegister->name }}</strong></div>
-    <div class="ticket-row"><span>Apertura</span><span>{{ $cut->cashRegister->opened_at->copy()->timezone(config('app.business_timezone'))->format('d/m/Y H:i') }}</span></div>
-    <div class="ticket-row"><span>Cierre</span><span>{{ $cut->generated_at->copy()->timezone(config('app.business_timezone'))->format('d/m/Y H:i') }}</span></div>
+    <div class="ticket-row"><span>Apertura</span><span>{{ $cut->cashRegister->opened_at->copy()->timezone(config('app.business_timezone'))->format('d/m/Y h:i A') }}</span></div>
+    <div class="ticket-row"><span>Cierre</span><span>{{ $cut->generated_at->copy()->timezone(config('app.business_timezone'))->format('d/m/Y h:i A') }}</span></div>
     <div class="ticket-row"><span>Cajero</span><span>{{ $cut->generator->name }}</span></div>
     <hr>
     <strong>VENTAS DEL TURNO</strong>

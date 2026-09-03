@@ -1,6 +1,12 @@
 * { box-sizing: border-box; }
 html { background: #eef0f3; }
 body.ticket-document { margin: 0 auto; color: #000; background: #fff; font-family: "Courier New", monospace; line-height: 1.35; }
+.ticket-info-readable { font-family: Arial, Helvetica, sans-serif; font-weight: 500; line-height: 1.4; }
+.ticket-info-readable .ticket-header h1,
+.ticket-info-readable .ticket-header strong,
+.ticket-info-readable .ticket-meta strong,
+.ticket-info-readable .ticket-total,
+.ticket-info-readable .ticket-cut-difference { font-weight: 800; }
 .ticket-paper-58 { width: 58mm; page: ticket-58; }
 .ticket-paper-80 { width: 80mm; page: ticket-80; }
 @page ticket-58 { size: 58mm auto; margin: 0; }
@@ -15,7 +21,7 @@ body.ticket-document { margin: 0 auto; color: #000; background: #fff; font-famil
 .ticket-header, .ticket-business, .ticket-footer, .ticket-qr { text-align: center; }
 .ticket-header h1 { margin: 0 0 2px; font-size: 1.35em; }
 .ticket-header strong { display: block; font-size: .92em; }
-.ticket-logo { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; object-fit: contain; filter: grayscale(1); }
+.ticket-logo { display: block; max-width: 100%; height: auto; margin: 0 auto 4px; object-fit: contain; opacity: 1; filter: grayscale(1) brightness(.75) contrast(4); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 .ticket-logo-size-12 .ticket-logo { width: 12mm; } .ticket-logo-size-18 .ticket-logo { width: 18mm; }
 .ticket-logo-size-24 .ticket-logo { width: 24mm; } .ticket-logo-size-30 .ticket-logo { width: 30mm; }
 .ticket-logo-size-36 .ticket-logo { width: 36mm; } .ticket-logo-size-42 .ticket-logo { width: 42mm; }
@@ -32,6 +38,7 @@ hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-items-font-arial .ticket-items { font-family: Arial, sans-serif; }
 .ticket-items-font-verdana .ticket-items { font-family: Verdana, sans-serif; }
 .ticket-items-font-system .ticket-items { font-family: system-ui, sans-serif; }
+.ticket-info-readable .ticket-items { font-weight: 400; }
 .ticket-items-size-12 .ticket-items { font-size: 12px; } .ticket-items-size-13 .ticket-items { font-size: 13px; }
 .ticket-items-size-14 .ticket-items { font-size: 14px; } .ticket-items-size-15 .ticket-items { font-size: 15px; }
 .ticket-items-size-16 .ticket-items { font-size: 16px; } .ticket-items-size-17 .ticket-items { font-size: 17px; }
