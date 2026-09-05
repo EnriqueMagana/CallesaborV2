@@ -67,7 +67,7 @@ class OrderList extends Component
     {
         $register = $this->activeCashRegister;
 
-        return Order::with(['seller', 'cashRegister', 'customer', 'changeRequests' => fn ($q) => $q->where('status', OrderChangeRequest::STATUS_PENDING)])
+        return Order::with(['seller', 'cashRegister', 'customer', 'payments', 'refunds', 'deliveryAssignment', 'changeRequests' => fn ($q) => $q->where('status', OrderChangeRequest::STATUS_PENDING)])
             ->when($register, fn ($q) => $q->where('cash_register_id', $register->id))
             ->when(! $register, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($this->search, function ($q): void {

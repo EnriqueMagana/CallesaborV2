@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
+use App\Models\DeliveryAssignmentEvent;
 use App\Models\Order;
 use App\Models\OrderPayment;
 use App\Models\User;
@@ -13,7 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class DeliveryWorkflow
 {
-    public function __construct(private readonly DeliveryModulePolicy $policy) {}
+    public function __construct(
+        private readonly DeliveryModulePolicy $policy,
+        private readonly OperationalNotificationService $notifications,
+    ) {}
 
     public function assignTo(Order $order, User $driver): DeliveryAssignment
     {
@@ -82,6 +86,70 @@ class DeliveryWorkflow
 
             return $assignment->fresh('driver');
         });
+    }
+
+    public function reassign(Order $order, User $newDriver, User $actor, string $reason): DeliveryAssignment
+    {
+        if (! $actor->can('reasignar pedidos delivery')) {
+            throw new AuthorizationException('No tienes permiso para reasignar pedidos de delivery.');
+        }
+
+        $result = DB::transaction(function () use ($order, $newDriver, $actor, $reason): array {
+            $this->policy->assertEnabledForUpdate();
+            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $this->ensureOrderBelongsToOpenRegister($lockedOrder);
+
+            if ($lockedOrder->type !== 'delivery' || ! $this->policy->isManaged($lockedOrder)) {
+                throw ValidationException::withMessages(['reassignDriverId' => 'Este pedido no admite asignaciÃ³n digital.']);
+            }
+
+            if (! in_array($lockedOrder->status, ['pendiente', 'en_preparacion', 'lista', 'pagada', 'en_reparto'], true)) {
+                throw ValidationException::withMessages(['reassignDriverId' => 'Este pedido ya no puede reasignarse.']);
+            }
+
+            $assignment = DeliveryAssignment::query()
+                ->where('order_id', $lockedOrder->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $assignment || $assignment->status !== 'asignado') {
+                throw ValidationException::withMessages(['reassignDriverId' => 'El pedido no tiene una asignaciÃ³n activa.']);
+            }
+
+            if ($newDriver->isBanned() || $newDriver->trashed() || ! $newDriver->hasAnyPermission(['entregar delivery', 'gestionar delivery'])) {
+                throw ValidationException::withMessages(['reassignDriverId' => 'Selecciona un repartidor activo con permiso para entregar pedidos.']);
+            }
+
+            if ($assignment->driver_id === $newDriver->id) {
+                throw ValidationException::withMessages(['reassignDriverId' => 'El pedido ya estÃ¡ asignado a ese repartidor.']);
+            }
+
+            $previousDriverId = $assignment->driver_id;
+            $assignment->update([
+                'driver_id' => $newDriver->id,
+                'assigned_by' => $actor->id,
+                'assigned_at' => now(),
+            ]);
+
+            $event = DeliveryAssignmentEvent::create([
+                'delivery_assignment_id' => $assignment->id,
+                'order_id' => $lockedOrder->id,
+                'from_driver_id' => $previousDriverId,
+                'to_driver_id' => $newDriver->id,
+                'actor_id' => $actor->id,
+                'event_type' => 'reassigned',
+                'reason' => trim($reason),
+            ]);
+
+            return [
+                'assignment' => $assignment->fresh(['order', 'driver']),
+                'event' => $event->load(['fromDriver', 'toDriver', 'actor']),
+            ];
+        });
+
+        $this->notifications->deliveryReassigned($result['assignment'], $result['event']);
+
+        return $result['assignment'];
     }
 
     public function markDelivered(Order $order, User $actor, bool $canManageAll = false): DeliveryAssignment

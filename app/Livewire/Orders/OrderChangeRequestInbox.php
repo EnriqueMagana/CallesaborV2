@@ -59,7 +59,7 @@ class OrderChangeRequestInbox extends Component
         $term = trim($this->search);
 
         return OrderChangeRequest::query()
-            ->with(['order.customer', 'requester', 'reviewer', 'refund'])
+            ->with(['order.customer', 'order.deliveryAssignment.driver', 'requester', 'reviewer', 'refund'])
             ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
             ->when($this->typeFilter, fn ($query) => $query->where('type', $this->typeFilter))
             ->when($term !== '', function ($query) use ($term): void {
@@ -82,7 +82,7 @@ class OrderChangeRequestInbox extends Component
     public function selectedRequest(): ?OrderChangeRequest
     {
         return $this->selectedRequestId
-            ? OrderChangeRequest::with(['order.customer', 'requester', 'reviewer', 'refund'])->find($this->selectedRequestId)
+            ? OrderChangeRequest::with(['order.customer', 'order.deliveryAssignment.driver', 'requester', 'reviewer', 'refund'])->find($this->selectedRequestId)
             : null;
     }
 
@@ -93,6 +93,8 @@ class OrderChangeRequestInbox extends Component
             'pending' => OrderChangeRequest::where('status', OrderChangeRequest::STATUS_PENDING)->count(),
             'cancellations' => OrderChangeRequest::where('status', OrderChangeRequest::STATUS_PENDING)->where('type', OrderChangeRequest::TYPE_CANCELLATION)->count(),
             'modifications' => OrderChangeRequest::where('status', OrderChangeRequest::STATUS_PENDING)->where('type', OrderChangeRequest::TYPE_MODIFICATION)->count(),
+            'payment_changes' => OrderChangeRequest::where('status', OrderChangeRequest::STATUS_PENDING)->where('type', OrderChangeRequest::TYPE_PAYMENT_CHANGE)->count(),
+            'address_changes' => OrderChangeRequest::where('status', OrderChangeRequest::STATUS_PENDING)->where('type', OrderChangeRequest::TYPE_ADDRESS_CHANGE)->count(),
             'resolved' => OrderChangeRequest::whereIn('status', [OrderChangeRequest::STATUS_APPROVED, OrderChangeRequest::STATUS_REJECTED])->count(),
         ];
     }

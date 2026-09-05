@@ -275,6 +275,9 @@ class KioskPosWorkflowTest extends TestCase
         foreach (['F6', 'F7', 'F8', 'F9', 'F11'] as $shortcut) {
             $this->assertStringContainsString('aria-keyshortcuts="'.$shortcut.'"', $toolbar);
         }
+        $this->assertStringContainsString('data-pos-more', $toolbar);
+        $this->assertStringContainsString("F11: '[data-pos-more]'", $view);
+        $this->assertStringNotContainsString('wire:click="openOperationsModal', $toolbar);
         foreach (['Por cobrar', 'Mesas', 'Pedidos', 'Más'] as $mobileArea) {
             $this->assertStringContainsString($mobileArea, $mobileNavigation);
         }
@@ -287,7 +290,25 @@ class KioskPosWorkflowTest extends TestCase
         foreach (['Guardados', 'Reimprimir', 'Registrar gasto', 'Ingreso de caja', 'Salida de insumos', 'Inicio'] as $allowedMoreAction) {
             $this->assertStringContainsString($allowedMoreAction, $moreMenu);
         }
-        foreach (['app.clientes', 'app.historial-ventas', 'app.inventario', 'app.usuarios', 'app.reservas', 'app.ordenes', 'app.constructor-menu', 'app.configuracion-negocio'] as $removedMoreRoute) {
+        $this->assertStringContainsString('app.ordenes', $moreMenu);
+        $this->assertStringContainsString('Cambiar datos', $moreMenu);
+        $this->assertStringContainsString('openOrderDataModal', $moreMenu);
+        $this->assertStringContainsString('Repartidores', $moreMenu);
+        $this->assertStringContainsString("'reasignar pedidos delivery'", $moreMenu);
+        $this->assertStringContainsString('openDeliveryDispatchModal', $moreMenu);
+        $this->assertStringNotContainsString("route('app.delivery'", $moreMenu);
+        $dispatchModal = file_get_contents(resource_path('views/livewire/pos/partials/modals/delivery-dispatch.blade.php'));
+        $this->assertIsString($dispatchModal);
+        $this->assertStringContainsString('Repartidores y pedidos', $dispatchModal);
+        $this->assertStringContainsString('selectDeliveryDispatchOrder', $dispatchModal);
+        $this->assertStringContainsString('reassignDeliveryFromPos', $dispatchModal);
+        $this->assertStringContainsString('x-model.debounce.120ms="query"', $dispatchModal);
+        $deliveryPanel = file_get_contents(resource_path('views/livewire/pos/partials/panels/delivery.blade.php'));
+        $this->assertIsString($deliveryPanel);
+        $this->assertStringNotContainsString('Gestionar reparto', $deliveryPanel);
+        $this->assertStringContainsString('right: 25vw', $mobileCss);
+        $this->assertStringContainsString('left: 25vw', $mobileCss);
+        foreach (['app.clientes', 'app.historial-ventas', 'app.inventario', 'app.usuarios', 'app.reservas', 'app.constructor-menu', 'app.configuracion-negocio'] as $removedMoreRoute) {
             $this->assertStringNotContainsString($removedMoreRoute, $moreMenu);
         }
         $this->assertStringContainsString('@media (max-width: 1024px)', $mobileCss);
@@ -357,7 +378,7 @@ class KioskPosWorkflowTest extends TestCase
             ->call('openDeliveryPanel')
             ->assertSet('deliveryPanelLoaded', true)
             ->assertSee('Domicilio contra entrega')
-            ->assertSee('Gestionar reparto')
+            ->assertDontSee('Gestionar reparto')
             ->assertDontSee('Cobrar ahora');
 
         $this->assertDatabaseMissing('order_payments', ['order_id' => $delivery->id]);
@@ -840,7 +861,7 @@ class KioskPosWorkflowTest extends TestCase
 
         $order = Order::latest('id')->firstOrFail();
         $this->assertSame('delivery', $order->type);
-        $this->assertSame('transfer', $order->delivery_method);
+        $this->assertSame('transferencia', $order->delivery_method);
         $this->assertSame('Centro', $order->customer_neighborhood);
         $this->assertSame('', (string) $order->customer_references);
         $this->assertSame('Sin popote', $order->notes);
@@ -891,7 +912,7 @@ class KioskPosWorkflowTest extends TestCase
 
         $order = Order::query()->latest('id')->firstOrFail();
         $this->assertSame('delivery', $order->type);
-        $this->assertSame('transfer', $order->delivery_method);
+        $this->assertSame('transferencia', $order->delivery_method);
         $this->assertDatabaseHas('order_payments', [
             'order_id' => $order->id,
             'method' => 'transferencia',

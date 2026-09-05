@@ -13,7 +13,9 @@ use App\Models\InventoryItem;
 use App\Models\MesaService;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
+use App\Models\OrderDataChangeAudit;
 use App\Models\OrderItem;
+use App\Models\OrderPayment;
 use App\Models\Product;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -295,8 +297,8 @@ class OperationalPermissionsTest extends TestCase
 
         Livewire::actingAs($employee)
             ->test(PointOfSale::class)
-            ->assertSee('Movimientos')
-            ->assertSee('Caja e insumos')
+            ->assertSee('Más')
+            ->assertSee('Herramientas')
             ->assertSee('Registrar gasto')
             ->assertSee('Ingreso de caja')
             ->assertSee('Salida de insumos')
@@ -442,6 +444,96 @@ class OperationalPermissionsTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'pagada']);
+    }
+
+    public function test_pos_order_data_editor_requires_permission_and_preserves_items_totals_and_status(): void
+    {
+        [$viewer, $register, $order] = $this->orderContext([], [
+            'customer_name' => 'Cliente original',
+            'customer_phone' => '5511111111',
+            'customer_address' => 'DirecciÃ³n anterior',
+            'customer_neighborhood' => 'Centro',
+            'type' => 'delivery',
+            'delivery_method' => 'transferencia',
+            'status' => 'pagada',
+            'subtotal' => 100,
+            'total' => 100,
+        ]);
+        $item = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Producto protegido',
+            'product_price' => 100,
+            'quantity' => 1,
+            'subtotal' => 100,
+        ]);
+        $firstPayment = OrderPayment::create([
+            'order_id' => $order->id,
+            'method' => 'transferencia',
+            'amount' => 60,
+            'transfer_reference' => 'REF-ANTERIOR',
+        ]);
+        $secondPayment = OrderPayment::create([
+            'order_id' => $order->id,
+            'method' => 'efectivo',
+            'amount' => 40,
+            'received_amount' => 40,
+            'change_amount' => 0,
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(PointOfSale::class)
+            ->call('openOrderDataModal')
+            ->assertForbidden();
+
+        $editor = $this->employee(['editar datos de ordenes en punto de venta']);
+        Livewire::actingAs($editor)
+            ->test(PointOfSale::class)
+            ->call('openOrderDataModal')
+            ->assertSet('showOrderDataModal', true)
+            ->assertSee('Selecciona una orden')
+            ->assertSee('Productos e importes protegidos')
+            ->call('selectOrderForDataEdit', $order->id)
+            ->assertSet('orderDataCustomerName', 'Cliente original')
+            ->assertSee('Total protegido')
+            ->assertSee('Datos de contacto')
+            ->set('orderDataCustomerName', 'Cliente corregido')
+            ->set('orderDataCustomerAddress', 'DirecciÃ³n nueva 123')
+            ->set('orderDataCustomerNeighborhood', 'Norte')
+            ->set('orderDataPayments.0.method', 'tarjeta')
+            ->set('orderDataPayments.0.card_last4', '4321')
+            ->set('orderDataPayments.1.method', 'transferencia')
+            ->set('orderDataPayments.1.transfer_reference', 'REF-NUEVA')
+            ->call('saveOrderData')
+            ->assertHasNoErrors()
+            ->assertSet('showOrderDataModal', false);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'customer_name' => 'Cliente corregido',
+            'customer_address' => 'DirecciÃ³n nueva 123',
+            'customer_neighborhood' => 'Norte',
+            'status' => 'pagada',
+            'subtotal' => 100,
+            'total' => 100,
+        ]);
+        $this->assertDatabaseHas('order_items', [
+            'id' => $item->id,
+            'quantity' => 1,
+            'subtotal' => 100,
+        ]);
+        $this->assertDatabaseHas('order_payments', [
+            'id' => $firstPayment->id,
+            'method' => 'tarjeta',
+            'amount' => 60,
+            'card_last4' => '4321',
+        ]);
+        $this->assertDatabaseHas('order_payments', [
+            'id' => $secondPayment->id,
+            'method' => 'transferencia',
+            'amount' => 40,
+            'transfer_reference' => 'REF-NUEVA',
+        ]);
+        $this->assertSame(1, OrderDataChangeAudit::where('order_id', $order->id)->count());
     }
 
     private function employee(array $permissions): User

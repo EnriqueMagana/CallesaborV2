@@ -18,8 +18,16 @@
         </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-        @if($order->cashRegister?->is_open && !in_array($order->status, ['cancelada', 'entregada'], true) && $order->changeRequests->where('status', 'pending')->isEmpty())
-            @if(auth()->user()?->can('solicitar modificacion de ordenes') || auth()->user()?->can('solicitar cancelacion de ordenes'))
+        @php
+            $user = auth()->user();
+            $activeUnpaid = in_array($order->status, ['pendiente', 'en_preparacion', 'lista'], true) && $order->payments->isEmpty();
+            $paid = $order->status === 'pagada' && $order->payments->isNotEmpty();
+            $canRequestOrderChange = (($activeUnpaid || $paid) && ($user?->can('solicitar cancelacion de ordenes') || $user?->can('solicitar modificacion de ordenes')))
+                || ($order->type === 'delivery' && $paid && $order->payments->count() === 1 && $order->refunds->isEmpty() && $user?->can('solicitar cambio de metodo de pago'))
+                || ($order->type === 'delivery' && in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true) && $order->deliveryAssignment?->status !== 'entregado' && $user?->can('solicitar cambio de direccion'));
+        @endphp
+        @if($order->cashRegister?->is_open && $order->changeRequests->where('status', 'pending')->isEmpty())
+            @if($canRequestOrderChange)
                 <a class="btn btn-sm btn-outline-primary" href="{{ route('app.ordenes.solicitud', ['order' => $order, 'source' => 'detail']) }}"><i class="bx bx-git-compare me-1"></i>Solicitar cambio</a>
             @endif
         @endif

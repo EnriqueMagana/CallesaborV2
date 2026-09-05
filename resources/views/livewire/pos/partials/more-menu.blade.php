@@ -81,6 +81,33 @@
                 </button>
             @endcanany
 
+            @can('editar datos de ordenes en punto de venta')
+                <button type="button" class="pos-more-action" data-tone="blue"
+                    @click="closeMore(false)" wire:click="openOrderDataModal"
+                    wire:loading.attr="disabled" wire:target="openOrderDataModal">
+                    <span class="pos-more-action__icon"><i class="bx bx-edit-alt" aria-hidden="true"></i></span>
+                    <strong>Cambiar datos</strong><small>Direcci&oacute;n, contacto o pago</small>
+                </button>
+            @endcan
+
+            @canany(['solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes'])
+                <a href="{{ route('app.ordenes', ['action' => 'request']) }}" class="pos-more-action" data-tone="blue">
+                    <span class="pos-more-action__icon"><i class="bx bx-message-square-edit" aria-hidden="true"></i></span>
+                    <strong>Solicitar ajuste</strong><small>Productos o cancelaci&oacute;n</small>
+                </a>
+            @endcanany
+
+            @if (app(\App\Services\DeliveryModulePolicy::class)->enabled())
+                @can('reasignar pedidos delivery')
+                    <button type="button" class="pos-more-action" data-tone="green"
+                        @click="closeMore(false)" wire:click="openDeliveryDispatchModal"
+                        wire:loading.attr="disabled" wire:target="openDeliveryDispatchModal">
+                        <span class="pos-more-action__icon"><i class="bx bx-group" aria-hidden="true"></i></span>
+                        <strong>Repartidores</strong><small>Ver y reasignar pedidos</small>
+                    </button>
+                @endcan
+            @endif
+
             <a href="{{ route('app.dashboard') }}" class="pos-more-action" data-tone="neutral">
                 <span class="pos-more-action__icon"><i class="bx bx-home-alt" aria-hidden="true"></i></span>
                 <strong>Inicio</strong><small>Volver al dashboard</small>

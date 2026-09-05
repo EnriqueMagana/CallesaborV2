@@ -259,6 +259,19 @@ html.pos-overlay-open body {
     scrollbar-gutter: stable;
 }
 
+/* En escritorio el menÃº funciona como paleta compacta; tablet y mÃ³vil conservan el sheet ancho. */
+@media (min-width: 1025px) {
+    .pos-more-sheet {
+        right: 25vw;
+        left: 25vw;
+        max-height: min(620px, calc(100dvh - var(--pos-more-sheet-bottom) - 20px));
+    }
+
+    .pos-more-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
 .pos-more-sheet__handle {
     display: block;
     width: 38px;

@@ -5,6 +5,7 @@
     'canTake' => false,
     'canComplete' => false,
     'canManageAll' => false,
+    'canReassign' => false,
     'highlighted' => false,
 ])
 
@@ -21,6 +22,9 @@
         && $controlsAssignment
         && $assignment?->status === 'asignado'
         && $order->status === 'en_reparto';
+    $canReassignThis = $canReassign
+        && $assignment?->status === 'asignado'
+        && in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada', 'en_reparto'], true);
     $searchKey = str(implode(' ', [
         $order->display_folio,
         $order->display_name,
@@ -140,6 +144,14 @@
             <button type="button" class="delivery-btn delivery-btn--success"
                 wire:click="askToMarkDelivered({{ $order->id }})">
                 <i class="bx bx-check-double" aria-hidden="true"></i> Marcar entregado
+            </button>
+        @endif
+
+        @if ($canReassignThis)
+            <button type="button" class="delivery-btn delivery-btn--secondary"
+                wire:click="openReassign({{ $order->id }})" wire:loading.attr="disabled"
+                wire:target="openReassign({{ $order->id }})">
+                <i class="bx bx-transfer-alt" aria-hidden="true"></i> Reasignar
             </button>
         @endif
     </footer>

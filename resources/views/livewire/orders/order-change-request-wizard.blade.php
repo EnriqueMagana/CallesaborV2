@@ -22,7 +22,7 @@
     @if($this->isPaidOrder)
         <div class="order-wizard-paid-notice" role="status">
             <i class="bx bx-credit-card" aria-hidden="true"></i>
-            <div><strong>Esta orden ya fue pagada</strong><p>El pago original se conservará. Si se autoriza un importe menor, se registrará una devolución auditada por ${{ number_format($this->refundAmount, 2) }}.</p></div>
+            <div><strong>Esta orden ya fue pagada</strong><p>@if(in_array($scope, ['full', 'partial', 'adjustment'], true)) El pago original se conservará. Si se autoriza un importe menor, se registrará una devolución auditada por ${{ number_format($this->refundAmount, 2) }}. @elseif($scope === 'payment') El cambio corregirá el método registrado sin duplicar el cobro ni alterar el total. @else Elige el tipo de solicitud para revisar su impacto antes de enviarla. @endif</p></div>
         </div>
     @endif
 
@@ -45,14 +45,24 @@
                                 <i class="bx bx-edit-alt" aria-hidden="true"></i><span><strong>Ajustar el pedido</strong><small>Agrega, retira o cambia cantidades.</small></span><b>Modificar</b>
                             </button>
                         @endif
+                        @if($this->canRequestPaymentChange)
+                            <button type="button" wire:click="chooseScope('payment')" role="radio" aria-checked="{{ $scope === 'payment' ? 'true' : 'false' }}" class="is-payment {{ $scope === 'payment' ? 'is-selected' : '' }}">
+                                <i class="bx bx-credit-card" aria-hidden="true"></i><span><strong>Cambiar método de pago</strong><small>Reclasifica el cobro sin alterar el total.</small></span><b>Pago</b>
+                            </button>
+                        @endif
+                        @if($this->canRequestAddressChange)
+                            <button type="button" wire:click="chooseScope('address')" role="radio" aria-checked="{{ $scope === 'address' ? 'true' : 'false' }}" class="is-address {{ $scope === 'address' ? 'is-selected' : '' }}">
+                                <i class="bx bx-map" aria-hidden="true"></i><span><strong>Cambiar dirección</strong><small>Actualiza el destino del pedido delivery.</small></span><b>Delivery</b>
+                            </button>
+                        @endif
                     </div>
                     @error('scope') <p class="orders-field-error" role="alert">{{ $message }}</p> @enderror
                 </div>
             @elseif($step === 2)
                 <div class="order-wizard-step" wire:key="wizard-step-2">
-                    <div class="order-wizard-step__heading"><span>2</span><div><h2>{{ $scope === 'full' ? 'Documenta la cancelación' : 'Configura el nuevo pedido' }}</h2><p>{{ $scope === 'full' ? 'Confirma el contexto para que la autorización sea rápida.' : 'Marca exactamente lo que se agrega, retira o cambia.' }}</p></div></div>
+                    <div class="order-wizard-step__heading"><span>2</span><div><h2>{{ match($scope) {'full' => 'Documenta la cancelación', 'payment' => 'Configura el nuevo método', 'address' => 'Confirma la nueva dirección', default => 'Configura el nuevo pedido'} }}</h2><p>{{ match($scope) {'full' => 'Confirma el contexto para que la autorización sea rápida.', 'payment' => 'El total no cambia y el cobro existente se reclasifica al aprobar.', 'address' => 'Registra el destino confirmado por el cliente.', default => 'Marca exactamente lo que se agrega, retira o cambia.'} }}</p></div></div>
 
-                    @if($scope !== 'full')
+                    @if(in_array($scope, ['partial', 'adjustment'], true))
                         <fieldset class="order-wizard-fieldset">
                             <legend>Artículos de la orden</legend>
                             <div class="orders-change-lines">
@@ -81,8 +91,35 @@
                                 @endforeach
                             </div>
                         </fieldset>
-                    @else
+                    @elseif($scope === 'full')
                         <div class="order-wizard-danger-summary"><i class="bx bx-error-circle" aria-hidden="true"></i><div><strong>Se solicitará cancelar toda la orden</strong><p>Los {{ $order->items->sum('quantity') }} artículos permanecerán en el historial; no se eliminará ningún registro.</p></div></div>
+                    @elseif($scope === 'payment')
+                        @php($currentPayment = $order->payments->first())
+                        <fieldset class="order-wizard-fieldset order-wizard-change-card">
+                            <legend>Cambio solicitado</legend>
+                            <div class="order-wizard-current-value"><span><small>Método registrado</small><strong>{{ $currentPayment?->method_label }}</strong></span><span><small>Importe</small><strong>${{ number_format($currentPayment?->amount ?? $order->total, 2) }}</strong></span></div>
+                            <label>Nuevo método de pago</label>
+                            <div class="order-wizard-payment-methods" role="radiogroup" aria-label="Nuevo método de pago">
+                                @foreach(['cash' => ['bx-money', 'Efectivo'], 'card' => ['bx-credit-card', 'Tarjeta'], 'transfer' => ['bx-transfer', 'Transferencia']] as $value => $option)
+                                    <button type="button" wire:click="$set('newPaymentMethod', '{{ $value }}')" class="{{ $newPaymentMethod === $value ? 'is-selected' : '' }}" aria-pressed="{{ $newPaymentMethod === $value ? 'true' : 'false' }}"><i class="bx {{ $option[0] }}"></i><span>{{ $option[1] }}</span></button>
+                                @endforeach
+                            </div>
+                            @error('newPaymentMethod')<p class="orders-field-error" role="alert">Selecciona el nuevo método.</p>@enderror
+                            <div class="orders-field"><label for="wizard-payment-received">¿El pago registrado sí llegó al negocio?</label><select id="wizard-payment-received" wire:model.live="previousPaymentReceived"><option value="">Selecciona</option><option value="no">No, se registró el método equivocado</option><option value="yes">Sí, el pago sí fue recibido</option></select>@error('previousPaymentReceived')<p class="orders-field-error" role="alert">Si el pago sí llegó, debe procesarse mediante devolución y un nuevo cobro.</p>@enderror</div>
+                            @if($previousPaymentReceived === 'yes')<div class="order-wizard-final-warning is-refund"><i class="bx bx-error-circle"></i><p>Este flujo no debe reemplazar un pago real. Solicita una devolución y registra después el nuevo cobro.</p></div>@endif
+                            @if($newPaymentMethod === 'cash')<div class="orders-field"><label for="wizard-cash-received">Efectivo recibido</label><input id="wizard-cash-received" type="number" min="{{ $order->total }}" step="0.01" wire:model.blur="paymentCashReceived">@error('paymentCashReceived')<p class="orders-field-error" role="alert">El efectivo recibido debe cubrir el total.</p>@enderror</div>@endif
+                            @if($newPaymentMethod === 'card')<div class="orders-field"><label for="wizard-card-last4">Últimos 4 dígitos</label><input id="wizard-card-last4" type="text" inputmode="numeric" maxlength="4" wire:model.blur="paymentCardLast4" placeholder="1234">@error('paymentCardLast4')<p class="orders-field-error" role="alert">Captura exactamente 4 dígitos.</p>@enderror</div>@endif
+                            @if($newPaymentMethod === 'transfer')<div class="orders-field"><label for="wizard-transfer-reference">Referencia de transferencia</label><input id="wizard-transfer-reference" type="text" maxlength="120" wire:model.blur="paymentTransferReference" placeholder="Folio o referencia bancaria">@error('paymentTransferReference')<p class="orders-field-error" role="alert">Captura una referencia válida.</p>@enderror</div>@endif
+                        </fieldset>
+                    @elseif($scope === 'address')
+                        <fieldset class="order-wizard-fieldset order-wizard-change-card">
+                            <legend>Nueva entrega</legend>
+                            <div class="order-wizard-address-before"><small>Dirección actual</small><strong>{{ $order->customer_address ?: 'Sin dirección registrada' }}</strong><span>{{ $order->customer_neighborhood }}@if($order->customer_references) · {{ $order->customer_references }}@endif</span></div>
+                            <div class="order-wizard-context-grid"><div class="orders-field"><label for="wizard-new-address">Calle y número</label><input id="wizard-new-address" wire:model.blur="newAddress" autocomplete="street-address">@error('newAddress')<p class="orders-field-error" role="alert">Captura una dirección válida.</p>@enderror</div><div class="orders-field"><label for="wizard-new-neighborhood">Colonia o zona</label><input id="wizard-new-neighborhood" wire:model.blur="newNeighborhood">@error('newNeighborhood')<p class="orders-field-error" role="alert">Captura la colonia o zona.</p>@enderror</div></div>
+                            <div class="order-wizard-context-grid"><div class="orders-field"><label for="wizard-new-references">Referencias</label><textarea id="wizard-new-references" rows="2" wire:model.blur="newReferences" placeholder="Color de fachada, entre calles…"></textarea>@error('newReferences')<p class="orders-field-error" role="alert">{{ $message }}</p>@enderror</div><div class="orders-field"><label for="wizard-new-phone">Teléfono de contacto</label><input id="wizard-new-phone" type="tel" wire:model.blur="newPhone">@error('newPhone')<p class="orders-field-error" role="alert">{{ $message }}</p>@enderror</div></div>
+                            @if($order->customer_id)<label class="order-wizard-checkbox"><input type="checkbox" wire:model="updateCustomerProfile"><span><strong>Guardar también en el perfil del cliente</strong><small>Úsalo solo si será su nueva dirección habitual.</small></span></label>@endif
+                            @if($order->deliveryAssignment)<div class="order-wizard-final-warning"><i class="bx bx-cycling"></i><p>El pedido ya tiene repartidor. Al aprobar, se le notificará inmediatamente el nuevo destino.</p></div>@endif
+                        </fieldset>
                     @endif
 
                     <fieldset class="order-wizard-fieldset">
@@ -103,7 +140,7 @@
                         <div class="orders-field"><label for="wizard-preparation-stage">Etapa real de preparación</label><select id="wizard-preparation-stage" wire:model="preparationStage"><option value="not_started">Aún no inicia</option><option value="in_progress">En preparación</option><option value="ready">Ya está listo</option><option value="unknown">No se pudo confirmar</option></select>@error('preparationStage')<p class="orders-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     </div>
 
-                    @if($this->isPaidOrder)
+                    @if($this->isPaidOrder && in_array($scope, ['full', 'partial', 'adjustment'], true))
                         <fieldset class="order-wizard-fieldset">
                             <legend>Destino de los productos retirados</legend>
                             <p class="orders-field-help">Esto deja evidencia operativa; no modifica existencias automáticamente.</p>
@@ -137,19 +174,25 @@
                 <div class="order-wizard-step" wire:key="wizard-step-3">
                     <div class="order-wizard-step__heading"><span>3</span><div><h2>Revisa antes de enviar</h2><p>La persona autorizadora recibirá exactamente esta información.</p></div></div>
                     <div class="order-wizard-review">
-                        <div><small>Solicitud</small><strong>{{ match($scope) {'full' => 'Cancelación total', 'partial' => 'Cancelación parcial', default => 'Ajuste de pedido'} }}</strong></div>
+                        <div><small>Solicitud</small><strong>{{ match($scope) {'full' => 'Cancelación total', 'partial' => 'Cancelación parcial', 'payment' => 'Cambio de método de pago', 'address' => 'Cambio de dirección', default => 'Ajuste de pedido'} }}</strong></div>
                         <div><small>Motivo</small><strong>{{ $this->reasonOptions[$reasonCode][0] ?? 'Sin seleccionar' }}</strong></div>
                         <div><small>Confirmación del cliente</small><strong>{{ match($customerConfirmed) {'yes' => 'Confirmado', 'no' => 'Sin confirmar', default => 'No aplica'} }}</strong></div>
                         <div><small>Preparación</small><strong>{{ match($preparationStage) {'not_started' => 'No iniciada', 'in_progress' => 'En proceso', 'ready' => 'Lista', default => 'Sin confirmar'} }}</strong></div>
                     </div>
                     @if($reasonDetail)<div class="orders-review-reason"><small>Detalle adicional</small><p>{{ $reasonDetail }}</p></div>@endif
-                    @if($scope !== 'full')
+                    @if(in_array($scope, ['partial', 'adjustment'], true))
                         <div class="order-wizard-impact"><span><small>Retiradas</small><b>{{ $this->changeSummary['removed'] }}</b></span><span><small>Agregadas</small><b>{{ $this->changeSummary['added'] }}</b></span><span><small>Cantidades modificadas</small><b>{{ $this->changeSummary['updated'] }}</b></span></div>
                         <div class="orders-total-comparison"><span>Actual <b>${{ number_format($order->total, 2) }}</b></span><i class="bx bx-right-arrow-alt"></i><span>Propuesto <strong>${{ number_format($this->proposedTotal, 2) }}</strong></span></div>
-                    @else
+                    @elseif($scope === 'full')
                         <div class="order-wizard-final-warning"><i class="bx bx-info-circle" aria-hidden="true"></i><p>Al aprobarse, la orden cambiará a estado cancelada. No se borrarán la orden ni sus artículos.</p></div>
+                    @elseif($scope === 'payment')
+                        <div class="order-wizard-review-change"><span><small>Método actual</small><strong>{{ $order->payments->first()?->method_label }}</strong></span><i class="bx bx-right-arrow-alt"></i><span><small>Nuevo método</small><strong>{{ match($newPaymentMethod) {'cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia', default => 'Sin seleccionar'} }}</strong></span></div>
+                        <div class="order-wizard-final-warning"><i class="bx bx-lock-alt"></i><p>El importe seguirá siendo <strong>${{ number_format($order->total, 2) }}</strong>. Se actualizará el pago existente sin duplicarlo.</p></div>
+                    @elseif($scope === 'address')
+                        <div class="order-wizard-review-change is-address"><span><small>Dirección actual</small><strong>{{ $order->customer_address ?: 'Sin dirección' }}</strong></span><i class="bx bx-right-arrow-alt"></i><span><small>Nueva dirección</small><strong>{{ $newAddress }}, {{ $newNeighborhood }}</strong></span></div>
+                        @if($updateCustomerProfile)<div class="order-wizard-final-warning"><i class="bx bx-user-check"></i><p>La dirección también se actualizará en el perfil del cliente.</p></div>@endif
                     @endif
-                    @if($this->isPaidOrder)
+                    @if($this->isPaidOrder && in_array($scope, ['full', 'partial', 'adjustment'], true))
                         <div class="order-wizard-final-warning is-refund"><i class="bx bx-receipt" aria-hidden="true"></i><p>Al aprobar, se registrará una devolución de <strong>${{ number_format($this->refundAmount, 2) }}</strong>. El autorizador confirmará el movimiento y capturará la referencia cuando corresponda.</p></div>
                     @endif
                     @error('requestItems') <p class="orders-field-error" role="alert">{{ $message }}</p> @enderror

@@ -235,4 +235,94 @@ class OrderChangeRequestWorkflowTest extends TestCase
             ->call('nextStep')
             ->assertHasErrors('requestItems');
     }
+
+    public function test_approved_payment_change_reclassifies_the_existing_delivery_payment_without_duplicating_it(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $requester = User::factory()->create();
+        $requester->givePermissionTo(['ver ordenes', 'solicitar cambio de metodo de pago']);
+        $register = CashRegister::create(['name' => 'Caja', 'opened_by' => $requester->id, 'initial_amount' => 0, 'opened_at' => now(), 'is_open' => true]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'served_by' => $requester->id,
+            'customer_name' => 'Cliente delivery',
+            'type' => 'delivery',
+            'delivery_method' => 'transferencia',
+            'status' => 'pagada',
+            'subtotal' => 150,
+            'total' => 150,
+        ]);
+        $payment = OrderPayment::create(['order_id' => $order->id, 'method' => 'transferencia', 'amount' => 150, 'transfer_reference' => 'TR-ERROR']);
+
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $requester,
+            OrderChangeRequest::TYPE_PAYMENT_CHANGE,
+            'El cliente pagará en efectivo al llegar al local',
+            [],
+            ['scope' => 'payment', 'previous_payment_received' => 'no', 'new_payment_method' => 'cash', 'cash_received' => 200]
+        );
+
+        app(OrderChangeRequestService::class)->approve($request, $owner, 'Método confirmado con el cliente');
+
+        $this->assertSame(1, OrderPayment::where('order_id', $order->id)->count());
+        $this->assertDatabaseHas('order_payments', [
+            'id' => $payment->id,
+            'method' => 'efectivo',
+            'amount' => 150,
+            'received_amount' => 200,
+            'change_amount' => 50,
+            'transfer_reference' => null,
+        ]);
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'delivery_method' => 'contra_entrega', 'total' => 150]);
+    }
+
+    public function test_approved_address_change_updates_delivery_destination_without_changing_total(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $requester = User::factory()->create();
+        $requester->givePermissionTo(['ver ordenes', 'solicitar cambio de direccion']);
+        $register = CashRegister::create(['name' => 'Caja', 'opened_by' => $requester->id, 'initial_amount' => 0, 'opened_at' => now(), 'is_open' => true]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'served_by' => $requester->id,
+            'customer_name' => 'Cliente delivery',
+            'customer_address' => 'Calle anterior 10',
+            'customer_neighborhood' => 'Centro',
+            'customer_phone' => '9991112233',
+            'type' => 'delivery',
+            'delivery_method' => 'contra_entrega',
+            'status' => 'pendiente',
+            'subtotal' => 95,
+            'total' => 95,
+        ]);
+
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $requester,
+            OrderChangeRequest::TYPE_ADDRESS_CHANGE,
+            'El cliente confirmó una dirección de entrega distinta',
+            [],
+            [
+                'scope' => 'address',
+                'new_address' => 'Avenida Nueva 245',
+                'new_neighborhood' => 'San Juan',
+                'new_references' => 'Fachada azul',
+                'new_phone' => '9994445566',
+            ]
+        );
+
+        app(OrderChangeRequestService::class)->approve($request, $owner, 'Destino confirmado');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'customer_address' => 'Avenida Nueva 245',
+            'customer_neighborhood' => 'San Juan',
+            'customer_references' => 'Fachada azul',
+            'customer_phone' => '9994445566',
+            'total' => 95,
+        ]);
+    }
 }

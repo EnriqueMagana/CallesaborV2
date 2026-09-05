@@ -26,12 +26,15 @@ use App\Models\QuotationItemAddon;
 use App\Models\QuotationItemIngredient;
 use App\Models\User;
 use App\Services\DeliveryModulePolicy;
+use App\Services\DeliveryWorkflow;
 use App\Services\DiscountPricingService;
 use App\Services\InventoryService;
 use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
+use App\Services\OrderOperationalDataService;
 use App\Services\PromotionPricingService;
 use App\Services\ThermalTicketRenderer;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -254,6 +257,27 @@ class PointOfSale extends Component
 
     public string $reprintType = 'ventanilla'; // ventanilla | mesas | delivery
 
+    // CorrecciÃ³n directa de datos operativos (nunca productos, importes ni estado).
+    public bool $showOrderDataModal = false;
+
+    public string $orderDataSearch = '';
+
+    public ?int $orderDataOrderId = null;
+
+    public string $orderDataCustomerName = '';
+
+    public string $orderDataCustomerPhone = '';
+
+    public string $orderDataCustomerAddress = '';
+
+    public string $orderDataCustomerNeighborhood = '';
+
+    public string $orderDataCustomerReferences = '';
+
+    public string $orderDataDeliveryMethod = 'contra_entrega';
+
+    public array $orderDataPayments = [];
+
     public bool $tableTrackingLoaded = false;
 
     public ?string $tableTrackingRefreshedAt = null;
@@ -265,6 +289,15 @@ class PointOfSale extends Component
     public string $tableWorkspaceFilter = 'all';
 
     public bool $deliveryPanelLoaded = false;
+
+    // Despacho de repartidores dentro del POS.
+    public bool $showDeliveryDispatchModal = false;
+
+    public ?int $deliveryDispatchOrderId = null;
+
+    public ?int $deliveryDispatchDriverId = null;
+
+    public string $deliveryDispatchReason = '';
 
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -607,6 +640,83 @@ class PointOfSale extends Component
     }
 
     #[Computed]
+    public function editableOrderDataOrders()
+    {
+        $cashRegisterId = $this->activeCashRegister?->id;
+
+        if (! $cashRegisterId || ! $this->showOrderDataModal) {
+            return collect();
+        }
+
+        $search = trim($this->orderDataSearch);
+
+        return Order::query()
+            ->with(['payments', 'customer'])
+            ->where('cash_register_id', $cashRegisterId)
+            ->where('status', '!=', 'cancelada')
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($scope) use ($search): void {
+                    $scope->where('customer_name', 'like', "%{$search}%")
+                        ->orWhere('customer_phone', 'like', "%{$search}%");
+
+                    if (ctype_digit($search)) {
+                        $scope->orWhere('id', (int) $search)
+                            ->orWhere('folio', (int) $search);
+                    }
+                });
+            })
+            ->latest('created_at')
+            ->limit(30)
+            ->get();
+    }
+
+    #[Computed]
+    public function deliveryDispatchDrivers()
+    {
+        if (! $this->showDeliveryDispatchModal || ! auth()->user()?->can('reasignar pedidos delivery')) {
+            return collect();
+        }
+
+        return User::query()
+            ->whereNull('banned_at')
+            ->with(['roles.permissions', 'permissions'])
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (User $user): bool => $user->hasAnyPermission(['entregar delivery', 'gestionar delivery']))
+            ->values();
+    }
+
+    #[Computed]
+    public function deliveryDispatchOrders()
+    {
+        $cashRegisterId = $this->activeCashRegister?->id;
+
+        if (! $cashRegisterId || ! $this->showDeliveryDispatchModal || ! auth()->user()?->can('reasignar pedidos delivery')) {
+            return collect();
+        }
+
+        return Order::query()
+            ->with(['deliveryAssignment.driver', 'items.addons', 'items.ingredients', 'payments'])
+            ->where('cash_register_id', $cashRegisterId)
+            ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'pagada', 'en_reparto'])
+            ->whereHas('deliveryAssignment', fn ($query) => $query->where('status', 'asignado'))
+            ->oldest('created_at')
+            ->get();
+    }
+
+    #[Computed]
+    public function selectedDeliveryDispatchOrder(): ?Order
+    {
+        if (! $this->deliveryDispatchOrderId) {
+            return null;
+        }
+
+        return $this->deliveryDispatchOrders->firstWhere('id', $this->deliveryDispatchOrderId);
+    }
+
+    #[Computed]
     public function reprintMesaGroups()
     {
         return $this->recentOrders
@@ -845,6 +955,99 @@ class PointOfSale extends Component
     public function closeDeliveryPanel(): void
     {
         $this->closeOperationalPanels();
+    }
+
+    public function openDeliveryDispatchModal(): void
+    {
+        abort_unless(auth()->user()?->can('reasignar pedidos delivery'), 403);
+        app(DeliveryModulePolicy::class)->assertEnabled();
+
+        if (! $this->activeCashRegister) {
+            $this->dispatch('notify', type: 'warning', message: 'Abre una caja para consultar el reparto activo.');
+
+            return;
+        }
+
+        $this->resetOperationalPanelState();
+        $this->resetDeliveryDispatchState();
+        $this->showDeliveryDispatchModal = true;
+        unset($this->deliveryDispatchDrivers, $this->deliveryDispatchOrders, $this->selectedDeliveryDispatchOrder);
+    }
+
+    public function closeDeliveryDispatchModal(): void
+    {
+        $this->showDeliveryDispatchModal = false;
+        $this->resetDeliveryDispatchState();
+        unset($this->deliveryDispatchDrivers, $this->deliveryDispatchOrders, $this->selectedDeliveryDispatchOrder);
+    }
+
+    public function selectDeliveryDispatchOrder(int $orderId): void
+    {
+        abort_unless(auth()->user()?->can('reasignar pedidos delivery'), 403);
+
+        $order = $this->deliveryDispatchOrders->firstWhere('id', $orderId);
+        abort_unless($order, 404);
+
+        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+        $this->deliveryDispatchOrderId = $order->id;
+        $this->deliveryDispatchDriverId = null;
+        $this->deliveryDispatchReason = '';
+        unset($this->selectedDeliveryDispatchOrder);
+    }
+
+    public function reassignDeliveryFromPos(DeliveryWorkflow $workflow): void
+    {
+        abort_unless(auth()->user()?->can('reasignar pedidos delivery'), 403);
+        app(DeliveryModulePolicy::class)->assertEnabled();
+        abort_unless($this->deliveryDispatchOrderId && $this->activeCashRegister, 422);
+
+        $validated = $this->validate([
+            'deliveryDispatchDriverId' => ['required', 'integer', 'exists:users,id'],
+            'deliveryDispatchReason' => ['required', 'string', 'min:8', 'max:500'],
+        ], [
+            'deliveryDispatchDriverId.required' => 'Selecciona al repartidor que recibirÃ¡ el pedido.',
+            'deliveryDispatchReason.required' => 'Indica por quÃ© se reasigna el pedido.',
+            'deliveryDispatchReason.min' => 'Describe el motivo con al menos 8 caracteres.',
+        ]);
+
+        $order = Order::query()
+            ->whereKey($this->deliveryDispatchOrderId)
+            ->where('cash_register_id', $this->activeCashRegister->id)
+            ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
+            ->firstOrFail();
+
+        try {
+            $workflow->reassign(
+                $order,
+                User::query()->findOrFail($validated['deliveryDispatchDriverId']),
+                auth()->user(),
+                $validated['deliveryDispatchReason'],
+            );
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $mappedField = $field === 'reassignDriverId' ? 'deliveryDispatchDriverId' : $field;
+                $this->addError($mappedField, $messages[0]);
+            }
+
+            return;
+        } catch (AuthorizationException) {
+            abort(403);
+        }
+
+        $this->deliveryDispatchDriverId = null;
+        $this->deliveryDispatchReason = '';
+        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+        unset($this->deliveryDispatchDrivers, $this->deliveryDispatchOrders, $this->selectedDeliveryDispatchOrder);
+        $this->dispatch('notify', type: 'success', message: 'Pedido reasignado sin salir del punto de venta.');
+    }
+
+    private function resetDeliveryDispatchState(): void
+    {
+        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+        $this->deliveryDispatchOrderId = null;
+        $this->deliveryDispatchDriverId = null;
+        $this->deliveryDispatchReason = '';
     }
 
     public function openPickupPanel(): void
@@ -2139,6 +2342,17 @@ class PointOfSale extends Component
         };
     }
 
+    private function mapDeliveryMethodForStorage(string $method): string
+    {
+        return match ($method) {
+            'cash' => 'contra_entrega',
+            'card' => 'tarjeta',
+            'transfer' => 'transferencia',
+            'contra_entrega', 'tarjeta', 'transferencia' => $method,
+            default => 'contra_entrega',
+        };
+    }
+
     public function submitOrder(
         DeliveryModulePolicy $deliveryPolicy,
         ManualDeliveryAccountingService $manualAccounting,
@@ -2661,6 +2875,149 @@ class PointOfSale extends Component
     }
 
     // ─── Movimientos operativos ───────────────────────────────────────────────
+
+    public function openOrderDataModal(): void
+    {
+        abort_unless(auth()->user()?->can('editar datos de ordenes en punto de venta'), 403);
+
+        if (! $this->activeCashRegister) {
+            $this->dispatch('notify', type: 'warning', message: 'Abre una caja antes de corregir una orden.');
+
+            return;
+        }
+
+        $this->resetOrderDataEditor();
+        $this->showOrderDataModal = true;
+        unset($this->editableOrderDataOrders);
+    }
+
+    public function closeOrderDataModal(): void
+    {
+        $this->showOrderDataModal = false;
+        $this->resetOrderDataEditor();
+    }
+
+    public function updatedOrderDataSearch(): void
+    {
+        unset($this->editableOrderDataOrders);
+    }
+
+    public function selectOrderForDataEdit(int $orderId): void
+    {
+        abort_unless(auth()->user()?->can('editar datos de ordenes en punto de venta'), 403);
+
+        $order = Order::query()
+            ->with('payments')
+            ->whereKey($orderId)
+            ->where('cash_register_id', $this->activeCashRegister?->id)
+            ->where('status', '!=', 'cancelada')
+            ->firstOrFail();
+
+        $this->resetErrorBag();
+        $this->orderDataOrderId = $order->id;
+        $this->orderDataCustomerName = (string) $order->customer_name;
+        $this->orderDataCustomerPhone = (string) $order->customer_phone;
+        $this->orderDataCustomerAddress = (string) $order->customer_address;
+        $this->orderDataCustomerNeighborhood = (string) $order->customer_neighborhood;
+        $this->orderDataCustomerReferences = (string) $order->customer_references;
+        $this->orderDataDeliveryMethod = match ($order->delivery_method) {
+            'tarjeta', 'card' => 'tarjeta',
+            'transferencia', 'transfer' => 'transferencia',
+            default => 'contra_entrega',
+        };
+        $this->orderDataPayments = $order->payments->map(fn (OrderPayment $payment) => [
+            'id' => $payment->id,
+            'method' => $payment->method,
+            'amount' => number_format((float) $payment->amount, 2, '.', ''),
+            'received_amount' => number_format((float) ($payment->received_amount ?? $payment->amount), 2, '.', ''),
+            'card_last4' => (string) $payment->card_last4,
+            'transfer_reference' => (string) $payment->transfer_reference,
+        ])->values()->all();
+    }
+
+    public function saveOrderData(OrderOperationalDataService $service): void
+    {
+        abort_unless(auth()->user()?->can('editar datos de ordenes en punto de venta'), 403);
+
+        $cashRegisterId = $this->activeCashRegister?->id;
+        abort_unless($cashRegisterId && $this->orderDataOrderId, 404);
+
+        $order = Order::query()
+            ->whereKey($this->orderDataOrderId)
+            ->where('cash_register_id', $cashRegisterId)
+            ->where('status', '!=', 'cancelada')
+            ->firstOrFail();
+
+        $this->validate([
+            'orderDataCustomerName' => ['nullable', 'string', 'max:150'],
+            'orderDataCustomerPhone' => ['nullable', 'string', 'max:30'],
+            'orderDataCustomerAddress' => ['nullable', 'string', 'max:255'],
+            'orderDataCustomerNeighborhood' => ['nullable', 'string', 'max:120'],
+            'orderDataCustomerReferences' => ['nullable', 'string', 'max:255'],
+            'orderDataDeliveryMethod' => ['required', 'in:contra_entrega,tarjeta,transferencia'],
+            'orderDataPayments' => ['array'],
+            'orderDataPayments.*.id' => ['required', 'integer'],
+            'orderDataPayments.*.method' => ['required', 'in:efectivo,tarjeta,transferencia,contra_entrega'],
+        ]);
+
+        $errors = [];
+        if ($order->type === 'delivery') {
+            if (blank($this->orderDataCustomerAddress)) {
+                $errors['orderDataCustomerAddress'] = 'La direcciÃ³n es obligatoria para delivery.';
+            }
+            if (blank($this->orderDataCustomerNeighborhood)) {
+                $errors['orderDataCustomerNeighborhood'] = 'La colonia o zona es obligatoria para delivery.';
+            }
+        }
+
+        foreach ($this->orderDataPayments as $index => $payment) {
+            $method = $payment['method'] ?? null;
+            $amount = (float) ($payment['amount'] ?? 0);
+
+            if ($method === 'efectivo' && (! is_numeric($payment['received_amount'] ?? null) || (float) $payment['received_amount'] < $amount)) {
+                $errors["orderDataPayments.{$index}.received_amount"] = 'El efectivo recibido debe cubrir este importe.';
+            }
+            if ($method === 'tarjeta' && ! preg_match('/^\d{4}$/', (string) ($payment['card_last4'] ?? ''))) {
+                $errors["orderDataPayments.{$index}.card_last4"] = 'Captura los Ãºltimos 4 dÃ­gitos.';
+            }
+            if ($method === 'transferencia' && mb_strlen(trim((string) ($payment['transfer_reference'] ?? ''))) < 4) {
+                $errors["orderDataPayments.{$index}.transfer_reference"] = 'Captura una referencia de al menos 4 caracteres.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        $service->update($order, $cashRegisterId, [
+            'customer_name' => trim($this->orderDataCustomerName) ?: null,
+            'customer_phone' => trim($this->orderDataCustomerPhone) ?: null,
+            'customer_address' => trim($this->orderDataCustomerAddress) ?: null,
+            'customer_neighborhood' => trim($this->orderDataCustomerNeighborhood) ?: null,
+            'customer_references' => trim($this->orderDataCustomerReferences) ?: null,
+            'delivery_method' => $this->orderDataDeliveryMethod,
+            'payments' => $this->orderDataPayments,
+        ], auth()->id());
+
+        $this->closeOrderDataModal();
+        unset($this->recentOrders, $this->pickupOrders, $this->deliveryOrders);
+        $this->dispatch('notify', type: 'success', message: 'Datos de la orden actualizados sin modificar productos ni total.');
+    }
+
+    private function resetOrderDataEditor(): void
+    {
+        $this->resetErrorBag();
+        $this->orderDataSearch = '';
+        $this->orderDataOrderId = null;
+        $this->orderDataCustomerName = '';
+        $this->orderDataCustomerPhone = '';
+        $this->orderDataCustomerAddress = '';
+        $this->orderDataCustomerNeighborhood = '';
+        $this->orderDataCustomerReferences = '';
+        $this->orderDataDeliveryMethod = 'contra_entrega';
+        $this->orderDataPayments = [];
+        unset($this->editableOrderDataOrders);
+    }
 
     public function openOperationsModal(string $type = 'expense'): void
     {
@@ -4620,7 +4977,7 @@ HTML;
                 'customer_references' => $type === 'delivery' ? ($this->customerReferences ?: null) : null,
                 'served_by' => auth()->id(),
                 'type' => $type,
-                'delivery_method' => $type === 'delivery' ? $this->deliveryMethod : null,
+                'delivery_method' => $type === 'delivery' ? $this->mapDeliveryMethodForStorage($this->deliveryMethod) : null,
                 'delivery_flow_mode' => $type === 'delivery'
                     ? ($deliveryFlowMode ?? 'managed')
                     : 'managed',

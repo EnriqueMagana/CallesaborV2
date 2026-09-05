@@ -34,20 +34,41 @@ class OrderChangeRequestWizard extends Component
 
     public string $inventoryDisposition = '';
 
+    public string $newPaymentMethod = '';
+
+    public string $previousPaymentReceived = '';
+
+    public string $paymentCashReceived = '';
+
+    public string $paymentCardLast4 = '';
+
+    public string $paymentTransferReference = '';
+
+    public string $newAddress = '';
+
+    public string $newNeighborhood = '';
+
+    public string $newReferences = '';
+
+    public string $newPhone = '';
+
+    public bool $updateCustomerProfile = false;
+
     public string $source = 'detail';
 
     public function mount(Order $order): void
     {
         abort_unless(auth()->user()?->can('ver ordenes'), 403);
-        abort_unless($this->canRequestCancellation || $this->canRequestModification, 403);
-
         $activeRegisterId = CashRegister::where('is_open', true)->latest('opened_at')->value('id');
         abort_unless($activeRegisterId && $order->cash_register_id === (int) $activeRegisterId, 404);
 
-        $this->order = $order->load(['customer', 'items' => fn ($query) => $query->where('is_cancelled', false), 'changeRequests', 'payments', 'refunds']);
+        $this->order = $order->load(['customer', 'items' => fn ($query) => $query->where('is_cancelled', false), 'changeRequests', 'payments', 'refunds', 'deliveryAssignment']);
+        abort_unless($this->canRequestCancellation || $this->canRequestModification || $this->canRequestPaymentChange || $this->canRequestAddressChange, 403);
         abort_if($this->order->changeRequests->contains('status', OrderChangeRequest::STATUS_PENDING), 409, 'Esta orden ya tiene una solicitud pendiente.');
         abort_unless(
-            (in_array($this->order->status, ['pendiente', 'en_preparacion', 'lista'], true) && $this->order->payments->isEmpty()) || $this->isPaidOrder,
+            (in_array($this->order->status, ['pendiente', 'en_preparacion', 'lista'], true) && $this->order->payments->isEmpty())
+                || $this->isPaidOrder
+                || $this->canRequestAddressChange,
             409,
             'La orden ya no admite solicitudes de cambio.'
         );
@@ -58,9 +79,13 @@ class OrderChangeRequestWizard extends Component
             'lista', 'pagada' => 'ready',
             default => 'not_started',
         };
+        $this->newAddress = (string) $this->order->customer_address;
+        $this->newNeighborhood = (string) $this->order->customer_neighborhood;
+        $this->newReferences = (string) $this->order->customer_references;
+        $this->newPhone = (string) $this->order->customer_phone;
 
         $requestedScope = request()->query('scope');
-        if (in_array($requestedScope, ['full', 'partial', 'adjustment'], true) && $this->canUseScope($requestedScope)) {
+        if (in_array($requestedScope, ['full', 'partial', 'adjustment', 'payment', 'address'], true) && $this->canUseScope($requestedScope)) {
             $this->chooseScope($requestedScope);
         }
     }
@@ -75,6 +100,25 @@ class OrderChangeRequestWizard extends Component
     public function canRequestModification(): bool
     {
         return auth()->user()?->can('solicitar modificacion de ordenes') ?? false;
+    }
+
+    #[Computed]
+    public function canRequestPaymentChange(): bool
+    {
+        return (auth()->user()?->can('solicitar cambio de metodo de pago') ?? false)
+            && $this->order->type === 'delivery'
+            && $this->isPaidOrder
+            && $this->order->payments->count() === 1
+            && $this->order->refunds->isEmpty();
+    }
+
+    #[Computed]
+    public function canRequestAddressChange(): bool
+    {
+        return (auth()->user()?->can('solicitar cambio de direccion') ?? false)
+            && $this->order->type === 'delivery'
+            && in_array($this->order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true)
+            && $this->order->deliveryAssignment?->status !== 'entregado';
     }
 
     #[Computed]
@@ -109,7 +153,7 @@ class OrderChangeRequestWizard extends Component
     #[Computed]
     public function refundAmount(): float
     {
-        if (! $this->isPaidOrder) {
+        if (! $this->isPaidOrder || ! in_array($this->scope, ['full', 'partial', 'adjustment'], true)) {
             return 0;
         }
 
@@ -171,7 +215,7 @@ class OrderChangeRequestWizard extends Component
     #[Computed]
     public function reasonOptions(): array
     {
-        return [
+        $options = [
             'customer_changed_mind' => ['El cliente cambió de opinión', 'bx-user-x'],
             'duplicate_order' => ['Pedido duplicado', 'bx-copy'],
             'wrong_order' => ['Pedido capturado incorrectamente', 'bx-error'],
@@ -181,6 +225,12 @@ class OrderChangeRequestWizard extends Component
             'payment_issue' => ['Problema con el cobro', 'bx-credit-card'],
             'other' => ['Otro motivo', 'bx-message-square-detail'],
         ];
+
+        return match ($this->scope) {
+            'payment' => collect($options)->only(['payment_issue', 'wrong_order', 'customer_changed_mind', 'other'])->all(),
+            'address' => collect($options)->only(['delivery_issue', 'wrong_order', 'customer_changed_mind', 'other'])->all(),
+            default => $options,
+        };
     }
 
     public function chooseScope(string $scope): void
@@ -188,8 +238,17 @@ class OrderChangeRequestWizard extends Component
         abort_unless($this->canUseScope($scope), 403);
         $this->resetValidation();
         $this->scope = $scope;
+        $this->reasonCode = '';
+        $this->reasonDetail = '';
         $this->productSearch = '';
-        $this->requestItems = $scope === 'full' ? [] : $this->originalLines();
+        $this->requestItems = in_array($scope, ['partial', 'adjustment'], true) ? $this->originalLines() : [];
+        if ($scope === 'payment') {
+            $this->newPaymentMethod = '';
+            $this->previousPaymentReceived = '';
+            $this->paymentCashReceived = number_format((float) $this->order->total, 2, '.', '');
+            $this->paymentCardLast4 = '';
+            $this->paymentTransferReference = '';
+        }
         $this->step = 2;
     }
 
@@ -260,7 +319,12 @@ class OrderChangeRequestWizard extends Component
         $this->validateScope();
         $this->validateDetails();
 
-        $type = $this->scope === 'full' ? OrderChangeRequest::TYPE_CANCELLATION : OrderChangeRequest::TYPE_MODIFICATION;
+        $type = match ($this->scope) {
+            'full' => OrderChangeRequest::TYPE_CANCELLATION,
+            'payment' => OrderChangeRequest::TYPE_PAYMENT_CHANGE,
+            'address' => OrderChangeRequest::TYPE_ADDRESS_CHANGE,
+            default => OrderChangeRequest::TYPE_MODIFICATION,
+        };
         $reasonLabel = $this->reasonOptions[$this->reasonCode][0];
         $reason = filled($this->reasonDetail) ? "{$reasonLabel}: ".trim($this->reasonDetail) : $reasonLabel;
 
@@ -271,6 +335,16 @@ class OrderChangeRequestWizard extends Component
             'preparation_stage' => $this->preparationStage,
             'source' => $this->source,
             'inventory_disposition' => $this->inventoryDisposition,
+            'previous_payment_received' => $this->previousPaymentReceived,
+            'new_payment_method' => $this->newPaymentMethod,
+            'cash_received' => $this->paymentCashReceived,
+            'card_last4' => $this->paymentCardLast4,
+            'transfer_reference' => $this->paymentTransferReference,
+            'new_address' => $this->newAddress,
+            'new_neighborhood' => $this->newNeighborhood,
+            'new_references' => $this->newReferences,
+            'new_phone' => $this->newPhone,
+            'update_customer_profile' => $this->updateCustomerProfile,
         ]);
 
         session()->flash('success', 'Solicitud enviada. La orden no cambiará hasta que sea autorizada.');
@@ -285,7 +359,7 @@ class OrderChangeRequestWizard extends Component
 
     private function validateScope(): void
     {
-        $this->validate(['scope' => ['required', Rule::in(['full', 'partial', 'adjustment'])]]);
+        $this->validate(['scope' => ['required', Rule::in(['full', 'partial', 'adjustment', 'payment', 'address'])]]);
         abort_unless($this->canUseScope($this->scope), 403);
     }
 
@@ -300,12 +374,30 @@ class OrderChangeRequestWizard extends Component
         if ($this->reasonCode === 'other') {
             $rules['reasonDetail'] = ['required', 'string', 'min:10', 'max:1000'];
         }
-        if ($this->isPaidOrder) {
+        if ($this->isPaidOrder && in_array($this->scope, ['full', 'partial', 'adjustment'], true)) {
             $rules['inventoryDisposition'] = ['required', Rule::in(['restock', 'waste', 'not_applicable'])];
+        }
+        if ($this->scope === 'payment') {
+            $rules['previousPaymentReceived'] = ['required', Rule::in(['no'])];
+            $rules['newPaymentMethod'] = ['required', Rule::in(['cash', 'card', 'transfer'])];
+            if ($this->newPaymentMethod === 'cash') {
+                $rules['paymentCashReceived'] = ['required', 'numeric', 'min:'.(float) $this->order->total];
+            } elseif ($this->newPaymentMethod === 'card') {
+                $rules['paymentCardLast4'] = ['required', 'digits:4'];
+            } elseif ($this->newPaymentMethod === 'transfer') {
+                $rules['paymentTransferReference'] = ['required', 'string', 'min:4', 'max:120'];
+            }
+        }
+        if ($this->scope === 'address') {
+            $rules['newAddress'] = ['required', 'string', 'min:5', 'max:255'];
+            $rules['newNeighborhood'] = ['required', 'string', 'min:2', 'max:120'];
+            $rules['newReferences'] = ['nullable', 'string', 'max:255'];
+            $rules['newPhone'] = ['nullable', 'string', 'max:30'];
+            $rules['updateCustomerProfile'] = ['boolean'];
         }
         $this->validate($rules);
 
-        if ($this->scope !== 'full') {
+        if (in_array($this->scope, ['partial', 'adjustment'], true)) {
             if ($this->proposedTotal <= 0) {
                 $this->addError('requestItems', 'No dejes la orden vacía. Para retirar todo, selecciona cancelación total.');
             }
@@ -329,6 +421,8 @@ class OrderChangeRequestWizard extends Component
         return match ($scope) {
             'full' => $this->canRequestCancellation,
             'partial', 'adjustment' => $this->canRequestModification,
+            'payment' => $this->canRequestPaymentChange,
+            'address' => $this->canRequestAddressChange,
             default => false,
         };
     }

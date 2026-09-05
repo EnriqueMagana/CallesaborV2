@@ -12,6 +12,10 @@ class OrderChangeRequest extends Model
 
     public const TYPE_MODIFICATION = 'modification';
 
+    public const TYPE_PAYMENT_CHANGE = 'payment_change';
+
+    public const TYPE_ADDRESS_CHANGE = 'address_change';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_APPROVED = 'approved';
@@ -55,6 +59,14 @@ class OrderChangeRequest extends Model
 
     public function getTypeLabelAttribute(): string
     {
+        if ($this->type === self::TYPE_PAYMENT_CHANGE) {
+            return 'Cambio de método de pago';
+        }
+
+        if ($this->type === self::TYPE_ADDRESS_CHANGE) {
+            return 'Cambio de dirección';
+        }
+
         return match ($this->scope) {
             'full' => 'Cancelación total',
             'partial' => 'Cancelación parcial',
