@@ -19,6 +19,7 @@ class OrderDetail extends Component
 
         $this->order = $order->load([
             'seller', 'cashRegister', 'customer', 'cancelledBy', 'payments',
+            'deliveryAssignment',
             'items.product', 'items.addons', 'items.ingredients', 'items.cancelledBy',
             'changeRequests.requester', 'changeRequests.reviewer', 'refunds.processor',
         ]);

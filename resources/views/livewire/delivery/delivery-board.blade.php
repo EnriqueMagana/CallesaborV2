@@ -3,13 +3,23 @@
     $canManageAll = $this->canManageAll();
     $canTakeOrders = $this->canTakeOrders();
     $canCompleteOrders = $this->canCompleteOrders();
+    $canReassign = $this->canReassignOrders();
+    $canSeeTeamDeliveries = $canManageAll || $canReassign;
+    $drivers = $canReassign ? $this->drivers : collect();
     $bank = $orders->filter(
         fn($order) => !$order->deliveryAssignment &&
             in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true),
     );
     $assigned = $orders
         ->filter(fn($order) => $order->deliveryAssignment?->status === 'asignado')
-        ->when(!$canManageAll, fn($items) => $items->where('deliveryAssignment.driver_id', auth()->id()));
+        ->when(!$canSeeTeamDeliveries, fn($items) => $items->where('deliveryAssignment.driver_id', auth()->id()));
+    $driverOrders = $canReassign
+        ? $orders->filter(fn($order) => $order->deliveryAssignment?->status === 'asignado')
+            ->groupBy('deliveryAssignment.driver_id')
+        : collect();
+    $reassigningOrder = $canReassign ? $this->reassigningOrder : null;
+    $currentDriver = $reassigningOrder?->deliveryAssignment?->driver;
+    $targetDrivers = $reassigningOrder ? $drivers->where('id', '!=', $currentDriver?->id) : collect();
     $delivered = $orders
         ->filter(fn($order) => $order->deliveryAssignment?->status === 'entregado')
         ->when(!$canManageAll, fn($items) => $items->where('deliveryAssignment.driver_id', auth()->id()))
@@ -131,7 +141,8 @@
                         <p>Las tarjetas se expanden sin salir del banco.</p>
                     </div>
                 </div>
-                <label class="delivery-search" for="delivery-search-input" x-show="tab !== 'reconciliation'" x-cloak>
+                <label class="delivery-search" for="delivery-search-input"
+                    x-show="!['reconciliation', 'drivers'].includes(tab)" x-cloak>
                     <span>Buscar pedido</span>
                     <div>
                         <i class="bx bx-search" aria-hidden="true"></i>
@@ -163,6 +174,14 @@
                     <i class="bx bx-check-double"
                         aria-hidden="true"></i><span>Entregados</span><b>{{ $delivered->count() }}</b>
                 </button>
+                @if ($canReassign)
+                    <button id="delivery-tab-drivers" type="button" role="tab"
+                        aria-controls="delivery-panel-drivers" x-on:click="changeTab('drivers')"
+                        x-bind:class="tab === 'drivers' && 'is-active'" x-bind:aria-selected="tab === 'drivers'">
+                        <i class="bx bx-group" aria-hidden="true"></i>
+                        <span>Repartidores</span><b>{{ $drivers->count() }}</b>
+                    </button>
+                @endif
                 <button id="delivery-tab-reconciliation" type="button" role="tab"
                     aria-controls="delivery-panel-reconciliation" x-on:click="changeTab('reconciliation')"
                     x-bind:class="tab === 'reconciliation' && 'is-active'"
@@ -214,6 +233,7 @@
                         @foreach ($panelOrders as $order)
                             <x-delivery.order-card :order="$order" :takeable="$panel === 'available'" :show-driver="in_array($panel, ['assigned', 'delivered'], true)"
                                 :can-take="$canTakeOrders" :can-complete="$canCompleteOrders" :can-manage-all="$canManageAll"
+                                :can-reassign="$canReassign"
                                 :highlighted="$highlightOrderId === $order->id" />
                         @endforeach
                     </div>
@@ -236,6 +256,75 @@
                     @endif
                 </div>
             @endforeach
+
+            @if ($canReassign)
+                <div id="delivery-panel-drivers" class="delivery-tab-panel" role="tabpanel" tabindex="-1"
+                    aria-labelledby="delivery-tab-drivers" x-ref="driversPanel" x-show="tab === 'drivers'" x-cloak
+                    wire:loading.remove wire:target="refreshBoard">
+                    <section class="delivery-dispatch" aria-labelledby="delivery-dispatch-title">
+                        <header class="delivery-dispatch__header">
+                            <span><i class="bx bx-transfer-alt" aria-hidden="true"></i></span>
+                            <div>
+                                <span>Despacho del turno</span>
+                                <h3 id="delivery-dispatch-title">Repartidores y pedidos asignados</h3>
+                                <p>Reasigna solo cuando exista una confusi&oacute;n o un cambio operativo. El pedido conserva su estado, productos, total y pagos.</p>
+                            </div>
+                        </header>
+
+                        <div class="delivery-dispatch__grid">
+                            @foreach ($drivers as $driver)
+                                @php($activeDriverOrders = $driverOrders->get($driver->id, collect()))
+                                <article class="delivery-driver-card">
+                                    <header>
+                                        <span class="delivery-driver-card__avatar">
+                                            @if ($driver->avatar)
+                                                <img src="{{ Storage::url($driver->avatar) }}" alt="Foto de {{ $driver->name }}" loading="lazy">
+                                            @else
+                                                {{ mb_strtoupper(mb_substr($driver->name, 0, 1)) }}
+                                            @endif
+                                        </span>
+                                        <div>
+                                            <strong>{{ $driver->name }}</strong>
+                                            <small>{{ $activeDriverOrders->count() }} {{ $activeDriverOrders->count() === 1 ? 'pedido activo' : 'pedidos activos' }}</small>
+                                        </div>
+                                        <span class="delivery-driver-card__status" aria-label="Cuenta activa"><i class="bx bx-check" aria-hidden="true"></i></span>
+                                    </header>
+
+                                    <div class="delivery-driver-card__orders">
+                                        @forelse ($activeDriverOrders as $order)
+                                            <div class="delivery-driver-order">
+                                                <div>
+                                                    <strong>{{ $order->display_folio }}</strong>
+                                                    <span>{{ $order->display_name }}</span>
+                                                    <small>{{ $order->status_label }} &middot; ${{ number_format($order->total, 2) }}</small>
+                                                </div>
+                                                <button type="button" class="delivery-btn delivery-btn--secondary"
+                                                    wire:click="openReassign({{ $order->id }})"
+                                                    wire:loading.attr="disabled" wire:target="openReassign({{ $order->id }})">
+                                                    <i class="bx bx-transfer-alt" aria-hidden="true"></i> Reasignar
+                                                </button>
+                                            </div>
+                                        @empty
+                                            <div class="delivery-driver-card__empty">
+                                                <i class="bx bx-check-circle" aria-hidden="true"></i>
+                                                <span>Sin entregas asignadas</span>
+                                            </div>
+                                        @endforelse
+                                    </div>
+                                </article>
+                            @endforeach
+                        </div>
+
+                        @if ($drivers->isEmpty())
+                            <section class="delivery-empty delivery-empty--list">
+                                <span><i class="bx bx-user-x" aria-hidden="true"></i></span>
+                                <h3>No hay repartidores disponibles</h3>
+                                <p>Asigna a un usuario el permiso &ldquo;Entregar delivery&rdquo; para mostrarlo en este panel.</p>
+                            </section>
+                        @endif
+                    </section>
+                </div>
+            @endif
 
             <div id="delivery-panel-reconciliation" class="delivery-tab-panel" role="tabpanel" tabindex="-1"
                 aria-labelledby="delivery-tab-reconciliation" x-ref="reconciliationPanel"
@@ -395,6 +484,78 @@
                                 aria-hidden="true"></i> Registrando…</span>
                     </button>
                 </div>
+            </section>
+        </div>
+    @endif
+
+    @if ($reassigningOrder)
+        <div class="delivery-confirm-layer" role="presentation" x-data
+            x-on:keydown.escape.window="$wire.closeReassign()"
+            x-init="$nextTick(() => $refs.reassignDriver?.focus())">
+            <button type="button" class="delivery-modal-layer__backdrop" wire:click="closeReassign"
+                aria-label="Cerrar reasignaciÃ³n"></button>
+            <section class="delivery-reassign-modal" role="dialog" aria-modal="true"
+                aria-labelledby="delivery-reassign-title" aria-describedby="delivery-reassign-copy">
+                <header class="delivery-reassign-modal__header">
+                    <span><i class="bx bx-transfer-alt" aria-hidden="true"></i></span>
+                    <div>
+                        <small>Correcci&oacute;n operativa</small>
+                        <h2 id="delivery-reassign-title">Reasignar {{ $reassigningOrder->display_folio }}</h2>
+                        <p id="delivery-reassign-copy">El contenido, el total, los pagos y el estado actual no cambiar&aacute;n.</p>
+                    </div>
+                    <button type="button" wire:click="closeReassign" aria-label="Cerrar">
+                        <i class="bx bx-x" aria-hidden="true"></i>
+                    </button>
+                </header>
+
+                <div class="delivery-reassign-modal__body">
+                    <div class="delivery-reassign-route" aria-label="Cambio de repartidor">
+                        <div>
+                            <small>Repartidor actual</small>
+                            <strong>{{ $currentDriver?->name ?? 'Usuario eliminado' }}</strong>
+                        </div>
+                        <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+                        <div>
+                            <small>Pedido</small>
+                            <strong>{{ $reassigningOrder->display_name }}</strong>
+                        </div>
+                    </div>
+
+                    <label class="delivery-reassign-field">
+                        <span>Nuevo repartidor <b aria-hidden="true">*</b></span>
+                        <select x-ref="reassignDriver" wire:model="reassignDriverId" @disabled($targetDrivers->isEmpty())>
+                            <option value="">Selecciona una persona</option>
+                            @foreach ($targetDrivers as $driver)
+                                <option value="{{ $driver->id }}">{{ $driver->name }} &middot; {{ $driverOrders->get($driver->id, collect())->count() }} activos</option>
+                            @endforeach
+                        </select>
+                        @error('reassignDriverId')<small class="delivery-field-error">{{ $message }}</small>@enderror
+                    </label>
+
+                    <label class="delivery-reassign-field">
+                        <span>Motivo de la reasignaci&oacute;n <b aria-hidden="true">*</b></span>
+                        <textarea wire:model="reassignReason" rows="3" maxlength="500"
+                            placeholder="Ej. El pedido fue tomado por el repartidor equivocado."></textarea>
+                        <small>Este motivo formar&aacute; parte del historial de la entrega.</small>
+                        @error('reassignReason')<small class="delivery-field-error">{{ $message }}</small>@enderror
+                    </label>
+
+                    @if ($targetDrivers->isEmpty())
+                        <div class="delivery-alert" role="alert">
+                            <i class="bx bx-error-circle" aria-hidden="true"></i>
+                            <span>No existe otro usuario activo con permiso para entregar delivery.</span>
+                        </div>
+                    @endif
+                </div>
+
+                <footer class="delivery-reassign-modal__footer">
+                    <button type="button" class="delivery-btn delivery-btn--secondary" wire:click="closeReassign">Cancelar</button>
+                    <button type="button" class="delivery-btn delivery-btn--primary" wire:click="confirmReassign"
+                        wire:loading.attr="disabled" wire:target="confirmReassign" @disabled($targetDrivers->isEmpty())>
+                        <span wire:loading.remove wire:target="confirmReassign"><i class="bx bx-transfer-alt" aria-hidden="true"></i> Confirmar reasignaci&oacute;n</span>
+                        <span wire:loading wire:target="confirmReassign"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Reasignando&hellip;</span>
+                    </button>
+                </footer>
             </section>
         </div>
     @endif

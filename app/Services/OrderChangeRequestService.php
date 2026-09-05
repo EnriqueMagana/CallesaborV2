@@ -21,7 +21,12 @@ class OrderChangeRequestService
 
     public function create(Order $order, User $actor, string $type, string $reason, array $desiredLines = [], array $context = []): OrderChangeRequest
     {
-        if (! in_array($type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)) {
+        if (! in_array($type, [
+            OrderChangeRequest::TYPE_CANCELLATION,
+            OrderChangeRequest::TYPE_MODIFICATION,
+            OrderChangeRequest::TYPE_PAYMENT_CHANGE,
+            OrderChangeRequest::TYPE_ADDRESS_CHANGE,
+        ], true)) {
             throw ValidationException::withMessages(['requestType' => 'El tipo de solicitud no es válido.']);
         }
 
@@ -31,8 +36,8 @@ class OrderChangeRequestService
         }
 
         return DB::transaction(function () use ($order, $actor, $type, $reason, $desiredLines, $context): OrderChangeRequest {
-            $order = Order::query()->with(['items.addons', 'items.ingredients', 'payments', 'refunds'])->lockForUpdate()->findOrFail($order->id);
-            $this->assertActionable($order);
+            $order = Order::query()->with(['items.addons', 'items.ingredients', 'payments', 'refunds', 'customer', 'deliveryAssignment'])->lockForUpdate()->findOrFail($order->id);
+            $this->assertActionable($order, $type);
 
             if (OrderChangeRequest::query()->where('order_id', $order->id)->where('status', OrderChangeRequest::STATUS_PENDING)->exists()) {
                 throw ValidationException::withMessages(['requestReason' => 'Esta orden ya tiene una solicitud pendiente de revisión.']);
@@ -44,6 +49,12 @@ class OrderChangeRequestService
 
             if ($type === OrderChangeRequest::TYPE_MODIFICATION) {
                 [$changes, $proposedTotal] = $this->buildChanges($order, $desiredLines);
+            } elseif ($type === OrderChangeRequest::TYPE_PAYMENT_CHANGE) {
+                $changes = ['payment_change' => $this->buildPaymentChange($order, $context)];
+                $proposedTotal = (float) $order->total;
+            } elseif ($type === OrderChangeRequest::TYPE_ADDRESS_CHANGE) {
+                $changes = ['address_change' => $this->buildAddressChange($order, $context)];
+                $proposedTotal = (float) $order->total;
             }
 
             $changes = array_merge($changes ?? [], [
@@ -70,14 +81,25 @@ class OrderChangeRequestService
 
     private function buildRequestContext(array $context, string $type, Order $order, ?float $proposedTotal): array
     {
-        $allowedScopes = $type === OrderChangeRequest::TYPE_CANCELLATION
-            ? ['full']
-            : ['partial', 'adjustment'];
+        $allowedScopes = match ($type) {
+            OrderChangeRequest::TYPE_CANCELLATION => ['full'],
+            OrderChangeRequest::TYPE_MODIFICATION => ['partial', 'adjustment'],
+            OrderChangeRequest::TYPE_PAYMENT_CHANGE => ['payment'],
+            OrderChangeRequest::TYPE_ADDRESS_CHANGE => ['address'],
+            default => [],
+        };
+
+        $defaultScope = match ($type) {
+            OrderChangeRequest::TYPE_CANCELLATION => 'full',
+            OrderChangeRequest::TYPE_PAYMENT_CHANGE => 'payment',
+            OrderChangeRequest::TYPE_ADDRESS_CHANGE => 'address',
+            default => 'adjustment',
+        };
 
         $result = [
             'scope' => in_array($context['scope'] ?? null, $allowedScopes, true)
                 ? $context['scope']
-                : ($type === OrderChangeRequest::TYPE_CANCELLATION ? 'full' : 'adjustment'),
+                : $defaultScope,
             'reason_code' => mb_substr((string) ($context['reason_code'] ?? 'other'), 0, 60),
             'customer_confirmed' => in_array($context['customer_confirmed'] ?? null, ['yes', 'no', 'not_applicable'], true)
                 ? $context['customer_confirmed']
@@ -89,7 +111,8 @@ class OrderChangeRequestService
             'payment_state' => $this->isPaidOrder($order) ? 'paid' : 'unpaid',
         ];
 
-        if (! $this->isPaidOrder($order)) {
+        if (! in_array($type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)
+            || ! $this->isPaidOrder($order)) {
             return $result;
         }
 
@@ -125,11 +148,13 @@ class OrderChangeRequestService
         return DB::transaction(function () use ($changeRequest, $reviewer, $notes, $financial): OrderChangeRequest {
             $request = OrderChangeRequest::query()->lockForUpdate()->findOrFail($changeRequest->id);
             $this->assertPending($request);
-            $order = Order::query()->with(['items', 'payments', 'refunds'])->lockForUpdate()->findOrFail($request->order_id);
-            $this->assertActionable($order);
+            $order = Order::query()->with(['items', 'payments', 'refunds', 'customer', 'deliveryAssignment'])->lockForUpdate()->findOrFail($request->order_id);
+            $this->assertActionable($order, $request->type);
             $wasPaid = $this->isPaidOrder($order);
 
-            if ($wasPaid && ! $reviewer->can('anular pagos')) {
+            if ($wasPaid
+                && in_array($request->type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)
+                && ! $reviewer->can('anular pagos')) {
                 throw new AuthorizationException('No tienes permiso para registrar devoluciones de pagos.');
             }
 
@@ -142,11 +167,15 @@ class OrderChangeRequestService
                     'cancelled_at' => now(),
                 ]);
                 DB::afterCommit(fn () => $this->notifications->orderStatusChanged($order->fresh(), $previousStatus));
-            } else {
+            } elseif ($request->type === OrderChangeRequest::TYPE_MODIFICATION) {
                 $this->applyModification($order, $request, $reviewer);
+            } elseif ($request->type === OrderChangeRequest::TYPE_PAYMENT_CHANGE) {
+                $this->applyPaymentChange($order, $request);
+            } else {
+                $this->applyAddressChange($order, $request);
             }
 
-            if ($wasPaid) {
+            if ($wasPaid && in_array($request->type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)) {
                 $this->recordRefund($order, $request, $reviewer, $financial);
             }
 
@@ -157,6 +186,8 @@ class OrderChangeRequestService
                 'reviewed_at' => now(),
                 'applied_at' => now(),
             ]);
+
+            DB::afterCommit(fn () => $this->notifications->orderChangeResolved($request->fresh(['order', 'requester', 'reviewer'])));
 
             return $request->fresh(['order', 'requester', 'reviewer', 'refund']);
         });
@@ -240,8 +271,136 @@ class OrderChangeRequestService
                 'reviewed_at' => now(),
             ]);
 
+            DB::afterCommit(fn () => $this->notifications->orderChangeResolved($request->fresh(['order', 'requester', 'reviewer'])));
+
             return $request->fresh(['order', 'requester', 'reviewer', 'refund']);
         });
+    }
+
+    private function buildPaymentChange(Order $order, array $context): array
+    {
+        if ($order->type !== 'delivery' || ! $this->isPaidOrder($order)) {
+            throw ValidationException::withMessages([
+                'newPaymentMethod' => 'El cambio de método solo está disponible para delivery pagado en la caja actual.',
+            ]);
+        }
+
+        if ($order->refunds->isNotEmpty() || $order->payments->count() !== 1) {
+            throw ValidationException::withMessages([
+                'newPaymentMethod' => 'Los pagos mixtos o con devoluciones requieren una revisión contable manual.',
+            ]);
+        }
+
+        if (($context['previous_payment_received'] ?? null) !== 'no') {
+            throw ValidationException::withMessages([
+                'previousPaymentReceived' => 'Si el pago anterior sí ingresó, no debe reclasificarse: registra una devolución antes de aceptar otro pago.',
+            ]);
+        }
+
+        $payment = $order->payments->first();
+        $requestedMethod = (string) ($context['new_payment_method'] ?? '');
+        $newMethod = match ($requestedMethod) {
+            'cash' => 'efectivo',
+            'card' => 'tarjeta',
+            'transfer' => 'transferencia',
+            default => throw ValidationException::withMessages(['newPaymentMethod' => 'Selecciona el nuevo método de pago.']),
+        };
+        $newDeliveryMethod = match ($requestedMethod) {
+            'cash' => 'contra_entrega',
+            'card' => 'tarjeta',
+            'transfer' => 'transferencia',
+        };
+
+        if ($newMethod === $payment->method) {
+            throw ValidationException::withMessages(['newPaymentMethod' => 'El nuevo método debe ser diferente al registrado.']);
+        }
+
+        $amount = round((float) $payment->amount, 2);
+        $received = null;
+        $change = null;
+        $last4 = null;
+        $reference = null;
+
+        if ($newMethod === 'efectivo') {
+            $received = round((float) ($context['cash_received'] ?? 0), 2);
+            if ($received < $amount) {
+                throw ValidationException::withMessages(['paymentCashReceived' => 'El efectivo recibido debe cubrir el total pagado.']);
+            }
+            $change = round($received - $amount, 2);
+        } elseif ($newMethod === 'tarjeta') {
+            $last4 = preg_replace('/\D+/', '', (string) ($context['card_last4'] ?? ''));
+            if (strlen($last4) !== 4) {
+                throw ValidationException::withMessages(['paymentCardLast4' => 'Captura los últimos 4 dígitos de la tarjeta.']);
+            }
+        } else {
+            $reference = trim((string) ($context['transfer_reference'] ?? ''));
+            if (mb_strlen($reference) < 4) {
+                throw ValidationException::withMessages(['paymentTransferReference' => 'Captura la referencia de la transferencia.']);
+            }
+        }
+
+        return [
+            'payment_id' => $payment->id,
+            'amount' => $amount,
+            'before' => [
+                'delivery_method' => $order->delivery_method,
+                'method' => $payment->method,
+                'received_amount' => $payment->received_amount !== null ? (float) $payment->received_amount : null,
+                'change_amount' => $payment->change_amount !== null ? (float) $payment->change_amount : null,
+                'card_last4' => $payment->card_last4,
+                'transfer_reference' => $payment->transfer_reference,
+            ],
+            'after' => [
+                'delivery_method' => $newDeliveryMethod,
+                'method' => $newMethod,
+                'received_amount' => $received,
+                'change_amount' => $change,
+                'card_last4' => $last4,
+                'transfer_reference' => $reference,
+            ],
+        ];
+    }
+
+    private function buildAddressChange(Order $order, array $context): array
+    {
+        if ($order->type !== 'delivery') {
+            throw ValidationException::withMessages(['newAddress' => 'La dirección solo puede cambiarse en órdenes delivery.']);
+        }
+
+        if ($order->deliveryAssignment?->status === 'entregado') {
+            throw ValidationException::withMessages(['newAddress' => 'La entrega ya fue completada y no admite cambio de dirección.']);
+        }
+
+        $after = [
+            'address' => trim((string) ($context['new_address'] ?? '')),
+            'neighborhood' => trim((string) ($context['new_neighborhood'] ?? '')),
+            'references' => trim((string) ($context['new_references'] ?? '')) ?: null,
+            'phone' => trim((string) ($context['new_phone'] ?? '')) ?: null,
+        ];
+        if (mb_strlen($after['address']) < 5) {
+            throw ValidationException::withMessages(['newAddress' => 'Captura una dirección completa.']);
+        }
+        if (mb_strlen($after['neighborhood']) < 2) {
+            throw ValidationException::withMessages(['newNeighborhood' => 'Captura la colonia o zona.']);
+        }
+
+        $before = [
+            'address' => $order->customer_address,
+            'neighborhood' => $order->customer_neighborhood,
+            'references' => $order->customer_references,
+            'phone' => $order->customer_phone,
+        ];
+        if ($before === $after) {
+            throw ValidationException::withMessages(['newAddress' => 'La nueva dirección y los datos de contacto no contienen cambios.']);
+        }
+
+        return [
+            'before' => $before,
+            'after' => $after,
+            'update_customer_profile' => filter_var($context['update_customer_profile'] ?? false, FILTER_VALIDATE_BOOL),
+            'delivery_assignment_id' => $order->deliveryAssignment?->id,
+            'delivery_status' => $order->deliveryAssignment?->status,
+        ];
     }
 
     private function buildChanges(Order $order, array $desiredLines): array
@@ -366,6 +525,70 @@ class OrderChangeRequestService
         }
     }
 
+    private function applyPaymentChange(Order $order, OrderChangeRequest $request): void
+    {
+        $change = data_get($request->proposed_changes, 'payment_change');
+        if (! is_array($change)) {
+            throw ValidationException::withMessages(['review' => 'La solicitud no contiene un cambio de pago válido.']);
+        }
+
+        $payment = $order->payments()->lockForUpdate()->find($change['payment_id'] ?? 0);
+        $before = $change['before'] ?? [];
+        $after = $change['after'] ?? [];
+        if (! $payment
+            || $order->payments()->count() !== 1
+            || $payment->method !== ($before['method'] ?? null)
+            || round((float) $payment->amount, 2) !== round((float) ($change['amount'] ?? 0), 2)
+            || $order->delivery_method !== ($before['delivery_method'] ?? null)) {
+            throw ValidationException::withMessages(['review' => 'El pago cambió después de crear la solicitud. Recházala y genera una nueva.']);
+        }
+
+        $payment->update([
+            'method' => $after['method'],
+            'received_amount' => $after['received_amount'],
+            'change_amount' => $after['change_amount'],
+            'card_last4' => $after['card_last4'],
+            'transfer_reference' => $after['transfer_reference'],
+        ]);
+        $order->update(['delivery_method' => $after['delivery_method']]);
+    }
+
+    private function applyAddressChange(Order $order, OrderChangeRequest $request): void
+    {
+        $change = data_get($request->proposed_changes, 'address_change');
+        if (! is_array($change)) {
+            throw ValidationException::withMessages(['review' => 'La solicitud no contiene un cambio de dirección válido.']);
+        }
+
+        $before = $change['before'] ?? [];
+        $after = $change['after'] ?? [];
+        $current = [
+            'address' => $order->customer_address,
+            'neighborhood' => $order->customer_neighborhood,
+            'references' => $order->customer_references,
+            'phone' => $order->customer_phone,
+        ];
+        if ($current !== $before || $order->deliveryAssignment?->status === 'entregado') {
+            throw ValidationException::withMessages(['review' => 'Los datos de entrega cambiaron o el pedido ya fue entregado. Rechaza la solicitud y genera una nueva.']);
+        }
+
+        $order->update([
+            'customer_address' => $after['address'],
+            'customer_neighborhood' => $after['neighborhood'],
+            'customer_references' => $after['references'],
+            'customer_phone' => $after['phone'],
+        ]);
+
+        if (($change['update_customer_profile'] ?? false) && $order->customer) {
+            $order->customer->update([
+                'address' => $after['address'],
+                'neighborhood' => $after['neighborhood'],
+                'references' => $after['references'],
+                'phone' => $after['phone'] ?: $order->customer->phone,
+            ]);
+        }
+    }
+
     private function snapshot(Order $order): array
     {
         return [
@@ -385,6 +608,15 @@ class OrderChangeRequestService
                 'amount' => (float) $payment->amount,
                 'transfer_reference' => $payment->transfer_reference,
             ])->values()->all(),
+            'delivery' => [
+                'method' => $order->delivery_method,
+                'address' => $order->customer_address,
+                'neighborhood' => $order->customer_neighborhood,
+                'references' => $order->customer_references,
+                'phone' => $order->customer_phone,
+                'assignment_id' => $order->deliveryAssignment?->id,
+                'assignment_status' => $order->deliveryAssignment?->status,
+            ],
             'prior_refunds' => $order->refunds->map(fn (OrderRefund $refund) => [
                 'id' => $refund->id,
                 'amount' => (float) $refund->amount,
@@ -451,8 +683,26 @@ class OrderChangeRequestService
         return $order->status === 'pagada' && $order->payments->isNotEmpty();
     }
 
-    private function assertActionable(Order $order): void
+    private function assertActionable(Order $order, string $type): void
     {
+        if ($type === OrderChangeRequest::TYPE_PAYMENT_CHANGE) {
+            if ($order->type !== 'delivery' || ! $this->isPaidOrder($order)) {
+                throw ValidationException::withMessages(['requestReason' => 'Solo un delivery pagado admite reclasificación del método de pago.']);
+            }
+
+            return;
+        }
+
+        if ($type === OrderChangeRequest::TYPE_ADDRESS_CHANGE) {
+            if ($order->type !== 'delivery'
+                || ! in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true)
+                || $order->deliveryAssignment?->status === 'entregado') {
+                throw ValidationException::withMessages(['requestReason' => 'Esta orden ya no admite cambios de dirección.']);
+            }
+
+            return;
+        }
+
         $isUnpaidActive = in_array($order->status, self::EDITABLE_STATUSES, true) && $order->payments->isEmpty();
         if (! $isUnpaidActive && ! $this->isPaidOrder($order)) {
             throw ValidationException::withMessages(['requestReason' => 'Solo se admiten órdenes activas sin pago u órdenes pagadas con saldo reembolsable.']);
@@ -475,11 +725,15 @@ class OrderChangeRequestService
 
     private function assertRequester(User $actor, string $type): void
     {
-        $permission = $type === OrderChangeRequest::TYPE_CANCELLATION
-            ? 'solicitar cancelacion de ordenes'
-            : 'solicitar modificacion de ordenes';
+        $permission = match ($type) {
+            OrderChangeRequest::TYPE_CANCELLATION => 'solicitar cancelacion de ordenes',
+            OrderChangeRequest::TYPE_MODIFICATION => 'solicitar modificacion de ordenes',
+            OrderChangeRequest::TYPE_PAYMENT_CHANGE => 'solicitar cambio de metodo de pago',
+            OrderChangeRequest::TYPE_ADDRESS_CHANGE => 'solicitar cambio de direccion',
+            default => null,
+        };
 
-        if (! $actor->can($permission)) {
+        if (! $permission || ! $actor->can($permission)) {
             throw new AuthorizationException('No tienes permiso para crear esta solicitud.');
         }
     }

@@ -31,13 +31,14 @@ class RolesAndPermissionsSeeder extends Seeder
                 'marcar pedidos listos en punto de venta',
                 'cobrar pedidos en punto de venta',
                 'convertir pedidos a delivery en punto de venta',
+                'editar datos de ordenes en punto de venta',
             ],
             'usuarios' => ['ver usuarios', 'crear usuarios', 'editar usuarios', 'eliminar usuarios', 'bloquear usuarios', 'gestionar roles', 'gestionar permisos', 'gestionar notificaciones por rol'],
             'clientes' => ['ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes'],
             'menu' => ['ver menu', 'crear platos', 'editar platos', 'eliminar platos', 'gestionar categorias', 'gestionar complementos', 'gestionar areas impresion', 'gestionar menu digital'],
             'promociones' => ['ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones'],
             'descuentos' => ['ver descuentos', 'crear descuentos', 'editar descuentos', 'eliminar descuentos'],
-            'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'revisar solicitudes de ordenes', 'cerrar ordenes', 'reimprimir tickets'],
+            'ordenes' => ['ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de metodo de pago', 'solicitar cambio de direccion', 'revisar solicitudes de ordenes', 'cerrar ordenes', 'reimprimir tickets'],
             'mesas' => [
                 'ver mesas',
                 'ver todas las mesas',
@@ -68,7 +69,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'gestionar bloqueos por caja',
             ],
             'kiosco' => ['gestionar kioscos'],
-            'delivery' => ['ver delivery', 'tomar delivery', 'entregar delivery', 'gestionar delivery'],
+            'delivery' => ['ver delivery', 'tomar delivery', 'entregar delivery', 'reasignar pedidos delivery', 'gestionar delivery'],
             'reservas' => ['ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas'],
             'inventario' => [
                 'ver inventario',
@@ -131,12 +132,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'crear ventas en punto de venta', 'gestionar borradores en punto de venta', 'ver pedidos en punto de venta',
             'iniciar preparacion en punto de venta', 'marcar pedidos listos en punto de venta',
             'cobrar pedidos en punto de venta', 'convertir pedidos a delivery en punto de venta',
+            'editar datos de ordenes en punto de venta',
             'ver usuarios',
             'ver clientes', 'crear clientes', 'editar clientes', 'eliminar clientes',
             'ver menu', 'crear platos', 'editar platos', 'gestionar categorias', 'gestionar menu digital',
             'ver promociones', 'crear promociones', 'editar promociones', 'eliminar promociones',
             'ver descuentos', 'crear descuentos', 'editar descuentos', 'eliminar descuentos',
-            'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
+            'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de metodo de pago', 'solicitar cambio de direccion', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'ver todas las mesas', 'ver historial completo de asignaciones mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'gestionar mesas', 'gestionar grupos',
@@ -145,7 +147,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'cancelar divisiones mesas',
             'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos', 'registrar movimientos de caja',
             'ver reportes', 'exportar reportes',
-            'ver delivery', 'gestionar delivery',
+            'ver delivery', 'reasignar pedidos delivery', 'gestionar delivery',
             'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
             'ver inventario', 'gestionar insumos', 'ajustar inventario',
             'generar compras inventario', 'recepcionar compras inventario',
@@ -160,20 +162,22 @@ class RolesAndPermissionsSeeder extends Seeder
             'crear ventas en punto de venta', 'gestionar borradores en punto de venta', 'ver pedidos en punto de venta',
             'iniciar preparacion en punto de venta', 'marcar pedidos listos en punto de venta',
             'cobrar pedidos en punto de venta', 'convertir pedidos a delivery en punto de venta',
+            'editar datos de ordenes en punto de venta',
             'ver clientes', 'crear clientes', 'editar clientes',
-            'ver ordenes', 'crear ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'cerrar ordenes', 'reimprimir tickets',
+            'ver ordenes', 'crear ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de metodo de pago', 'solicitar cambio de direccion', 'cerrar ordenes', 'reimprimir tickets',
             'ver mesas', 'ver todas las mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'liberar mesas', 'reasignar mesas', 'cobrar mesas', 'dividir mesas',
             'cancelar divisiones mesas',
             'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos', 'registrar movimientos de caja',
             'registrar salida de insumos',
+            'ver delivery', 'reasignar pedidos delivery',
             'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
         ]);
 
         // Mesero
         $mesero = Role::firstOrCreate(['name' => 'mesero', 'guard_name' => 'web']);
         $mesero->syncPermissions([
-            'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'reimprimir tickets',
+            'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de direccion', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'dividir mesas', 'cancelar divisiones mesas', 'reasignar mesas', 'gestionar grupos',
         ]);
@@ -188,7 +192,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Repartidor — acceso operativo únicamente a sus entregas.
         $repartidor = Role::firstOrCreate(['name' => 'repartidor', 'guard_name' => 'web']);
-        $repartidor->syncPermissions(['ver delivery', 'tomar delivery', 'entregar delivery']);
+        $repartidor->syncPermissions(['ver delivery', 'tomar delivery', 'entregar delivery', 'reasignar pedidos delivery']);
 
         if (Schema::hasColumn('roles', 'icon')) {
             foreach ([

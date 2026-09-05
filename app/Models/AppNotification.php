@@ -52,6 +52,7 @@ class AppNotification extends Model
             'order.paid' => 'bx-wallet',
             'delivery.available' => 'bx-package',
             'delivery.assigned' => 'bx-user-check',
+            'delivery.reassigned' => 'bx-transfer-alt',
             'delivery.picked_up' => 'bx-cycling',
             'delivery.completed' => 'bx-check-shield',
             'developer.realtime_test', 'developer.livewire_test' => 'bx-test-tube',
@@ -73,7 +74,7 @@ class AppNotification extends Model
             'order.cancellation_requested' => 'danger',
             'order.modification_requested' => 'order',
             'order.paid', 'delivery.completed' => 'success',
-            'delivery.assigned', 'delivery.picked_up' => 'delivery',
+            'delivery.assigned', 'delivery.reassigned', 'delivery.picked_up' => 'delivery',
             'developer.realtime_test', 'developer.livewire_test' => 'system',
             default => $this->category === 'tables' ? 'table' : 'order',
         };

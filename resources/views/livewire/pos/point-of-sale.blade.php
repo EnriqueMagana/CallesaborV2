@@ -125,7 +125,7 @@
             F7: '[data-pos-panel=tables]',
             F8: '[data-pos-panel=delivery]',
             F9: '[data-pos-panel=reprint]',
-            F11: '[data-pos-operations]'
+            F11: '[data-pos-more]'
         };
         const key = event.key.toUpperCase();
         const isSearchShortcut = key === 'F3' || key === 'F10';
@@ -238,6 +238,8 @@
 @include('livewire.pos.partials.modals.order-success')
 @include('livewire.pos.partials.modals.pickup-pay')
 @include('livewire.pos.partials.modals.convert-delivery')
+@include('livewire.pos.partials.modals.order-data')
+@include('livewire.pos.partials.modals.delivery-dispatch')
 @include('livewire.pos.partials.modals.mesa-pay')
 @include('livewire.pos.partials.modals.ticket')
 

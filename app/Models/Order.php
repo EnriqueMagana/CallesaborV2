@@ -135,6 +135,11 @@ class Order extends Model
         return $this->hasMany(OrderChangeRequest::class);
     }
 
+    public function dataChangeAudits(): HasMany
+    {
+        return $this->hasMany(OrderDataChangeAudit::class);
+    }
+
     public function refunds(): HasMany
     {
         return $this->hasMany(OrderRefund::class);

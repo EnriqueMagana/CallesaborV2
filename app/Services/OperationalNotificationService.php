@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\PublishRealtimeNotification;
 use App\Models\AppNotification;
 use App\Models\DeliveryAssignment;
+use App\Models\DeliveryAssignmentEvent;
 use App\Models\Mesa;
 use App\Models\MesaHelpRequest;
 use App\Models\Order;
@@ -90,6 +91,34 @@ class OperationalNotificationService
             $this->urlFor($assignment->order), 'delivery', 'assignment-'.$assignment->id);
     }
 
+    public function deliveryReassigned(DeliveryAssignment $assignment, DeliveryAssignmentEvent $event): void
+    {
+        $assignment->loadMissing(['order', 'driver']);
+        $event->loadMissing(['fromDriver', 'toDriver', 'actor']);
+        if (! $assignment->order || ! $assignment->driver || ! $this->managedDelivery($assignment->order)) {
+            return;
+        }
+
+        $recipients = $this->usersByRoles(self::SUPERVISORS)
+            ->merge(User::query()->whereKey([$event->from_driver_id, $event->to_driver_id])->get())
+            ->unique('id');
+
+        $from = $event->fromDriver?->name ?? 'Sin repartidor';
+        $to = $event->toDriver?->name ?? $assignment->driver->name;
+        $this->send(
+            'delivery.reassigned',
+            'delivery',
+            'high',
+            $assignment->order,
+            $recipients,
+            'Delivery reasignado',
+            "Pedido {$assignment->order->display_folio}: {$from} â†’ {$to}. Motivo: {$event->reason}",
+            $this->urlFor($assignment->order),
+            'delivery',
+            'reassignment-'.$event->id,
+        );
+    }
+
     public function orderChangeRequested(OrderChangeRequest $request): void
     {
         $request->loadMissing(['order', 'requester']);
@@ -97,9 +126,15 @@ class OperationalNotificationService
             return;
         }
 
+        $event = match ($request->type) {
+            OrderChangeRequest::TYPE_CANCELLATION => 'order.cancellation_requested',
+            OrderChangeRequest::TYPE_PAYMENT_CHANGE => 'order.payment_change_requested',
+            OrderChangeRequest::TYPE_ADDRESS_CHANGE => 'order.address_change_requested',
+            default => 'order.modification_requested',
+        };
         $isCancellation = $request->type === OrderChangeRequest::TYPE_CANCELLATION;
         $this->send(
-            eventKey: $isCancellation ? 'order.cancellation_requested' : 'order.modification_requested',
+            eventKey: $event,
             category: 'orders',
             priority: $isCancellation ? 'urgent' : 'high',
             subject: $request,
@@ -109,6 +144,37 @@ class OperationalNotificationService
             url: route('app.solicitudes-ordenes', ['request' => $request->id], false),
             sound: $isCancellation ? 'alert' : 'order',
             dedupeSuffix: 'requested'
+        );
+    }
+
+    public function orderChangeResolved(OrderChangeRequest $request): void
+    {
+        $request->loadMissing(['order.deliveryAssignment.driver', 'requester', 'reviewer']);
+        if (! $request->order || ! $request->requester) {
+            return;
+        }
+
+        $approved = $request->status === OrderChangeRequest::STATUS_APPROVED;
+        $recipients = collect([$request->requester]);
+        if ($approved && $request->type === OrderChangeRequest::TYPE_ADDRESS_CHANGE) {
+            $driver = $request->order->deliveryAssignment?->driver;
+            if ($driver) {
+                $recipients->push($driver);
+            }
+        }
+
+        $this->send(
+            eventKey: $approved ? 'order.change_approved' : 'order.change_rejected',
+            category: $request->type === OrderChangeRequest::TYPE_ADDRESS_CHANGE ? 'delivery' : 'orders',
+            priority: $request->type === OrderChangeRequest::TYPE_ADDRESS_CHANGE ? 'urgent' : 'high',
+            subject: $request,
+            recipients: $recipients->unique('id'),
+            title: ($approved ? 'Solicitud aprobada: ' : 'Solicitud rechazada: ').$request->type_label,
+            message: "Pedido {$request->order->display_folio} · revisó {$request->reviewer?->name}.",
+            url: $this->urlFor($request->order),
+            sound: $approved ? 'success' : 'alert',
+            dedupeSuffix: $request->status,
+            resolveByRole: false,
         );
     }
 

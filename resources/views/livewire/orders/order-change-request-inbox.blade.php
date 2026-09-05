@@ -10,7 +10,7 @@
             <div>
                 <p class="orders-eyebrow">Autorizaciones · Órdenes</p>
                 <h1>Solicitudes de órdenes</h1>
-                <p>Revisa cancelaciones y modificaciones antes de que cambien una orden.</p>
+                <p>Revisa cancelaciones, ajustes, pagos y direcciones antes de que cambien una orden.</p>
             </div>
         </div>
         <a class="orders-button orders-button--ghost" href="{{ route('app.ordenes') }}" wire:navigate>
@@ -23,6 +23,8 @@
             ['bx-time-five', 'Por revisar', $this->summary['pending'], 'warning'],
             ['bx-x-circle', 'Cancelaciones', $this->summary['cancellations'], 'danger'],
             ['bx-edit-alt', 'Modificaciones', $this->summary['modifications'], 'info'],
+            ['bx-credit-card', 'Cambios de pago', $this->summary['payment_changes'], 'info'],
+            ['bx-map', 'Cambios de dirección', $this->summary['address_changes'], 'warning'],
             ['bx-check-shield', 'Resueltas', $this->summary['resolved'], 'success'],
         ] as $stat)
             <article class="orders-stat orders-stat--{{ $stat[3] }}">
@@ -69,6 +71,8 @@
                     <option value="">Todos</option>
                     <option value="cancellation">Cancelación</option>
                     <option value="modification">Modificación</option>
+                    <option value="payment_change">Cambio de método de pago</option>
+                    <option value="address_change">Cambio de dirección</option>
                 </select>
             </div>
         </div>
@@ -90,7 +94,7 @@
                         @forelse($this->requests as $request)
                             <tr wire:key="order-request-{{ $request->id }}" class="{{ $selectedRequestId === $request->id ? 'is-selected' : '' }}">
                                 <td data-label="Orden"><strong>{{ $request->order?->display_folio }}</strong><small>{{ $request->order?->customer?->name ?? $request->order?->customer_name ?? 'Sin cliente' }}</small></td>
-                                <td data-label="Solicitud"><span class="order-request-type is-{{ $request->type }}"><i class="bx {{ match($request->scope) {'full' => 'bx-x-circle', 'partial' => 'bx-minus-circle', default => 'bx-edit-alt'} }}"></i>{{ $request->type_label }}</span><small>{{ $request->created_at->format('d/m/Y H:i') }}</small></td>
+                                <td data-label="Solicitud"><span class="order-request-type is-{{ $request->type }}"><i class="bx {{ match($request->scope) {'full' => 'bx-x-circle', 'partial' => 'bx-minus-circle', 'payment' => 'bx-credit-card', 'address' => 'bx-map', default => 'bx-edit-alt'} }}"></i>{{ $request->type_label }}</span><small>{{ $request->created_at->format('d/m/Y H:i') }}</small></td>
                                 <td data-label="Solicitó">{{ $request->requester?->name }}</td>
                                 <td data-label="Estado"><span class="order-request-status is-{{ $request->status }}"><i class="bx {{ match($request->status) {'approved' => 'bx-check-circle', 'rejected' => 'bx-x-circle', default => 'bx-time-five'} }}"></i>{{ $request->status_label }}</span></td>
                                 <td><button type="button" class="order-request-open" wire:click="selectRequest({{ $request->id }})" aria-label="Revisar solicitud de la orden {{ $request->order?->display_folio }}"><span>Revisar</span><i class="bx bx-chevron-right"></i></button></td>
@@ -141,7 +145,7 @@
                 @endif
                 <div class="orders-review-reason"><small>Motivo indicado</small><p>{{ $review->reason }}</p></div>
 
-                @if($review->type === 'modification')
+                @if($review->type === \App\Models\OrderChangeRequest::TYPE_MODIFICATION)
                     <h3>Cambios exactos</h3>
                     <div class="orders-review-changes">
                         @foreach(data_get($review->proposed_changes, 'items', []) as $change)
@@ -154,8 +158,19 @@
                         @endforeach
                     </div>
                     <div class="orders-total-comparison"><span>Actual <b>${{ number_format($review->original_total, 2) }}</b></span><i class="bx bx-right-arrow-alt"></i><span>Propuesto <strong>${{ number_format($review->proposed_total, 2) }}</strong></span></div>
-                @else
+                @elseif($review->type === \App\Models\OrderChangeRequest::TYPE_CANCELLATION)
                     <div class="order-request-warning"><i class="bx bx-info-circle" aria-hidden="true"></i><p>Al aprobar, la orden se marcará como cancelada. El registro y sus productos se conservarán para auditoría.</p></div>
+                @elseif($review->type === \App\Models\OrderChangeRequest::TYPE_PAYMENT_CHANGE)
+                    @php($paymentChange = data_get($review->proposed_changes, 'payment_change', []))
+                    <h3>Reclasificación del cobro</h3>
+                    <div class="order-wizard-review-change"><span><small>Método registrado</small><strong>{{ match(data_get($paymentChange, 'before.method')) {'efectivo' => 'Efectivo', 'tarjeta' => 'Tarjeta', 'transferencia' => 'Transferencia', default => 'Otro'} }}</strong></span><i class="bx bx-right-arrow-alt"></i><span><small>Método solicitado</small><strong>{{ match(data_get($paymentChange, 'after.method')) {'efectivo' => 'Efectivo', 'tarjeta' => 'Tarjeta', 'transferencia' => 'Transferencia', default => 'Otro'} }}</strong></span></div>
+                    <div class="order-request-warning is-neutral"><i class="bx bx-receipt"></i><p>El importe permanece en <strong>${{ number_format(data_get($paymentChange, 'amount', $review->original_total), 2) }}</strong>. Se actualizará el pago existente; no se creará un segundo cobro.</p></div>
+                    @if(data_get($paymentChange, 'after.transfer_reference'))<div class="orders-review-reason"><small>Referencia nueva</small><p>{{ data_get($paymentChange, 'after.transfer_reference') }}</p></div>@endif
+                @elseif($review->type === \App\Models\OrderChangeRequest::TYPE_ADDRESS_CHANGE)
+                    @php($addressChange = data_get($review->proposed_changes, 'address_change', []))
+                    <h3>Cambio de destino</h3>
+                    <div class="order-request-address-comparison"><article><small>Dirección actual</small><strong>{{ data_get($addressChange, 'before.address') ?: 'Sin dirección' }}</strong><p>{{ data_get($addressChange, 'before.neighborhood') }}@if(data_get($addressChange, 'before.references')) · {{ data_get($addressChange, 'before.references') }}@endif</p></article><i class="bx bx-right-arrow-alt"></i><article><small>Nueva dirección</small><strong>{{ data_get($addressChange, 'after.address') }}</strong><p>{{ data_get($addressChange, 'after.neighborhood') }}@if(data_get($addressChange, 'after.references')) · {{ data_get($addressChange, 'after.references') }}@endif</p></article></div>
+                    @if($review->order?->deliveryAssignment?->driver)<div class="order-request-warning is-neutral"><i class="bx bx-cycling"></i><p>Pedido asignado a <strong>{{ $review->order->deliveryAssignment->driver->name }}</strong>. Recibirá una notificación al aprobar el cambio.</p></div>@endif
                 @endif
 
                 @if($review->status === 'pending')

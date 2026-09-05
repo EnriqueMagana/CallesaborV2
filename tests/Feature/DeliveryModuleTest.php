@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Livewire\Delivery\DeliveryBoard;
 use App\Livewire\Kiosk\OrderTracking;
+use App\Livewire\Pos\PointOfSale;
 use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
+use App\Models\DeliveryAssignmentEvent;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -154,6 +156,156 @@ class DeliveryModuleTest extends TestCase
         $this->assertSame(1, DeliveryAssignment::where('order_id', $preparing->id)->count());
         $this->assertDatabaseHas('orders', ['id' => $preparing->id, 'status' => 'en_preparacion']);
         $this->assertDatabaseMissing('delivery_assignments', ['order_id' => $ready->id]);
+    }
+
+    public function test_authorized_user_can_reassign_an_active_delivery_without_changing_the_order(): void
+    {
+        $firstDriver = $this->driver();
+        $nextDriver = $this->driver();
+        $register = $this->register($firstDriver, true);
+        $order = $this->deliveryOrder($register, $firstDriver, ['status' => 'en_reparto']);
+        $assignment = DeliveryAssignment::create([
+            'order_id' => $order->id,
+            'driver_id' => $firstDriver->id,
+            'assigned_by' => $firstDriver->id,
+            'status' => 'asignado',
+            'assigned_at' => now()->subMinutes(12),
+        ]);
+
+        Livewire::actingAs($firstDriver)
+            ->withQueryParams(['tab' => 'drivers'])
+            ->test(DeliveryBoard::class)
+            ->assertSet('tab', 'drivers')
+            ->assertSee('Repartidores y pedidos asignados')
+            ->assertSee($nextDriver->name)
+            ->call('openReassign', $order->id)
+            ->set('reassignDriverId', $nextDriver->id)
+            ->set('reassignReason', 'El pedido fue tomado por el repartidor equivocado.')
+            ->call('confirmReassign')
+            ->assertHasNoErrors()
+            ->assertSet('tab', 'drivers')
+            ->assertSet('reassignOrderId', null);
+
+        $this->assertDatabaseHas('delivery_assignments', [
+            'id' => $assignment->id,
+            'driver_id' => $nextDriver->id,
+            'assigned_by' => $firstDriver->id,
+            'status' => 'asignado',
+        ]);
+        $this->assertDatabaseHas('delivery_assignment_events', [
+            'delivery_assignment_id' => $assignment->id,
+            'order_id' => $order->id,
+            'from_driver_id' => $firstDriver->id,
+            'to_driver_id' => $nextDriver->id,
+            'actor_id' => $firstDriver->id,
+            'event_type' => 'reassigned',
+        ]);
+        $this->assertSame(1, DeliveryAssignmentEvent::query()->where('order_id', $order->id)->count());
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'en_reparto',
+            'total' => 195,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $nextDriver->id,
+            'event_key' => 'delivery.reassigned',
+            'subject_type' => Order::class,
+            'subject_id' => $order->id,
+        ]);
+    }
+
+    public function test_cashier_can_review_and_reassign_a_delivery_inside_the_pos_modal(): void
+    {
+        $cashier = User::factory()->create();
+        $cashier->assignRole('cajero');
+        $firstDriver = $this->driver();
+        $nextDriver = $this->driver();
+        $register = $this->register($cashier, true);
+        $order = $this->deliveryOrder($register, $cashier, ['status' => 'lista']);
+        $assignment = DeliveryAssignment::create([
+            'order_id' => $order->id,
+            'driver_id' => $firstDriver->id,
+            'assigned_by' => $cashier->id,
+            'status' => 'asignado',
+            'assigned_at' => now()->subMinutes(5),
+        ]);
+
+        Livewire::actingAs($cashier)
+            ->test(PointOfSale::class)
+            ->call('openDeliveryDispatchModal')
+            ->assertSet('showDeliveryDispatchModal', true)
+            ->assertSee('Repartidores y pedidos')
+            ->assertSee($firstDriver->name)
+            ->assertSee($nextDriver->name)
+            ->assertSee($order->display_folio)
+            ->call('selectDeliveryDispatchOrder', $order->id)
+            ->assertSet('deliveryDispatchOrderId', $order->id)
+            ->set('deliveryDispatchDriverId', $nextDriver->id)
+            ->set('deliveryDispatchReason', 'Corrección operativa desde el punto de venta.')
+            ->call('reassignDeliveryFromPos')
+            ->assertHasNoErrors()
+            ->assertSet('showDeliveryDispatchModal', true)
+            ->assertSet('deliveryDispatchDriverId', null);
+
+        $this->assertDatabaseHas('delivery_assignments', [
+            'id' => $assignment->id,
+            'driver_id' => $nextDriver->id,
+            'assigned_by' => $cashier->id,
+            'status' => 'asignado',
+        ]);
+        $this->assertDatabaseHas('delivery_assignment_events', [
+            'delivery_assignment_id' => $assignment->id,
+            'order_id' => $order->id,
+            'from_driver_id' => $firstDriver->id,
+            'to_driver_id' => $nextDriver->id,
+            'actor_id' => $cashier->id,
+            'event_type' => 'reassigned',
+        ]);
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status' => 'lista',
+            'total' => 195,
+        ]);
+    }
+
+    public function test_delivery_cannot_be_reassigned_to_a_user_without_delivery_capability(): void
+    {
+        $driver = $this->driver();
+        $ineligible = User::factory()->create();
+        $register = $this->register($driver, true);
+        $order = $this->deliveryOrder($register, $driver, ['status' => 'lista']);
+        DeliveryAssignment::create([
+            'order_id' => $order->id,
+            'driver_id' => $driver->id,
+            'assigned_by' => $driver->id,
+            'status' => 'asignado',
+            'assigned_at' => now(),
+        ]);
+
+        Livewire::actingAs($driver)
+            ->test(DeliveryBoard::class)
+            ->call('openReassign', $order->id)
+            ->set('reassignDriverId', $ineligible->id)
+            ->set('reassignReason', 'CorrecciÃ³n por confusiÃ³n en la asignaciÃ³n.')
+            ->call('confirmReassign')
+            ->assertHasErrors('reassignDriverId');
+
+        $this->assertDatabaseHas('delivery_assignments', [
+            'order_id' => $order->id,
+            'driver_id' => $driver->id,
+        ]);
+        $this->assertDatabaseCount('delivery_assignment_events', 0);
+    }
+
+    public function test_reassignment_permission_is_available_to_pos_and_delivery_default_roles(): void
+    {
+        foreach (['admin', 'gerente', 'cajero', 'repartidor'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+
+            $this->assertTrue($user->can('reasignar pedidos delivery'), "El rol {$role} debe poder reasignar delivery.");
+        }
     }
 
     public function test_delivery_board_filters_locally_and_exposes_accessible_loading_states(): void

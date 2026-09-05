@@ -4,6 +4,7 @@ namespace App\Livewire\Delivery;
 
 use App\Models\CashRegister;
 use App\Models\Order;
+use App\Models\User;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -20,12 +21,22 @@ class DeliveryBoard extends Component
 
     public ?int $confirmingDeliveryOrderId = null;
 
+    public ?int $reassignOrderId = null;
+
+    public ?int $reassignDriverId = null;
+
+    public string $reassignReason = '';
+
     public ?string $lastCheckedAt = null;
 
     public function mount(): void
     {
         app(DeliveryModulePolicy::class)->assertEnabled();
         abort_unless(auth()->user()?->can('ver delivery'), 403);
+
+        if (request()->query('tab') === 'drivers' && $this->canReassignOrders()) {
+            $this->tab = 'drivers';
+        }
 
         $orderId = request()->integer('order');
         if (! $orderId) {
@@ -66,6 +77,37 @@ class DeliveryBoard extends Component
             ->where('status', '!=', 'cancelada')
             ->oldest('created_at')
             ->get();
+    }
+
+    #[Computed]
+    public function drivers(): Collection
+    {
+        if (! $this->canReassignOrders()) {
+            return collect();
+        }
+
+        return User::query()
+            ->whereNull('banned_at')
+            ->with(['roles.permissions', 'permissions'])
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (User $user): bool => $user->hasAnyPermission(['entregar delivery', 'gestionar delivery']))
+            ->values();
+    }
+
+    #[Computed]
+    public function reassigningOrder(): ?Order
+    {
+        if (! $this->canReassignOrders() || ! $this->reassignOrderId || ! $this->activeRegister) {
+            return null;
+        }
+
+        return Order::query()
+            ->with('deliveryAssignment.driver')
+            ->where('cash_register_id', $this->activeRegister->id)
+            ->where('type', 'delivery')
+            ->where('delivery_flow_mode', 'managed')
+            ->find($this->reassignOrderId);
     }
 
     public function refreshBoard(): void
@@ -153,6 +195,64 @@ class DeliveryBoard extends Component
         $this->dispatch('notify', type: 'success', message: 'Entrega completada y registrada.');
     }
 
+    public function openReassign(int $orderId): void
+    {
+        abort_unless($this->canReassignOrders(), 403);
+
+        $order = $this->currentRegisterOrder($orderId)->load('deliveryAssignment');
+        abort_unless($order->deliveryAssignment?->status === 'asignado', 422);
+
+        $this->resetValidation(['reassignDriverId', 'reassignReason']);
+        $this->reassignOrderId = $order->id;
+        $this->reassignDriverId = null;
+        $this->reassignReason = '';
+        unset($this->reassigningOrder);
+    }
+
+    public function closeReassign(): void
+    {
+        $this->resetValidation(['reassignDriverId', 'reassignReason']);
+        $this->reset('reassignOrderId', 'reassignDriverId', 'reassignReason');
+        unset($this->reassigningOrder);
+    }
+
+    public function confirmReassign(DeliveryWorkflow $workflow): void
+    {
+        abort_unless($this->canReassignOrders(), 403);
+        abort_unless($this->reassignOrderId, 422);
+
+        $validated = $this->validate([
+            'reassignDriverId' => ['required', 'integer', 'exists:users,id'],
+            'reassignReason' => ['required', 'string', 'min:8', 'max:500'],
+        ], [
+            'reassignDriverId.required' => 'Selecciona al repartidor que recibirÃ¡ el pedido.',
+            'reassignReason.required' => 'Indica por quÃ© se reasigna el pedido.',
+            'reassignReason.min' => 'Describe el motivo con al menos 8 caracteres.',
+        ]);
+
+        try {
+            $workflow->reassign(
+                $this->currentRegisterOrder($this->reassignOrderId),
+                User::query()->findOrFail($validated['reassignDriverId']),
+                auth()->user(),
+                $validated['reassignReason'],
+            );
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError($field, $messages[0]);
+            }
+
+            return;
+        } catch (AuthorizationException) {
+            abort(403);
+        }
+
+        $this->closeReassign();
+        $this->tab = 'drivers';
+        $this->clearComputedData();
+        $this->dispatch('notify', type: 'success', message: 'Pedido reasignado. El cambio quedÃ³ registrado.');
+    }
+
     public function dismissDeliveryError(): void
     {
         $this->resetErrorBag('delivery');
@@ -173,6 +273,11 @@ class DeliveryBoard extends Component
         return auth()->user()?->can('gestionar delivery') ?? false;
     }
 
+    public function canReassignOrders(): bool
+    {
+        return auth()->user()?->can('reasignar pedidos delivery') ?? false;
+    }
+
     private function currentRegisterOrder(int $orderId): Order
     {
         abort_unless($this->activeRegister, 422);
@@ -186,7 +291,7 @@ class DeliveryBoard extends Component
 
     private function clearComputedData(): void
     {
-        unset($this->activeRegister, $this->orders);
+        unset($this->activeRegister, $this->orders, $this->drivers, $this->reassigningOrder);
     }
 
     public function render()

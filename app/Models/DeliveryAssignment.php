@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DeliveryAssignment extends Model
 {
@@ -46,5 +47,10 @@ class DeliveryAssignment extends Model
     public function settlement(): BelongsTo
     {
         return $this->belongsTo(DeliverySettlement::class, 'delivery_settlement_id');
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(DeliveryAssignmentEvent::class);
     }
 }

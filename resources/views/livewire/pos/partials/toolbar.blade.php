@@ -47,15 +47,13 @@
         <kbd class="tb-btn__shortcut" aria-hidden="true">F9</kbd>
     </button>
     @endcan
-    @canany(['registrar movimientos de caja', 'registrar gastos', 'registrar salida de insumos', 'ajustar inventario'])
-    <button type="button" class="tb-btn tb-btn--operations"
-        @click="closeAllPanels(); showCart = false; showMore = false"
-        wire:click="openOperationsModal('{{ auth()->user()->can('registrar movimientos de caja') || auth()->user()->can('registrar gastos') ? 'expense' : 'inventory_out' }}')"
-        data-pos-operations aria-keyshortcuts="F11"
-        aria-label="Registrar movimientos de caja o salida de insumos" title="Abrir movimientos (F11)">
-        <span class="tb-btn__icon"><i class="bx bx-transfer-alt"></i></span>
-        <span class="tb-btn__copy"><strong>Movimientos</strong><small>Caja e insumos</small></span>
+    <button type="button" class="tb-btn tb-btn--operations" :class="showMore ? 'is-active' : ''"
+        @click="openMore($event.currentTarget)"
+        data-pos-more aria-keyshortcuts="F11"
+        aria-haspopup="dialog" aria-controls="pos-more-menu" :aria-expanded="showMore"
+        aria-label="Abrir más herramientas" title="Abrir más opciones (F11)">
+        <span class="tb-btn__icon"><i class="bx bx-dots-horizontal-rounded"></i></span>
+        <span class="tb-btn__copy"><strong>Más</strong><small>Herramientas</small></span>
         <kbd class="tb-btn__shortcut" aria-hidden="true">F11</kbd>
     </button>
-    @endcanany
 </nav>

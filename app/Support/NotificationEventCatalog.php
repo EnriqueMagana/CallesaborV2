@@ -60,6 +60,10 @@ class NotificationEventCatalog
                 'events' => [
                     'order.cancellation_requested' => self::event('Solicitud de cancelación', 'Avisa cuando un usuario solicita cancelar total o parcialmente una orden.', ['revisar solicitudes de ordenes'], 'bx-error-circle'),
                     'order.modification_requested' => self::event('Solicitud de modificación', 'Avisa cuando un usuario solicita agregar, retirar o cambiar productos de una orden.', ['revisar solicitudes de ordenes'], 'bx-edit-alt'),
+                    'order.payment_change_requested' => self::event('Solicitud de cambio de pago', 'Avisa cuando se solicita corregir el método de pago de un delivery sin duplicar el cobro.', ['revisar solicitudes de ordenes'], 'bx-credit-card'),
+                    'order.address_change_requested' => self::event('Solicitud de cambio de dirección', 'Avisa cuando un cliente solicita modificar el destino de un delivery activo.', ['revisar solicitudes de ordenes'], 'bx-map'),
+                    'order.change_approved' => self::event('Cambio de orden aprobado', 'Confirma al solicitante o repartidor que el cambio autorizado ya fue aplicado.', ['solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de metodo de pago', 'solicitar cambio de direccion', 'ver delivery'], 'bx-check-shield'),
+                    'order.change_rejected' => self::event('Cambio de orden rechazado', 'Informa al solicitante que la orden permanece sin cambios y muestra la resolución.', ['solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de metodo de pago', 'solicitar cambio de direccion'], 'bx-x-circle'),
                 ],
             ],
             'delivery' => [
@@ -71,6 +75,7 @@ class NotificationEventCatalog
                     'delivery.order_ready' => self::event('Pedido de delivery listo', 'Avisa cuando un delivery directo queda preparado sin usar la asignación administrada.', ['ver pedidos en punto de venta', 'ver ordenes', 'ver caja'], 'bx-check-circle'),
                     'delivery.available' => self::event('Nuevo pedido en espera para tomar (delivery)', 'Avisa cuando un delivery administrado está listo y disponible para que un repartidor lo tome.', ['ver delivery'], 'bx-package'),
                     'delivery.assigned' => self::event('Delivery asignado', 'Avisa cuando una entrega se asigna a un repartidor.', ['ver delivery'], 'bx-user-check'),
+                    'delivery.reassigned' => self::event('Delivery reasignado', 'Avisa cuando un pedido cambia de repartidor e incluye el motivo operativo.', ['ver delivery'], 'bx-transfer-alt'),
                     'delivery.picked_up' => self::event('Delivery recogido', 'Avisa cuando el repartidor recoge el pedido y comienza el trayecto.', ['ver delivery', 'ver ordenes', 'ver caja'], 'bx-run'),
                     'delivery.completed' => self::event('Delivery completado', 'Confirma que la entrega terminó y el pedido quedó liquidado.', ['ver delivery', 'ver ordenes', 'ver caja'], 'bx-home-heart'),
                 ],
