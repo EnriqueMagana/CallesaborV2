@@ -93,6 +93,39 @@ class BusinessSettingsTest extends TestCase
         $this->assertSame('203', TicketTemplate::current('customer')->options['printer_dpi']);
     }
 
+    public function test_deleted_featured_products_do_not_block_updating_business_data(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        BusinessSetting::current()->update(['featured_product_ids' => [999999]]);
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->assertSet('featuredProductIds', [])
+            ->assertSee('Productos destacados')
+            ->set('businessName', 'Negocio actualizado')
+            ->call('saveBusiness')
+            ->assertHasNoErrors();
+
+        $setting = BusinessSetting::current()->fresh();
+        $this->assertSame('Negocio actualizado', $setting->business_name);
+        $this->assertSame([], $setting->featured_product_ids);
+    }
+
+    public function test_business_validation_opens_the_section_that_contains_the_error(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $this->actingAs($owner);
+
+        Livewire::test(BusinessSettingsManager::class)
+            ->set('featuredProductIds', [999999])
+            ->call('saveBusiness')
+            ->assertHasErrors('featuredProductIds.0')
+            ->assertSet('businessSection', 'featured')
+            ->assertSee('No se pudo guardar la configuración.');
+    }
+
     public function test_renderer_uses_blocks_business_data_and_qr_without_inline_css(): void
     {
         $business = BusinessSetting::current();

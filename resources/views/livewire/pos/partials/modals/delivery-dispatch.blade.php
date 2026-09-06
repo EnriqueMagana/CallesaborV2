@@ -18,13 +18,13 @@
             matches(value) { return this.normalize(value).includes(this.normalize(this.query)); }
         }"
         x-on:keydown.escape.window="$wire.closeDeliveryDispatchModal()">
-        <div class="pos-modal wide pos-delivery-dispatch-modal" wire:click.stop>
+        <div class="pos-modal wide pos-delivery-dispatch-modal" x-on:click.stop="void 0">
             <header class="modal-header-pos pos-delivery-dispatch-header">
                 <i class="bx bx-group" aria-hidden="true"></i>
                 <div>
                     <span class="pos-modal-eyebrow">Delivery activo &middot; caja abierta</span>
                     <h4 id="pos-delivery-dispatch-title">Repartidores y pedidos</h4>
-                    <p>Consulta qui&eacute;n lleva cada entrega y corrige una asignaci&oacute;n sin salir del POS.</p>
+                    <p>Corrige datos de entrega o reasigna el pedido sin salir del POS.</p>
                 </div>
                 <button type="button" wire:click="closeDeliveryDispatchModal" aria-label="Cerrar panel de repartidores">
                     <i class="bx bx-x" aria-hidden="true"></i>
@@ -37,7 +37,7 @@
                         <span><i class="bx bx-cycling" aria-hidden="true"></i></span>
                         <div>
                             <strong id="pos-dispatch-directory-title">Repartidores del turno</strong>
-                            <small>Selecciona un pedido para revisar sus datos y reasignarlo.</small>
+                            <small>Selecciona un pedido y despu&eacute;s indica qu&eacute; acci&oacute;n necesitas.</small>
                         </div>
                     </div>
 
@@ -165,51 +165,175 @@
                             </ul>
                         </section>
 
-                        <form class="pos-delivery-reassign-form" wire:submit="reassignDeliveryFromPos">
-                            <div class="pos-delivery-reassign-title">
-                                <i class="bx bx-transfer-alt" aria-hidden="true"></i>
-                                <div><strong>Reasignar pedido</strong><small>El estado, los productos, pagos y total permanecer&aacute;n intactos.</small></div>
-                            </div>
+                        @if ($deliveryDispatchAction === '')
+                            <section class="pos-delivery-action-picker" aria-labelledby="pos-delivery-action-title">
+                                <div class="pos-delivery-reassign-title">
+                                    <i class="bx bx-list-check" aria-hidden="true"></i>
+                                    <div>
+                                        <strong id="pos-delivery-action-title">&iquest;Qu&eacute; acci&oacute;n quieres realizar?</strong>
+                                        <small>Los productos, importes y estado de la orden permanecen protegidos.</small>
+                                    </div>
+                                </div>
+                                <div class="pos-delivery-action-grid">
+                                    @can('editar datos de ordenes en punto de venta')
+                                        <button type="button" wire:click="selectDeliveryDispatchAction('edit_order')">
+                                            <span><i class="bx bx-edit-alt" aria-hidden="true"></i></span>
+                                            <strong>Modificar datos de la orden</strong>
+                                            <small>Direcci&oacute;n, contacto y forma de pago.</small>
+                                            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    @endcan
+                                    @can('reasignar pedidos delivery')
+                                        <button type="button" wire:click="selectDeliveryDispatchAction('reassign')">
+                                            <span><i class="bx bx-transfer-alt" aria-hidden="true"></i></span>
+                                            <strong>Reasignar pedido</strong>
+                                            <small>Cambiar repartidor y registrar el motivo.</small>
+                                            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    @endcan
+                                </div>
+                            </section>
+                        @elseif ($deliveryDispatchAction === 'edit_order')
+                            <form class="pos-delivery-edit-form" wire:submit="saveDeliveryDispatchOrderData">
+                                <div class="pos-delivery-workflow-heading">
+                                    <button type="button" wire:click="resetDeliveryDispatchAction" aria-label="Volver a las acciones">
+                                        <i class="bx bx-left-arrow-alt" aria-hidden="true"></i>
+                                    </button>
+                                    <div><strong>Modificar datos de la orden</strong><small>El cambio es inmediato y quedar&aacute; registrado en el historial.</small></div>
+                                </div>
 
-                            <label>
-                                <span>Nuevo repartidor <b>*</b></span>
-                                <select wire:model="deliveryDispatchDriverId" @disabled($targetDispatchDrivers->isEmpty())>
-                                    <option value="">Selecciona una persona</option>
-                                    @foreach ($targetDispatchDrivers as $driver)
-                                        <option value="{{ $driver->id }}">{{ $driver->name }} &middot; {{ $ordersByDriver->get($driver->id, collect())->count() }} activos</option>
-                                    @endforeach
-                                </select>
-                                @error('deliveryDispatchDriverId')<small class="pos-delivery-field-error">{{ $message }}</small>@enderror
-                            </label>
+                                <div class="pos-delivery-edit-grid">
+                                    <label class="co-field">
+                                        <span class="co-label">Nombre del cliente</span>
+                                        <input class="co-input" type="text" wire:model.defer="orderDataCustomerName" maxlength="150">
+                                        @error('orderDataCustomerName')<small class="co-error">{{ $message }}</small>@enderror
+                                    </label>
+                                    <label class="co-field">
+                                        <span class="co-label">Tel&eacute;fono</span>
+                                        <input class="co-input" type="tel" wire:model.defer="orderDataCustomerPhone" maxlength="30">
+                                        @error('orderDataCustomerPhone')<small class="co-error">{{ $message }}</small>@enderror
+                                    </label>
+                                    <label class="co-field co-field--full">
+                                        <span class="co-label">Direcci&oacute;n de entrega <b>*</b></span>
+                                        <input class="co-input" type="text" wire:model.defer="orderDataCustomerAddress" maxlength="255">
+                                        @error('orderDataCustomerAddress')<small class="co-error">{{ $message }}</small>@enderror
+                                    </label>
+                                    <label class="co-field">
+                                        <span class="co-label">Colonia o zona <b>*</b></span>
+                                        <input class="co-input" type="text" wire:model.defer="orderDataCustomerNeighborhood" maxlength="120">
+                                        @error('orderDataCustomerNeighborhood')<small class="co-error">{{ $message }}</small>@enderror
+                                    </label>
+                                    <label class="co-field">
+                                        <span class="co-label">Referencias</span>
+                                        <input class="co-input" type="text" wire:model.defer="orderDataCustomerReferences" maxlength="255">
+                                        @error('orderDataCustomerReferences')<small class="co-error">{{ $message }}</small>@enderror
+                                    </label>
+                                </div>
 
-                            <label>
-                                <span>Motivo <b>*</b></span>
-                                <textarea wire:model="deliveryDispatchReason" rows="2" maxlength="500"
-                                    placeholder="Ej. El pedido fue asignado al repartidor equivocado."></textarea>
-                                @error('deliveryDispatchReason')<small class="pos-delivery-field-error">{{ $message }}</small>@enderror
-                            </label>
+                                @if ($orderDataPayments === [])
+                                    <label class="co-field">
+                                        <span class="co-label">Forma de pago acordada</span>
+                                        <select class="co-input" wire:model.defer="orderDataDeliveryMethod">
+                                            <option value="contra_entrega">Efectivo contra entrega</option>
+                                            <option value="tarjeta">Tarjeta</option>
+                                            <option value="transferencia">Transferencia</option>
+                                        </select>
+                                    </label>
+                                @else
+                                    <div class="pos-delivery-edit-payments">
+                                        <div class="pos-delivery-edit-payments__heading">
+                                            <strong>Pagos registrados</strong>
+                                            <small>Solo cambia el m&eacute;todo; el importe est&aacute; bloqueado.</small>
+                                        </div>
+                                        @foreach ($orderDataPayments as $index => $payment)
+                                            <article wire:key="delivery-edit-payment-{{ $payment['id'] }}">
+                                                <div><span>Pago {{ $index + 1 }}</span><strong>${{ number_format((float) $payment['amount'], 2) }}</strong></div>
+                                                <label class="co-field">
+                                                    <span class="co-label">M&eacute;todo correcto</span>
+                                                    <select class="co-input" wire:model.live="orderDataPayments.{{ $index }}.method">
+                                                        <option value="efectivo">Efectivo</option>
+                                                        <option value="tarjeta">Tarjeta</option>
+                                                        <option value="transferencia">Transferencia</option>
+                                                        <option value="contra_entrega">Pendiente contra entrega</option>
+                                                    </select>
+                                                </label>
+                                                @if (($payment['method'] ?? null) === 'efectivo')
+                                                    <label class="co-field">
+                                                        <span class="co-label">Efectivo recibido</span>
+                                                        <input class="co-input" type="number" min="{{ $payment['amount'] }}" step="0.01"
+                                                            wire:model.defer="orderDataPayments.{{ $index }}.received_amount">
+                                                        @error("orderDataPayments.{$index}.received_amount")<small class="co-error">{{ $message }}</small>@enderror
+                                                    </label>
+                                                @elseif (($payment['method'] ?? null) === 'tarjeta')
+                                                    <label class="co-field">
+                                                        <span class="co-label">&Uacute;ltimos 4 d&iacute;gitos</span>
+                                                        <input class="co-input" type="text" inputmode="numeric" maxlength="4"
+                                                            wire:model.defer="orderDataPayments.{{ $index }}.card_last4">
+                                                        @error("orderDataPayments.{$index}.card_last4")<small class="co-error">{{ $message }}</small>@enderror
+                                                    </label>
+                                                @elseif (($payment['method'] ?? null) === 'transferencia')
+                                                    <label class="co-field">
+                                                        <span class="co-label">Referencia</span>
+                                                        <input class="co-input" type="text" maxlength="120"
+                                                            wire:model.defer="orderDataPayments.{{ $index }}.transfer_reference">
+                                                        @error("orderDataPayments.{$index}.transfer_reference")<small class="co-error">{{ $message }}</small>@enderror
+                                                    </label>
+                                                @endif
+                                            </article>
+                                        @endforeach
+                                        @error('orderDataPayments')<small class="co-error">{{ $message }}</small>@enderror
+                                    </div>
+                                @endif
 
-                            @error('delivery')
-                                <div class="pos-delivery-field-error" role="alert">{{ $message }}</div>
-                            @enderror
-
-                            <button type="submit" class="pos-btn pos-btn-primary"
-                                wire:loading.attr="disabled" wire:target="reassignDeliveryFromPos"
-                                @disabled($targetDispatchDrivers->isEmpty())>
-                                <span wire:loading.remove wire:target="reassignDeliveryFromPos"><i class="bx bx-transfer-alt"></i> Confirmar reasignaci&oacute;n</span>
-                                <span wire:loading wire:target="reassignDeliveryFromPos"><i class="bx bx-loader-alt bx-spin"></i> Reasignando</span>
-                            </button>
-                        </form>
+                                <div class="pos-delivery-edit-guardrail"><i class="bx bx-history"></i> Se guardar&aacute; qui&eacute;n hizo el cambio y los valores anteriores y nuevos.</div>
+                                <button type="submit" class="pos-btn pos-btn-primary" wire:loading.attr="disabled"
+                                    wire:target="saveDeliveryDispatchOrderData">
+                                    <span wire:loading.remove wire:target="saveDeliveryDispatchOrderData"><i class="bx bx-save"></i> Guardar cambios</span>
+                                    <span wire:loading wire:target="saveDeliveryDispatchOrderData"><i class="bx bx-loader-alt bx-spin"></i> Guardando</span>
+                                </button>
+                            </form>
+                        @else
+                            <form class="pos-delivery-reassign-form" wire:submit="reassignDeliveryFromPos">
+                                <div class="pos-delivery-workflow-heading">
+                                    <button type="button" wire:click="resetDeliveryDispatchAction" aria-label="Volver a las acciones">
+                                        <i class="bx bx-left-arrow-alt" aria-hidden="true"></i>
+                                    </button>
+                                    <div><strong>Reasignar pedido</strong><small>Selecciona al nuevo repartidor e indica el motivo del cambio.</small></div>
+                                </div>
+                                <label>
+                                    <span>Nuevo repartidor <b>*</b></span>
+                                    <select wire:model="deliveryDispatchDriverId" @disabled($targetDispatchDrivers->isEmpty())>
+                                        <option value="">Selecciona una persona</option>
+                                        @foreach ($targetDispatchDrivers as $driver)
+                                            <option value="{{ $driver->id }}">{{ $driver->name }} &middot; {{ $ordersByDriver->get($driver->id, collect())->count() }} activos</option>
+                                        @endforeach
+                                    </select>
+                                    @error('deliveryDispatchDriverId')<small class="pos-delivery-field-error">{{ $message }}</small>@enderror
+                                </label>
+                                <label>
+                                    <span>Comentario del cambio <b>*</b></span>
+                                    <textarea wire:model="deliveryDispatchReason" rows="2" maxlength="500"
+                                        placeholder="Ej. El pedido fue asignado al repartidor equivocado."></textarea>
+                                    @error('deliveryDispatchReason')<small class="pos-delivery-field-error">{{ $message }}</small>@enderror
+                                </label>
+                                @error('delivery')<div class="pos-delivery-field-error" role="alert">{{ $message }}</div>@enderror
+                                <button type="submit" class="pos-btn pos-btn-primary" wire:loading.attr="disabled"
+                                    wire:target="reassignDeliveryFromPos" @disabled($targetDispatchDrivers->isEmpty())>
+                                    <span wire:loading.remove wire:target="reassignDeliveryFromPos"><i class="bx bx-transfer-alt"></i> Confirmar reasignaci&oacute;n</span>
+                                    <span wire:loading wire:target="reassignDeliveryFromPos"><i class="bx bx-loader-alt bx-spin"></i> Reasignando</span>
+                                </button>
+                            </form>
+                        @endif
                     @else
                         <div class="pos-delivery-dispatch-empty">
                             <span><i class="bx bx-pointer" aria-hidden="true"></i></span>
                             <small>PASO 2</small>
                             <h5>Selecciona un pedido</h5>
-                            <p>Ver&aacute;s su estado, destino, contenido, importe y repartidor actual antes de realizar cualquier cambio.</p>
+                            <p>Ver&aacute;s su estado, destino, contenido, importe y repartidor actual antes de elegir una acci&oacute;n.</p>
                             <ul>
-                                <li><i class="bx bx-show" aria-hidden="true"></i> Revisi&oacute;n completa antes de reasignar</li>
-                                <li><i class="bx bx-shield-quarter" aria-hidden="true"></i> Cambio protegido por permiso</li>
-                                <li><i class="bx bx-history" aria-hidden="true"></i> Motivo guardado en el historial</li>
+                                <li><i class="bx bx-edit-alt" aria-hidden="true"></i> Corregir direcci&oacute;n o forma de pago</li>
+                                <li><i class="bx bx-transfer-alt" aria-hidden="true"></i> Reasignar con un comentario</li>
+                                <li><i class="bx bx-history" aria-hidden="true"></i> Todos los cambios quedan en historial</li>
                             </ul>
                         </div>
                     @endif

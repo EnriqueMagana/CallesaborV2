@@ -42,7 +42,7 @@ class PublicReservation extends Component
 
     public function mount(): void
     {
-        $this->selectedDate = array_key_first($this->dateOptions) ?? now()->format('Y-m-d');
+        $this->selectedDate = array_key_first($this->dateOptions) ?? $this->businessNow()->format('Y-m-d');
     }
 
     #[Computed]
@@ -51,7 +51,7 @@ class PublicReservation extends Component
         $business = BusinessSetting::current();
 
         return collect(range(0, 20))
-            ->map(fn (int $offset) => now()->startOfDay()->addDays($offset))
+            ->map(fn (int $offset) => $this->businessNow()->startOfDay()->addDays($offset))
             ->filter(fn (Carbon $date) => count($business->reservationSlots($date)) > 0)
             ->take(10)
             ->mapWithKeys(fn (Carbon $date) => [$date->format('Y-m-d') => [
@@ -122,7 +122,7 @@ class PublicReservation extends Component
     public function continueToTime(): void
     {
         $this->validate([
-            'selectedDate' => ['required', 'date', 'after_or_equal:today'],
+            'selectedDate' => ['required', 'date', 'after_or_equal:'.$this->businessNow()->toDateString()],
         ], [
             'selectedDate.required' => 'Selecciona una fecha disponible.',
         ]);
@@ -167,7 +167,7 @@ class PublicReservation extends Component
     public function submit(): void
     {
         $validated = $this->validate([
-            'selectedDate' => ['required', 'date', 'after_or_equal:today'],
+            'selectedDate' => ['required', 'date', 'after_or_equal:'.$this->businessNow()->toDateString()],
             'selectedTime' => ['required', 'date_format:H:i'],
             'guests' => ['required', 'integer', 'min:1', 'max:20'],
             'customerName' => ['required', 'string', 'max:100'],
@@ -185,7 +185,11 @@ class PublicReservation extends Component
             'website.max' => 'No fue posible registrar la solicitud.',
         ]);
 
-        $reservedAt = Carbon::createFromFormat('Y-m-d H:i', $validated['selectedDate'].' '.$validated['selectedTime']);
+        $reservedAt = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $validated['selectedDate'].' '.$validated['selectedTime'],
+            config('app.business_timezone', 'America/Mexico_City'),
+        );
 
         if (! BusinessSetting::current()->acceptsReservationAt($reservedAt)) {
             $this->step = 2;
@@ -249,5 +253,10 @@ class PublicReservation extends Component
     public function render()
     {
         return view('livewire.public-reservation');
+    }
+
+    private function businessNow(): Carbon
+    {
+        return now(config('app.business_timezone', 'America/Mexico_City'));
     }
 }

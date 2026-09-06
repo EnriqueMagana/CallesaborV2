@@ -3,32 +3,6 @@
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    const initializePreloader = () => {
-        const preloader = document.querySelector('[data-home-preloader]');
-        if (!preloader) return;
-
-        const startedAt = performance.now();
-        let hidden = false;
-        const hide = () => {
-            if (hidden) return;
-            hidden = true;
-            const minimumDisplay = reducedMotion ? 0 : Math.max(0, 650 - (performance.now() - startedAt));
-
-            window.setTimeout(() => {
-                preloader.classList.add('is-hidden');
-                preloader.setAttribute('aria-hidden', 'true');
-                window.setTimeout(() => preloader.remove(), reducedMotion ? 0 : 450);
-            }, minimumDisplay);
-        };
-
-        if (document.readyState === 'complete') {
-            hide();
-        } else {
-            window.addEventListener('load', hide, { once: true });
-            window.setTimeout(hide, 4500);
-        }
-    };
-
     const trapReservationFocus = (event) => {
         if (event.key !== 'Tab') return;
 
@@ -199,7 +173,6 @@
     };
 
     document.addEventListener('keydown', trapReservationFocus);
-    initializePreloader();
     initializeHeroCarousel();
     initializeGalleryCarousel();
     initializeRevealMotion();

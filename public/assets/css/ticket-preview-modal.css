@@ -1,0 +1,47 @@
+.ticket-preview-open { overflow: hidden; }
+.ticket-preview-modal { position: fixed; inset: 0; z-index: 1600; display: none; place-items: center; padding: 18px; background: rgba(20, 19, 31, .62); backdrop-filter: blur(8px); }
+.ticket-preview-modal.is-open { display: grid; }
+.ticket-preview-dialog { width: min(680px, 100%); height: min(820px, calc(100dvh - 36px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.75); border-radius: 24px; background: #fff; box-shadow: 0 30px 90px rgba(22, 19, 43, .32); animation: ticket-preview-enter .18s ease-out; }
+.ticket-preview-header { display: flex; align-items: center; gap: 14px; min-height: 90px; padding: 16px 22px; border-bottom: 1px solid #e8e6ef; }
+.ticket-preview-header__icon { width: 50px; height: 50px; flex: 0 0 50px; display: grid; place-items: center; border-radius: 15px; color: #fff; background: linear-gradient(145deg,#7058ef,#5540dd); box-shadow: 0 10px 24px rgba(93,70,224,.25); font-size: 24px; }
+.ticket-preview-header__copy { min-width: 0; margin-right: auto; }
+.ticket-preview-header__copy > span { display: block; margin-bottom: 3px; color: #6956e8; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.ticket-preview-header h4 { margin: 0; color: #242233; font-size: 20px; font-weight: 800; }
+.ticket-preview-tabs { display: flex; gap: 6px; padding: 4px; border: 1px solid #e3dfef; border-radius: 14px; background: #f8f7fc; }
+.ticket-preview-tabs button { min-height: 42px; padding: 0 14px; border: 0; border-radius: 10px; color: #666277; background: transparent; font: 700 13px/1 "Public Sans","Segoe UI",sans-serif; cursor: pointer; }
+.ticket-preview-tabs button.is-active { color: #fff; background: #6956e8; box-shadow: 0 7px 16px rgba(105,86,232,.22); }
+.ticket-preview-close { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border: 1px solid #e3e0e9; border-radius: 13px; color: #656172; background: #fff; font-size: 22px; cursor: pointer; }
+.ticket-preview-body { flex: 1; min-height: 0; padding: 18px 24px; background: #f3f2f7; }
+.ticket-preview-pane { display: none; height: 100%; }
+.ticket-preview-pane.is-active { display: block; }
+.ticket-preview-frame { position: relative; height: 100%; overflow: hidden; border-radius: 15px; background: #eeedf4; box-shadow: inset 0 0 0 1px rgba(73,65,98,.06); }
+.ticket-preview-frame iframe { width: 100%; height: 100%; display: block; border: 0; opacity: 0; background: #f8f7fb; transition: opacity .16s ease; }
+.ticket-preview-frame.is-ready iframe { opacity: 1; }
+.ticket-preview-loader { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 7px; color: #403b56; background: linear-gradient(145deg,#faf9fd,#f1eff8); text-align: center; transition: opacity .16s ease, visibility .16s ease; }
+.ticket-preview-frame.is-ready .ticket-preview-loader { opacity: 0; visibility: hidden; pointer-events: none; }
+.ticket-preview-loader strong { font-size: 14px; }
+.ticket-preview-loader small { color: #767087; font-size: 12px; }
+.ticket-preview-loader__spinner { width: 38px; height: 38px; margin-bottom: 5px; border: 3px solid rgba(105,86,232,.16); border-top-color: #6956e8; border-radius: 50%; animation: ticket-preview-spin .7s linear infinite; }
+.ticket-preview-footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-height: 84px; padding: 14px 24px; border-top: 1px solid #e8e6ef; background: #fff; }
+.ticket-preview-button { min-height: 48px; padding: 0 22px; border-radius: 13px; font: 800 14px/1 "Public Sans","Segoe UI",sans-serif; cursor: pointer; }
+.ticket-preview-button.is-secondary { margin-right: auto; border: 1px solid transparent; color: #6e697a; background: transparent; }
+.ticket-preview-button.is-primary { border: 0; color: #fff; background: #6956e8; box-shadow: 0 10px 24px rgba(105,86,232,.24); }
+.ticket-preview-button:disabled { opacity: .55; cursor: wait; box-shadow: none; }
+@keyframes ticket-preview-spin { to { transform: rotate(360deg); } }
+@keyframes ticket-preview-enter { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+@media (max-width: 640px) {
+    .ticket-preview-modal { padding: 7px; }
+    .ticket-preview-dialog { height: calc(100dvh - 14px); border-radius: 18px; }
+    .ticket-preview-header { min-height: 74px; padding: 12px; gap: 9px; flex-wrap: wrap; }
+    .ticket-preview-header__icon { width: 42px; height: 42px; flex-basis: 42px; border-radius: 12px; font-size: 20px; }
+    .ticket-preview-header h4 { font-size: 17px; }
+    .ticket-preview-tabs { order: 4; width: 100%; }
+    .ticket-preview-tabs button { flex: 1; }
+    .ticket-preview-body { padding: 7px; }
+    .ticket-preview-footer { min-height: 70px; padding: 10px 12px; }
+    .ticket-preview-button { min-height: 46px; padding: 0 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ticket-preview-dialog, .ticket-preview-loader__spinner { animation-duration: 1.4s; }
+    .ticket-preview-frame iframe, .ticket-preview-loader { transition: none; }
+}

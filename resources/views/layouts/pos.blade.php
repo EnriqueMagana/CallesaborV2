@@ -50,10 +50,12 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}"/>
 <link rel="stylesheet" href="{{ asset('assets/css/pos-mobile-navigation.css') }}?v={{ filemtime(public_path('assets/css/pos-mobile-navigation.css')) }}"/>
+<link rel="stylesheet" href="{{ asset('assets/css/ticket-preview-modal.css') }}?v={{ filemtime(public_path('assets/css/ticket-preview-modal.css')) }}"/>
 
 <!-- Helpers -->
 <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
 <script src="{{ asset('assets/js/config.js') }}"></script>
+<script src="{{ asset('assets/js/ticket-preview-modal.js') }}?v={{ filemtime(public_path('assets/js/ticket-preview-modal.js')) }}"></script>
 {{-- Modo oscuro pausado temporalmente.
 <script src="{{ asset('assets/js/theme.js') }}?v={{ filemtime(public_path('assets/js/theme.js')) }}"></script>
 --}}

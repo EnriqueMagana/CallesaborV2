@@ -1,31 +1,13 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
-    <meta name="description" content="Descubre el menú, reserva una mesa y conoce {{ $business->business_name }}.">
-    <title>{{ $business->business_name }} | Menú y reservaciones</title>
-    @include('partials.favicon')
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet"
-        href="{{ asset('assets/vendor/fonts/boxicons.css') }}?v={{ filemtime(public_path('assets/vendor/fonts/boxicons.css')) }}">
-    <link rel="stylesheet"
-        href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
-    <link rel="stylesheet"
-        href="{{ asset('assets/css/public-home.css') }}?v={{ filemtime(public_path('assets/css/public-home.css')) }}">
-    <noscript><style>.home-preloader{display:none!important}</style></noscript>
-    @livewireStyles
-</head>
-
-<body class="public-home" style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
+<x-public-menu.site-layout
+    :business="$business"
+    :menu-settings="$menuSettings"
+    :title="$business->business_name.' | Menú y reservaciones'"
+    :description="'Descubre el menú, reserva una mesa y conoce '.$business->business_name.'.'"
+    body-class="public-home"
+    :styles="['assets/css/public-home.css']"
+    font-url="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+    livewire>
     <a class="menu-skip-link" href="#experiencia">Saltar al contenido</a>
-    <x-public-menu.page-loader :business="$business" />
     @php
         $heroSlides = collect($menuSettings->show_banners ? $menuSettings->bannerItems() : []);
     @endphp
@@ -68,12 +50,7 @@
                 <a href="#contacto">Contacto</a>
             </nav>
             <div class="home-hero__utilities">
-                <a class="home-hero__status home-hero__status--{{ $openingStatus['is_open'] ? 'open' : 'closed' }}"
-                    href="{{ route('public.hours') }}"
-                    aria-label="{{ $openingStatus['label'] }}: {{ $openingStatus['detail'] }}. Ver horarios">
-                    <span aria-hidden="true"></span>
-                    <span><strong>{{ $openingStatus['label'] }}</strong><small>{{ $openingStatus['detail'] }}</small></span>
-                </a>
+                <x-public-menu.opening-status :status="$openingStatus" variant="home" />
                 <a class="home-hero__login" href="{{ route('login') }}" aria-label="Acceso al sistema">
                     <i class="bx bx-user" aria-hidden="true"></i>
                 </a>
@@ -246,7 +223,7 @@
                                     <img src="{{ Storage::url($item['path']) }}"
                                         alt="{{ $item['caption'] ?: 'Experiencia en ' . $business->business_name }}"
                                         width="1200" height="620"
-                                        loading="{{ $loop->first ? 'eager' : 'lazy' }}" decoding="async">
+                                        loading="lazy" decoding="async">
                                     @if ($item['caption'])
                                         <figcaption>{{ $item['caption'] }}</figcaption>
                                     @endif
@@ -278,12 +255,10 @@
                         <span
                             class="{{ $openingStatus['is_open'] ? 'is-open' : '' }}">{{ $openingStatus['label'] }}</span>
                     </header>
-                    @php($todayKey = strtolower(now()->englishDayOfWeek))
                     <dl>
-                        @foreach ($business->business_hours ?: \App\Models\BusinessSetting::DEFAULT_HOURS as $day)
-                            @php($isToday = ($day['key'] ?? '') === $todayKey)
-                            <div @class(['is-today' => $isToday])>
-                                <dt>{{ $day['label'] }} @if ($isToday)
+                        @foreach ($weeklySchedule as $day)
+                            <div @class(['is-today' => $day['is_today']])>
+                                <dt>{{ $day['label'] }} @if ($day['is_today'])
                                         <span>Hoy</span>
                                     @endif
                                 </dt>
@@ -346,9 +321,7 @@
     </main>
 
     <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
-    @livewireScripts
-    <script src="{{ asset('assets/js/public-home.js') }}?v={{ filemtime(public_path('assets/js/public-home.js')) }}"
-        defer></script>
-</body>
-
-</html>
+    <x-slot:scripts>
+        <script src="{{ asset('assets/js/public-home.js') }}?v={{ filemtime(public_path('assets/js/public-home.js')) }}" defer></script>
+    </x-slot:scripts>
+</x-public-menu.site-layout>

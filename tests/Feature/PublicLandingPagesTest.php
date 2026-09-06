@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BusinessSetting;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -53,11 +54,8 @@ class PublicLandingPagesTest extends TestCase
 
         $response->assertOk()
             ->assertSee('assets/css/public-home.css', false)
-            ->assertSee('assets/img/restaurant/banner1.jpg', false)
-            ->assertSee('assets/img/restaurant/banner5.jpg', false)
-            ->assertSee('assets/img/restaurant/banner7.jpg', false)
             ->assertSee('data-home-hero', false)
-            ->assertSee('data-home-preloader', false)
+            ->assertDontSee('data-home-preloader', false)
             ->assertDontSee('home-hero__visual', false)
             ->assertDontSee('data-home-hero-progress', false)
             ->assertDontSee('data-home-hero-prev', false)
@@ -88,7 +86,7 @@ class PublicLandingPagesTest extends TestCase
         $this->assertStringNotContainsString('data-home-hero-progress', $javascript);
         $this->assertStringNotContainsString('data-home-hero-pause', $javascript);
         $this->assertStringContainsString('IntersectionObserver', $javascript);
-        $this->assertStringContainsString('initializePreloader', $javascript);
+        $this->assertStringNotContainsString('initializePreloader', $javascript);
     }
 
     public function test_home_fills_the_viewport_and_keeps_reservation_forms_above_every_section(): void
@@ -136,7 +134,7 @@ class PublicLandingPagesTest extends TestCase
 
     public function test_home_marks_the_current_day_in_the_business_hours(): void
     {
-        Carbon::setTestNow('2026-08-10 12:00:00');
+        Carbon::setTestNow(Carbon::parse('2026-08-10 12:00:00', 'America/Mexico_City'));
 
         try {
             $this->get(route('public.home'))
@@ -145,6 +143,53 @@ class PublicLandingPagesTest extends TestCase
                 ->assertSeeTextInOrder(['Lunes', 'Hoy', '09:00 – 18:00']);
         } finally {
             Carbon::setTestNow();
+        }
+    }
+
+    public function test_public_status_uses_the_business_timezone_and_a_half_open_schedule_window(): void
+    {
+        config()->set('app.timezone', 'UTC');
+        config()->set('app.business_timezone', 'America/Mexico_City');
+
+        $business = BusinessSetting::current();
+        $hours = BusinessSetting::DEFAULT_HOURS;
+        $hours[0] = ['key' => 'monday', 'label' => 'Lunes', 'enabled' => true, 'opens' => '09:30', 'closes' => '18:00'];
+        $business->update(['business_hours' => $hours]);
+
+        try {
+            Carbon::setTestNow(Carbon::parse('2026-08-10 15:00:00', 'UTC'));
+            $this->get(route('public.home'))
+                ->assertOk()
+                ->assertSee('home-hero__status--closed', false)
+                ->assertSee('Abre hoy a las 09:30');
+
+            Carbon::setTestNow(Carbon::parse('2026-08-10 15:30:00', 'UTC'));
+            $this->get(route('public.home'))
+                ->assertOk()
+                ->assertSee('home-hero__status--open', false)
+                ->assertSee('Cierra a las 18:00');
+
+            Carbon::setTestNow(Carbon::parse('2026-08-11 00:00:00', 'UTC'));
+            $this->get(route('public.home'))
+                ->assertOk()
+                ->assertSee('home-hero__status--closed', false);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_all_public_experiences_use_the_shared_document_layout(): void
+    {
+        $views = [
+            resource_path('views/public-home/index.blade.php'),
+            resource_path('views/public-menu/index.blade.php'),
+            resource_path('views/components/public-menu/info-layout.blade.php'),
+        ];
+
+        foreach ($views as $view) {
+            $source = file_get_contents($view);
+            $this->assertStringContainsString('<x-public-menu.site-layout', $source);
+            $this->assertStringNotContainsString('<!DOCTYPE html>', $source);
         }
     }
 }

@@ -9,6 +9,7 @@ use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
 use App\Models\DeliveryAssignmentEvent;
 use App\Models\Order;
+use App\Models\OrderDataChangeAudit;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\User;
@@ -241,6 +242,8 @@ class DeliveryModuleTest extends TestCase
             ->assertSee($order->display_folio)
             ->call('selectDeliveryDispatchOrder', $order->id)
             ->assertSet('deliveryDispatchOrderId', $order->id)
+            ->call('selectDeliveryDispatchAction', 'reassign')
+            ->assertSet('deliveryDispatchAction', 'reassign')
             ->set('deliveryDispatchDriverId', $nextDriver->id)
             ->set('deliveryDispatchReason', 'Corrección operativa desde el punto de venta.')
             ->call('reassignDeliveryFromPos')
@@ -267,6 +270,77 @@ class DeliveryModuleTest extends TestCase
             'status' => 'lista',
             'total' => 195,
         ]);
+    }
+
+    public function test_cashier_can_change_delivery_address_and_payment_inside_the_dispatch_wizard(): void
+    {
+        $cashier = User::factory()->create();
+        $cashier->assignRole('cajero');
+        $driver = $this->driver();
+        $register = $this->register($cashier, true);
+        $order = $this->deliveryOrder($register, $cashier, [
+            'status' => 'lista',
+            'customer_neighborhood' => 'Centro',
+            'delivery_method' => 'transferencia',
+        ]);
+        $assignment = DeliveryAssignment::create([
+            'order_id' => $order->id,
+            'driver_id' => $driver->id,
+            'assigned_by' => $cashier->id,
+            'status' => 'asignado',
+            'assigned_at' => now(),
+        ]);
+        $payment = OrderPayment::create([
+            'order_id' => $order->id,
+            'method' => 'transferencia',
+            'amount' => 195,
+            'transfer_reference' => 'REF-ORIGINAL',
+        ]);
+
+        $component = Livewire::actingAs($cashier)
+            ->test(PointOfSale::class)
+            ->call('openDeliveryDispatchModal')
+            ->call('selectDeliveryDispatchOrder', $order->id)
+            ->assertSee('Modificar datos de la orden')
+            ->call('selectDeliveryDispatchAction', 'edit_order')
+            ->assertSet('deliveryDispatchAction', 'edit_order')
+            ->assertSet('orderDataCustomerAddress', 'Av. Reforma 120, Centro');
+
+        $component
+            ->assertSee('x-on:click.stop="void 0"', false)
+            ->assertDontSee('wire:click.stop', false);
+
+        $component
+            ->set('orderDataCustomerAddress', 'Calle Nueva 45')
+            ->set('orderDataCustomerNeighborhood', 'Colonia Norte')
+            ->set('orderDataCustomerReferences', 'Fachada azul')
+            ->set('orderDataPayments.0.method', 'efectivo')
+            ->set('orderDataPayments.0.received_amount', '200.00')
+            ->call('saveDeliveryDispatchOrderData')
+            ->assertHasNoErrors()
+            ->assertSet('showDeliveryDispatchModal', true)
+            ->assertSet('deliveryDispatchAction', '');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'customer_address' => 'Calle Nueva 45',
+            'customer_neighborhood' => 'Colonia Norte',
+            'customer_references' => 'Fachada azul',
+            'status' => 'lista',
+            'total' => 195,
+        ]);
+        $this->assertDatabaseHas('order_payments', [
+            'id' => $payment->id,
+            'method' => 'efectivo',
+            'amount' => 195,
+            'received_amount' => 200,
+            'change_amount' => 5,
+        ]);
+        $this->assertDatabaseHas('delivery_assignments', [
+            'id' => $assignment->id,
+            'driver_id' => $driver->id,
+        ]);
+        $this->assertSame(1, OrderDataChangeAudit::where('order_id', $order->id)->count());
     }
 
     public function test_delivery_cannot_be_reassigned_to_a_user_without_delivery_capability(): void

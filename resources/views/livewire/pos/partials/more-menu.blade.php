@@ -98,14 +98,14 @@
             @endcanany
 
             @if (app(\App\Services\DeliveryModulePolicy::class)->enabled())
-                @can('reasignar pedidos delivery')
+                @canany(['reasignar pedidos delivery', 'editar datos de ordenes en punto de venta'])
                     <button type="button" class="pos-more-action" data-tone="green"
                         @click="closeMore(false)" wire:click="openDeliveryDispatchModal"
                         wire:loading.attr="disabled" wire:target="openDeliveryDispatchModal">
                         <span class="pos-more-action__icon"><i class="bx bx-group" aria-hidden="true"></i></span>
-                        <strong>Repartidores</strong><small>Ver y reasignar pedidos</small>
+                        <strong>Gestionar delivery</strong><small>Datos y repartidores</small>
                     </button>
-                @endcan
+                @endcanany
             @endif
 
             <a href="{{ route('app.dashboard') }}" class="pos-more-action" data-tone="neutral">

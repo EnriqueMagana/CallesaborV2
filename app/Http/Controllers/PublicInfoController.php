@@ -123,7 +123,8 @@ class PublicInfoController extends Controller
         $activeWindow = collect([$now->copy()->subDay(), $now->copy()])
             ->map($windowFor)
             ->filter()
-            ->first(fn (array $window): bool => $now->betweenIncluded($window['opens'], $window['closes']));
+            ->first(fn (array $window): bool => $now->greaterThanOrEqualTo($window['opens'])
+                && $now->lessThan($window['closes']));
         $todayWindow = $windowFor($now->copy());
 
         if ($activeWindow) {
@@ -159,6 +160,10 @@ class PublicInfoController extends Controller
             'status_detail' => $statusDetail,
             'progress' => round(max(0, min(1, $progress)), 4),
             'timezone' => config('app.business_timezone', 'America/Mexico_City'),
+            'timezone_label' => str((string) config('app.business_timezone', 'America/Mexico_City'))
+                ->afterLast('/')
+                ->replace('_', ' ')
+                ->toString(),
             'business_date' => $now->format('Y-m-d'),
             'now_iso' => $now->toIso8601String(),
             'clock_label' => $this->formatDateTime12($now),

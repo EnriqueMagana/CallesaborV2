@@ -17,6 +17,7 @@ class PublicMenuController extends Controller
     {
         $business = BusinessSetting::current();
         $menuSettings = DigitalMenuSetting::current();
+        $moment = now(config('app.business_timezone', 'America/Mexico_City'));
         $categories = Category::query()
             ->where('is_active', true)
             ->whereHas('products', fn ($query) => $query->where('is_active', true))
@@ -78,7 +79,7 @@ class PublicMenuController extends Controller
             'uncategorized' => $uncategorized,
             'featured' => $featured,
             'galleryImages' => $galleryImages,
-            'openingStatus' => $business->openingStatus(),
+            'openingStatus' => $business->openingStatus($moment),
             'totalProducts' => $catalogProducts->count(),
             'promotions' => $promotions,
             'discountCampaigns' => $discountCampaigns,

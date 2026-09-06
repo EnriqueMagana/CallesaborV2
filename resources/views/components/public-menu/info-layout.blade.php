@@ -1,23 +1,11 @@
 @props(['business', 'menuSettings', 'openingStatus', 'title', 'subtitle', 'icon'])
 
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
-    <meta name="description" content="{{ $subtitle }} — {{ $business->business_name }}">
-    <title>{{ $title }} | {{ $business->business_name }}</title>
-    @include('partials.favicon')
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
-    <noscript><style>.home-preloader{display:none!important}</style></noscript>
-</head>
-<body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
-    <x-public-menu.page-loader :business="$business" />
+<x-public-menu.site-layout
+    :business="$business"
+    :menu-settings="$menuSettings"
+    :title="$title.' | '.$business->business_name"
+    :description="$subtitle.' — '.$business->business_name"
+    font-url="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
     <a class="menu-skip-link skip-link" href="#contenido">Saltar al contenido</a>
     <x-public-menu.brand-header
         :business="$business"
@@ -33,6 +21,7 @@
         {{ $slot }}
     </main>
     <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
-    <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}" defer></script>
-</body>
-</html>
+    <x-slot:scripts>
+        <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}" defer></script>
+    </x-slot:scripts>
+</x-public-menu.site-layout>

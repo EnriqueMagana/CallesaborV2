@@ -2,7 +2,7 @@
     @php($selectedOrder = $this->editableOrderDataOrders->firstWhere('id', $orderDataOrderId))
     <div class="pos-modal-wrap show pos-order-data-wrap" wire:click.self="closeOrderDataModal"
         role="dialog" aria-modal="true" aria-labelledby="order-data-modal-title">
-        <div class="pos-modal wide pos-order-data-modal" wire:click.stop>
+        <div class="pos-modal wide pos-order-data-modal" x-on:click.stop="void 0">
             <header class="modal-header-pos">
                 <i class="bx bx-edit-alt" aria-hidden="true"></i>
                 <div class="pos-order-data-heading">

@@ -91,32 +91,6 @@
         });
     };
 
-    const initializePreloader = () => {
-        const preloader = document.querySelector('[data-home-preloader]');
-        if (!preloader) return;
-
-        const startedAt = performance.now();
-        let hidden = false;
-        const hide = () => {
-            if (hidden) return;
-            hidden = true;
-            const minimumDisplay = reducedMotion ? 0 : Math.max(0, 650 - (performance.now() - startedAt));
-
-            window.setTimeout(() => {
-                preloader.classList.add('is-hidden');
-                preloader.setAttribute('aria-hidden', 'true');
-                window.setTimeout(() => preloader.remove(), reducedMotion ? 0 : 450);
-            }, minimumDisplay);
-        };
-
-        if (document.readyState === 'complete') {
-            hide();
-        } else {
-            window.addEventListener('load', hide, { once: true });
-            window.setTimeout(hide, 4500);
-        }
-    };
-
     const initializeContactMaps = () => {
         document.querySelectorAll('[data-contact-map-shell]').forEach((shell) => {
             const frame = shell.querySelector('[data-contact-map]');
@@ -241,7 +215,7 @@
             let progress = 0;
             if (dayEnabled && timestamp < opensAt) {
                 state = 'upcoming';
-            } else if (dayEnabled && timestamp <= closesAt) {
+            } else if (dayEnabled && timestamp < closesAt) {
                 state = 'open';
                 progress = Math.max(0, Math.min(1, (timestamp - opensAt) / Math.max(1, closesAt - opensAt)));
             } else if (dayEnabled) {
@@ -307,7 +281,6 @@
         });
     };
 
-    initializePreloader();
     initializeImageLoadingStates();
     initializeContactMaps();
     initializeDirectionsLinks();

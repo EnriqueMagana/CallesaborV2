@@ -299,6 +299,8 @@ class PointOfSale extends Component
 
     public string $deliveryDispatchReason = '';
 
+    public string $deliveryDispatchAction = '';
+
     // ──────────────────────────────────────────────────────────────────────────
 
     #[Computed]
@@ -673,7 +675,10 @@ class PointOfSale extends Component
     #[Computed]
     public function deliveryDispatchDrivers()
     {
-        if (! $this->showDeliveryDispatchModal || ! auth()->user()?->can('reasignar pedidos delivery')) {
+        if (! $this->showDeliveryDispatchModal || ! auth()->user()?->canAny([
+            'reasignar pedidos delivery',
+            'editar datos de ordenes en punto de venta',
+        ])) {
             return collect();
         }
 
@@ -691,7 +696,10 @@ class PointOfSale extends Component
     {
         $cashRegisterId = $this->activeCashRegister?->id;
 
-        if (! $cashRegisterId || ! $this->showDeliveryDispatchModal || ! auth()->user()?->can('reasignar pedidos delivery')) {
+        if (! $cashRegisterId || ! $this->showDeliveryDispatchModal || ! auth()->user()?->canAny([
+            'reasignar pedidos delivery',
+            'editar datos de ordenes en punto de venta',
+        ])) {
             return collect();
         }
 
@@ -959,7 +967,10 @@ class PointOfSale extends Component
 
     public function openDeliveryDispatchModal(): void
     {
-        abort_unless(auth()->user()?->can('reasignar pedidos delivery'), 403);
+        abort_unless(auth()->user()?->canAny([
+            'reasignar pedidos delivery',
+            'editar datos de ordenes en punto de venta',
+        ]), 403);
         app(DeliveryModulePolicy::class)->assertEnabled();
 
         if (! $this->activeCashRegister) {
@@ -983,16 +994,57 @@ class PointOfSale extends Component
 
     public function selectDeliveryDispatchOrder(int $orderId): void
     {
-        abort_unless(auth()->user()?->can('reasignar pedidos delivery'), 403);
+        abort_unless(auth()->user()?->canAny([
+            'reasignar pedidos delivery',
+            'editar datos de ordenes en punto de venta',
+        ]), 403);
 
         $order = $this->deliveryDispatchOrders->firstWhere('id', $orderId);
         abort_unless($order, 404);
 
-        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+        $this->resetDeliveryDispatchAction();
         $this->deliveryDispatchOrderId = $order->id;
+        unset($this->selectedDeliveryDispatchOrder);
+    }
+
+    public function selectDeliveryDispatchAction(string $action): void
+    {
+        abort_unless(in_array($action, ['edit_order', 'reassign'], true), 422);
+
+        $permission = $action === 'edit_order'
+            ? 'editar datos de ordenes en punto de venta'
+            : 'reasignar pedidos delivery';
+        abort_unless(auth()->user()?->can($permission), 403);
+
+        $order = $this->selectedDeliveryDispatchOrder;
+        abort_unless($order, 404);
+
+        $this->resetDeliveryDispatchAction();
+        $this->deliveryDispatchAction = $action;
+
+        if ($action === 'edit_order') {
+            $this->fillOrderDataEditor($order);
+        }
+    }
+
+    public function resetDeliveryDispatchAction(): void
+    {
+        $this->deliveryDispatchAction = '';
         $this->deliveryDispatchDriverId = null;
         $this->deliveryDispatchReason = '';
-        unset($this->selectedDeliveryDispatchOrder);
+        $this->resetOrderDataEditor();
+        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+    }
+
+    public function saveDeliveryDispatchOrderData(OrderOperationalDataService $service): void
+    {
+        abort_unless(auth()->user()?->can('editar datos de ordenes en punto de venta'), 403);
+        abort_unless($this->deliveryDispatchAction === 'edit_order', 422);
+        abort_unless($this->deliveryDispatchOrderId === $this->orderDataOrderId, 422);
+
+        $this->saveOrderData($service);
+        $this->deliveryDispatchAction = '';
+        unset($this->deliveryDispatchOrders, $this->selectedDeliveryDispatchOrder);
     }
 
     public function reassignDeliveryFromPos(DeliveryWorkflow $workflow): void
@@ -1000,6 +1052,7 @@ class PointOfSale extends Component
         abort_unless(auth()->user()?->can('reasignar pedidos delivery'), 403);
         app(DeliveryModulePolicy::class)->assertEnabled();
         abort_unless($this->deliveryDispatchOrderId && $this->activeCashRegister, 422);
+        abort_unless($this->deliveryDispatchAction === 'reassign', 422);
 
         $validated = $this->validate([
             'deliveryDispatchDriverId' => ['required', 'integer', 'exists:users,id'],
@@ -1035,19 +1088,15 @@ class PointOfSale extends Component
             abort(403);
         }
 
-        $this->deliveryDispatchDriverId = null;
-        $this->deliveryDispatchReason = '';
-        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+        $this->resetDeliveryDispatchAction();
         unset($this->deliveryDispatchDrivers, $this->deliveryDispatchOrders, $this->selectedDeliveryDispatchOrder);
         $this->dispatch('notify', type: 'success', message: 'Pedido reasignado sin salir del punto de venta.');
     }
 
     private function resetDeliveryDispatchState(): void
     {
-        $this->resetValidation(['deliveryDispatchDriverId', 'deliveryDispatchReason']);
+        $this->resetDeliveryDispatchAction();
         $this->deliveryDispatchOrderId = null;
-        $this->deliveryDispatchDriverId = null;
-        $this->deliveryDispatchReason = '';
     }
 
     public function openPickupPanel(): void
@@ -2913,6 +2962,11 @@ class PointOfSale extends Component
             ->where('status', '!=', 'cancelada')
             ->firstOrFail();
 
+        $this->fillOrderDataEditor($order);
+    }
+
+    private function fillOrderDataEditor(Order $order): void
+    {
         $this->resetErrorBag();
         $this->orderDataOrderId = $order->id;
         $this->orderDataCustomerName = (string) $order->customer_name;

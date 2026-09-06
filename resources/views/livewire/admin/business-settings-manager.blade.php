@@ -47,7 +47,10 @@
         'hours' => ['03', 'bx-time-five', 'Horarios', 'Apertura por día'],
         'social' => ['04', 'bx-share-alt', 'Redes sociales', 'Instagram, Facebook y TikTok'],
         'visual' => ['05', 'bx-image', 'Identidad visual', 'Logos de la sucursal'],
-        'homepage' => ['06', 'bx-layout', 'Página principal', 'Titulares y presentación'],
+        'appearance' => ['06', 'bx-palette', 'Apariencia', 'Color principal y contraste'],
+        'homepage' => ['07', 'bx-layout', 'Página principal', 'Titulares y presentación'],
+        'gallery' => ['08', 'bx-images', 'Galería pública', 'Fotografías y descripciones'],
+        'featured' => ['09', 'bx-star', 'Productos destacados', 'Favoritos de la casa'],
     ] as $sectionKey => $section)
                     <button type="button" wire:click="setBusinessSection('{{ $sectionKey }}')"
                         class="{{ $businessSection === $sectionKey ? 'is-active' : '' }}"
@@ -60,6 +63,12 @@
             </aside>
 
             <form wire:submit="saveBusiness" class="business-editor__form">
+                @if ($errors->any())
+                    <div class="business-validation-summary" role="alert" aria-live="assertive">
+                        <i class="bx bx-error-circle" aria-hidden="true"></i>
+                        <span><strong>No se pudo guardar la configuración.</strong><small>Revisa los campos marcados en este apartado e inténtalo nuevamente.</small></span>
+                    </div>
+                @endif
                 @if ($businessSection === 'identity')
                     <div class="biz-section-heading">
                         <div><span>01</span>
@@ -303,7 +312,7 @@
                                 administrándose desde sus apartados actuales.</small></span></div>
                 @elseif($businessSection === 'gallery')
                     <div class="biz-section-heading">
-                        <div><span>07</span>
+                        <div><span>08</span>
                             <div>
                                 <h2>Galería pública</h2>
                                 <p>Organiza hasta {{ \App\Livewire\Admin\BusinessSettingsManager::MAX_GALLERY_IMAGES }}
@@ -394,7 +403,7 @@
                     @endif
                 @else
                     <div class="biz-section-heading">
-                        <div><span>08</span>
+                        <div><span>09</span>
                             <div>
                                 <h2>Productos destacados</h2>
                                 <p>Elige hasta 8 opciones para la sección “Favoritos de la casa”.</p>

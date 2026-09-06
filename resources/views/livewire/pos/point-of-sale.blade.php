@@ -246,32 +246,22 @@
 @endif{{-- /activeCashRegister --}}
 
 <script>
-window._posTicketTab = 'cliente';
-
 window.bindPosTicketEvents = function () {
     if (!window.Livewire || window._posTicketEventsBound) return;
     window._posTicketEventsBound = true;
 
     Livewire.on('pos-reprint-show', ({ html_cliente, html_cocina }) => {
-        const clientFrame = document.getElementById('iframe-cliente');
-        const kitchenFrame = document.getElementById('iframe-cocina');
-        const modal = document.getElementById('posTicketModal');
-        if (!clientFrame || !kitchenFrame || !modal) return;
-        clientFrame.srcdoc = html_cliente || '';
-        kitchenFrame.srcdoc = html_cocina || '';
-        posTicketTab('cliente');
-        modal.classList.add('is-open');
+        window.TicketPreviewModal?.open('posTicketModal', {
+            activeTab: 'cliente',
+            frames: { cliente: html_cliente || '', cocina: html_cocina || '' },
+        });
     });
 
     Livewire.on('pos-reprint-show-cocina', ({ html_cliente, html_cocina }) => {
-        const clientFrame = document.getElementById('iframe-cliente');
-        const kitchenFrame = document.getElementById('iframe-cocina');
-        const modal = document.getElementById('posTicketModal');
-        if (!clientFrame || !kitchenFrame || !modal) return;
-        clientFrame.srcdoc = html_cliente || '';
-        kitchenFrame.srcdoc = html_cocina || '';
-        posTicketTab('cocina');
-        modal.classList.add('is-open');
+        window.TicketPreviewModal?.open('posTicketModal', {
+            activeTab: 'cocina',
+            frames: { cliente: html_cliente || '', cocina: html_cocina || '' },
+        });
     });
 };
 
@@ -282,26 +272,15 @@ if (window.Livewire) {
 }
 
 window.posTicketTab = function (tab) {
-    window._posTicketTab = tab;
-    const clientPane = document.getElementById('pane-cliente');
-    const kitchenPane = document.getElementById('pane-cocina');
-    const clientTab = document.getElementById('tab-cliente');
-    const kitchenTab = document.getElementById('tab-cocina');
-    if (!clientPane || !kitchenPane || !clientTab || !kitchenTab) return;
-    clientPane.classList.toggle('is-hidden', tab !== 'cliente');
-    kitchenPane.classList.toggle('is-hidden', tab !== 'cocina');
-    clientTab.className = 'pos-btn pos-btn-sm ' + (tab === 'cliente' ? 'pos-btn-primary' : 'pos-btn-secondary');
-    kitchenTab.className = 'pos-btn pos-btn-sm ' + (tab === 'cocina' ? 'pos-btn-primary' : 'pos-btn-secondary');
+    window.TicketPreviewModal?.activate('posTicketModal', tab);
 };
 
 window.posTicketClose = function () {
-    const modal = document.getElementById('posTicketModal');
-    if (modal) modal.classList.remove('is-open');
+    window.TicketPreviewModal?.close('posTicketModal');
 };
 
 window.posTicketPrint = function () {
-    const id = window._posTicketTab === 'cocina' ? 'iframe-cocina' : 'iframe-cliente';
-    try { document.getElementById(id).contentWindow.print(); } catch(e) {}
+    window.TicketPreviewModal?.print('posTicketModal');
 };
 </script>
 

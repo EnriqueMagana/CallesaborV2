@@ -1664,33 +1664,16 @@
     @endif
 
     @if ($showMesaTicketPreview)
-        <div class="mesa-ticket-preview-backdrop" x-data
-            x-on:keydown.escape.window="$wire.closeMesaTicketPreview()"
-            wire:click.self="closeMesaTicketPreview" role="dialog" aria-modal="true"
-            aria-labelledby="mesa-ticket-preview-title">
-            <section class="mesa-ticket-preview">
-                <header class="mesa-ticket-preview__header">
-                    <div>
-                        <span>VISTA PREVIA</span>
-                        <h5 id="mesa-ticket-preview-title">{{ $mesaTicketPreviewTitle }}</h5>
-                    </div>
-                    <button type="button" class="mesas-modal-close" wire:click="closeMesaTicketPreview"
-                        aria-label="Cerrar vista previa"><i class="bx bx-x"></i></button>
-                </header>
-                <div class="mesa-ticket-preview__body">
-                    <iframe x-ref="ticketFrame" srcdoc="{{ $mesaTicketPreviewHtml }}"
-                        title="Vista previa del ticket de mesa"></iframe>
-                </div>
-                <footer class="mesa-ticket-preview__actions">
-                    <button type="button" class="btn btn-outline-secondary"
-                        wire:click="closeMesaTicketPreview">Cerrar</button>
-                    <button type="button" class="btn btn-primary"
-                        x-on:click="$refs.ticketFrame.contentWindow.print()">
-                        <i class="bx bx-printer me-1"></i> Imprimir ticket
-                    </button>
-                </footer>
-            </section>
-        </div>
+        <x-ticket-preview-modal id="mesaTicketPreviewModal" :title="$mesaTicketPreviewTitle"
+            eyebrow="Vista previa" initial-tab="cliente" :open="true"
+            close-method="closeMesaTicketPreview" print-label="Imprimir ticket"
+            :tabs="[[
+                'key' => 'cliente',
+                'label' => 'Cliente',
+                'icon' => 'bx-user',
+                'html' => $mesaTicketPreviewHtml,
+                'title' => 'Vista previa del ticket de mesa',
+            ]]" />
     @endif
 
 </div>

@@ -1,6 +1,6 @@
 @if ($showConvertDeliveryModal)
     <div class="pos-modal-wrap show" wire:click.self="closeConvertDeliveryModal">
-        <div class="pos-modal pos-convert-delivery-modal" role="dialog" aria-modal="true" aria-labelledby="convert-delivery-title" wire:click.stop>
+        <div class="pos-modal pos-convert-delivery-modal" role="dialog" aria-modal="true" aria-labelledby="convert-delivery-title" x-on:click.stop="void 0">
             <header class="modal-header-pos">
                 <span class="pos-modal-icon is-delivery"><i class="bx bx-cycling"></i></span>
                 <div>
