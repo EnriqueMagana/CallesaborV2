@@ -37,8 +37,9 @@ class MesaActiveAccountPrintingTest extends TestCase
         Livewire::actingAs($operator)
             ->test(GestionMesas::class)
             ->call('openDetail', $mesa->id)
-            ->assertSee('Imprimir cuenta')
-            ->assertSee('Cuenta completa')
+            ->assertSee('Tickets')
+            ->assertSee('Cuenta del cliente')
+            ->assertSee('Consumo global del servicio')
             ->call('printActiveMesaAccount', $mesa->id)
             ->assertSet('showMesaTicketPreview', true)
             ->assertSet('mesaTicketPreviewTitle', $mesa->display_name)
@@ -48,6 +49,58 @@ class MesaActiveAccountPrintingTest extends TestCase
             ->call('closeMesaTicketPreview')
             ->assertSet('showMesaTicketPreview', false)
             ->assertSet('mesaTicketPreviewHtml', '');
+    }
+
+    public function test_waiter_can_print_each_kitchen_order_before_closing_the_table(): void
+    {
+        [$operator, $mesa, $service, $order] = $this->activeAccountContext();
+        $mesa->update(['status' => 'ocupada']);
+        $service->update(['status' => 'abierta']);
+
+        Livewire::actingAs($operator)
+            ->test(GestionMesas::class)
+            ->call('openDetail', $mesa->id)
+            ->assertSee('Tickets')
+            ->assertSee('Comandas de cocina')
+            ->assertSee($order->display_folio)
+            ->assertDontSee('Cuenta del cliente')
+            ->call('printMesaKitchenOrder', $mesa->id, $order->id)
+            ->assertSet('showMesaTicketPreview', true)
+            ->assertSet('mesaTicketPreviewKind', 'kitchen')
+            ->assertSet('mesaTicketPreviewTitle', 'Cocina · '.$order->display_folio)
+            ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Taco de prueba'));
+    }
+
+    public function test_kitchen_ticket_cannot_be_loaded_from_another_table_service(): void
+    {
+        [$operator, $mesa, $service, $order] = $this->activeAccountContext();
+        $mesa->update(['status' => 'ocupada']);
+        $service->update(['status' => 'abierta']);
+
+        $otherMesa = Mesa::create([
+            'area_id' => $mesa->area_id,
+            'number' => 9,
+            'capacity' => 4,
+            'status' => 'ocupada',
+        ]);
+        $register = CashRegister::findOrFail($order->cash_register_id);
+        $otherService = app(MesaServiceManager::class)->resolveOrCreate($otherMesa, $register, $operator->id);
+        $otherOrder = Order::create([
+            'cash_register_id' => $register->id,
+            'mesa_id' => $otherMesa->id,
+            'mesa_service_id' => $otherService->id,
+            'served_by' => $operator->id,
+            'type' => 'mesa',
+            'status' => 'pendiente',
+            'subtotal' => 80,
+            'total' => 80,
+        ]);
+
+        Livewire::actingAs($operator)
+            ->test(GestionMesas::class)
+            ->call('printMesaKitchenOrder', $mesa->id, $otherOrder->id)
+            ->assertSet('showMesaTicketPreview', false)
+            ->assertDispatched('notify');
     }
 
     public function test_split_account_reprints_a_paid_snapshot_with_its_payment_methods(): void
@@ -95,6 +148,9 @@ class MesaActiveAccountPrintingTest extends TestCase
 
         Livewire::actingAs($operator)
             ->test(GestionMesas::class)
+            ->call('printActiveMesaAccount', $mesa->id)
+            ->assertSet('showMesaTicketPreview', true)
+            ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Taco de prueba'))
             ->call('printActiveMesaAccount', $mesa->id, $split->id, 1)
             ->assertSet('showMesaTicketPreview', true)
             ->assertSet('mesaTicketPreviewHtml', fn ($html) => str_contains($html, 'Taco de Luis')
@@ -114,6 +170,11 @@ class MesaActiveAccountPrintingTest extends TestCase
         Livewire::actingAs($viewer)
             ->test(GestionMesas::class)
             ->call('printActiveMesaAccount', $mesa->id)
+            ->assertForbidden();
+
+        Livewire::actingAs($viewer)
+            ->test(GestionMesas::class)
+            ->call('printMesaKitchenOrder', $mesa->id, $service->orders()->first()->id)
             ->assertForbidden();
 
         $mesa->update(['status' => 'ocupada']);

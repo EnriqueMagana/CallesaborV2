@@ -1076,19 +1076,31 @@
 .mesa-print-section__heading h6 { margin:1px 0 4px; color:var(--c-text); font-size:.95rem; font-weight:800; }
 .mesa-print-section__heading p { margin:0; color:var(--c-text-muted); font-size:.78rem; line-height:1.45; }
 .mesa-print-section__icon { width:42px; height:42px; flex:0 0 42px; display:grid; place-items:center; border-radius:12px; background:rgba(105,108,255,.12); color:var(--c-primary); font-size:1.2rem; }
+.mesa-print-group { display:grid; gap:10px; padding-top:14px; border-top:1px solid var(--c-border); }
+.mesa-print-group__heading { display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--c-text); }
+.mesa-print-group__heading span { display:inline-flex; align-items:center; gap:7px; font-size:.82rem; font-weight:800; }
+.mesa-print-group__heading span i { color:var(--c-primary); font-size:1rem; }
+.mesa-print-group__heading small { color:var(--c-text-muted); font-size:.7rem; }
+.mesa-print-subheading { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding-top:3px; }
+.mesa-print-subheading span { color:var(--c-text); font-size:.77rem; font-weight:800; }
+.mesa-print-subheading small { color:var(--c-text-muted); font-size:.7rem; }
 .mesa-print-accounts { display:grid; gap:10px; }
 .mesa-print-account { display:grid; grid-template-columns:40px minmax(0,1fr) auto auto; align-items:center; gap:12px; padding:13px; border:1px solid var(--c-border); border-radius:13px; background:var(--c-surface); }
 .mesa-print-account.is-paid { background:var(--c-bg); opacity:.78; }
 .mesa-print-account__status { width:40px; height:40px; display:grid; place-items:center; border-radius:11px; background:rgba(245,158,11,.12); color:#b16b06; font-size:1.15rem; }
 .mesa-print-account.is-paid .mesa-print-account__status { background:rgba(34,197,94,.1); color:#15803d; }
 .mesa-print-account--full .mesa-print-account__status { background:rgba(105,108,255,.12); color:var(--c-primary); }
+.mesa-print-account--kitchen .mesa-print-account__status { background:rgba(245,158,11,.12); color:#b16b06; }
 .mesa-print-account__summary { min-width:0; display:grid; gap:3px; }
 .mesa-print-account__summary strong { overflow:hidden; color:var(--c-text); font-size:.86rem; text-overflow:ellipsis; white-space:nowrap; }
 .mesa-print-account__summary small { color:var(--c-text-muted); font-size:.72rem; }
 .mesa-print-account__total { color:var(--c-text); font-size:.92rem; white-space:nowrap; }
 .mesa-print-account__locked { display:inline-flex; align-items:center; gap:4px; color:var(--c-text-muted); font-size:.72rem; font-weight:700; white-space:nowrap; }
+.mesa-print-account .btn { min-height:44px; }
 .mesa-print-section__notice { display:flex; align-items:flex-start; gap:8px; padding:10px 12px; border-radius:11px; background:rgba(34,197,94,.08); color:#24613a; font-size:.73rem; line-height:1.45; }
 .mesa-print-section__notice i { margin-top:1px; color:#16a34a; font-size:1rem; }
+.mesa-print-section__notice--neutral { background:rgba(59,130,246,.08); color:#31577f; }
+.mesa-print-section__notice--neutral i { color:#3b82f6; }
 
 .detail-order-row {
   border: 1px solid var(--c-border);
