@@ -299,7 +299,7 @@
 
     @if($showCancelConfirm)
         <div class="mesas-modal-backdrop split-cancel-backdrop" wire:click.self="closeCancelConfirm">
-            <section class="mesas-modal mesas-modal--sm split-cancel-modal" role="dialog" aria-modal="true" aria-labelledby="split-cancel-title" wire:click.stop>
+            <section class="mesas-modal mesas-modal--sm split-cancel-modal" role="dialog" aria-modal="true" aria-labelledby="split-cancel-title" x-on:click.stop="void 0">
                 <div class="split-cancel-modal__icon"><i class="bx bx-edit-alt"></i></div>
                 <h5 id="split-cancel-title">¿Cancelar el split?</h5>
                 <p>Se eliminará la división actual y podrás volver a asignar los productos de la mesa.</p>

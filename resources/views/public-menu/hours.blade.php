@@ -20,7 +20,7 @@
                 <div class="info-current-time">
                     <span class="info-current-time__icon" aria-hidden="true"><i class="bx bx-time-five"></i></span>
                     <div>
-                        <small>Hora actual · Ciudad de México</small>
+                        <small>Hora actual · {{ $hoursTimeline['timezone_label'] }}</small>
                         <time datetime="{{ $hoursTimeline['now_iso'] }}" data-hours-clock>{{ $hoursTimeline['clock_label'] }}</time>
                         <span data-hours-date>{{ $hoursTimeline['date_label'] }}</span>
                     </div>

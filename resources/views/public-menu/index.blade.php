@@ -1,27 +1,10 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
-    <meta name="description" content="Consulta el menú, horarios y datos de {{ $business->business_name }}.">
-    <title>Menú | {{ $business->business_name }}</title>
-    @include('partials.favicon')
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Parisienne&family=Poppins:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}">
-    <link rel="stylesheet"
-        href="{{ asset('assets/css/public-menu.css') }}?v={{ filemtime(public_path('assets/css/public-menu.css')) }}">
-    <link rel="stylesheet"
-        href="{{ asset('assets/css/promotions-public.css') }}?v={{ filemtime(public_path('assets/css/promotions-public.css')) }}">
-    <noscript><style>.home-preloader{display:none!important}</style></noscript>
-</head>
-
-<body style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
-    <x-public-menu.page-loader :business="$business" />
+<x-public-menu.site-layout
+    :business="$business"
+    :menu-settings="$menuSettings"
+    :title="'Menú | '.$business->business_name"
+    :description="'Consulta el menú, horarios y datos de '.$business->business_name.'.'"
+    :styles="['assets/css/promotions-public.css']"
+    font-url="https://fonts.googleapis.com/css2?family=Parisienne&family=Poppins:wght@400;500;600;700;800&display=swap">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
         :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
@@ -527,9 +510,8 @@
             </footer>
         </div>
     </dialog>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" async></script>
-    <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}"
-        defer></script>
-</body>
-
-</html>
+    <x-slot:scripts>
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" async></script>
+        <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}" defer></script>
+    </x-slot:scripts>
+</x-public-menu.site-layout>

@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\TicketTemplate;
 use App\Services\ThermalTicketRenderer;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -195,55 +196,61 @@ class BusinessSettingsManager extends Component
     public function saveBusiness(): void
     {
         $this->authorizeManage();
-        $this->validate([
-            'businessName' => 'required|string|max:120',
-            'platformName' => 'required|string|max:120',
-            'legalName' => 'nullable|string|max:160',
-            'rfc' => 'nullable|string|max:20',
-            'phone' => 'nullable|string|max:20',
-            'whatsapp' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:160',
-            'website' => 'nullable|url|max:200',
-            'instagramUrl' => 'nullable|url|max:255',
-            'facebookUrl' => 'nullable|url|max:255',
-            'tiktokUrl' => 'nullable|url|max:255',
-            'address' => 'nullable|string|max:200',
-            'city' => 'nullable|string|max:100',
-            'state' => 'nullable|string|max:100',
-            'postalCode' => 'nullable|string|max:10',
-            'mapsUrl' => 'nullable|url:http,https|max:500',
-            'logoUpload' => 'nullable|image|max:4096',
-            'ticketLogoUpload' => 'nullable|image|max:2048',
-            'bannerUpload' => 'nullable|image|max:6144',
-            'primaryColor' => [
-                'required',
-                'regex:/^#[0-9A-Fa-f]{6}$/',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (is_string($value) && ! $this->hasReadableWhiteContrast($value)) {
-                        $fail('El color debe ser suficientemente oscuro para mantener un contraste accesible.');
-                    }
-                },
-            ],
-            'galleryUploads' => 'array',
-            'homeBadge' => 'nullable|string|max:120',
-            'homeHeadline' => 'nullable|string|max:180',
-            'homeDescription' => 'nullable|string|max:600',
-            'homeIntroKicker' => 'nullable|string|max:80',
-            'homeIntroTitle' => 'nullable|string|max:180',
-            'homeIntroDescription' => 'nullable|string|max:600',
-            'galleryUploads.*' => 'image|max:6144',
-            'galleryPaths.*.caption' => 'nullable|string|max:120',
-            'galleryUploadCaptions' => 'array',
-            'galleryUploadCaptions.*' => 'nullable|string|max:120',
-            'featuredProductIds' => 'array|max:8',
-            'featuredProductIds.*' => 'integer|distinct|exists:products,id',
-            'businessHours' => 'required|array|size:7',
-            'businessHours.*.key' => 'required|string|max:20',
-            'businessHours.*.label' => 'required|string|max:20',
-            'businessHours.*.enabled' => 'required|boolean',
-            'businessHours.*.opens' => 'required|date_format:H:i',
-            'businessHours.*.closes' => 'required|date_format:H:i',
-        ]);
+        try {
+            $this->validate([
+                'businessName' => 'required|string|max:120',
+                'platformName' => 'required|string|max:120',
+                'legalName' => 'nullable|string|max:160',
+                'rfc' => 'nullable|string|max:20',
+                'phone' => 'nullable|string|max:20',
+                'whatsapp' => 'nullable|string|max:20',
+                'email' => 'nullable|email|max:160',
+                'website' => 'nullable|url|max:200',
+                'instagramUrl' => 'nullable|url|max:255',
+                'facebookUrl' => 'nullable|url|max:255',
+                'tiktokUrl' => 'nullable|url|max:255',
+                'address' => 'nullable|string|max:200',
+                'city' => 'nullable|string|max:100',
+                'state' => 'nullable|string|max:100',
+                'postalCode' => 'nullable|string|max:10',
+                'mapsUrl' => 'nullable|url:http,https|max:500',
+                'logoUpload' => 'nullable|image|max:4096',
+                'ticketLogoUpload' => 'nullable|image|max:2048',
+                'bannerUpload' => 'nullable|image|max:6144',
+                'primaryColor' => [
+                    'required',
+                    'regex:/^#[0-9A-Fa-f]{6}$/',
+                    function (string $attribute, mixed $value, \Closure $fail): void {
+                        if (is_string($value) && ! $this->hasReadableWhiteContrast($value)) {
+                            $fail('El color debe ser suficientemente oscuro para mantener un contraste accesible.');
+                        }
+                    },
+                ],
+                'galleryUploads' => 'array',
+                'homeBadge' => 'nullable|string|max:120',
+                'homeHeadline' => 'nullable|string|max:180',
+                'homeDescription' => 'nullable|string|max:600',
+                'homeIntroKicker' => 'nullable|string|max:80',
+                'homeIntroTitle' => 'nullable|string|max:180',
+                'homeIntroDescription' => 'nullable|string|max:600',
+                'galleryUploads.*' => 'image|max:6144',
+                'galleryPaths.*.caption' => 'nullable|string|max:120',
+                'galleryUploadCaptions' => 'array',
+                'galleryUploadCaptions.*' => 'nullable|string|max:120',
+                'featuredProductIds' => 'array|max:8',
+                'featuredProductIds.*' => 'integer|distinct|exists:products,id',
+                'businessHours' => 'required|array|size:7',
+                'businessHours.*.key' => 'required|string|max:20',
+                'businessHours.*.label' => 'required|string|max:20',
+                'businessHours.*.enabled' => 'required|boolean',
+                'businessHours.*.opens' => 'required|date_format:H:i',
+                'businessHours.*.closes' => 'required|date_format:H:i',
+            ]);
+        } catch (ValidationException $exception) {
+            $this->businessSection = $this->sectionForValidationErrors(array_keys($exception->errors()));
+
+            throw $exception;
+        }
 
         if (count($this->galleryPaths) + count($this->galleryUploads) > self::MAX_GALLERY_IMAGES) {
             $this->addError('galleryUploads', 'La galería admite un máximo de '.self::MAX_GALLERY_IMAGES.' imágenes.');
@@ -575,7 +582,16 @@ class BusinessSettingsManager extends Component
         $this->homeIntroTitle = $setting->home_intro_title ?? '';
         $this->homeIntroDescription = $setting->home_intro_description ?? '';
         $this->galleryPaths = $setting->galleryItems();
-        $this->featuredProductIds = array_map('strval', $setting->featured_product_ids ?? []);
+        $configuredProductIds = array_values(array_filter(
+            array_map('intval', $setting->featured_product_ids ?? []),
+            fn (int $id): bool => $id > 0,
+        ));
+        $this->featuredProductIds = Product::query()
+            ->where('is_active', true)
+            ->whereIn('id', $configuredProductIds)
+            ->pluck('id')
+            ->map(fn (int $id): string => (string) $id)
+            ->all();
     }
 
     private function loadTemplate(): void
@@ -662,6 +678,33 @@ class BusinessSettingsManager extends Component
         $luminance = (0.2126 * $linear[0]) + (0.7152 * $linear[1]) + (0.0722 * $linear[2]);
 
         return 1.05 / ($luminance + 0.05) >= 4.5;
+    }
+
+    private function sectionForValidationErrors(array $fields): string
+    {
+        $sections = [
+            'identity' => ['businessName', 'platformName', 'legalName', 'rfc'],
+            'contact' => ['phone', 'whatsapp', 'email', 'website', 'address', 'city', 'state', 'postalCode', 'mapsUrl'],
+            'hours' => ['businessHours'],
+            'social' => ['instagramUrl', 'facebookUrl', 'tiktokUrl'],
+            'visual' => ['logoUpload', 'ticketLogoUpload', 'bannerUpload'],
+            'appearance' => ['primaryColor'],
+            'homepage' => ['homeBadge', 'homeHeadline', 'homeDescription', 'homeIntroKicker', 'homeIntroTitle', 'homeIntroDescription'],
+            'gallery' => ['galleryUploads', 'galleryPaths', 'galleryUploadCaptions'],
+            'featured' => ['featuredProductIds'],
+        ];
+
+        foreach ($sections as $section => $prefixes) {
+            foreach ($fields as $field) {
+                foreach ($prefixes as $prefix) {
+                    if ($field === $prefix || str_starts_with($field, $prefix.'.')) {
+                        return $section;
+                    }
+                }
+            }
+        }
+
+        return $this->businessSection;
     }
 
     private function authorizeManage(): void

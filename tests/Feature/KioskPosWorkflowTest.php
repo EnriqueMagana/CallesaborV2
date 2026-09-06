@@ -293,13 +293,16 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertStringContainsString('app.ordenes', $moreMenu);
         $this->assertStringContainsString('Cambiar datos', $moreMenu);
         $this->assertStringContainsString('openOrderDataModal', $moreMenu);
-        $this->assertStringContainsString('Repartidores', $moreMenu);
+        $this->assertStringContainsString('Gestionar delivery', $moreMenu);
         $this->assertStringContainsString("'reasignar pedidos delivery'", $moreMenu);
         $this->assertStringContainsString('openDeliveryDispatchModal', $moreMenu);
         $this->assertStringNotContainsString("route('app.delivery'", $moreMenu);
         $dispatchModal = file_get_contents(resource_path('views/livewire/pos/partials/modals/delivery-dispatch.blade.php'));
         $this->assertIsString($dispatchModal);
         $this->assertStringContainsString('Repartidores y pedidos', $dispatchModal);
+        $this->assertStringContainsString('Modificar datos de la orden', $dispatchModal);
+        $this->assertStringContainsString('saveDeliveryDispatchOrderData', $dispatchModal);
+        $this->assertStringContainsString('Reasignar pedido', $dispatchModal);
         $this->assertStringContainsString('selectDeliveryDispatchOrder', $dispatchModal);
         $this->assertStringContainsString('reassignDeliveryFromPos', $dispatchModal);
         $this->assertStringContainsString('x-model.debounce.120ms="query"', $dispatchModal);

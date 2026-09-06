@@ -233,7 +233,7 @@ class PublicMenuTest extends TestCase
         );
     }
 
-    public function test_menu_uses_the_home_preloader_and_only_skeletonizes_images_while_they_load(): void
+    public function test_menu_renders_immediately_and_only_skeletonizes_images_while_they_load(): void
     {
         Product::create([
             'name' => 'Platillo progresivo',
@@ -248,8 +248,8 @@ class PublicMenuTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('data-home-preloader', false)
-            ->assertSee('home-preloader__chase', false)
+            ->assertDontSee('data-home-preloader', false)
+            ->assertDontSee('home-preloader__chase', false)
             ->assertDontSee('Preparando el menú')
             ->assertDontSee('menu-page-loader', false)
             ->assertDontSee('data-progressive-image', false)
@@ -258,22 +258,19 @@ class PublicMenuTest extends TestCase
             ->assertSee('data-menu-image-shell', false)
             ->assertSee('data-menu-image', false)
             ->assertSee('is-image-loading', false)
-            ->assertSee('https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js', false)
-            ->assertSee('<noscript>', false);
+            ->assertSee('https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js', false);
 
-        $this->assertStringContainsString('.home-preloader{', $css);
-        $this->assertStringContainsString('.home-preloader__chase{', $css);
+        $this->assertStringNotContainsString('.home-preloader{', $css);
+        $this->assertStringNotContainsString('.home-preloader__chase{', $css);
         $this->assertStringNotContainsString('.menu-page-loader{', $css);
         $this->assertStringNotContainsString('.is-media-pending::after{', $css);
         $this->assertStringContainsString('.menu-image-shell.is-image-loading::after', $css);
         $this->assertStringContainsString('@keyframes menu-image-shimmer', $css);
         $this->assertStringContainsString('@media(prefers-reduced-motion:reduce)', $css);
-        $this->assertStringContainsString("document.querySelector('[data-home-preloader]')", $javascript);
-        $this->assertStringContainsString('Math.max(0, 650 - (performance.now() - startedAt))', $javascript);
-        $this->assertStringContainsString("window.addEventListener('load', hide, { once: true })", $javascript);
-        $this->assertStringContainsString('window.setTimeout(hide, 4500)', $javascript);
+        $this->assertStringNotContainsString("document.querySelector('[data-home-preloader]')", $javascript);
+        $this->assertStringNotContainsString('initializePreloader', $javascript);
         $this->assertStringContainsString('const initializeImageLoadingStates = (scope = document) =>', $javascript);
-        $this->assertStringContainsString("window.gsap.to(state", $javascript);
+        $this->assertStringContainsString('window.gsap.to(state', $javascript);
         $this->assertStringContainsString("animateAxisScroll(window, 'y'", $javascript);
         $this->assertStringNotContainsString("document.querySelectorAll('[data-progressive-image]')", $javascript);
     }
@@ -397,7 +394,7 @@ class PublicMenuTest extends TestCase
         );
         $this->assertStringContainsString('scroll-snap-type:x mandatory', $css);
         $this->assertStringContainsString("document.querySelectorAll('[data-featured-carousel]')", $javascript);
-        $this->assertStringContainsString("timer = window.setTimeout(() => goTo(activeIndex + 1), interval)", $javascript);
+        $this->assertStringContainsString('timer = window.setTimeout(() => goTo(activeIndex + 1), interval)', $javascript);
         $this->assertStringContainsString("event.key === 'ArrowLeft' || event.key === 'ArrowRight'", $javascript);
     }
 
@@ -474,7 +471,7 @@ class PublicMenuTest extends TestCase
 
         $homeResponse = $this->get('/')
             ->assertOk()
-            ->assertSee('data-home-preloader', false)
+            ->assertDontSee('data-home-preloader', false)
             ->assertSee('Reservar una mesa')
             ->assertSee(route('public.menu'), false)
             ->assertSee(route('public.hours'), false)
@@ -485,14 +482,14 @@ class PublicMenuTest extends TestCase
 
         $this->get(route('public.hours'))
             ->assertOk()
-            ->assertSee('data-home-preloader', false)
+            ->assertDontSee('data-home-preloader', false)
             ->assertSee('Semana completa')
             ->assertSee('Estado actual')
             ->assertSee('maps.app.goo.gl/cocina-de-barrio', false);
 
         $this->get(route('public.gallery'))
             ->assertOk()
-            ->assertSee('data-home-preloader', false)
+            ->assertDontSee('data-home-preloader', false)
             ->assertSee(Storage::url('business/banner.jpg'), false)
             ->assertSee(Storage::url('business/gallery/local.jpg'), false)
             ->assertSee('Terraza principal')
@@ -500,7 +497,7 @@ class PublicMenuTest extends TestCase
 
         $this->get(route('public.contact'))
             ->assertOk()
-            ->assertSee('data-home-preloader', false)
+            ->assertDontSee('data-home-preloader', false)
             ->assertSee(Storage::url('business/banner.jpg'), false)
             ->assertSee('5512345678')
             ->assertSee('maps.app.goo.gl/cocina-de-barrio', false)
@@ -545,7 +542,7 @@ class PublicMenuTest extends TestCase
         $hours[4] = ['key' => 'friday', 'label' => 'Viernes', 'enabled' => true, 'opens' => '18:00', 'closes' => '02:00'];
         $business->update(['business_hours' => $hours]);
 
-        $status = $business->openingStatus(Carbon::parse('2026-07-31 23:30:00'));
+        $status = $business->openingStatus(Carbon::parse('2026-07-31 23:30:00', 'America/Mexico_City'));
 
         $this->assertTrue($status['is_open']);
         $this->assertSame('Abierto ahora', $status['label']);

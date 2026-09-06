@@ -601,9 +601,6 @@ html.dark-style .pos-pickup-pay-modal .pos-payment-received.is-pending { backgro
 .pos-root select { touch-action: manipulation; }
 .pos-root :is(button, a, input, select):focus-visible { outline: 3px solid rgba(105, 86, 232, 0.28); outline-offset: 2px; }
 .pos-btn-block { width: 100%; justify-content: center; text-decoration: none; }
-.pos-ticket-modal { display: none; z-index: 1500; }
-.pos-ticket-modal.is-open { display: flex; }
-.pos-ticket-pane.is-hidden { display: none; }
 .pos-split-account { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding: 8px 10px; border: 1px solid var(--pos-border); border-radius: 8px; background: var(--pos-card); }
 .pos-split-account.is-paid { background: rgba(34, 197, 94, 0.06); }
 .pos-split-account__label { color: var(--pos-text); font-size: 0.82rem; font-weight: 600; }
@@ -773,9 +770,6 @@ html.dark-style .pos-draft-help {
 /* Reimpresión */
 .pos-reprint-panel { border-left: 1px solid var(--pos-border); background: #fff; box-shadow: -20px 0 60px rgba(31, 25, 62, 0.16); }
 .pos-reprint-header { min-height: 72px; padding: 17px 20px; background: linear-gradient(135deg, #fff, #faf9ff); }
-.pos-ticket-preview { width: min(920px, 100%); }
-.pos-ticket-preview iframe { border-radius: 12px; background: #f8f7fb; }
-
 @media (max-width: 767.98px) {
     .pos-root .pos-modal-wrap,
     .pos-modal-shell { align-items: flex-end; padding: 0; }
@@ -1327,10 +1321,207 @@ html.dark-style .pos-draft-help {
     resize: vertical;
 }
 
-.pos-delivery-reassign-form button {
+.pos-delivery-reassign-form > button {
     justify-self: end;
     min-width: 220px;
     justify-content: center;
+}
+
+.pos-delivery-action-picker,
+.pos-delivery-edit-form {
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid rgba(105, 86, 232, .25);
+    border-radius: 14px;
+    background: rgba(105, 86, 232, .045);
+}
+
+.pos-delivery-action-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.pos-delivery-action-grid > button {
+    min-width: 0;
+    padding: 13px;
+    border: 1px solid var(--pos-border);
+    border-radius: 13px;
+    color: var(--pos-text);
+    background: #fff;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 9px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.pos-delivery-action-grid > button:hover,
+.pos-delivery-action-grid > button:focus-visible {
+    border-color: var(--pos-accent);
+    background: #f4f1ff;
+}
+
+.pos-delivery-action-grid > button > span {
+    width: 38px;
+    height: 38px;
+    grid-row: 1 / 3;
+    border-radius: 11px;
+    color: var(--pos-accent);
+    background: #eeebff;
+    display: grid;
+    place-items: center;
+    font-size: 19px;
+}
+
+.pos-delivery-action-grid > button > strong,
+.pos-delivery-action-grid > button > small {
+    min-width: 0;
+    display: block;
+}
+
+.pos-delivery-action-grid > button > strong {
+    align-self: end;
+    font-size: .72rem;
+}
+
+.pos-delivery-action-grid > button > small {
+    align-self: start;
+    color: var(--pos-muted);
+    font-size: .62rem;
+    line-height: 1.35;
+}
+
+.pos-delivery-action-grid > button > i {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    color: var(--pos-accent);
+}
+
+.pos-delivery-workflow-heading {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pos-delivery-workflow-heading > button {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0;
+    border: 1px solid var(--pos-border);
+    border-radius: 11px;
+    color: var(--pos-accent);
+    background: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    font-size: 19px;
+}
+
+.pos-delivery-workflow-heading strong,
+.pos-delivery-workflow-heading small {
+    display: block;
+}
+
+.pos-delivery-workflow-heading strong {
+    color: var(--pos-text);
+    font-size: .78rem;
+}
+
+.pos-delivery-workflow-heading small {
+    margin-top: 2px;
+    color: var(--pos-muted);
+    font-size: .66rem;
+    line-height: 1.4;
+}
+
+.pos-delivery-edit-form {
+    display: grid;
+    gap: 12px;
+}
+
+.pos-delivery-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.pos-delivery-edit-form .co-field--full {
+    grid-column: 1 / -1;
+}
+
+.pos-delivery-edit-form > .pos-btn {
+    justify-self: end;
+    min-width: 190px;
+    justify-content: center;
+}
+
+.pos-delivery-edit-payments {
+    display: grid;
+    gap: 9px;
+}
+
+.pos-delivery-edit-payments__heading strong,
+.pos-delivery-edit-payments__heading small {
+    display: block;
+}
+
+.pos-delivery-edit-payments__heading strong {
+    color: var(--pos-text);
+    font-size: .73rem;
+}
+
+.pos-delivery-edit-payments__heading small {
+    margin-top: 2px;
+    color: var(--pos-muted);
+    font-size: .64rem;
+}
+
+.pos-delivery-edit-payments article {
+    padding: 11px;
+    border: 1px solid var(--pos-border);
+    border-radius: 12px;
+    background: #fff;
+    display: grid;
+    grid-template-columns: minmax(110px, .65fr) repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 9px;
+}
+
+.pos-delivery-edit-payments article > div:first-child {
+    align-self: center;
+}
+
+.pos-delivery-edit-payments article > div:first-child span,
+.pos-delivery-edit-payments article > div:first-child strong {
+    display: block;
+}
+
+.pos-delivery-edit-payments article > div:first-child span {
+    color: var(--pos-muted);
+    font-size: .62rem;
+}
+
+.pos-delivery-edit-payments article > div:first-child strong {
+    margin-top: 3px;
+    color: var(--pos-text);
+    font-size: .8rem;
+}
+
+.pos-delivery-edit-guardrail {
+    padding: 10px 11px;
+    border-radius: 11px;
+    color: #287157;
+    background: #eaf8f1;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .65rem;
+    line-height: 1.4;
 }
 
 .pos-delivery-field-error {
@@ -1449,7 +1640,10 @@ html.dark-style .pos-delivery-dispatch-header > button {
 html.dark-style .pos-delivery-dispatch-search input,
 html.dark-style .pos-delivery-driver-order,
 html.dark-style .pos-delivery-reassign-form select,
-html.dark-style .pos-delivery-reassign-form textarea {
+html.dark-style .pos-delivery-reassign-form textarea,
+html.dark-style .pos-delivery-action-grid > button,
+html.dark-style .pos-delivery-workflow-heading > button,
+html.dark-style .pos-delivery-edit-payments article {
     color: #f2f4f7;
     border-color: var(--pos-border);
     background: #2c313c;
@@ -1463,7 +1657,9 @@ html.dark-style .pos-delivery-driver-order.is-selected {
 
 html.dark-style .pos-delivery-dispatch-facts > div,
 html.dark-style .pos-delivery-destination,
-html.dark-style .pos-delivery-reassign-form {
+html.dark-style .pos-delivery-reassign-form,
+html.dark-style .pos-delivery-action-picker,
+html.dark-style .pos-delivery-edit-form {
     background: #242832;
 }
 
@@ -1507,7 +1703,10 @@ html.dark-style .pos-delivery-reassign-form {
     }
 
     .pos-delivery-dispatch-facts,
-    .pos-delivery-reassign-form {
+    .pos-delivery-reassign-form,
+    .pos-delivery-action-grid,
+    .pos-delivery-edit-grid,
+    .pos-delivery-edit-payments article {
         grid-template-columns: 1fr;
     }
 
@@ -1517,7 +1716,21 @@ html.dark-style .pos-delivery-reassign-form {
         grid-column: auto;
     }
 
-    .pos-delivery-reassign-form button {
+    .pos-delivery-reassign-form > button {
+        width: 100%;
+        min-width: 0;
+        justify-self: stretch;
+    }
+
+    .pos-delivery-action-grid > button {
+        grid-template-columns: 38px minmax(0, 1fr) 18px;
+    }
+
+    .pos-delivery-edit-form .co-field--full {
+        grid-column: auto;
+    }
+
+    .pos-delivery-edit-form > .pos-btn {
         width: 100%;
         min-width: 0;
         justify-self: stretch;

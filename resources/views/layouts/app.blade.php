@@ -65,6 +65,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/role-permissions.css') }}?v={{ filemtime(public_path('assets/css/role-permissions.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/developer-console.css') }}?v={{ filemtime(public_path('assets/css/developer-console.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/ticket-preview-modal.css') }}?v={{ filemtime(public_path('assets/css/ticket-preview-modal.css')) }}" />
 
     @stack('styles')
     {{-- Modo oscuro pausado temporalmente.
@@ -74,6 +75,7 @@
     <!-- Helpers -->
     <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
     <script src="{{ asset('assets/js/config.js') }}"></script>
+    <script src="{{ asset('assets/js/ticket-preview-modal.js') }}?v={{ filemtime(public_path('assets/js/ticket-preview-modal.js')) }}"></script>
 
     @livewireStyles
 </head>

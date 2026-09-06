@@ -41,11 +41,7 @@
         <div class="menu-cover__overlay"></div>
         <div class="menu-container menu-cover__topbar">
             <div class="menu-cover__top-actions">
-                <a class="menu-status menu-status--{{ $openingStatus['is_open'] ? 'open' : 'closed' }}"
-                    href="{{ route('public.hours') }}">
-                    <span aria-hidden="true"></span>
-                    <span><strong>{{ $openingStatus['label'] }}</strong><small>{{ $openingStatus['detail'] }}</small></span>
-                </a>
+                <x-public-menu.opening-status :status="$openingStatus" />
                 <a class="menu-system-link" href="{{ route('login') }}" aria-label="Acceso al sistema">
                     <i class="bx bx-user" aria-hidden="true"></i>
                 </a>

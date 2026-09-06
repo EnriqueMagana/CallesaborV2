@@ -84,7 +84,7 @@ class BusinessSetting extends Model
 
     public function openingStatus(?CarbonInterface $moment = null): array
     {
-        $now = $moment?->copy() ?? now();
+        $now = $this->businessMoment($moment);
         $hours = collect($this->weeklySchedule($now))->keyBy('key');
 
         for ($offset = -1; $offset <= 7; $offset++) {
@@ -102,7 +102,7 @@ class BusinessSetting extends Model
                 $closes->addDay();
             }
 
-            if ($now->betweenIncluded($opens, $closes)) {
+            if ($now->greaterThanOrEqualTo($opens) && $now->lessThan($closes)) {
                 return [
                     'is_open' => true,
                     'label' => 'Abierto ahora',
@@ -118,7 +118,7 @@ class BusinessSetting extends Model
                 return [
                     'is_open' => false,
                     'label' => 'Cerrado ahora',
-                    'detail' => ($opens->isToday() ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('H:i'),
+                    'detail' => ($opens->isSameDay($now) ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('H:i'),
                     'opens_at' => $opens->format('H:i'),
                     'closes_at' => $closes->format('H:i'),
                     'day_label' => $day['label'],
@@ -143,7 +143,7 @@ class BusinessSetting extends Model
      */
     public function weeklySchedule(?CarbonInterface $moment = null): array
     {
-        $todayKey = strtolower(($moment?->copy() ?? now())->englishDayOfWeek);
+        $todayKey = strtolower($this->businessMoment($moment)->englishDayOfWeek);
         $configured = collect($this->business_hours ?: self::DEFAULT_HOURS)->keyBy('key');
 
         return collect(self::DEFAULT_HOURS)
@@ -162,9 +162,13 @@ class BusinessSetting extends Model
 
     public function reservationSlots(CarbonInterface|string $date, int $intervalMinutes = 30): array
     {
-        $target = $date instanceof CarbonInterface ? $date->copy()->startOfDay() : Carbon::parse($date)->startOfDay();
+        $timezone = $this->businessTimezone();
+        $now = now($timezone);
+        $target = $date instanceof CarbonInterface
+            ? $date->copy()->setTimezone($timezone)->startOfDay()
+            : Carbon::parse($date, $timezone)->startOfDay();
 
-        if ($target->isBefore(now()->startOfDay()) || $target->isAfter(now()->addDays(90)->endOfDay())) {
+        if ($target->isBefore($now->copy()->startOfDay()) || $target->isAfter($now->copy()->addDays(90)->endOfDay())) {
             return [];
         }
 
@@ -186,7 +190,7 @@ class BusinessSetting extends Model
             }
 
             for ($slot = $opens->copy(); $slot->lessThan($closes); $slot->addMinutes($intervalMinutes)) {
-                if ($slot->isSameDay($target) && $slot->greaterThanOrEqualTo(now()->addMinutes(30))) {
+                if ($slot->isSameDay($target) && $slot->greaterThanOrEqualTo($now->copy()->addMinutes(30))) {
                     $slots->push($slot->format('H:i'));
                 }
             }
@@ -197,6 +201,20 @@ class BusinessSetting extends Model
 
     public function acceptsReservationAt(CarbonInterface $moment): bool
     {
-        return in_array($moment->format('H:i'), $this->reservationSlots($moment), true);
+        $businessMoment = $this->businessMoment($moment);
+
+        return in_array($businessMoment->format('H:i'), $this->reservationSlots($businessMoment), true);
+    }
+
+    private function businessMoment(?CarbonInterface $moment = null): CarbonInterface
+    {
+        return $moment
+            ? $moment->copy()->setTimezone($this->businessTimezone())
+            : now($this->businessTimezone());
+    }
+
+    private function businessTimezone(): string
+    {
+        return (string) config('app.business_timezone', 'America/Mexico_City');
     }
 }
