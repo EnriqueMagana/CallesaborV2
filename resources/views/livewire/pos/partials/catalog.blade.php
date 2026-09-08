@@ -105,7 +105,8 @@
                               @if($promotionImage) x-data="posProductImage"
                               :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
                             @if($promotionImage)
-                                <img x-ref="image" data-src="{{ Storage::url($promotionImage) }}" alt="{{ $promotion->name }}" width="320" height="216" decoding="async">
+                                <img x-ref="image" src="{{ Storage::url($promotionImage) }}" data-src="{{ Storage::url($promotionImage) }}"
+                                     alt="" width="320" height="216" loading="lazy" decoding="async">
                                 <i class="bx bx-purchase-tag-alt no-img pos-product-image-fallback" x-show="state === 'error'" x-cloak aria-hidden="true"></i>
                             @else
                                 <i class="bx bx-purchase-tag-alt no-img" aria-hidden="true"></i>
@@ -148,8 +149,8 @@
                          @if($product->image) x-data="posProductImage"
                          :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
                         @if($product->image)
-                            <img x-ref="image" data-src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
-                                 width="320" height="216" decoding="async">
+                            <img x-ref="image" src="{{ Storage::url($product->image) }}" data-src="{{ Storage::url($product->image) }}"
+                                 alt="" width="320" height="216" loading="lazy" decoding="async">
                             <i class="bx bx-dish no-img pos-product-image-fallback" x-show="state === 'error'" x-cloak aria-hidden="true"></i>
                         @else
                             <i class="bx bx-dish no-img" aria-hidden="true"></i>
@@ -187,8 +188,8 @@
                      @if($product->image) x-data="posProductImage"
                      :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
                     @if($product->image)
-                        <img x-ref="image" data-src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
-                             width="320" height="216" decoding="async">
+                        <img x-ref="image" src="{{ Storage::url($product->image) }}" data-src="{{ Storage::url($product->image) }}"
+                             alt="" width="320" height="216" loading="lazy" decoding="async">
                         <i class="bx bx-dish no-img pos-product-image-fallback" x-show="state === 'error'" x-cloak aria-hidden="true"></i>
                     @else
                         <i class="bx bx-dish no-img" aria-hidden="true"></i>
