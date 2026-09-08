@@ -241,6 +241,7 @@
 .delivery-reconciliation__history td>span:not(:first-child),.delivery-reconciliation__history time { padding-left:8px; border-left:1px solid var(--app-border); font-size:.66rem; }
 .delivery-reconciliation__history .is-exact { color:var(--app-success); font-weight:750; }
 .delivery-reconciliation__history .is-difference { color:var(--app-danger); font-weight:750; }
+.delivery-reconciliation__mobile-list { display:none; }
 .delivery-settlement-help { margin:7px 0 0; color:var(--app-muted); font-size:.68rem; line-height:1.45; }
 .delivery-settlement-modal>header>span { color:#266da8; background:#e9f4ff; }
 .delivery-settlement-modal>header small { color:#266da8; }
@@ -268,6 +269,25 @@
     .delivery-reconciliation__warning { white-space:normal; }
     .delivery-reconciliation__notice { align-items:flex-start; flex-wrap:wrap; padding:13px 17px; }
     .delivery-reconciliation__notice a { width:100%; justify-content:center; border-top:1px solid #f0d997; }
+    .delivery-reconciliation > .table-responsive { display:none; }
+    .delivery-reconciliation__mobile-list { display:grid; gap:12px; padding:12px; }
+    .delivery-driver-card { min-width:0; overflow:hidden; padding:16px; border:1px solid var(--app-border); border-radius:16px; background:var(--app-surface); }
+    .delivery-driver-card__header { padding-bottom:14px; border-bottom:1px solid var(--app-border); }
+    .delivery-driver-card__header .delivery-reconciliation__driver { width:100%; min-width:0; }
+    .delivery-driver-card__header .delivery-reconciliation__driver strong { min-width:0; overflow-wrap:anywhere; }
+    .delivery-driver-card__metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 20px; margin:0; padding:18px 0; }
+    .delivery-driver-card__metrics > div { min-width:0; }
+    .delivery-driver-card__metrics dt { margin:0; color:var(--app-muted); font-size:.62rem; font-weight:800; letter-spacing:.035em; line-height:1.35; text-transform:uppercase; }
+    .delivery-driver-card__metrics dd { margin:6px 0 0; color:var(--app-ink); font-size:.88rem; font-weight:650; line-height:1.35; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .delivery-driver-card__metrics .is-cash dd { color:var(--app-success); font-weight:800; }
+    .delivery-driver-card__action { padding-top:14px; border-top:1px solid var(--app-border); }
+    .delivery-driver-card__action > :is(.btn,.app-status) { width:100%; min-height:48px; justify-content:center; }
+    .delivery-driver-card__history { display:grid; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid var(--app-border); }
+    .delivery-driver-card__history > div { display:grid; gap:3px; padding:10px; border-radius:11px; background:var(--app-surface-soft,#f8fafc); }
+    .delivery-driver-card__history strong { color:var(--app-success); font-size:.71rem; }
+    .delivery-driver-card__history span { color:var(--app-muted); font-size:.67rem; line-height:1.4; }
+    .delivery-driver-card__history .is-exact { color:var(--app-success); font-weight:750; }
+    .delivery-driver-card__history .is-difference { color:var(--app-danger); font-weight:750; }
     .cash-cut-delivery-blockers>header { align-items:flex-start; flex-direction:column; }
     .cash-cut-delivery-blockers>header a { width:100%; justify-content:center; }
     .cash-cut-delivery-blockers__list { grid-template-columns:1fr; }

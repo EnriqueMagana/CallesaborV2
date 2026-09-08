@@ -54,7 +54,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/cash-cut.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}" />
-    <link rel="stylesheet" href="{{ asset('assets/css/sales-history.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/sales-history.css') }}?v={{ filemtime(public_path('assets/css/sales-history.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/business-settings.css') }}?v={{ filemtime(public_path('assets/css/business-settings.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/delivery.css') }}?v={{ filemtime(public_path('assets/css/delivery.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/inventory.css') }}?v={{ filemtime(public_path('assets/css/inventory.css')) }}" />
@@ -164,6 +164,7 @@
     @vite('resources/js/app.js')
 
     <script src="{{ asset('assets/js/dashboard.js') }}?v={{ filemtime(public_path('assets/js/dashboard.js')) }}" data-navigate-once></script>
+    <script src="{{ asset('assets/js/sales-history.js') }}?v={{ filemtime(public_path('assets/js/sales-history.js')) }}" data-navigate-once></script>
     <script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>
 
     @stack('scripts')

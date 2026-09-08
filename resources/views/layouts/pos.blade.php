@@ -78,6 +78,71 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <script src="{{ asset('assets/vendor/libs/popper/popper.js') }}"></script>
 <script src="{{ asset('assets/vendor/js/bootstrap.js') }}"></script>
 
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('posProductImage', () => ({
+        state: 'waiting',
+        observer: null,
+        image: null,
+        init() {
+            this.image = this.$refs.image;
+            if (!this.image) return;
+
+            const requestImage = () => {
+                if (this.state !== 'waiting') return;
+
+                this.state = 'loading';
+                this.observer?.disconnect();
+                this.observer = null;
+                this.image.addEventListener('load', () => this.reveal(), { once: true });
+                this.image.addEventListener('error', () => this.fail(), { once: true });
+                this.image.src = this.image.dataset.src;
+
+                if (this.image.complete) {
+                    this.image.naturalWidth > 0 ? this.reveal() : this.fail();
+                }
+            };
+
+            if (!('IntersectionObserver' in window)) {
+                requestImage();
+                return;
+            }
+
+            this.observer = new IntersectionObserver((entries) => {
+                if (entries.some(entry => entry.isIntersecting)) requestImage();
+            }, {
+                root: this.$el.closest('.catalog-grid'),
+                rootMargin: '320px 0px',
+                threshold: 0.01,
+            });
+            this.observer.observe(this.$el);
+        },
+        async reveal() {
+            if (!this.image || this.state === 'decoding' || this.state === 'ready') return;
+
+            this.state = 'decoding';
+
+            try {
+                if (typeof this.image.decode === 'function') await this.image.decode();
+                requestAnimationFrame(() => { this.state = 'ready'; });
+            } catch (error) {
+                this.image.naturalWidth > 0
+                    ? requestAnimationFrame(() => { this.state = 'ready'; })
+                    : this.fail();
+            }
+        },
+        fail() {
+            this.state = 'error';
+            this.observer?.disconnect();
+            this.observer = null;
+        },
+        destroy() {
+            this.observer?.disconnect();
+        },
+    }));
+});
+</script>
+
 @livewireScripts
 @vite('resources/js/app.js')
 <script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>

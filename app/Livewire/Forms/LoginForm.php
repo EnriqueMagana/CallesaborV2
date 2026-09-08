@@ -14,10 +14,12 @@ use Livewire\Form;
 
 class LoginForm extends Form
 {
-    #[Validate('required|string|email')]
+    private const AUTHENTICATION_TIMEBOX_MICROSECONDS = 200_000;
+
+    #[Validate('required|string|email:rfc|max:254')]
     public string $email = '';
 
-    #[Validate('required|string')]
+    #[Validate('required|string|max:1024')]
     public string $password = '';
 
     #[Validate('boolean')]
@@ -67,27 +69,36 @@ class LoginForm extends Form
         $this->ensureIsNotRateLimited();
 
         $guard = Auth::guard('web');
-        $user = $guard->getProvider()->retrieveByCredentials(['email' => $this->email]);
 
-        if (! $user || ! $guard->getProvider()->validateCredentials($user, ['password' => $this->password])) {
-            RateLimiter::hit($this->throttleKey());
+        return $guard->getTimebox()->call(function ($timebox) use ($guard) {
+            $user = $guard->getProvider()->retrieveByCredentials(['email' => $this->email]);
 
-            throw ValidationException::withMessages([
-                'form.email' => trans('auth.failed'),
-            ]);
-        }
+            if (! $user || ! $guard->getProvider()->validateCredentials($user, ['password' => $this->password])) {
+                $this->rejectCredentials();
+            }
 
-        if ($user->isBanned()) {
-            RateLimiter::hit($this->throttleKey());
+            if ($user->isBanned()) {
+                RateLimiter::hit($this->throttleKey());
 
-            throw ValidationException::withMessages([
-                'form.email' => 'Tu cuenta está bloqueada. Contacta al administrador del negocio.',
-            ]);
-        }
+                throw ValidationException::withMessages([
+                    'form.email' => 'Tu cuenta está bloqueada. Contacta al administrador del negocio.',
+                ]);
+            }
 
-        RateLimiter::clear($this->throttleKey());
+            RateLimiter::clear($this->throttleKey());
+            $timebox->returnEarly();
 
-        return $user;
+            return $user;
+        }, self::AUTHENTICATION_TIMEBOX_MICROSECONDS);
+    }
+
+    private function rejectCredentials(): never
+    {
+        RateLimiter::hit($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'form.email' => trans('auth.failed'),
+        ]);
     }
 
     /**

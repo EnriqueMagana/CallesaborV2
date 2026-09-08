@@ -2110,36 +2110,102 @@ progress {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+@media (max-width: 767.98px) {
 
-@media (max-width: 575.98px) {
-  .table-responsive-sm {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+    .table-responsive {
+        overflow: visible;
+    }
+
+    .table-responsive table {
+        display: block;
+        width: 100%;
+    }
+
+    .table-responsive thead {
+        display: none;
+    }
+
+    .table-responsive tbody {
+        display: grid;
+        gap: 12px;
+    }
+
+    .table-responsive tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+
+        padding: 14px;
+
+        border: 1px solid var(--app-border);
+        border-radius: 16px;
+        background: #fff;
+    }
+
+    .table-responsive tbody td {
+        display: block;
+        min-width: 0;
+
+        padding: 10px 8px;
+        border: 0;
+
+        text-align: left;
+    }
+
+    /* Primer dato: repartidor */
+    .table-responsive tbody td:first-child {
+        grid-column: 1 / -1;
+
+        padding: 0 0 14px;
+        margin-bottom: 4px;
+
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    /* Último dato: estado */
+    .table-responsive tbody td:last-child {
+        grid-column: 1 / -1;
+
+        display: flex;
+        justify-content: center;
+
+        padding: 12px 0 0;
+        margin-top: 4px;
+
+        border-top: 1px solid var(--app-border);
+    }
+
+    /* Labels móviles */
+    .table-responsive tbody td::before {
+        content: attr(data-label);
+
+        display: block;
+        margin-bottom: 4px;
+
+        color: var(--app-muted);
+        font-size: .62rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    /* No mostrar label en usuario y estado */
+    .table-responsive tbody td:first-child::before,
+    .table-responsive tbody td:last-child::before {
+        display: none;
+    }
 }
 @media (max-width: 767.98px) {
-  .table-responsive-md {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-@media (max-width: 991.98px) {
-  .table-responsive-lg {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-@media (max-width: 1199.98px) {
-  .table-responsive-xl {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-@media (max-width: 1399.98px) {
-  .table-responsive-xxl {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+
+    .table-responsive tbody tr {
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    .table-responsive tbody td {
+        height: auto !important;
+        min-height: 0 !important;
+    }
 }
 .form-label {
   margin-bottom: 0.5rem;

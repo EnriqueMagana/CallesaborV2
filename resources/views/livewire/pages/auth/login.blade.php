@@ -59,8 +59,8 @@ new #[Layout('layouts.guest')] class extends Component {
 
 <div class="auth-login" x-data="{ showPassword: false }">
     <header class="auth-login__header">
-        <h2>¡Qué gusto verte!</h2>
-        <p>Usa las credenciales asignadas a tu cuenta para entrar al espacio de trabajo.</p>
+        <h1>Iniciar sesión</h1>
+        <p>Ingresa tus datos para acceder al panel.</p>
     </header>
 
     @if (session('auth_warning'))
@@ -82,7 +82,7 @@ new #[Layout('layouts.guest')] class extends Component {
                 <i class="bx bx-envelope" aria-hidden="true"></i>
                 <input wire:model.blur="form.email" id="email" type="email" name="email" required autofocus
                     autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="nombre@callesabor.com"
-                    aria-describedby="email-help email-error">
+                    aria-describedby="email-help email-error" aria-invalid="{{ $errors->has('form.email') ? 'true' : 'false' }}">
             </div>
             <small id="email-help" class="auth-field__help">Usa el correo asignado por el administrador.</small>
             @error('form.email')
@@ -92,12 +92,17 @@ new #[Layout('layouts.guest')] class extends Component {
         </div>
 
         <div class="auth-field {{ $errors->has('form.password') ? 'has-error' : '' }}">
-            <label for="password">Contraseña</label>
+            <div class="auth-field__label-row">
+                <label for="password">Contraseña</label>
+                @if (Route::has('password.request'))
+                    <a href="{{ route('password.request') }}" wire:navigate>¿Olvidaste tu contraseña?</a>
+                @endif
+            </div>
             <div class="auth-input-wrap">
                 <i class="bx bx-lock-alt" aria-hidden="true"></i>
                 <input wire:model="form.password" id="password" x-bind:type="showPassword ? 'text' : 'password'"
                     name="password" required autocomplete="current-password" placeholder="Ingresa tu contraseña"
-                    aria-describedby="password-error">
+                    aria-describedby="password-error" aria-invalid="{{ $errors->has('form.password') ? 'true' : 'false' }}">
                 <button type="button" class="auth-password-toggle" x-on:click="showPassword = !showPassword"
                     x-bind:aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
                     x-bind:aria-pressed="showPassword">
@@ -113,7 +118,7 @@ new #[Layout('layouts.guest')] class extends Component {
         <label class="auth-remember" for="remember">
             <input wire:model="form.remember" id="remember" type="checkbox" name="remember">
             <span aria-hidden="true"><i class="bx bx-check"></i></span>
-            <span>Mantener mi sesión iniciada en este dispositivo</span>
+            <span>Mantener la sesión en este dispositivo</span>
         </label>
 
         <button type="submit" class="auth-submit" wire:loading.attr="disabled" wire:target="login">
@@ -123,25 +128,6 @@ new #[Layout('layouts.guest')] class extends Component {
                 Verificando acceso…</span>
         </button>
     </form>
-
-    @if (Route::has('password.request'))
-        <aside class="auth-recovery" aria-labelledby="auth-recovery-title">
-            <span class="auth-recovery__icon"><i class="bx bx-key" aria-hidden="true"></i></span>
-            <div>
-                <strong id="auth-recovery-title">¿No puedes acceder?</strong>
-                <span>Recibe por correo un enlace seguro para crear una nueva contraseña.</span>
-            </div>
-            <a href="{{ route('password.request') }}" wire:navigate>Recuperar contraseña</a>
-        </aside>
-    @endif
-
-    <div class="auth-security-note">
-        <i class="bx bx-rocket" aria-hidden="true"></i>
-        <p>
-            <strong>Tu negocio, todo en un solo lugar.</strong>
-            <span>Gestiona tus operaciones de forma rápida, simple y organizada.</span>
-        </p>
-    </div>
 
     @if ($showSessionConfirmation)
         <div class="auth-session-modal" role="presentation">

@@ -163,6 +163,38 @@ class DiscountModuleTest extends TestCase
         ]);
     }
 
+    public function test_discount_deletion_uses_the_shared_confirmation_modal(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo(['ver descuentos', 'eliminar descuentos']);
+        $discount = Discount::create([
+            'name' => 'Descuento por confirmar',
+            'value_type' => 'percentage',
+            'value' => 15,
+            'scope' => 'order',
+            'audience' => 'everyone',
+            'fulfillment_modes' => ['takeaway'],
+            'is_active' => true,
+            'auto_apply' => true,
+        ]);
+
+        $component = Livewire::actingAs($user)->test(DiscountManager::class)
+            ->call('confirmDelete', $discount->id)
+            ->assertDispatched('open-confirm');
+
+        $this->assertDatabaseHas('discounts', ['id' => $discount->id]);
+
+        $component
+            ->dispatch('modal-confirmed', action: 'delete-discount', params: ['id' => $discount->id])
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseMissing('discounts', ['id' => $discount->id]);
+
+        $view = file_get_contents(resource_path('views/livewire/admin/discount-manager.blade.php'));
+        $this->assertStringContainsString('wire:click="confirmDelete(', $view);
+        $this->assertStringNotContainsString('wire:confirm', $view);
+    }
+
     public function test_editor_is_rendered_above_its_backdrop_and_uses_available_icons(): void
     {
         $user = User::factory()->create();

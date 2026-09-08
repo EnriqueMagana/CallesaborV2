@@ -1636,10 +1636,6 @@
                                     </div>
                                 @endif
 
-                                <div class="mesa-print-section__notice">
-                                    <i class="bx bx-shield-quarter"></i>
-                                    <span>Los tickets pertenecen exclusivamente al servicio activo y abrir una vista previa no cambia el estado de la mesa.</span>
-                                </div>
                             </section>
                         </div>
                     @endif

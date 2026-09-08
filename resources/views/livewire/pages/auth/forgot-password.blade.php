@@ -13,7 +13,7 @@ new #[Layout('layouts.guest')] class extends Component {
     public function sendPasswordResetLink(): void
     {
         $this->validate([
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'email:rfc', 'max:254'],
         ]);
 
         // Enviamos el enlace para restablecer la contraseña al usuario.
