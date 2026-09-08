@@ -9,6 +9,7 @@ use App\Services\SingleSessionManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use Tests\TestCase;
@@ -37,21 +38,19 @@ class AuthenticationTest extends TestCase
             ->assertSee('Una cuenta, un navegador activo.');
     }
 
-    public function test_password_recovery_icon_keeps_its_centered_layout(): void
+    public function test_login_keeps_password_recovery_visible_without_extra_visual_noise(): void
     {
         $response = $this->get('/login');
         $css = file_get_contents(public_path('assets/css/login.css'));
 
         $response
             ->assertOk()
-            ->assertSee('class="auth-recovery__icon"', false)
-            ->assertSee('bx bx-key', false);
+            ->assertSee('¿Olvidaste tu contraseña?')
+            ->assertSee('aria-invalid=', false)
+            ->assertDontSee('auth-recovery__icon', false)
+            ->assertDontSee('auth-security-note', false);
 
-        $this->assertStringContainsString('.auth-recovery__icon { display: grid;', $css);
-        $this->assertStringContainsString('place-items: center;', $css);
-        $this->assertStringContainsString('.auth-recovery__icon i { display: grid;', $css);
-        $this->assertStringContainsString('.auth-recovery > div strong,.auth-recovery > div span { display: block; }', $css);
-        $this->assertStringNotContainsString('.auth-recovery strong,.auth-recovery span { display: block; }', $css);
+        $this->assertStringContainsString('.auth-field__label-row a { display: inline-flex; min-height: 44px;', $css);
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void
@@ -278,6 +277,73 @@ class AuthenticationTest extends TestCase
             ->assertNoRedirect();
 
         $this->assertGuest();
+    }
+
+    public function test_sql_injection_payloads_cannot_bypass_login(): void
+    {
+        User::factory()->create([
+            'email' => 'admin@example.com',
+            'password' => bcrypt('correct-password'),
+        ]);
+
+        foreach ([
+            "admin@example.com' OR 1=1 --",
+            "' OR '1'='1",
+            'admin@example.com',
+        ] as $index => $email) {
+            $component = Volt::test('pages.auth.login')
+                ->set('form.email', $email)
+                ->set('form.password', $index === 2 ? "' OR '1'='1" : 'anything')
+                ->call('login');
+
+            $component->assertHasErrors()->assertNoRedirect();
+            $this->assertGuest();
+        }
+    }
+
+    public function test_unknown_accounts_use_the_same_failed_login_timebox(): void
+    {
+        $source = file_get_contents(app_path('Livewire/Forms/LoginForm.php'));
+
+        $this->assertStringContainsString('AUTHENTICATION_TIMEBOX_MICROSECONDS = 200_000', $source);
+        $this->assertStringContainsString('$guard->getTimebox()->call', $source);
+
+        Volt::test('pages.auth.login')
+            ->set('form.email', 'unknown@example.com')
+            ->set('form.password', 'wrong-password')
+            ->call('login')
+            ->assertHasErrors('form.email')
+            ->assertNoRedirect();
+
+        $this->assertGuest();
+    }
+
+    public function test_login_rejects_oversized_credentials_before_querying_authentication(): void
+    {
+        Volt::test('pages.auth.login')
+            ->set('form.email', str_repeat('a', 255).'@example.com')
+            ->set('form.password', str_repeat('x', 1025))
+            ->call('login')
+            ->assertHasErrors(['form.email', 'form.password'])
+            ->assertNoRedirect();
+
+        $this->assertGuest();
+    }
+
+    public function test_login_and_parallel_fortify_route_have_named_rate_limits(): void
+    {
+        $this->assertNotNull(RateLimiter::limiter('login'));
+        $this->assertNotNull(RateLimiter::limiter('two-factor'));
+    }
+
+    public function test_login_responses_include_browser_security_headers(): void
+    {
+        $this->get('/login')
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'DENY')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
     }
 
     public function test_navigation_menu_can_be_rendered(): void

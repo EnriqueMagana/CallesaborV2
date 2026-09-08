@@ -65,9 +65,17 @@
             </div>
         </div>
 
-        <div wire:loading.class="mo-loading" class="mo-products-wrap">
-            <div wire:loading class="mo-loading-overlay">
-                <div class="spinner-border spinner-border-sm text-primary"></div>
+        <div wire:loading.class="mo-loading"
+             wire:target="search,categoryFilter,openPromotionModal"
+             class="mo-products-wrap">
+            <div wire:loading.flex
+                 wire:target="search,categoryFilter,openPromotionModal"
+                 class="mo-loading-overlay"
+                 role="status"
+                 aria-live="polite"
+                 aria-label="Actualizando el catálogo">
+                <div class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></div>
+                <span class="visually-hidden">Actualizando el catálogo…</span>
             </div>
 
             @if($this->activePromotions->isNotEmpty())
@@ -118,9 +126,62 @@
     </div>
 
     @if($showPromotionModal && $this->customizingPromotion)
-        @php $promotion = $this->customizingPromotion; @endphp
+        @php
+            $promotion = $this->customizingPromotion;
+            $promotionSelectionComplete = $promotion->groups->every(function ($group) use ($promotionSelections) {
+                $selectedCount = (int) collect($promotionSelections[$group->id] ?? [])->sum();
+
+                return $selectedCount >= $group->min_selections
+                    && $selectedCount <= $group->max_selections;
+            });
+        @endphp
         <div class="mo-promotion-backdrop" wire:click="closePromotionModal"></div>
-        <div class="mo-promotion-wrap" role="dialog" aria-modal="true" aria-labelledby="mo-promotion-title"><section class="mo-promotion-modal"><header><div><small>Promoción para comedor</small><h2 id="mo-promotion-title">{{ $promotion->name }}</h2><p>{{ $promotion->short_description }}</p></div><strong>${{ number_format($promotion->price,2) }}</strong><button type="button" wire:click="closePromotionModal" aria-label="Cerrar"><i class="bx bx-x"></i></button></header><div class="mo-promotion-body"><div class="mo-promotion-terms"><span><i class="bx bx-restaurant"></i>{{ $promotion->fulfillmentSummary() }}</span>@if($promotion->terms_and_conditions)<p><i class="bx bx-info-circle"></i>{{ $promotion->terms_and_conditions }}</p>@endif</div>@foreach($promotion->groups as $group)@php $selectedCount=collect($promotionSelections[$group->id]??[])->sum(); @endphp<fieldset><legend><span><strong>{{ $group->name }}</strong><small>Elige de {{ $group->min_selections }} a {{ $group->max_selections }}</small></span><b>{{ $selectedCount }}/{{ $group->max_selections }}</b></legend><div>@foreach($group->products as $product)@php $selectedQuantity=(int)($promotionSelections[$group->id][$product->id]??0); @endphp<article class="{{ $selectedQuantity?'is-selected':'' }}">@if($product->image)<img src="{{ Storage::url($product->image) }}" alt="" width="64" height="64">@else<span><i class="bx bx-dish"></i></span>@endif<strong>{{ $product->name }}</strong><div><button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},-1)" @disabled(!$selectedQuantity)><i class="bx bx-minus"></i></button><b>{{ $selectedQuantity }}</b><button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},1)" @disabled($selectedCount >= $group->max_selections)><i class="bx bx-plus"></i></button></div></article>@endforeach</div></fieldset>@endforeach @error('promotion')<p class="mo-promotion-error">{{ $message }}</p>@enderror</div><footer><label>Cantidad <input type="number" wire:model="promotionQuantity" min="1" max="99"></label><div><button type="button" wire:click="closePromotionModal">Cancelar</button><button type="button" class="is-primary" wire:click="addPromotionToCart">Agregar promoción</button></div></footer></section></div>
+        <div class="mo-promotion-wrap" role="dialog" aria-modal="true" aria-labelledby="mo-promotion-title">
+            <section class="mo-promotion-modal">
+                <header>
+                    <div><small>Promoción para comedor</small><h2 id="mo-promotion-title">{{ $promotion->name }}</h2><p>{{ $promotion->short_description }}</p></div>
+                    <strong>${{ number_format($promotion->price, 2) }}</strong>
+                    <button type="button" wire:click="closePromotionModal" aria-label="Cerrar"><i class="bx bx-x" aria-hidden="true"></i></button>
+                </header>
+                <div class="mo-promotion-body">
+                    <div class="mo-promotion-terms">
+                        <span><i class="bx bx-restaurant" aria-hidden="true"></i>{{ $promotion->fulfillmentSummary() }}</span>
+                        @if($promotion->terms_and_conditions)<p><i class="bx bx-info-circle" aria-hidden="true"></i>{{ $promotion->terms_and_conditions }}</p>@endif
+                    </div>
+                    @foreach($promotion->groups as $group)
+                        @php $selectedCount = (int) collect($promotionSelections[$group->id] ?? [])->sum(); @endphp
+                        <fieldset>
+                            <legend><span><strong>{{ $group->name }}</strong><small>Elige de {{ $group->min_selections }} a {{ $group->max_selections }}</small></span><b aria-live="polite">{{ $selectedCount }}/{{ $group->max_selections }}</b></legend>
+                            <div>
+                                @foreach($group->products as $product)
+                                    @php $selectedQuantity = (int) ($promotionSelections[$group->id][$product->id] ?? 0); @endphp
+                                    <article class="{{ $selectedQuantity ? 'is-selected' : '' }}">
+                                        @if($product->image)<img src="{{ Storage::url($product->image) }}" alt="" width="64" height="64">@else<span><i class="bx bx-dish" aria-hidden="true"></i></span>@endif
+                                        <strong>{{ $product->name }}</strong>
+                                        <div>
+                                            <button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},-1)" wire:loading.attr="disabled" wire:target="changePromotionSelection" aria-label="Quitar {{ $product->name }}" @disabled(!$selectedQuantity)><i class="bx bx-minus" aria-hidden="true"></i></button>
+                                            <b>{{ $selectedQuantity }}</b>
+                                            <button type="button" wire:click="changePromotionSelection({{ $group->id }},{{ $product->id }},1)" wire:loading.attr="disabled" wire:target="changePromotionSelection" aria-label="Agregar {{ $product->name }}" @disabled($selectedCount >= $group->max_selections)><i class="bx bx-plus" aria-hidden="true"></i></button>
+                                        </div>
+                                    </article>
+                                @endforeach
+                            </div>
+                        </fieldset>
+                    @endforeach
+                    @error('promotion')<p class="mo-promotion-error" role="alert">{{ $message }}</p>@enderror
+                </div>
+                <footer>
+                    <label>Cantidad <input type="number" wire:model="promotionQuantity" min="1" max="99" inputmode="numeric"></label>
+                    <div>
+                        <button type="button" wire:click="closePromotionModal">Cancelar</button>
+                        <button type="button" class="is-primary" wire:click="addPromotionToCart" wire:loading.attr="disabled" wire:target="addPromotionToCart" @disabled(!$promotionSelectionComplete)>
+                            <span wire:loading.remove wire:target="addPromotionToCart">Agregar promoción</span>
+                            <span wire:loading wire:target="addPromotionToCart"><i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Agregando…</span>
+                        </button>
+                    </div>
+                </footer>
+            </section>
+        </div>
     @endif
 
     {{-- ══ BACKDROP ══ --}}

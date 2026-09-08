@@ -8,8 +8,8 @@
                 default => ['modifier'=>'is-danger', 'icon'=>'bx-shield-x'],
             };
         @endphp
-        <div class="confirm-dialog-backdrop" wire:click="cancel"></div>
-        <div class="confirm-dialog-layer" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+        <div class="confirm-dialog-backdrop" wire:click="cancel" aria-hidden="true"></div>
+        <div class="confirm-dialog-layer" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message" wire:keydown.escape.window="cancel">
             <section class="confirm-dialog {{ $cfg['modifier'] }}">
                 <header class="confirm-dialog-header">
                     <span class="confirm-dialog-icon"><i class="bx {{ $cfg['icon'] }}"></i></span>
@@ -17,7 +17,7 @@
                     <button type="button" class="confirm-dialog-close" wire:click="cancel" aria-label="Cerrar"><i class="bx bx-x"></i></button>
                 </header>
                 <div class="confirm-dialog-body">
-                    <div class="confirm-dialog-message">{!! $message !!}</div>
+                    <div id="confirm-dialog-message" class="confirm-dialog-message">{!! $message !!}</div>
                     @if($type === 'warning')
                         <div class="confirm-dialog-notice"><i class="bx bx-info-circle"></i><span>Esta acción tendrá efecto inmediatamente.</span></div>
                     @endif

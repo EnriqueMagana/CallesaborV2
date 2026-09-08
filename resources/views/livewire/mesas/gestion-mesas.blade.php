@@ -1318,6 +1318,10 @@
             $printableMesaAccount = auth()->user()?->can('reimprimir tickets')
                 ? $this->printableMesaAccount
                 : null;
+            $printableKitchenOrders = auth()->user()?->can('reimprimir tickets')
+                ? $this->printableMesaKitchenOrders
+                : collect();
+            $hasPrintableTickets = $printableMesaAccount || $printableKitchenOrders->isNotEmpty();
         @endphp
         <div class="mesas-modal-backdrop" wire:click.self="$set('showDetailModal', false)">
             <div class="mesas-modal mesas-modal--xl">
@@ -1356,10 +1360,10 @@
                             @click="tab = 'asignaciones'">
                             <i class="bx bx-user-pin"></i> Asignaciones
                         </button>
-                        @if ($printableMesaAccount)
+                        @if ($hasPrintableTickets)
                             <button class="mesas-inner-tab" :class="{ active: tab === 'imprimir' }"
                                 @click="tab = 'imprimir'">
-                                <i class="bx bx-printer"></i> Imprimir cuenta
+                                <i class="bx bx-printer"></i> Tickets
                             </button>
                         @endif
                         @if ($dm->splits->isNotEmpty())
@@ -1535,61 +1539,103 @@
                         @endif
                     </div>
 
-                    @if ($printableMesaAccount)
+                    @if ($hasPrintableTickets)
                         <div x-show="tab === 'imprimir'" x-cloak>
-                            <section class="mesa-print-section" aria-labelledby="mesa-print-title">
+                            <section class="mesa-print-section" aria-labelledby="mesa-tickets-title">
                                 <div class="mesa-print-section__heading">
                                     <span class="mesa-print-section__icon"><i class="bx bx-printer"></i></span>
                                     <div>
-                                        <h6 id="mesa-print-title">Ticket de la cuenta vigente</h6>
-                                        <p>La vista previa usa el consumo actual y no registra pagos ni cambia el estado de la mesa.</p>
+                                        <h6 id="mesa-tickets-title">Tickets del servicio</h6>
+                                        <p>Imprime comandas individuales para cocina y, al cerrar la mesa, la cuenta global o cada subcuenta.</p>
                                     </div>
                                 </div>
 
-                                @if ($printableMesaAccount['is_split'])
-                                    <div class="mesa-print-accounts" aria-label="Subcuentas disponibles para imprimir">
-                                        @foreach ($printableMesaAccount['accounts'] as $account)
-                                            <article class="mesa-print-account {{ $account['paid'] ? 'is-paid' : '' }}">
-                                                <div class="mesa-print-account__status">
-                                                    <i class="bx {{ $account['paid'] ? 'bx-check-circle' : 'bx-wallet' }}"></i>
-                                                </div>
-                                                <div class="mesa-print-account__summary">
-                                                    <strong>{{ $account['label'] }}</strong>
-                                                    <small>{{ $account['item_count'] }} producto(s) · {{ $account['paid'] ? 'Pagada · reimpresión disponible' : 'Pendiente de cobro' }}</small>
-                                                </div>
-                                                <strong class="mesa-print-account__total">${{ number_format($account['total'], 2) }}</strong>
-                                                <button type="button" class="btn {{ $account['paid'] ? 'btn-outline-primary' : 'btn-primary' }} btn-sm"
-                                                    wire:click="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
-                                                    wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
-                                                    aria-label="Ver e imprimir {{ $account['label'] }}">
-                                                    <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><i class="bx {{ $account['paid'] ? 'bx-printer' : 'bx-show' }} me-1"></i> {{ $account['paid'] ? 'Reimprimir' : 'Vista previa' }}</span>
-                                                    <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
-                                                </button>
-                                            </article>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <article class="mesa-print-account mesa-print-account--full">
-                                        <div class="mesa-print-account__status"><i class="bx bx-receipt"></i></div>
-                                        <div class="mesa-print-account__summary">
-                                            <strong>{{ $printableMesaAccount['service_label'] }}</strong>
-                                            <small>Cuenta completa · pendiente de cobro</small>
+                                @if ($printableKitchenOrders->isNotEmpty())
+                                    <div class="mesa-print-group">
+                                        <div class="mesa-print-group__heading">
+                                            <span><i class="bx bx-restaurant"></i> Comandas de cocina</span>
+                                            <small>{{ $printableKitchenOrders->count() }} orden(es)</small>
                                         </div>
-                                        <strong class="mesa-print-account__total">${{ number_format($printableMesaAccount['total'], 2) }}</strong>
-                                        <button type="button" class="btn btn-primary btn-sm"
-                                            wire:click="printActiveMesaAccount({{ $dm->id }})"
-                                            wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }})"
-                                            aria-label="Ver e imprimir la cuenta completa">
-                                            <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }})"><i class="bx bx-show me-1"></i> Vista previa</span>
-                                            <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
-                                        </button>
-                                    </article>
+                                        <div class="mesa-print-accounts" aria-label="Comandas disponibles para imprimir">
+                                            @foreach ($printableKitchenOrders as $kitchenOrder)
+                                                <article class="mesa-print-account mesa-print-account--kitchen">
+                                                    <div class="mesa-print-account__status"><i class="bx bx-dish"></i></div>
+                                                    <div class="mesa-print-account__summary">
+                                                        <strong>{{ $kitchenOrder->display_folio }}</strong>
+                                                        <small>{{ $kitchenOrder->items->where('is_cancelled', false)->count() }} partida(s) · {{ $kitchenOrder->status_label }} · {{ $kitchenOrder->created_at->format('H:i') }} h</small>
+                                                    </div>
+                                                    <span class="badge bg-label-{{ $kitchenOrder->status_color }}">{{ $kitchenOrder->status_label }}</span>
+                                                    <button type="button" class="btn btn-outline-primary btn-sm"
+                                                        wire:click="printMesaKitchenOrder({{ $dm->id }}, {{ $kitchenOrder->id }})"
+                                                        wire:loading.attr="disabled" wire:target="printMesaKitchenOrder({{ $dm->id }}, {{ $kitchenOrder->id }})"
+                                                        aria-label="Ver e imprimir la comanda {{ $kitchenOrder->display_folio }}">
+                                                        <span wire:loading.remove wire:target="printMesaKitchenOrder({{ $dm->id }}, {{ $kitchenOrder->id }})"><i class="bx bx-printer me-1"></i> Cocina</span>
+                                                        <span wire:loading wire:target="printMesaKitchenOrder({{ $dm->id }}, {{ $kitchenOrder->id }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
+                                                    </button>
+                                                </article>
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 @endif
 
-                                <div class="mesa-print-section__notice">
-                                    <i class="bx bx-shield-quarter"></i>
-                                    <span>Solo se muestran cuentas del servicio activo, con caja abierta y estado <strong>En cuenta</strong>.</span>
-                                </div>
+                                @if ($printableMesaAccount)
+                                    <div class="mesa-print-group">
+                                        <div class="mesa-print-group__heading">
+                                            <span><i class="bx bx-receipt"></i> Cuenta del cliente</span>
+                                            <small>{{ $printableMesaAccount['is_split'] ? 'Global y subcuentas' : 'Cuenta global' }}</small>
+                                        </div>
+
+                                        <article class="mesa-print-account mesa-print-account--full">
+                                            <div class="mesa-print-account__status"><i class="bx bx-receipt"></i></div>
+                                            <div class="mesa-print-account__summary">
+                                                <strong>{{ $printableMesaAccount['service_label'] }}</strong>
+                                                <small>Consumo global del servicio{{ $printableMesaAccount['is_split'] ? ' · incluye todas las subcuentas' : '' }}</small>
+                                            </div>
+                                            <strong class="mesa-print-account__total">${{ number_format($printableMesaAccount['total'], 2) }}</strong>
+                                            <button type="button" class="btn btn-primary btn-sm"
+                                                wire:click="printActiveMesaAccount({{ $dm->id }})"
+                                                wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }})"
+                                                aria-label="Ver e imprimir la cuenta global">
+                                                <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }})"><i class="bx bx-show me-1"></i> Vista previa global</span>
+                                                <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
+                                            </button>
+                                        </article>
+
+                                        @if ($printableMesaAccount['is_split'])
+                                            <div class="mesa-print-subheading">
+                                                <span>Subcuentas</span>
+                                                <small>Imprime cada ticket por separado.</small>
+                                            </div>
+                                            <div class="mesa-print-accounts" aria-label="Subcuentas disponibles para imprimir">
+                                                @foreach ($printableMesaAccount['accounts'] as $account)
+                                                    <article class="mesa-print-account {{ $account['paid'] ? 'is-paid' : '' }}">
+                                                        <div class="mesa-print-account__status">
+                                                            <i class="bx {{ $account['paid'] ? 'bx-check-circle' : 'bx-wallet' }}"></i>
+                                                        </div>
+                                                        <div class="mesa-print-account__summary">
+                                                            <strong>{{ $account['label'] }}</strong>
+                                                            <small>{{ $account['item_count'] }} producto(s) · {{ $account['paid'] ? 'Pagada · reimpresión disponible' : 'Pendiente de cobro' }}</small>
+                                                        </div>
+                                                        <strong class="mesa-print-account__total">${{ number_format($account['total'], 2) }}</strong>
+                                                        <button type="button" class="btn {{ $account['paid'] ? 'btn-outline-primary' : 'btn-primary' }} btn-sm"
+                                                            wire:click="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
+                                                            wire:loading.attr="disabled" wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"
+                                                            aria-label="Ver e imprimir {{ $account['label'] }}">
+                                                            <span wire:loading.remove wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><i class="bx {{ $account['paid'] ? 'bx-printer' : 'bx-show' }} me-1"></i> {{ $account['paid'] ? 'Reimprimir' : 'Vista previa' }}</span>
+                                                            <span wire:loading wire:target="printActiveMesaAccount({{ $dm->id }}, {{ $printableMesaAccount['split_id'] }}, {{ $account['index'] }})"><span class="spinner-border spinner-border-sm me-1"></span>Preparando</span>
+                                                        </button>
+                                                    </article>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="mesa-print-section__notice mesa-print-section__notice--neutral">
+                                        <i class="bx bx-info-circle"></i>
+                                        <span>La cuenta global y las subcuentas estarán disponibles cuando la mesa cambie a <strong>En cuenta</strong>.</span>
+                                    </div>
+                                @endif
+
                             </section>
                         </div>
                     @endif
@@ -1665,14 +1711,17 @@
 
     @if ($showMesaTicketPreview)
         <x-ticket-preview-modal id="mesaTicketPreviewModal" :title="$mesaTicketPreviewTitle"
-            eyebrow="Vista previa" initial-tab="cliente" :open="true"
+            :eyebrow="$mesaTicketPreviewKind === 'kitchen' ? 'Comanda de cocina' : 'Cuenta del cliente'"
+            :initial-tab="$mesaTicketPreviewKind" :open="true"
             close-method="closeMesaTicketPreview" print-label="Imprimir ticket"
             :tabs="[[
-                'key' => 'cliente',
-                'label' => 'Cliente',
-                'icon' => 'bx-user',
+                'key' => $mesaTicketPreviewKind,
+                'label' => $mesaTicketPreviewKind === 'kitchen' ? 'Cocina' : 'Cliente',
+                'icon' => $mesaTicketPreviewKind === 'kitchen' ? 'bx-dish' : 'bx-user',
                 'html' => $mesaTicketPreviewHtml,
-                'title' => 'Vista previa del ticket de mesa',
+                'title' => $mesaTicketPreviewKind === 'kitchen'
+                    ? 'Vista previa de la comanda de cocina'
+                    : 'Vista previa del ticket de mesa',
             ]]" />
     @endif
 

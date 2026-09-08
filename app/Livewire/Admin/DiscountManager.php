@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class DiscountManager extends Component
@@ -205,7 +206,34 @@ class DiscountManager extends Component
         unset($this->discounts);
     }
 
-    public function delete(int $discountId): void
+    public function confirmDelete(int $discountId): void
+    {
+        $this->authorize('eliminar descuentos');
+        $discount = Discount::query()->findOrFail($discountId);
+
+        $this->dispatch(
+            'open-confirm',
+            type: 'danger',
+            title: 'Eliminar descuento',
+            message: 'Se eliminará <strong>'.e($discount->name).'</strong>. Las órdenes anteriores conservarán el descuento aplicado en su historial.',
+            action: 'delete-discount',
+            params: ['id' => $discount->id],
+            confirmText: 'Eliminar descuento',
+            cancelText: 'Conservar',
+        );
+    }
+
+    #[On('modal-confirmed')]
+    public function handleModalConfirmed(string $action, array $params = []): void
+    {
+        if ($action !== 'delete-discount' || ! isset($params['id'])) {
+            return;
+        }
+
+        $this->deleteDiscount((int) $params['id']);
+    }
+
+    private function deleteDiscount(int $discountId): void
     {
         $this->authorize('eliminar descuentos');
         Discount::findOrFail($discountId)->delete();

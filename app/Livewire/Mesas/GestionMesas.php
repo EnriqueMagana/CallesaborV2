@@ -110,6 +110,8 @@ class GestionMesas extends Component
 
     public string $mesaTicketPreviewTitle = 'Cuenta de mesa';
 
+    public string $mesaTicketPreviewKind = 'customer';
+
     // ── Collaborative service team ──
     public bool $showServiceTeamModal = false;
 
@@ -353,6 +355,35 @@ class GestionMesas extends Component
                 'paid' => (bool) ($account['paid'] ?? false),
             ])->values()->all(),
         ];
+    }
+
+    #[Computed]
+    public function printableMesaKitchenOrders()
+    {
+        if (! $this->detailMesaId || ! auth()->user()?->can('reimprimir tickets')) {
+            return collect();
+        }
+
+        $mesa = Mesa::find($this->detailMesaId);
+        if (! $mesa) {
+            return collect();
+        }
+        $this->authorizeMesaVisibility($mesa);
+
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->findActiveForMesa($mesa, $register->id)
+            : null;
+
+        if (! $service || ! in_array($service->status, ['abierta', 'en_cuenta'], true)) {
+            return collect();
+        }
+
+        return $service->orders()
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->with(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'mesa.area'])
+            ->oldest('created_at')
+            ->get();
     }
 
     #[Computed]
@@ -1052,9 +1083,15 @@ class GestionMesas extends Component
         $cashierName = auth()->user()->name;
         $trackingOrder = $context['orders']->first();
 
-        if ($split) {
-            if ($splitId !== $split->id || $accountIndex === null) {
-                $this->dispatch('notify', type: 'warning', message: 'Selecciona una subcuenta pendiente para imprimir.');
+        if (($splitId === null) !== ($accountIndex === null)) {
+            $this->dispatch('notify', type: 'warning', message: 'La selección de la subcuenta está incompleta. Actualiza el detalle e intenta de nuevo.');
+
+            return;
+        }
+
+        if ($split && $splitId !== null && $accountIndex !== null) {
+            if ($splitId !== $split->id) {
+                $this->dispatch('notify', type: 'warning', message: 'La cuenta dividida cambió. Actualiza el detalle e intenta de nuevo.');
 
                 return;
             }
@@ -1078,7 +1115,7 @@ class GestionMesas extends Component
             $trackingOrder = $context['orders']->firstWhere('id', (int) ($account['tracking_order_id'] ?? 0))
                 ?? $trackingOrder;
         } else {
-            if ($splitId !== null || $accountIndex !== null) {
+            if (! $split && ($splitId !== null || $accountIndex !== null)) {
                 $this->dispatch('notify', type: 'warning', message: 'La cuenta vigente ya no coincide con la selección. Actualiza el detalle e intenta de nuevo.');
 
                 return;
@@ -1121,8 +1158,52 @@ class GestionMesas extends Component
 
         $this->mesaTicketPreviewHtml = $html;
         $this->mesaTicketPreviewTitle = $label;
+        $this->mesaTicketPreviewKind = 'customer';
         $this->showMesaTicketPreview = true;
 
+    }
+
+    public function printMesaKitchenOrder(int $mesaId, int $orderId): void
+    {
+        $this->requirePermission('reimprimir tickets');
+
+        $mesa = Mesa::find($mesaId);
+        if (! $mesa) {
+            return;
+        }
+        $this->authorizeMesaVisibility($mesa);
+
+        $register = CashRegister::where('is_open', true)->latest('id')->first();
+        $service = $register
+            ? app(MesaServiceManager::class)->findActiveForMesa($mesa, $register->id)
+            : null;
+
+        if (! $service || ! in_array($service->status, ['abierta', 'en_cuenta'], true)) {
+            $this->dispatch('notify', type: 'warning', message: 'Solo puedes imprimir comandas del servicio activo de esta mesa.');
+
+            return;
+        }
+
+        $order = $service->orders()
+            ->whereKey($orderId)
+            ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+            ->with(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'mesa.area'])
+            ->first();
+
+        if (! $order) {
+            $this->dispatch('notify', type: 'warning', message: 'La comanda ya no pertenece al servicio activo de esta mesa.');
+
+            return;
+        }
+
+        $this->mesaTicketPreviewHtml = app(ThermalTicketRenderer::class)->renderOrder(
+            $order,
+            'kitchen_area',
+            autoPrint: false,
+        );
+        $this->mesaTicketPreviewTitle = 'Cocina · '.$order->display_folio;
+        $this->mesaTicketPreviewKind = 'kitchen';
+        $this->showMesaTicketPreview = true;
     }
 
     public function closeMesaTicketPreview(): void
@@ -1130,6 +1211,7 @@ class GestionMesas extends Component
         $this->showMesaTicketPreview = false;
         $this->mesaTicketPreviewHtml = '';
         $this->mesaTicketPreviewTitle = 'Cuenta de mesa';
+        $this->mesaTicketPreviewKind = 'customer';
     }
 
     private function printableAccountContext(Mesa $mesa): ?array

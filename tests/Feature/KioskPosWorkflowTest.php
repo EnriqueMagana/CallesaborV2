@@ -1032,6 +1032,26 @@ class KioskPosWorkflowTest extends TestCase
                 && ! str_contains($params['html_cliente'] ?? '', 'window.print()'));
     }
 
+    public function test_pos_product_images_use_card_skeletons_and_viewport_loading(): void
+    {
+        $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
+        $layout = file_get_contents(resource_path('views/layouts/pos.blade.php'));
+        $css = file_get_contents(public_path('assets/css/pos-modern.css'));
+
+        $this->assertIsString($catalog);
+        $this->assertIsString($layout);
+        $this->assertIsString($css);
+        $this->assertSame(3, substr_count($catalog, 'x-data="posProductImage"'));
+        $this->assertSame(3, substr_count($catalog, 'data-src="{{ Storage::url('));
+        $this->assertStringNotContainsString('<img src="{{ Storage::url($product->image) }}"', $catalog);
+        $this->assertStringContainsString("Alpine.data('posProductImage'", $layout);
+        $this->assertStringContainsString("root: this.\$el.closest('.catalog-grid')", $layout);
+        $this->assertStringContainsString("rootMargin: '320px 0px'", $layout);
+        $this->assertStringContainsString('await this.image.decode()', $layout);
+        $this->assertStringContainsString('.pos-product-image-shell.is-image-pending::before', $css);
+        $this->assertStringContainsString('.pos-product-image-shell.is-image-ready > img', $css);
+    }
+
     public function test_finishing_a_direct_sale_opens_the_ticket_maker_document_without_double_printing_iframes(): void
     {
         [$user] = $this->posContext();

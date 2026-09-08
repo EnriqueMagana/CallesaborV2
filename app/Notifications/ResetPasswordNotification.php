@@ -9,10 +9,11 @@ class ResetPasswordNotification extends ResetPassword
 {
     public function toMail($notifiable): MailMessage
     {
-        $resetUrl = route('password.reset', [
+        $resetPath = route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
-        ]);
+        ], absolute: false);
+        $resetUrl = rtrim((string) config('app.url'), '/').'/'.ltrim($resetPath, '/');
 
         $minutes = (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60);
 

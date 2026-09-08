@@ -6,12 +6,13 @@
                 <h2 id="recent-orders-title">Últimos pedidos</h2>
                 <p>Información visible según tu función.</p>
             </div>
-            @if($dashboard['can_view_orders'])
-                <a href="{{ route('app.ordenes') }}" class="dashboard-text-link" wire:navigate>Ver todos <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a>
+            @if ($dashboard['can_view_orders'])
+                <a href="{{ route('app.ordenes') }}" class="dashboard-text-link" wire:navigate>Ver todos <i
+                        class="bx bx-right-arrow-alt" aria-hidden="true"></i></a>
             @endif
         </div>
 
-        @if($dashboard['recent_orders']->isEmpty())
+        @if ($dashboard['recent_orders']->isEmpty())
             <div class="dashboard-empty">
                 <i class="bx bx-receipt" aria-hidden="true"></i>
                 <strong>Aún no hay pedidos</strong>
@@ -19,14 +20,18 @@
             </div>
         @else
             <div class="dashboard-order-list">
-                @foreach($dashboard['recent_orders'] as $order)
+                @foreach ($dashboard['recent_orders'] as $order)
                     <a href="{{ route('app.ordenes.show', $order) }}" class="dashboard-order" wire:navigate>
-                        <span class="dashboard-order__icon"><i class="bx {{ $order->type_icon }}" aria-hidden="true"></i></span>
+                        <span class="dashboard-order__icon"><i class="bx {{ $order->type_icon }}"
+                                aria-hidden="true"></i></span>
                         <span class="dashboard-order__copy">
                             <strong>{{ $order->display_folio }} · {{ $order->display_name }}</strong>
-                            <small>{{ $order->type_label }}{{ $order->mesa ? ' · '.$order->mesa->display_name : '' }} · {{ $order->created_at->diffForHumans() }}</small>
+                            <small>{{ $order->type_label }}{{ $order->mesa ? ' · ' . $order->mesa->display_name : '' }}
+                                ·
+                                {{ $order->created_at->diffForHumans() }}</small>
                         </span>
-                        <span class="dashboard-order__status dashboard-order__status--{{ $order->status_color }}">{{ $order->status_label }}</span>
+                        <span
+                            class="dashboard-order__status dashboard-order__status--{{ $order->status_color }}">{{ $order->status_label }}</span>
                         <i class="bx bx-chevron-right dashboard-order__arrow" aria-hidden="true"></i>
                     </a>
                 @endforeach
@@ -45,7 +50,7 @@
         <div class="dashboard-action-list">
             @forelse($dashboard['quick_actions'] as $action)
                 @php($usesStandaloneLayout = rtrim($action['route'], '/') === rtrim(route('app.pos'), '/'))
-                <a href="{{ $action['route'] }}" @unless($usesStandaloneLayout) wire:navigate @endunless>
+                <a href="{{ $action['route'] }}" @unless ($usesStandaloneLayout) wire:navigate @endunless>
                     <i class="bx {{ $action['icon'] }}" aria-hidden="true"></i>
                     <span><strong>{{ $action['label'] }}</strong><small>{{ $action['description'] }}</small></span>
                     <i class="bx bx-chevron-right" aria-hidden="true"></i>
@@ -59,11 +64,22 @@
             @endforelse
         </div>
         <a href="{{ route('profile') }}" class="dashboard-profile-link" wire:navigate>
+
             <span class="dashboard-avatar dashboard-avatar--small">
-                @if($avatar)<img src="{{ $avatar }}" alt="">@else<span>{{ $initials }}</span>@endif
+                @if ($avatar)
+                    <img src="{{ $avatar }}" alt="">
+                @else
+                    <span>{{ $initials }}</span>
+                @endif
             </span>
-            <span><strong>Mi perfil</strong><small>Cuenta, foto y seguridad</small></span>
+
+            <span class="dashboard-profile-text">
+                <strong class="dashboard-text-link">Mi perfil</strong>
+                <small>Cuenta, foto y seguridad</small>
+            </span>
+
             <i class="bx bx-cog" aria-hidden="true"></i>
+
         </a>
     </aside>
 </div>

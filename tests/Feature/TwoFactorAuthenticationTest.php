@@ -65,6 +65,16 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertNotNull($user->fresh()->active_session_token_hash);
     }
 
+    public function test_fortify_two_factor_management_routes_require_recent_password_confirmation(): void
+    {
+        $route = collect(app('router')->getRoutes()->getRoutes())
+            ->first(fn ($route) => $route->uri() === 'user/two-factor-authentication'
+                && in_array('POST', $route->methods(), true));
+
+        $this->assertNotNull($route);
+        $this->assertContains('password.confirm', $route->gatherMiddleware());
+    }
+
     private function twoFactorUser(): User
     {
         $user = User::factory()->create()->forceFill([

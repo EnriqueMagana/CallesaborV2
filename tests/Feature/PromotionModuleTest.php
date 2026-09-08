@@ -984,6 +984,40 @@ class PromotionModuleTest extends TestCase
             ->assertDontSee($promotion->name);
     }
 
+    public function test_waiter_can_add_a_single_choice_promotion_to_the_cart(): void
+    {
+        Permission::create(['name' => 'ordenar mesas', 'guard_name' => 'web']);
+        Role::create(['name' => 'admin', 'guard_name' => 'web']);
+        $user = User::factory()->create();
+        $user->givePermissionTo('ordenar mesas');
+        $user->assignRole('admin');
+        $area = Area::create(['name' => 'Comedor principal']);
+        $mesa = Mesa::create(['area_id' => $area->id, 'number' => 1, 'status' => 'ocupada']);
+        [$promotion, $products] = $this->promotionFixture();
+        $promotion->update(['fulfillment_modes' => ['dine_in']]);
+        $group = $promotion->groups->first();
+        $group->update(['min_selections' => 1, 'max_selections' => 1]);
+        $group->products()->sync([$products[0]->id]);
+
+        Livewire::actingAs($user)->test(MesaOrden::class, ['mesa' => $mesa])
+            ->call('openPromotionModal', $promotion->id)
+            ->assertSeeHtml('wire:target="search,categoryFilter,openPromotionModal"')
+            ->assertSeeHtml('wire:loading.flex')
+            ->assertSeeHtml('wire:target="addPromotionToCart"')
+            ->call('changePromotionSelection', $group->id, $products[0]->id, 1)
+            ->assertSet('promotionSelections.'.$group->id.'.'.$products[0]->id, 1)
+            ->call('addPromotionToCart')
+            ->assertHasNoErrors()
+            ->assertSet('showPromotionModal', false)
+            ->assertSet('cart.0.promotion_id', $promotion->id)
+            ->assertSet('cart.0.promotion_selections.0.items.0.product_id', $products[0]->id);
+
+        $css = file_get_contents(public_path('assets/css/mesa-orden.css'));
+        $this->assertStringContainsString('.mo-promotion-backdrop { z-index: 1100; }', $css);
+        $this->assertStringContainsString('.mo-promotion-wrap { z-index: 1101; }', $css);
+        $this->assertStringContainsString('display: none;', $css);
+    }
+
     public function test_public_digital_menu_hides_promotional_section_when_none_are_available(): void
     {
         $this->get(route('public.menu'))

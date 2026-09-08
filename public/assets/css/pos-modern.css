@@ -2806,6 +2806,47 @@ html.dark-style .pos-order-data-guardrail {
     font-size: 2rem;
 }
 
+.pos-product-image-shell {
+    contain: paint;
+}
+
+.pos-product-image-shell::before {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    visibility: hidden;
+    opacity: 0;
+    background: linear-gradient(100deg, #e9e5ef 18%, #f8f6fb 36%, #e9e5ef 54%);
+    background-size: 220% 100%;
+    content: '';
+    pointer-events: none;
+    transition: opacity .16s ease, visibility .16s ease;
+}
+
+.pos-product-image-shell.is-image-pending::before {
+    visibility: visible;
+    opacity: 1;
+    animation: pos-skeleton-shimmer 1.1s ease-in-out infinite;
+}
+
+.pos-product-image-shell > img {
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+
+.pos-product-image-shell.is-image-ready > img {
+    opacity: 1;
+}
+
+.pos-product-image-shell.is-image-error > img {
+    display: none;
+}
+
+.pos-product-image-fallback {
+    position: relative;
+    z-index: 3;
+}
+
 .prod-badge-qty {
     z-index: 1;
     top: 8px;
@@ -3078,9 +3119,15 @@ html.dark-style .pos-order-data-guardrail {
 
 @media (prefers-reduced-motion: reduce) {
     .pos-root .pos-modal,
-    .prod-card {
+    .prod-card,
+    .pos-product-image-shell > img {
         animation: none;
         transition: none;
+    }
+
+    .pos-product-image-shell.is-image-pending::before {
+        animation: none;
+        background: #ece9f2;
     }
 }
 

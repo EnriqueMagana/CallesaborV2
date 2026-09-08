@@ -122,12 +122,12 @@
                         @forelse($this->deliveryReconciliations as $driver)
                             <tr>
                                 <td><span class="delivery-reconciliation__driver"><i class="bx bx-user"></i><strong>{{ $driver['name'] }}</strong></span></td>
-                                <td class="text-end">{{ $driver['in_route'] }}</td>
-                                <td class="text-end">{{ $driver['pending_notes'] }}</td>
-                                <td class="text-end is-cash">${{ number_format($driver['cash_expected'], 2) }}</td>
-                                <td class="text-end">${{ number_format($driver['transfer_total'], 2) }}</td>
-                                <td class="text-end"><strong>${{ number_format($driver['sales_total'], 2) }}</strong></td>
-                                <td>
+                                <td class="text-end" data-label="En ruta"><span class="delivery-reconciliation__value">{{ $driver['in_route'] }}</span></td>
+                                <td class="text-end" data-label="Notas por arquear"><span class="delivery-reconciliation__value">{{ $driver['pending_notes'] }}</span></td>
+                                <td class="text-end is-cash" data-label="Efectivo esperado"><span class="delivery-reconciliation__value">${{ number_format($driver['cash_expected'], 2) }}</span></td>
+                                <td class="text-end" data-label="Transferencias"><span class="delivery-reconciliation__value">${{ number_format($driver['transfer_total'], 2) }}</span></td>
+                                <td class="text-end" data-label="Venta"><span class="delivery-reconciliation__value"><strong>${{ number_format($driver['sales_total'], 2) }}</strong></span></td>
+                                <td data-label="Estado / acción">
                                     @if($driver['can_settle'])
                                         @can('cerrar caja')
                                             <button type="button" class="btn btn-sm btn-primary" wire:click="openDeliverySettlement({{ $driver['driver_id'] }})">
@@ -163,6 +163,58 @@
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+
+            <div class="delivery-reconciliation__mobile-list">
+                @forelse($this->deliveryReconciliations as $driver)
+                    <article class="delivery-driver-card">
+                        <header class="delivery-driver-card__header">
+                            <span class="delivery-reconciliation__driver"><i class="bx bx-user" aria-hidden="true"></i><strong>{{ $driver['name'] }}</strong></span>
+                        </header>
+
+                        <dl class="delivery-driver-card__metrics">
+                            <div><dt>En ruta</dt><dd>{{ $driver['in_route'] }}</dd></div>
+                            <div><dt>Notas por arquear</dt><dd>{{ $driver['pending_notes'] }}</dd></div>
+                            <div class="is-cash"><dt>Efectivo esperado</dt><dd>${{ number_format($driver['cash_expected'], 2) }}</dd></div>
+                            <div><dt>Transferencias</dt><dd>${{ number_format($driver['transfer_total'], 2) }}</dd></div>
+                            <div><dt>Venta</dt><dd><strong>${{ number_format($driver['sales_total'], 2) }}</strong></dd></div>
+                        </dl>
+
+                        <div class="delivery-driver-card__action">
+                            @if($driver['can_settle'])
+                                @can('cerrar caja')
+                                    <button type="button" class="btn btn-primary" wire:click="openDeliverySettlement({{ $driver['driver_id'] }})">
+                                        <i class="bx bx-calculator" aria-hidden="true"></i> Realizar arqueo
+                                    </button>
+                                @else
+                                    <span class="app-status app-status--warning"><i class="bx bx-time-five"></i>Pendiente de caja</span>
+                                @endcan
+                            @elseif($driver['in_route'] > 0)
+                                <span class="app-status app-status--warning"><i class="bx bx-cycling"></i>Entrega en curso</span>
+                            @elseif($driver['settlements']->isNotEmpty())
+                                <span class="app-status app-status--success"><i class="bx bx-check-double"></i>Arqueo completado</span>
+                            @else
+                                <span class="app-status app-status--neutral"><i class="bx bx-minus"></i>Sin notas</span>
+                            @endif
+                        </div>
+
+                        @if($driver['settlements']->isNotEmpty())
+                            <div class="delivery-driver-card__history">
+                                @foreach($driver['settlements'] as $settlement)
+                                    <div>
+                                        <strong><i class="bx bx-check-circle" aria-hidden="true"></i> Arqueo completado</strong>
+                                        <span>{{ $settlement->orders_count }} notas · Efectivo ${{ number_format($settlement->declared_cash, 2) }}</span>
+                                        <span class="{{ (float)$settlement->difference === 0.0 ? 'is-exact' : 'is-difference' }}">
+                                            {{ (float)$settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $'.number_format($settlement->difference, 2) }} · {{ $settlement->completed_at->format('g:i A') }}
+                                        </span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </article>
+                @empty
+                    <div class="cash-cut-empty"><span><i class="bx bx-cycling"></i></span><div><strong>Sin actividad de delivery</strong><p>Cuando un repartidor tome un pedido, su resumen aparecerá aquí.</p></div></div>
+                @endforelse
             </div>
         </section>
         @else

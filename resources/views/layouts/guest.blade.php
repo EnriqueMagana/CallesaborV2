@@ -18,7 +18,7 @@
         href="{{ asset('assets/css/login.css') }}?v={{ filemtime(public_path('assets/css/login.css')) }}">
 </head>
 
-<body class="auth-body">
+<body class="auth-body {{ request()->routeIs('login') ? 'auth-body--login' : '' }}">
     <main class="auth-shell">
         <section class="auth-brand-panel" aria-label="Información del negocio">
             @if ($businessSettings?->banner_path)
@@ -34,23 +34,12 @@
                 </a>
 
                 <div class="auth-brand-message">
-                    <h1>Todo listo para comenzar el turno.</h1>
-                    <ul>
-                        <li><i class="bx bx-check" aria-hidden="true"></i><span>Información centralizada y disponible
-                                según tus permisos.</span></li>
-                        <li><i class="bx bx-check" aria-hidden="true"></i><span>Una sola sesión activa para proteger
-                                cada cuenta.</span></li>
-                    </ul>
-                    <div class="auth-brand-modules" aria-label="Módulos operativos">
-                        <span><i class="bx bx-receipt" aria-hidden="true"></i>Ventas</span>
-                        <span><i class="bx bx-chair" aria-hidden="true"></i>Mesas</span>
-                        <span><i class="bx bx-dish" aria-hidden="true"></i>Cocina</span>
-                        <span><i class="bx bx-package" aria-hidden="true"></i>Productos</span>
-                        <span><i class="bx bx-user" aria-hidden="true"></i>Clientes</span>
-                        <span><i class="bx bx-calendar" aria-hidden="true"></i>Reservas</span>
-                        <span><i class="bx bx-cycling" aria-hidden="true"></i>Delivery</span>
-                        <span><i class="bx bx-user-pin" aria-hidden="true"></i>Empleados</span>
-                        <span><i class="bx bx-purchase-tag" aria-hidden="true"></i>Promociones</span>
+                    <span class="auth-brand-message__eyebrow">Operación interna</span>
+                    <h1>Tu turno empieza aquí.</h1>
+                    <p>Accede a las herramientas del restaurante con los permisos de tu cuenta.</p>
+                    <div class="auth-brand-trust" aria-label="Protecciones de acceso">
+                        <span><i class="bx bx-lock-alt" aria-hidden="true"></i>Acceso protegido</span>
+                        <span><i class="bx bx-devices" aria-hidden="true"></i>Una cuenta, un navegador activo.</span>
                     </div>
                 </div>
 
@@ -73,10 +62,11 @@
         </section>
 
         <section class="auth-content">
-            <div class="auth-mobile-brand">
+            <a href="/" class="auth-mobile-brand"
+                aria-label="Ir al inicio de {{ $businessSettings?->business_name ?? config('app.name') }}">
                 <span class="auth-brand__logo"><x-application-logo /></span>
                 <span><strong>{{ $businessSettings?->platform_name ?? config('app.name', 'Calle Sabor') }}</strong><small>{{ $businessSettings?->business_name ?? 'Administración del restaurante' }}</small></span>
-            </div>
+            </a>
 
             <div class="auth-card">
                 {{ $slot }}

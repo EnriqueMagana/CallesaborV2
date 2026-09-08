@@ -101,9 +101,12 @@
                             wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name.' '.$promotionDescription), null, catalogQuery)" x-cloak
                             class="prod-card pos-promotion-card"
                             aria-label="{{ $isAutomatic ? 'Agregar producto para' : 'Configurar' }} {{ $promotion->name }}, {{ $promotion->pricingRuleLabel() ?: 'precio $'.number_format($promotion->price, 2) }}">
-                        <span class="prod-img pos-promotion-card__image">
+                        <span class="prod-img pos-promotion-card__image {{ $promotionImage ? 'pos-product-image-shell' : '' }}"
+                              @if($promotionImage) x-data="posProductImage"
+                              :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
                             @if($promotionImage)
-                                <img src="{{ Storage::url($promotionImage) }}" alt="{{ $promotion->name }}" width="320" height="216" loading="lazy" decoding="async">
+                                <img x-ref="image" data-src="{{ Storage::url($promotionImage) }}" alt="{{ $promotion->name }}" width="320" height="216" decoding="async">
+                                <i class="bx bx-purchase-tag-alt no-img pos-product-image-fallback" x-show="state === 'error'" x-cloak aria-hidden="true"></i>
                             @else
                                 <i class="bx bx-purchase-tag-alt no-img" aria-hidden="true"></i>
                             @endif
@@ -141,10 +144,13 @@
                      wire:key="pos-product-{{ $product->id }}"
                      class="prod-card {{ $inCart ? 'in-cart' : '' }}"
                      aria-label="{{ $hasOptions ? 'Personalizar' : 'Agregar' }} {{ $product->name }} por ${{ number_format($product->price, 2) }}{{ $inCart ? ', '.$cartQty.' en el pedido' : '' }}">
-                    <div class="prod-img">
+                    <div class="prod-img {{ $product->image ? 'pos-product-image-shell' : '' }}"
+                         @if($product->image) x-data="posProductImage"
+                         :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
                         @if($product->image)
-                            <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
-                                 width="320" height="216" loading="lazy" decoding="async">
+                            <img x-ref="image" data-src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
+                                 width="320" height="216" decoding="async">
+                            <i class="bx bx-dish no-img pos-product-image-fallback" x-show="state === 'error'" x-cloak aria-hidden="true"></i>
                         @else
                             <i class="bx bx-dish no-img" aria-hidden="true"></i>
                         @endif
@@ -177,10 +183,13 @@
                  wire:key="pos-product-{{ $product->id }}"
                  class="prod-card {{ $inCart ? 'in-cart' : '' }}"
                  aria-label="{{ $hasOptions ? 'Personalizar' : 'Agregar' }} {{ $product->name }} por ${{ number_format($product->price, 2) }}{{ $inCart ? ', '.$cartQty.' en el pedido' : '' }}">
-                <div class="prod-img">
+                <div class="prod-img {{ $product->image ? 'pos-product-image-shell' : '' }}"
+                     @if($product->image) x-data="posProductImage"
+                     :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
                     @if($product->image)
-                        <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
-                             width="320" height="216" loading="lazy" decoding="async">
+                        <img x-ref="image" data-src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}"
+                             width="320" height="216" decoding="async">
+                        <i class="bx bx-dish no-img pos-product-image-fallback" x-show="state === 'error'" x-cloak aria-hidden="true"></i>
                     @else
                         <i class="bx bx-dish no-img" aria-hidden="true"></i>
                     @endif
