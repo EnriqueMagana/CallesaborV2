@@ -62,13 +62,12 @@
         </section>
 
         <section class="auth-content">
-            <a href="/" class="auth-mobile-brand"
-                aria-label="Ir al inicio de {{ $businessSettings?->business_name ?? config('app.name') }}">
-                <span class="auth-brand__logo"><x-application-logo /></span>
-                <span><strong>{{ $businessSettings?->platform_name ?? config('app.name', 'Calle Sabor') }}</strong><small>{{ $businessSettings?->business_name ?? 'Administración del restaurante' }}</small></span>
-            </a>
 
             <div class="auth-card">
+                <a href="/" class="auth-mobile-brand"
+                    aria-label="Ir al inicio de {{ $businessSettings?->business_name ?? config('app.name') }}">
+                    <span class="auth-brand__logo"><x-application-logo /></span>
+                </a>
                 {{ $slot }}
             </div>
 

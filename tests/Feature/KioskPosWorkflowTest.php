@@ -1043,7 +1043,10 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertIsString($css);
         $this->assertSame(3, substr_count($catalog, 'x-data="posProductImage"'));
         $this->assertSame(3, substr_count($catalog, 'data-src="{{ Storage::url('));
-        $this->assertStringNotContainsString('<img src="{{ Storage::url($product->image) }}"', $catalog);
+        $this->assertSame(3, substr_count($catalog, '<img x-ref="image" src="{{ Storage::url('));
+        $this->assertSame(3, substr_count($catalog, 'alt="" width="320" height="216" loading="lazy"'));
+        $this->assertStringNotContainsString('alt="{{ $product->name }}"', $catalog);
+        $this->assertStringNotContainsString('alt="{{ $promotion->name }}"', $catalog);
         $this->assertStringContainsString("Alpine.data('posProductImage'", $layout);
         $this->assertStringContainsString("root: this.\$el.closest('.catalog-grid')", $layout);
         $this->assertStringContainsString("rootMargin: '320px 0px'", $layout);
