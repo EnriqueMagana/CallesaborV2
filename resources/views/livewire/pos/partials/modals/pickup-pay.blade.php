@@ -4,7 +4,8 @@
     $ppoItems = $ppo ? $ppo->items : collect();
     $ppoPaidAmt = collect($pickupPayments)->sum('amount');
     $ppoRem = $ppo ? max(0, $ppo->total - $ppoPaidAmt) : 0;
-    $ppoCanConfirm = !empty($pickupPayments) && $ppoPaidAmt >= ($ppo->total ?? 0) - 0.01;
+    $ppoCanConfirm = !empty($pickupPayments)
+        && round($ppoPaidAmt * 100) === round(($ppo->total ?? 0) * 100);
     $ppoIsContraDelivery = $ppo && $ppo->type === 'delivery' && $ppo->delivery_method === 'contra_entrega';
 @endphp
 <div class="pos-modal-wrap show" data-ui="xui-6jaq3m" wire:click.self="closePickupPayModal"
@@ -148,7 +149,9 @@
                     </div>
                 @endif
 
-                <button type="button" wire:click="addPickupPayment" class="pos-btn pos-btn-secondary pos-add-payment" data-ui="xui-5q5jzi">
+                <button type="button" wire:click="addPickupPayment" wire:loading.attr="disabled"
+                    wire:target="addPickupPayment" class="pos-btn pos-btn-secondary pos-add-payment"
+                    data-ui="xui-5q5jzi" @disabled($ppoRem <= 0)>
                     <i class="bx bx-plus"></i> Agregar pago
                 </button>
             @endif

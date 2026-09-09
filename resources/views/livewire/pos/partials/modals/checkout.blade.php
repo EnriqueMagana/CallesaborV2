@@ -277,7 +277,9 @@
                                 Cambio: ${{ number_format(max(0, (float) $payCashReceived - (float) $payAmount), 2) }}
                             </div>
                         @endif
-                        <button wire:click="addPayment" class="pos-btn pos-btn-secondary" data-ui="xui-n8egc2">
+                        <button type="button" wire:click="addPayment" wire:loading.attr="disabled"
+                            wire:target="addPayment" class="pos-btn pos-btn-secondary" data-ui="xui-n8egc2"
+                            @disabled($this->paymentRemaining <= 0)>
                             Agregar pago
                         </button>
                     </div>
@@ -295,7 +297,8 @@
                 </button>
                 @if ($orderType === 'ventanilla')
                     <button wire:click="submitOrder" wire:loading.attr="disabled" wire:target="submitOrder"
-                        class="pos-btn pos-btn-primary pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2">
+                        class="pos-btn pos-btn-primary pos-btn-lg" data-pos-submit-order aria-keyshortcuts="F2"
+                        @disabled(round($this->paidTotal * 100) !== round($this->cartTotal * 100))>
                         <span wire:loading wire:target="submitOrder" class="pos-btn-spinner"></span>
                         <i wire:loading.remove wire:target="submitOrder" class="bx bx-send"></i>
                         Cobrar y enviar <kbd class="pos-shortcut-hint" aria-hidden="true">F2</kbd>

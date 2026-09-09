@@ -2341,12 +2341,25 @@ class PointOfSale extends Component
 
     public function addPayment(): void
     {
-        $amount = (float) $this->payAmount;
-        if ($amount <= 0) {
+        $amountInCents = $this->moneyInCents($this->payAmount);
+        $remainingInCents = max(
+            0,
+            $this->moneyInCents($this->cartTotal) - $this->paymentSumInCents($this->payments),
+        );
+
+        if ($amountInCents <= 0) {
             $this->dispatch('notify', type: 'warning', message: 'Ingresa un monto válido.');
 
             return;
         }
+
+        if ($amountInCents > $remainingInCents) {
+            $this->dispatch('notify', type: 'warning', message: 'El pago no puede superar el saldo pendiente.');
+
+            return;
+        }
+
+        $amount = $amountInCents / 100;
 
         $payment = [
             'method' => $this->payMethod,
@@ -2391,6 +2404,18 @@ class PointOfSale extends Component
         };
     }
 
+    private function moneyInCents(mixed $amount): int
+    {
+        return (int) round((float) $amount * 100);
+    }
+
+    private function paymentSumInCents(array $payments): int
+    {
+        return (int) collect($payments)->sum(
+            fn ($payment) => $this->moneyInCents($payment['amount'] ?? 0),
+        );
+    }
+
     private function mapDeliveryMethodForStorage(string $method): string
     {
         return match ($method) {
@@ -2421,9 +2446,16 @@ class PointOfSale extends Component
         }
 
         if (! $isContraEntrega) {
-            $paid = collect($this->payments)->sum('amount');
-            if ($paid < $this->cartTotal - 0.01) {
+            $paidInCents = $this->paymentSumInCents($this->payments);
+            $totalInCents = $this->moneyInCents($this->cartTotal);
+            if ($paidInCents < $totalInCents) {
                 $this->dispatch('notify', type: 'warning', message: 'El monto pagado es insuficiente.');
+
+                return;
+            }
+
+            if ($paidInCents > $totalInCents) {
+                $this->dispatch('notify', type: 'warning', message: 'El monto pagado no puede superar el total del pedido.');
 
                 return;
             }
@@ -3688,7 +3720,7 @@ class PointOfSale extends Component
             return;
         }
 
-        if ($amount > $rem + 0.01) {
+        if ($this->moneyInCents($amount) > $this->moneyInCents($rem)) {
             $this->addError('mesaPayAmount', 'El monto no puede superar el saldo pendiente.');
 
             return;
@@ -3743,8 +3775,8 @@ class PointOfSale extends Component
         }
 
         $total = (float) ($this->mesaPaymentContext['total'] ?? 0);
-        $paid = collect($this->mesaPayments)->sum(fn ($payment) => (float) ($payment['amount'] ?? 0));
-        if ($paid <= 0 || $paid > $total + 0.01) {
+        $paidInCents = $this->paymentSumInCents($this->mesaPayments);
+        if ($paidInCents <= 0 || $paidInCents > $this->moneyInCents($total)) {
             return false;
         }
 
@@ -3836,10 +3868,14 @@ class PointOfSale extends Component
             return;
         }
         $mesaTotal = (float) $orders->sum('total');
-        $paid = collect($this->mesaPayments)->sum('amount');
+        $paidInCents = $this->paymentSumInCents($this->mesaPayments);
+        $mesaTotalInCents = $this->moneyInCents($mesaTotal);
 
-        if ($paid < $mesaTotal - 0.01) {
-            $this->dispatch('notify', type: 'warning', message: 'El monto es insuficiente.');
+        if ($paidInCents !== $mesaTotalInCents) {
+            $message = $paidInCents > $mesaTotalInCents
+                ? 'El monto pagado no puede superar el total de la cuenta.'
+                : 'El monto es insuficiente.';
+            $this->dispatch('notify', type: 'warning', message: $message);
 
             return;
         }
@@ -3969,9 +4005,13 @@ class PointOfSale extends Component
         $accountTotal = (float) $account['total'];
         $assignment = $mesa->currentAssignment;
 
-        $paid = collect($this->mesaPayments)->sum('amount');
-        if ($paid < $accountTotal - 0.01) {
-            $this->dispatch('notify', type: 'warning', message: 'El monto es insuficiente.');
+        $paidInCents = $this->paymentSumInCents($this->mesaPayments);
+        $accountTotalInCents = $this->moneyInCents($accountTotal);
+        if ($paidInCents !== $accountTotalInCents) {
+            $message = $paidInCents > $accountTotalInCents
+                ? 'El monto pagado no puede superar el total de la cuenta.'
+                : 'El monto es insuficiente.';
+            $this->dispatch('notify', type: 'warning', message: $message);
 
             return;
         }
@@ -4317,6 +4357,14 @@ HTML;
             return;
         }
 
+        if ($this->moneyInCents($amount) > $this->moneyInCents($rem)) {
+            $this->dispatch('notify', type: 'warning', message: 'El pago no puede superar el saldo pendiente.');
+
+            return;
+        }
+
+        $amount = $this->moneyInCents($amount) / 100;
+
         $payment = ['method' => $this->pickupPayMethod, 'amount' => $amount];
 
         if ($this->pickupPayMethod === 'cash') {
@@ -4361,9 +4409,13 @@ HTML;
             return;
         }
 
-        $paid = collect($this->pickupPayments)->sum('amount');
-        if ($paid < $order->total - 0.01) {
-            $this->dispatch('notify', type: 'warning', message: 'El monto es insuficiente.');
+        $paidInCents = $this->paymentSumInCents($this->pickupPayments);
+        $totalInCents = $this->moneyInCents($order->total);
+        if ($paidInCents !== $totalInCents) {
+            $message = $paidInCents > $totalInCents
+                ? 'El monto pagado no puede superar el total del pedido.'
+                : 'El monto es insuficiente.';
+            $this->dispatch('notify', type: 'warning', message: $message);
 
             return;
         }

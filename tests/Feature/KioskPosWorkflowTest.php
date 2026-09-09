@@ -1096,6 +1096,90 @@ class KioskPosWorkflowTest extends TestCase
                 && ! str_contains($params['html_cocina'] ?? '', 'window.print()'));
     }
 
+    public function test_pos_blocks_a_second_cash_payment_that_would_exceed_the_order_total(): void
+    {
+        [$user] = $this->posContext();
+        $product = Product::create([
+            'name' => 'Pedido de prueba por 180',
+            'price' => 180,
+            'is_active' => true,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->set('cart', [[
+                'cart_id' => 'overpayment-regression',
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_price' => 180,
+                'quantity' => 1,
+                'subtotal' => 180,
+                'notes' => '',
+                'addons' => [],
+                'ingredients' => [],
+            ]])
+            ->set('payMethod', 'cash')
+            ->set('payAmount', '180')
+            ->set('payCashReceived', '180')
+            ->call('addPayment')
+            ->assertCount('payments', 1)
+            ->set('payAmount', '80')
+            ->set('payCashReceived', '80')
+            ->call('addPayment')
+            ->assertCount('payments', 1)
+            ->assertSet('payments.0.amount', 180.0)
+            ->assertDispatched('notify');
+
+        $component
+            ->set('payments', [
+                ['method' => 'cash', 'amount' => 180, 'cash_received' => 180, 'cash_change' => 0],
+                ['method' => 'cash', 'amount' => 80, 'cash_received' => 80, 'cash_change' => 0],
+            ])
+            ->call('submitOrder')
+            ->assertSet('showOrderSuccess', false)
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_payments', 0);
+    }
+
+    public function test_pickup_payment_cannot_exceed_the_pending_order_total(): void
+    {
+        [$user, $register, $terminal] = $this->posContext();
+        $order = $this->kioskOrder(
+            $register->id,
+            $user->id,
+            $terminal->id,
+            'Cliente sin sobrepago',
+            'takeaway',
+            status: 'lista',
+        );
+
+        $component = Livewire::actingAs($user)
+            ->test(PointOfSale::class)
+            ->call('openPickupPayModal', $order->id)
+            ->set('pickupPayAmount', '100')
+            ->set('pickupPayReceived', '100')
+            ->call('addPickupPayment')
+            ->assertCount('pickupPayments', 1)
+            ->set('pickupPayAmount', '60')
+            ->set('pickupPayReceived', '60')
+            ->call('addPickupPayment')
+            ->assertCount('pickupPayments', 1)
+            ->assertDispatched('notify');
+
+        $component
+            ->set('pickupPayments', [
+                ['method' => 'cash', 'amount' => 100, 'cash_received' => 100, 'cash_change' => 0],
+                ['method' => 'cash', 'amount' => 60, 'cash_received' => 60, 'cash_change' => 0],
+            ])
+            ->call('confirmPickupPayment')
+            ->assertDispatched('notify');
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'lista']);
+        $this->assertDatabaseMissing('order_payments', ['order_id' => $order->id]);
+    }
+
     private function posContext(): array
     {
         $user = User::factory()->create();

@@ -11,7 +11,7 @@
 
     $mpPaid      = collect($mesaPayments)->sum('amount');
     $mpRem       = max(0, $mpTotal - $mpPaid);
-    $mpCanPay    = !empty($mesaPayments) && $mpPaid >= $mpTotal - 0.01;
+    $mpCanPay    = !empty($mesaPayments) && round($mpPaid * 100) === round($mpTotal * 100);
     $assignment  = $mpMesa?->currentAssignment;
 @endphp
 <div class="pos-modal-wrap show pos-modal-shell" data-ui="xui-6jaq3m" wire:click.self="closeMesaPayModal" role="dialog" aria-modal="true" aria-labelledby="mesa-pay-title">
