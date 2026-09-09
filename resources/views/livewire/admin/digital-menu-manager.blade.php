@@ -1,5 +1,15 @@
 <div class="digital-menu-page">
     <x-ui.toast-stack />
+    @php
+        $sectionNames = [
+            'overview' => 'configuración general',
+            'banners' => 'banners',
+            'featured' => 'favoritos',
+            'categories' => 'categorías',
+            'gallery' => 'galería',
+        ];
+        $currentSectionName = $sectionNames[$activeSection] ?? 'esta sección';
+    @endphp
 
     <header class="digital-menu-header">
         <span class="digital-menu-header__icon"><i class="bx bx-mobile-alt"></i></span>
@@ -13,7 +23,7 @@
         </a>
     </header>
 
-    <form wire:submit="save" class="digital-menu-editor"
+    <form wire:submit="saveSection" class="digital-menu-editor"
         x-data="{ uploading: false, uploadProgress: 0 }"
         x-on:livewire-upload-start="uploading = true; uploadProgress = 0"
         x-on:livewire-upload-finish="uploading = false; uploadProgress = 100"
@@ -40,26 +50,26 @@
             @if ($errors->any())
                 <div class="digital-menu-validation-summary" role="alert">
                     <i class="bx bx-error-circle" aria-hidden="true"></i>
-                    <span><strong>Hay cambios que necesitan atención.</strong><small>{{ $errors->first() }}</small></span>
+                    <span><strong>No guardamos {{ $currentSectionName }}.</strong><small>{{ $errors->first() }}</small></span>
                 </div>
             @endif
             @if ($activeSection === 'overview')
                 <header class="digital-menu-section-heading">
-                    <span>01</span><div><h2>Composición general</h2><p>Activa únicamente las secciones que aportan valor al cliente.</p></div>
+                    <span>01</span><div><h2>Configuración general</h2><p>Consulta el estado de cada sección y entra a ella para editarla o cambiar su visibilidad.</p></div>
                 </header>
-                <div class="digital-menu-toggle-grid">
+                <div class="digital-menu-overview-grid">
                     @foreach ([
-                        ['showBanners', 'bx-slideshow', 'Carrusel de banners', 'Presentación visual superior.'],
-                        ['showFeatured', 'bx-trophy', 'Favoritos ordenados', 'Ranking manual con posiciones.'],
-                        ['showCategories', 'bx-category-alt', 'Navegación por categorías', 'Accesos rápidos al catálogo.'],
-                        ['showGallery', 'bx-images', 'Galería pública', 'Fotos en portada, menú y galería.'],
-                    ] as $toggle)
-                        <label class="digital-menu-toggle">
-                            <input type="checkbox" wire:model.live="{{ $toggle[0] }}">
-                            <span class="digital-menu-toggle__icon"><i class="bx {{ $toggle[1] }}"></i></span>
-                            <span><strong>{{ $toggle[2] }}</strong><small>{{ $toggle[3] }}</small></span>
-                            <span class="digital-menu-switch" aria-hidden="true"></span>
-                        </label>
+                        ['banners', $showBanners, 'bx-slideshow', 'Carrusel de banners', 'Imágenes de portada y reproducción.'],
+                        ['featured', $showFeatured, 'bx-trophy', 'Favoritos ordenados', 'Productos destacados y su posición.'],
+                        ['categories', $showCategories, 'bx-category-alt', 'Navegación por categorías', 'Estilo de acceso al catálogo.'],
+                        ['gallery', $showGallery, 'bx-images', 'Galería pública', 'Fotografías de espacios y platillos.'],
+                    ] as $module)
+                        <button type="button" class="digital-menu-overview-link" wire:click="setSection('{{ $module[0] }}')">
+                            <span class="digital-menu-toggle__icon"><i class="bx {{ $module[2] }}"></i></span>
+                            <span><strong>{{ $module[3] }}</strong><small>{{ $module[4] }}</small></span>
+                            <span class="digital-menu-overview-link__status {{ $module[1] ? 'is-active' : '' }}"><i class="bx {{ $module[1] ? 'bx-show' : 'bx-hide' }}" aria-hidden="true"></i>{{ $module[1] ? 'Visible' : 'Oculta' }}</span>
+                            <i class="bx bx-chevron-right" aria-hidden="true"></i>
+                        </button>
                     @endforeach
                 </div>
                 <div class="digital-menu-color">
@@ -79,6 +89,8 @@
                     <label><input type="checkbox" wire:model.live="autoplayBanners"><span><strong>Reproducción automática</strong><small>Siempre incluye controles manuales y pausa.</small></span></label>
                     <label><span><strong>Duración por banner</strong><small>Entre 3 y 12 segundos.</small></span><select wire:model="bannerIntervalSeconds">@for($second = 3; $second <= 12; $second++)<option value="{{ $second }}">{{ $second }} s</option>@endfor</select></label>
                 </div>
+                @error('showBanners')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                @error('bannerIntervalSeconds')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 <div class="digital-menu-media-list">
                     @foreach ($bannerPaths as $index => $item)
                         <article wire:key="banner-saved-{{ $index }}">
@@ -107,6 +119,7 @@
                 @endif
                 @error('bannerUploads')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 @error('bannerUploads.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                @error('bannerPaths.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @elseif ($activeSection === 'featured')
                 <header class="digital-menu-section-heading">
                     <span>03</span><div><h2>Favoritos con ranking</h2><p>El primer producto mostrará el número 1; usa las flechas para decidir 2, 3 y siguientes.</p></div>
@@ -118,6 +131,7 @@
                     <span class="digital-menu-section-switch__copy"><strong>Mostrar favoritos</strong><small>Oculta o publica toda la sección sin perder el orden.</small></span>
                     <span class="digital-menu-switch" aria-hidden="true"></span>
                 </label>
+                @error('showFeatured')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 <div class="digital-menu-ranking" aria-label="Orden actual de favoritos">
                     @forelse ($this->selectedProducts as $index => $product)
                         <article wire:key="ranked-product-{{ $product->id }}">
@@ -144,6 +158,7 @@
                     @endforeach
                 </div>
                 @error('featuredProductIds')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                @error('featuredProductIds.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @elseif ($activeSection === 'categories')
                 <header class="digital-menu-section-heading">
                     <span>04</span><div><h2>Presentación de categorías</h2><p>El catálogo conserva sus categorías; aquí decides cómo se navegan.</p></div>
@@ -154,6 +169,7 @@
                     <span class="digital-menu-section-switch__copy"><strong>Mostrar accesos de categorías</strong><small>Permite saltar rápidamente a cada grupo de productos.</small></span>
                     <span class="digital-menu-switch" aria-hidden="true"></span>
                 </label>
+                @error('showCategories')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 <fieldset class="digital-menu-style-options">
                     <legend>Estilo de categorías</legend>
                     <label class="{{ $categoryStyle === 'cards' ? 'is-selected' : '' }}">
@@ -163,6 +179,7 @@
                         <input type="radio" wire:model.live="categoryStyle" value="circles"><span class="digital-menu-style-preview digital-menu-style-preview--circles"><i class="bx bx-grid-alt"></i><i class="bx bx-dish"></i><i class="bx bx-drink"></i></span><span><strong>Círculos visuales</strong><small>Estilo móvil como la referencia, usando imagen o icono.</small></span><i class="bx bx-check-circle"></i>
                     </label>
                 </fieldset>
+                @error('categoryStyle')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @else
                 <header class="digital-menu-section-heading">
                     <span>05</span><div><h2>Galería pública</h2><p>Publica fotografías y decide si la sección aparece para los clientes.</p></div>
@@ -174,6 +191,7 @@
                     <span class="digital-menu-section-switch__copy"><strong>Galería activa</strong><small>Controla portada, menú, pie de página y página de galería.</small></span>
                     <span class="digital-menu-switch" aria-hidden="true"></span>
                 </label>
+                @error('showGallery')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 <div class="digital-menu-media-list digital-menu-media-list--gallery">
                     @foreach ($galleryPaths as $index => $item)
                         <article wire:key="digital-gallery-{{ $index }}">
@@ -199,12 +217,13 @@
                 @endif
                 @error('galleryUploads')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 @error('galleryUploads.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
+                @error('galleryPaths.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @endif
 
             <footer class="digital-menu-actions">
-                <span x-show="! uploading"><i class="bx bx-info-circle"></i>Los cambios se publican al guardar.</span>
+                <span x-show="! uploading"><i class="bx bx-info-circle"></i>Solo se guardarán los cambios de {{ $currentSectionName }}.</span>
                 <span x-show="uploading" x-cloak class="digital-menu-upload-status"><i class="bx bx-cloud-upload"></i>Subiendo imágenes… <b x-text="`${uploadProgress}%`"></b></span>
-                <button type="submit" :disabled="uploading" wire:loading.attr="disabled" wire:target="save,bannerUploads,galleryUploads"><span wire:loading.remove wire:target="save"><i class="bx bx-save"></i>Guardar menú digital</span><span wire:loading wire:target="save"><i class="bx bx-loader-alt"></i>Guardando…</span></button>
+                <button type="submit" :disabled="uploading" wire:loading.attr="disabled" wire:target="saveSection,bannerUploads,galleryUploads"><span wire:loading.remove wire:target="saveSection"><i class="bx bx-save"></i>Guardar {{ $currentSectionName }}</span><span wire:loading wire:target="saveSection"><i class="bx bx-loader-alt"></i>Guardando {{ $currentSectionName }}…</span></button>
             </footer>
             @error('save')<p class="biz-form-error digital-menu-save-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
         </section>

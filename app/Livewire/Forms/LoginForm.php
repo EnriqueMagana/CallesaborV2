@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -64,7 +65,7 @@ class LoginForm extends Form
         return false;
     }
 
-    private function validatedUser(): \App\Models\User
+    private function validatedUser(): User
     {
         $this->ensureIsNotRateLimited();
 
@@ -81,7 +82,7 @@ class LoginForm extends Form
                 RateLimiter::hit($this->throttleKey());
 
                 throw ValidationException::withMessages([
-                    'form.email' => 'Tu cuenta está bloqueada. Contacta al administrador del negocio.',
+                    'form.email' => 'Tu acceso está bloqueado. Si crees que es un error, comunícate con el administrador.',
                 ]);
             }
 
@@ -97,7 +98,7 @@ class LoginForm extends Form
         RateLimiter::hit($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'form.email' => trans('auth.failed'),
+            'form.email' => 'No pudimos iniciar sesión con esos datos. Revisa tu correo y contraseña e inténtalo de nuevo.',
         ]);
     }
 
@@ -115,11 +116,25 @@ class LoginForm extends Form
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'form.email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'form.email' => "Hiciste varios intentos seguidos. Espera {$seconds} segundos antes de volver a intentarlo.",
         ]);
+    }
+
+    /**
+     * Human-readable login validation messages that do not depend on server locale files.
+     */
+    protected function messages(): array
+    {
+        return [
+            'email.required' => 'Escribe tu correo electrónico.',
+            'email.string' => 'El correo electrónico no tiene un formato válido.',
+            'email.email' => 'Revisa el formato de tu correo electrónico.',
+            'email.max' => 'El correo electrónico es demasiado largo.',
+            'password.required' => 'Escribe tu contraseña.',
+            'password.string' => 'La contraseña no tiene un formato válido.',
+            'password.max' => 'La contraseña es demasiado larga.',
+            'remember.boolean' => 'No pudimos reconocer la opción de mantener la sesión.',
+        ];
     }
 
     /**

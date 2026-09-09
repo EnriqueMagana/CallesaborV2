@@ -22,14 +22,24 @@ class DigitalMenuSetting extends Model
     public static function current(): self
     {
         $business = BusinessSetting::current();
+        $bannerPaths = $business->banner_path
+            ? [['path' => $business->banner_path, 'alt' => '']]
+            : [];
+        $featuredProductIds = array_values(array_map('intval', $business->featured_product_ids ?? []));
+        $galleryPaths = $business->galleryItems();
 
         return static::query()->firstOrCreate([], [
             'primary_color' => $business->primary_color ?: '#15803d',
-            'banner_paths' => $business->banner_path
-                ? [['path' => $business->banner_path, 'alt' => '']]
-                : [],
-            'featured_product_ids' => $business->featured_product_ids ?? [],
-            'gallery_paths' => $business->galleryItems(),
+            'show_banners' => $bannerPaths !== [],
+            'banner_paths' => $bannerPaths,
+            'show_featured' => $featuredProductIds !== [],
+            'featured_product_ids' => $featuredProductIds,
+            'show_categories' => Category::query()
+                ->where('is_active', true)
+                ->whereHas('products', fn ($query) => $query->where('is_active', true))
+                ->exists(),
+            'show_gallery' => $galleryPaths !== [],
+            'gallery_paths' => $galleryPaths,
         ]);
     }
 
