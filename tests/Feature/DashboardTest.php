@@ -59,6 +59,40 @@ class DashboardTest extends TestCase
             ->assertSee('Contra entrega');
     }
 
+    public function test_cashier_role_takes_priority_over_waiter_role_on_the_dashboard(): void
+    {
+        $user = $this->userWithRole('mesero');
+        $cashierPermission = Permission::create(['name' => 'ver caja', 'guard_name' => 'web']);
+        $cashierRole = Role::create(['name' => 'turno nocturno', 'guard_name' => 'web']);
+        $cashierRole->givePermissionTo($cashierPermission);
+        $user->assignRole($cashierRole);
+        $this->openRegister($user);
+
+        $this->actingAs($user)
+            ->get(route('app.dashboard'))
+            ->assertOk()
+            ->assertSee('Punto de venta bajo control')
+            ->assertSee('bx bx-money', false)
+            ->assertSee('app-role-summary__label">Turno Nocturno', false)
+            ->assertDontSee('Tu turno, organizado');
+    }
+
+    public function test_role_summary_collapses_three_roles_to_primary_role_and_counter(): void
+    {
+        $user = $this->userWithRole('mesero');
+        Role::create(['name' => 'cajero', 'guard_name' => 'web']);
+        Role::create(['name' => 'apoyo temporal', 'guard_name' => 'web']);
+        $user->assignRole(['cajero', 'apoyo temporal']);
+        $this->openRegister($user);
+
+        $this->actingAs($user)
+            ->get(route('app.dashboard'))
+            ->assertOk()
+            ->assertSee('app-role-summary__label">Cajero', false)
+            ->assertSee('app-role-summary__more" aria-hidden="true">+2', false)
+            ->assertSee('Roles asignados: Cajero, Mesero, Apoyo Temporal', false);
+    }
+
     public function test_owner_can_open_each_active_kiosk_from_the_dashboard(): void
     {
         $owner = $this->userWithRole('owner');
@@ -94,7 +128,7 @@ class DashboardTest extends TestCase
         $this->actingAs($owner)
             ->get(route('app.dashboard'))
             ->assertOk()
-            ->assertSee('Todos a descansar')
+            ->assertSee('Excelente trabajo por hoy')
             ->assertSee('data-dashboard-state="resting"', false)
             ->assertDontSee('Indicadores principales')
             ->assertDontSee('Actividad del periodo')

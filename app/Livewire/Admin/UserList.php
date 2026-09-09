@@ -517,7 +517,7 @@ class UserList extends Component
 
     public function render()
     {
-        $query = User::withTrashed()->with(['roles', 'bannedBy'])
+        $query = User::withTrashed()->with(['roles.permissions', 'bannedBy'])
             ->when($this->search, fn ($q) => $q->where(fn ($search) => $search
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('email', 'like', "%{$this->search}%")

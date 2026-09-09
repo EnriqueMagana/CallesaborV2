@@ -6,11 +6,16 @@ use App\Models\BusinessSetting;
 use App\Models\DigitalMenuSetting;
 use App\Models\Product;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use RuntimeException;
+use Throwable;
 
 #[Layout('layouts.app')]
 class DigitalMenuManager extends Component
@@ -72,86 +77,121 @@ class DigitalMenuManager extends Component
     public function save(): void
     {
         $this->authorizeAccess();
-        $this->validate([
-            'primaryColor' => [
-                'required',
-                'regex:/^#[0-9A-Fa-f]{6}$/',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (is_string($value) && ! $this->hasReadableWhiteContrast($value)) {
-                        $fail('El color debe ser suficientemente oscuro para mantener un contraste accesible.');
-                    }
-                },
-            ],
-            'showBanners' => 'boolean',
-            'autoplayBanners' => 'boolean',
-            'bannerIntervalSeconds' => 'integer|min:3|max:12',
-            'bannerPaths' => 'array',
-            'bannerPaths.*.path' => 'required|string',
-            'bannerPaths.*.alt' => 'nullable|string|max:120',
-            'bannerUploads' => 'array',
-            'bannerUploads.*' => 'image|max:6144',
-            'bannerUploadAlts' => 'array',
-            'bannerUploadAlts.*' => 'nullable|string|max:120',
-            'showFeatured' => 'boolean',
-            'featuredProductIds' => 'array|max:'.self::MAX_FEATURED,
-            'featuredProductIds.*' => 'integer|distinct|exists:products,id',
-            'showCategories' => 'boolean',
-            'categoryStyle' => 'required|in:cards,circles',
-            'showGallery' => 'boolean',
-            'galleryPaths' => 'array',
-            'galleryPaths.*.path' => 'required|string',
-            'galleryPaths.*.caption' => 'nullable|string|max:120',
-            'galleryUploads' => 'array',
-            'galleryUploads.*' => 'image|max:6144',
-            'galleryUploadCaptions' => 'array',
-            'galleryUploadCaptions.*' => 'nullable|string|max:120',
-        ]);
+        $this->resetErrorBag();
+
+        try {
+            $this->validate([
+                'primaryColor' => [
+                    'required',
+                    'regex:/^#[0-9A-Fa-f]{6}$/',
+                    function (string $attribute, mixed $value, \Closure $fail): void {
+                        if (is_string($value) && ! $this->hasReadableWhiteContrast($value)) {
+                            $fail('El color debe ser suficientemente oscuro para mantener un contraste accesible.');
+                        }
+                    },
+                ],
+                'showBanners' => 'boolean',
+                'autoplayBanners' => 'boolean',
+                'bannerIntervalSeconds' => 'integer|min:3|max:12',
+                'bannerPaths' => 'array',
+                'bannerPaths.*.path' => 'required|string',
+                'bannerPaths.*.alt' => 'nullable|string|max:120',
+                'bannerUploads' => 'array',
+                'bannerUploads.*' => 'image|mimes:jpg,jpeg,png,webp|max:6144',
+                'bannerUploadAlts' => 'array',
+                'bannerUploadAlts.*' => 'nullable|string|max:120',
+                'showFeatured' => 'boolean',
+                'featuredProductIds' => 'array|max:'.self::MAX_FEATURED,
+                'featuredProductIds.*' => 'integer|distinct|exists:products,id',
+                'showCategories' => 'boolean',
+                'categoryStyle' => 'required|in:cards,circles',
+                'showGallery' => 'boolean',
+                'galleryPaths' => 'array',
+                'galleryPaths.*.path' => 'required|string',
+                'galleryPaths.*.caption' => 'nullable|string|max:120',
+                'galleryUploads' => 'array',
+                'galleryUploads.*' => 'image|mimes:jpg,jpeg,png,webp|max:6144',
+                'galleryUploadCaptions' => 'array',
+                'galleryUploadCaptions.*' => 'nullable|string|max:120',
+            ], $this->validationMessages());
+        } catch (ValidationException $exception) {
+            $this->activeSection = $this->sectionForErrors(array_keys($exception->errors()));
+            $this->notify('error', 'No se pudo guardar', 'Revisa los campos marcados en la sección abierta.');
+
+            throw $exception;
+        }
 
         if (count($this->bannerPaths) + count($this->bannerUploads) > self::MAX_BANNERS) {
-            $this->addError('bannerUploads', 'Puedes publicar un máximo de '.self::MAX_BANNERS.' banners.');
+            $this->reportLimitError('bannerUploads', 'banners', 'Puedes publicar un máximo de '.self::MAX_BANNERS.' banners.');
 
             return;
         }
 
         if (count($this->galleryPaths) + count($this->galleryUploads) > self::MAX_GALLERY_IMAGES) {
-            $this->addError('galleryUploads', 'La galería admite un máximo de '.self::MAX_GALLERY_IMAGES.' imágenes.');
+            $this->reportLimitError('galleryUploads', 'gallery', 'La galería admite un máximo de '.self::MAX_GALLERY_IMAGES.' imágenes.');
 
             return;
         }
 
-        $setting = DigitalMenuSetting::current();
-        $bannerPaths = $this->storeMediaUploads($this->bannerPaths, $this->bannerUploads, $this->bannerUploadAlts, 'business/digital-menu/banners', 'alt');
-        $galleryPaths = $this->storeMediaUploads($this->galleryPaths, $this->galleryUploads, $this->galleryUploadCaptions, 'business/digital-menu/gallery', 'caption');
-        $featuredIds = array_values(array_map('intval', $this->featuredProductIds));
+        $newMediaPaths = [];
 
-        $setting->update([
-            'primary_color' => strtolower($this->primaryColor),
-            'show_banners' => $this->showBanners,
-            'autoplay_banners' => $this->autoplayBanners,
-            'banner_interval_seconds' => $this->bannerIntervalSeconds,
-            'banner_paths' => $bannerPaths,
-            'show_featured' => $this->showFeatured,
-            'featured_product_ids' => $featuredIds,
-            'show_categories' => $this->showCategories,
-            'category_style' => $this->categoryStyle,
-            'show_gallery' => $this->showGallery,
-            'gallery_paths' => $galleryPaths,
-            'updated_by' => auth()->id(),
-        ]);
+        try {
+            $bannerPaths = $this->storeMediaUploads($this->bannerPaths, $this->bannerUploads, $this->bannerUploadAlts, 'business/digital-menu/banners', 'alt', $newMediaPaths);
+            $galleryPaths = $this->storeMediaUploads($this->galleryPaths, $this->galleryUploads, $this->galleryUploadCaptions, 'business/digital-menu/gallery', 'caption', $newMediaPaths);
+            $featuredIds = array_values(array_map('intval', $this->featuredProductIds));
 
-        BusinessSetting::current()->update([
-            'primary_color' => strtolower($this->primaryColor),
-            'banner_path' => $bannerPaths[0]['path'] ?? null,
-            'featured_product_ids' => $featuredIds,
-            'gallery_paths' => $galleryPaths,
-            'updated_by' => auth()->id(),
-        ]);
+            DB::transaction(function () use ($bannerPaths, $galleryPaths, $featuredIds): void {
+                DigitalMenuSetting::current()->update([
+                    'primary_color' => strtolower($this->primaryColor),
+                    'show_banners' => $this->showBanners,
+                    'autoplay_banners' => $this->autoplayBanners,
+                    'banner_interval_seconds' => $this->bannerIntervalSeconds,
+                    'banner_paths' => $bannerPaths,
+                    'show_featured' => $this->showFeatured,
+                    'featured_product_ids' => $featuredIds,
+                    'show_categories' => $this->showCategories,
+                    'category_style' => $this->categoryStyle,
+                    'show_gallery' => $this->showGallery,
+                    'gallery_paths' => $galleryPaths,
+                    'updated_by' => auth()->id(),
+                ]);
+
+                BusinessSetting::current()->update([
+                    'primary_color' => strtolower($this->primaryColor),
+                    'banner_path' => $bannerPaths[0]['path'] ?? null,
+                    'featured_product_ids' => $featuredIds,
+                    'gallery_paths' => $galleryPaths,
+                    'updated_by' => auth()->id(),
+                ]);
+            });
+        } catch (Throwable $exception) {
+            $this->discardNewMedia($newMediaPaths);
+            Log::error('No fue posible publicar el menú digital.', [
+                'user_id' => auth()->id(),
+                'exception' => $exception,
+            ]);
+            $this->addError('save', 'No fue posible guardar los cambios. Verifica el almacenamiento del servidor e inténtalo de nuevo.');
+            $this->notify('error', 'Error al publicar', 'Los cambios no se guardaron. El equipo técnico puede revisar el registro del servidor.');
+
+            return;
+        }
 
         $protectedPaths = collect($bannerPaths)->concat($galleryPaths)->pluck('path')->filter()->all();
-        collect($this->removedMediaPaths)
+        $obsoletePaths = collect($this->removedMediaPaths)
             ->unique()
             ->reject(fn (string $path): bool => in_array($path, $protectedPaths, true))
-            ->each(fn (string $path) => Storage::disk('public')->delete($path));
+            ->values()
+            ->all();
+
+        try {
+            Storage::disk('public')->delete($obsoletePaths);
+        } catch (Throwable $exception) {
+            Log::warning('El menú digital se publicó, pero no se pudieron limpiar archivos anteriores.', [
+                'user_id' => auth()->id(),
+                'paths' => $obsoletePaths,
+                'exception' => $exception,
+            ]);
+        }
 
         $this->bannerUploads = [];
         $this->bannerUploadAlts = [];
@@ -160,7 +200,7 @@ class DigitalMenuManager extends Component
         $this->removedMediaPaths = [];
         $this->loadSettings();
 
-        session()->flash('success', 'Menú digital actualizado correctamente.');
+        $this->notify('success', 'Menú publicado', 'Las imágenes y la configuración ya están visibles para tus clientes.');
     }
 
     public function toggleFeaturedProduct(int $productId): void
@@ -278,13 +318,20 @@ class DigitalMenuManager extends Component
         $this->galleryPaths = $setting->galleryItems();
     }
 
-    private function storeMediaUploads(array $current, array $uploads, array $texts, string $directory, string $textKey): array
+    private function storeMediaUploads(array $current, array $uploads, array $texts, string $directory, string $textKey, array &$newMediaPaths): array
     {
         $items = array_values($current);
 
         foreach ($uploads as $index => $upload) {
+            $path = $upload->store($directory, 'public');
+
+            if (! is_string($path) || $path === '' || ! Storage::disk('public')->exists($path)) {
+                throw new RuntimeException("No se pudo confirmar la imagen almacenada en {$directory}.");
+            }
+
+            $newMediaPaths[] = $path;
             $items[] = [
-                'path' => $upload->store($directory, 'public'),
+                'path' => $path,
                 $textKey => trim((string) ($texts[$index] ?? '')),
             ];
         }
@@ -344,5 +391,58 @@ class DigitalMenuManager extends Component
     private function authorizeAccess(): void
     {
         abort_unless(auth()->user()?->can('gestionar menu digital'), 403);
+    }
+
+    private function validationMessages(): array
+    {
+        return [
+            'bannerUploads.*.image' => 'Cada banner debe ser una imagen válida.',
+            'bannerUploads.*.mimes' => 'Los banners deben ser JPG, PNG o WebP.',
+            'bannerUploads.*.max' => 'Cada banner puede pesar máximo 6 MB.',
+            'galleryUploads.*.image' => 'Cada archivo de galería debe ser una imagen válida.',
+            'galleryUploads.*.mimes' => 'Las imágenes de galería deben ser JPG, PNG o WebP.',
+            'galleryUploads.*.max' => 'Cada imagen de galería puede pesar máximo 6 MB.',
+        ];
+    }
+
+    private function sectionForErrors(array $fields): string
+    {
+        $field = (string) ($fields[0] ?? '');
+
+        return match (true) {
+            str_starts_with($field, 'banner') => 'banners',
+            str_starts_with($field, 'featured') => 'featured',
+            str_starts_with($field, 'category'), str_starts_with($field, 'showCategories') => 'categories',
+            str_starts_with($field, 'gallery'), str_starts_with($field, 'showGallery') => 'gallery',
+            default => 'overview',
+        };
+    }
+
+    private function reportLimitError(string $field, string $section, string $message): void
+    {
+        $this->activeSection = $section;
+        $this->addError($field, $message);
+        $this->notify('error', 'Límite de imágenes', $message);
+    }
+
+    private function notify(string $type, string $title, string $message): void
+    {
+        $this->dispatch('notify', type: $type, title: $title, message: $message);
+    }
+
+    private function discardNewMedia(array $paths): void
+    {
+        if ($paths === []) {
+            return;
+        }
+
+        try {
+            Storage::disk('public')->delete($paths);
+        } catch (Throwable $cleanupException) {
+            Log::warning('No fue posible limpiar archivos de un guardado fallido del menú digital.', [
+                'paths' => $paths,
+                'exception' => $cleanupException,
+            ]);
+        }
     }
 }

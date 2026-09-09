@@ -1,7 +1,5 @@
 <div class="digital-menu-page">
-    @if (session('success'))
-        <div class="biz-toast" role="status" aria-live="polite"><i class="bx bx-check-circle"></i>{{ session('success') }}</div>
-    @endif
+    <x-ui.toast-stack />
 
     <header class="digital-menu-header">
         <span class="digital-menu-header__icon"><i class="bx bx-mobile-alt"></i></span>
@@ -15,7 +13,13 @@
         </a>
     </header>
 
-    <form wire:submit="save" class="digital-menu-editor">
+    <form wire:submit="save" class="digital-menu-editor"
+        x-data="{ uploading: false, uploadProgress: 0 }"
+        x-on:livewire-upload-start="uploading = true; uploadProgress = 0"
+        x-on:livewire-upload-finish="uploading = false; uploadProgress = 100"
+        x-on:livewire-upload-cancel="uploading = false; uploadProgress = 0"
+        x-on:livewire-upload-error="uploading = false; $dispatch('notify', { type: 'error', title: 'No se pudo subir', message: 'Comprueba que la imagen sea JPG, PNG o WebP y no supere 6 MB.' })"
+        x-on:livewire-upload-progress="uploadProgress = $event.detail.progress">
         <nav class="digital-menu-nav" aria-label="Secciones del menú digital">
             @foreach ([
                 'overview' => ['bx-slider-alt', 'General', 'Visibilidad y color'],
@@ -33,6 +37,12 @@
         </nav>
 
         <section class="digital-menu-panel">
+            @if ($errors->any())
+                <div class="digital-menu-validation-summary" role="alert">
+                    <i class="bx bx-error-circle" aria-hidden="true"></i>
+                    <span><strong>Hay cambios que necesitan atención.</strong><small>{{ $errors->first() }}</small></span>
+                </div>
+            @endif
             @if ($activeSection === 'overview')
                 <header class="digital-menu-section-heading">
                     <span>01</span><div><h2>Composición general</h2><p>Activa únicamente las secciones que aportan valor al cliente.</p></div>
@@ -93,7 +103,7 @@
                     @endforeach
                 </div>
                 @if (count($bannerPaths) + count($bannerUploads) < $this->maxBanners)
-                    <label class="digital-menu-upload"><input type="file" wire:model.live="bannerUploads" accept="image/png,image/jpeg,image/webp" multiple><i class="bx bx-cloud-upload"></i><span><strong>Subir banners</strong><small>Formato horizontal recomendado 1600 × 640 px · máximo 6 MB.</small></span></label>
+                    <label class="digital-menu-upload"><input type="file" wire:model="bannerUploads" accept="image/png,image/jpeg,image/webp" multiple><i class="bx bx-cloud-upload"></i><span><strong>Subir banners</strong><small>Formato horizontal recomendado 1600 × 640 px · máximo 6 MB.</small></span></label>
                 @endif
                 @error('bannerUploads')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 @error('bannerUploads.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
@@ -185,16 +195,18 @@
                     @endforeach
                 </div>
                 @if (count($galleryPaths) + count($galleryUploads) < $this->maxGalleryImages)
-                    <label class="digital-menu-upload"><input type="file" wire:model.live="galleryUploads" accept="image/png,image/jpeg,image/webp" multiple><i class="bx bx-images"></i><span><strong>Agregar fotografías</strong><small>JPG, PNG o WebP · máximo 6 MB por imagen.</small></span></label>
+                    <label class="digital-menu-upload"><input type="file" wire:model="galleryUploads" accept="image/png,image/jpeg,image/webp" multiple><i class="bx bx-images"></i><span><strong>Agregar fotografías</strong><small>JPG, PNG o WebP · máximo 6 MB por imagen.</small></span></label>
                 @endif
                 @error('galleryUploads')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
                 @error('galleryUploads.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @endif
 
             <footer class="digital-menu-actions">
-                <span><i class="bx bx-info-circle"></i>Los cambios se publican al guardar.</span>
-                <button type="submit" wire:loading.attr="disabled" wire:target="save,bannerUploads,galleryUploads"><span wire:loading.remove wire:target="save"><i class="bx bx-save"></i>Guardar menú digital</span><span wire:loading wire:target="save">Guardando…</span></button>
+                <span x-show="! uploading"><i class="bx bx-info-circle"></i>Los cambios se publican al guardar.</span>
+                <span x-show="uploading" x-cloak class="digital-menu-upload-status"><i class="bx bx-cloud-upload"></i>Subiendo imágenes… <b x-text="`${uploadProgress}%`"></b></span>
+                <button type="submit" :disabled="uploading" wire:loading.attr="disabled" wire:target="save,bannerUploads,galleryUploads"><span wire:loading.remove wire:target="save"><i class="bx bx-save"></i>Guardar menú digital</span><span wire:loading wire:target="save"><i class="bx bx-loader-alt"></i>Guardando…</span></button>
             </footer>
+            @error('save')<p class="biz-form-error digital-menu-save-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i>{{ $message }}</p>@enderror
         </section>
     </form>
 </div>

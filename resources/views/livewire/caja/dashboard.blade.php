@@ -1,9 +1,11 @@
 <div class="app-page cash-page">
 
-    @if(session('cash_register_required'))
+    @if (session('cash_register_required'))
         <div class="cash-access-notice" role="alert">
             <span><i class="bx bx-lock-alt" aria-hidden="true"></i></span>
-            <div><strong>Este acceso requiere una caja abierta</strong><p>{{ session('cash_register_required') }} Abre el turno para continuar.</p></div>
+            <div><strong>Este acceso requiere una caja abierta</strong>
+                <p>{{ session('cash_register_required') }} Abre el turno para continuar.</p>
+            </div>
         </div>
     @endif
 
@@ -13,13 +15,16 @@
             <div>
                 <div class="app-eyebrow">Operación · Efectivo</div>
                 <h1 class="app-page-title">Caja</h1>
-                <p class="app-page-subtitle">Controla la apertura del turno, el efectivo disponible y el cierre de caja.</p>
+                <p class="app-page-subtitle">Controla la apertura del turno, el efectivo disponible y el cierre de caja.
+                </p>
             </div>
         </div>
-        @if($this->activeRegister)
-            <span class="app-status app-status--success"><i class="bx bx-check-circle" aria-hidden="true"></i>Turno activo</span>
+        @if ($this->activeRegister)
+            <span class="app-status app-status--success"><i class="bx bx-check-circle" aria-hidden="true"></i>Turno
+                activo</span>
         @else
-            <span class="app-status app-status--warning"><i class="bx bx-lock" aria-hidden="true"></i>Caja cerrada</span>
+            <span class="app-status app-status--warning"><i class="bx bx-lock" aria-hidden="true"></i>Caja
+                cerrada</span>
         @endif
     </header>
 
@@ -87,154 +92,231 @@
             </div>
         </div>
 
-        @if($this->deliveryManagementEnabled)
-        <section class="app-card delivery-reconciliation" aria-labelledby="delivery-reconciliation-title">
-            <header class="delivery-reconciliation__header">
-                <div>
-                    <span><i class="bx bx-cycling" aria-hidden="true"></i></span>
+        @if ($this->deliveryManagementEnabled)
+            <section class="app-card delivery-reconciliation" aria-labelledby="delivery-reconciliation-title">
+                <header class="delivery-reconciliation__header">
                     <div>
-                        <div class="app-eyebrow">Arqueo por área · Delivery</div>
-                        <h2 id="delivery-reconciliation-title">Mini cortes de repartidores</h2>
-                        <p>Notas entregadas, efectivo bajo resguardo y pagos digitales del turno.</p>
+                        <span><i class="bx bx-cycling" aria-hidden="true"></i></span>
+                        <div>
+                            <div class="app-eyebrow">Arqueo por área · Delivery</div>
+                            <h2 id="delivery-reconciliation-title">Mini cortes de repartidores</h2>
+                            <p>Notas entregadas, efectivo bajo resguardo y pagos digitales del turno.</p>
+                        </div>
                     </div>
-                </div>
-                @if($this->unassignedDeliveryCount > 0)
-                    <span class="delivery-reconciliation__warning"><i class="bx bx-error-circle"></i>{{ $this->unassignedDeliveryCount }} sin asignar</span>
-                @else
-                    <span class="app-status app-status--success"><i class="bx bx-check-shield"></i>Sin pedidos huérfanos</span>
+                    @if ($this->unassignedDeliveryCount > 0)
+                        <span class="delivery-reconciliation__warning"><i
+                                class="bx bx-error-circle"></i>{{ $this->unassignedDeliveryCount }} sin asignar</span>
+                    @else
+                        <span class="app-status app-status--success"><i class="bx bx-check-shield"></i>Todo
+                            correcto</span>
+                    @endif
+                </header>
+
+                @if ($this->unassignedDeliveryCount > 0)
+                    <div class="delivery-reconciliation__notice" role="alert">
+                        <i class="bx bx-lock-alt" aria-hidden="true"></i>
+                        <div><strong>El corte general está bloqueado.</strong>
+                            <p>Todo pedido a domicilio debe tener un repartidor asignado, incluso si ya fue pagado en
+                                sucursal.</p>
+                        </div>
+                        @can('ver delivery')
+                            <a href="{{ route('app.delivery') }}">Asignar pedidos <i class="bx bx-right-arrow-alt"></i></a>
+                        @endcan
+                    </div>
                 @endif
-            </header>
 
-            @if($this->unassignedDeliveryCount > 0)
-                <div class="delivery-reconciliation__notice" role="alert">
-                    <i class="bx bx-lock-alt" aria-hidden="true"></i>
-                    <div><strong>El corte general está bloqueado.</strong><p>Todo pedido a domicilio debe tener un repartidor asignado, incluso si ya fue pagado en sucursal.</p></div>
-                    @can('ver delivery')<a href="{{ route('app.delivery') }}">Asignar pedidos <i class="bx bx-right-arrow-alt"></i></a>@endcan
-                </div>
-            @endif
-
-            <div class="table-responsive">
-                <table class="delivery-reconciliation__table">
-                    <thead>
-                        <tr><th>Repartidor</th><th class="text-end">En ruta</th><th class="text-end">Notas por arquear</th><th class="text-end">Efectivo esperado</th><th class="text-end">Transferencias</th><th class="text-end">Venta</th><th>Estado / acción</th></tr>
-                    </thead>
-                    <tbody>
-                        @forelse($this->deliveryReconciliations as $driver)
+                <div class="table-responsive">
+                    <table class="delivery-reconciliation__table">
+                        <thead>
                             <tr>
-                                <td><span class="delivery-reconciliation__driver"><i class="bx bx-user"></i><strong>{{ $driver['name'] }}</strong></span></td>
-                                <td class="text-end" data-label="En ruta"><span class="delivery-reconciliation__value">{{ $driver['in_route'] }}</span></td>
-                                <td class="text-end" data-label="Notas por arquear"><span class="delivery-reconciliation__value">{{ $driver['pending_notes'] }}</span></td>
-                                <td class="text-end is-cash" data-label="Efectivo esperado"><span class="delivery-reconciliation__value">${{ number_format($driver['cash_expected'], 2) }}</span></td>
-                                <td class="text-end" data-label="Transferencias"><span class="delivery-reconciliation__value">${{ number_format($driver['transfer_total'], 2) }}</span></td>
-                                <td class="text-end" data-label="Venta"><span class="delivery-reconciliation__value"><strong>${{ number_format($driver['sales_total'], 2) }}</strong></span></td>
-                                <td data-label="Estado / acción">
-                                    @if($driver['can_settle'])
-                                        @can('cerrar caja')
-                                            <button type="button" class="btn btn-sm btn-primary" wire:click="openDeliverySettlement({{ $driver['driver_id'] }})">
-                                                <i class="bx bx-calculator"></i> Realizar arqueo
-                                            </button>
-                                        @else
-                                            <span class="app-status app-status--warning"><i class="bx bx-time-five"></i>Pendiente de caja</span>
-                                        @endcan
-                                    @elseif($driver['in_route'] > 0)
-                                        <span class="app-status app-status--warning"><i class="bx bx-cycling"></i>Entrega en curso</span>
-                                    @elseif($driver['settlements']->isNotEmpty())
-                                        <span class="app-status app-status--success"><i class="bx bx-check-double"></i>Arqueo completado</span>
-                                    @else
-                                        <span class="app-status app-status--neutral"><i class="bx bx-minus"></i>Sin notas</span>
-                                    @endif
-                                </td>
+                                <th>Repartidor</th>
+                                <th class="text-end">En ruta</th>
+                                <th class="text-end">Notas por arquear</th>
+                                <th class="text-end">Efectivo esperado</th>
+                                <th class="text-end">Transferencias</th>
+                                <th class="text-end">Venta</th>
+                                <th>Estado / acción</th>
                             </tr>
-                            @foreach($driver['settlements'] as $settlement)
-                                <tr class="delivery-reconciliation__history">
-                                    <td colspan="7">
-                                        <span><i class="bx bx-check-circle"></i><strong>{{ $driver['name'] }} · arqueo completado</strong></span>
-                                        <span>{{ $settlement->orders_count }} notas</span>
-                                        <span>Efectivo ${{ number_format($settlement->declared_cash, 2) }}</span>
-                                        <span class="{{ (float)$settlement->difference === 0.0 ? 'is-exact' : 'is-difference' }}">
-                                            {{ (float)$settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $'.number_format($settlement->difference, 2) }}
-                                        </span>
-                                        <time datetime="{{ $settlement->completed_at->toIso8601String() }}">{{ $settlement->completed_at->format('g:i A') }}</time>
+                        </thead>
+                        <tbody>
+                            @forelse($this->deliveryReconciliations as $driver)
+                                <tr>
+                                    <td><span class="delivery-reconciliation__driver"><i
+                                                class="bx bx-user"></i><strong>{{ $driver['name'] }}</strong></span>
+                                    </td>
+                                    <td class="text-end" data-label="En ruta"><span
+                                            class="delivery-reconciliation__value">{{ $driver['in_route'] }}</span>
+                                    </td>
+                                    <td class="text-end" data-label="Notas por arquear"><span
+                                            class="delivery-reconciliation__value">{{ $driver['pending_notes'] }}</span>
+                                    </td>
+                                    <td class="text-end is-cash" data-label="Efectivo esperado"><span
+                                            class="delivery-reconciliation__value">${{ number_format($driver['cash_expected'], 2) }}</span>
+                                    </td>
+                                    <td class="text-end" data-label="Transferencias"><span
+                                            class="delivery-reconciliation__value">${{ number_format($driver['transfer_total'], 2) }}</span>
+                                    </td>
+                                    <td class="text-end" data-label="Venta"><span
+                                            class="delivery-reconciliation__value"><strong>${{ number_format($driver['sales_total'], 2) }}</strong></span>
+                                    </td>
+                                    <td data-label="Estado / acción">
+                                        @if ($driver['can_settle'])
+                                            @can('cerrar caja')
+                                                <button type="button" class="btn btn-sm btn-primary"
+                                                    wire:click="openDeliverySettlement({{ $driver['driver_id'] }})">
+                                                    <i class="bx bx-calculator"></i> Realizar arqueo
+                                                </button>
+                                            @else
+                                                <span class="app-status app-status--warning"><i
+                                                        class="bx bx-time-five"></i>Pendiente de caja</span>
+                                            @endcan
+                                        @elseif($driver['in_route'] > 0)
+                                            <span class="app-status app-status--warning"><i
+                                                    class="bx bx-cycling"></i>Entrega en curso</span>
+                                        @elseif($driver['settlements']->isNotEmpty())
+                                            <span class="app-status app-status--success"><i
+                                                    class="bx bx-check-double"></i>Arqueo completado</span>
+                                        @else
+                                            <span class="app-status app-status--neutral"><i
+                                                    class="bx bx-minus"></i>Sin notas</span>
+                                        @endif
                                     </td>
                                 </tr>
-                            @endforeach
-                        @empty
-                            <tr><td colspan="7"><div class="cash-cut-empty"><span><i class="bx bx-cycling"></i></span><div><strong>Sin actividad de delivery</strong><p>Cuando un repartidor tome un pedido, su resumen aparecerá aquí.</p></div></div></td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="delivery-reconciliation__mobile-list">
-                @forelse($this->deliveryReconciliations as $driver)
-                    <article class="delivery-driver-card">
-                        <header class="delivery-driver-card__header">
-                            <span class="delivery-reconciliation__driver"><i class="bx bx-user" aria-hidden="true"></i><strong>{{ $driver['name'] }}</strong></span>
-                        </header>
-
-                        <dl class="delivery-driver-card__metrics">
-                            <div><dt>En ruta</dt><dd>{{ $driver['in_route'] }}</dd></div>
-                            <div><dt>Notas por arquear</dt><dd>{{ $driver['pending_notes'] }}</dd></div>
-                            <div class="is-cash"><dt>Efectivo esperado</dt><dd>${{ number_format($driver['cash_expected'], 2) }}</dd></div>
-                            <div><dt>Transferencias</dt><dd>${{ number_format($driver['transfer_total'], 2) }}</dd></div>
-                            <div><dt>Venta</dt><dd><strong>${{ number_format($driver['sales_total'], 2) }}</strong></dd></div>
-                        </dl>
-
-                        <div class="delivery-driver-card__action">
-                            @if($driver['can_settle'])
-                                @can('cerrar caja')
-                                    <button type="button" class="btn btn-primary" wire:click="openDeliverySettlement({{ $driver['driver_id'] }})">
-                                        <i class="bx bx-calculator" aria-hidden="true"></i> Realizar arqueo
-                                    </button>
-                                @else
-                                    <span class="app-status app-status--warning"><i class="bx bx-time-five"></i>Pendiente de caja</span>
-                                @endcan
-                            @elseif($driver['in_route'] > 0)
-                                <span class="app-status app-status--warning"><i class="bx bx-cycling"></i>Entrega en curso</span>
-                            @elseif($driver['settlements']->isNotEmpty())
-                                <span class="app-status app-status--success"><i class="bx bx-check-double"></i>Arqueo completado</span>
-                            @else
-                                <span class="app-status app-status--neutral"><i class="bx bx-minus"></i>Sin notas</span>
-                            @endif
-                        </div>
-
-                        @if($driver['settlements']->isNotEmpty())
-                            <div class="delivery-driver-card__history">
-                                @foreach($driver['settlements'] as $settlement)
-                                    <div>
-                                        <strong><i class="bx bx-check-circle" aria-hidden="true"></i> Arqueo completado</strong>
-                                        <span>{{ $settlement->orders_count }} notas · Efectivo ${{ number_format($settlement->declared_cash, 2) }}</span>
-                                        <span class="{{ (float)$settlement->difference === 0.0 ? 'is-exact' : 'is-difference' }}">
-                                            {{ (float)$settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $'.number_format($settlement->difference, 2) }} · {{ $settlement->completed_at->format('g:i A') }}
-                                        </span>
-                                    </div>
+                                @foreach ($driver['settlements'] as $settlement)
+                                    <tr class="delivery-reconciliation__history">
+                                        <td colspan="7">
+                                            <span><i class="bx bx-check-circle"></i><strong>{{ $driver['name'] }} ·
+                                                    arqueo completado</strong></span>
+                                            <span>{{ $settlement->orders_count }} notas</span>
+                                            <span>Efectivo ${{ number_format($settlement->declared_cash, 2) }}</span>
+                                            <span
+                                                class="{{ (float) $settlement->difference === 0.0 ? 'is-exact' : 'is-difference' }}">
+                                                {{ (float) $settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $' . number_format($settlement->difference, 2) }}
+                                            </span>
+                                            <time
+                                                datetime="{{ $settlement->completed_at->toIso8601String() }}">{{ $settlement->completed_at->format('g:i A') }}</time>
+                                        </td>
+                                    </tr>
                                 @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="cash-cut-empty"><span><i class="bx bx-cycling"></i></span>
+                                            <div><strong>Sin actividad de delivery</strong>
+                                                <p>Cuando un repartidor tome un pedido, su resumen aparecerá aquí.</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="delivery-reconciliation__mobile-list">
+                    @forelse($this->deliveryReconciliations as $driver)
+                        <article class="delivery-driver-card">
+                            <header class="delivery-driver-card__header">
+                                <span class="delivery-reconciliation__driver"><i class="bx bx-user"
+                                        aria-hidden="true"></i><strong>{{ $driver['name'] }}</strong></span>
+                            </header>
+
+                            <dl class="delivery-driver-card__metrics">
+                                <div>
+                                    <dt>En ruta</dt>
+                                    <dd>{{ $driver['in_route'] }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Notas por arquear</dt>
+                                    <dd>{{ $driver['pending_notes'] }}</dd>
+                                </div>
+                                <div class="is-cash">
+                                    <dt>Efectivo esperado</dt>
+                                    <dd>${{ number_format($driver['cash_expected'], 2) }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Transferencias</dt>
+                                    <dd>${{ number_format($driver['transfer_total'], 2) }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Venta</dt>
+                                    <dd><strong>${{ number_format($driver['sales_total'], 2) }}</strong></dd>
+                                </div>
+                            </dl>
+
+                            <div class="delivery-driver-card__action">
+                                @if ($driver['can_settle'])
+                                    @can('cerrar caja')
+                                        <button type="button" class="btn btn-primary"
+                                            wire:click="openDeliverySettlement({{ $driver['driver_id'] }})">
+                                            <i class="bx bx-calculator" aria-hidden="true"></i> Realizar arqueo
+                                        </button>
+                                    @else
+                                        <span class="app-status app-status--warning"><i
+                                                class="bx bx-time-five"></i>Pendiente de caja</span>
+                                    @endcan
+                                @elseif($driver['in_route'] > 0)
+                                    <span class="app-status app-status--warning"><i class="bx bx-cycling"></i>Entrega
+                                        en curso</span>
+                                @elseif($driver['settlements']->isNotEmpty())
+                                    <span class="app-status app-status--success"><i
+                                            class="bx bx-check-double"></i>Arqueo completado</span>
+                                @else
+                                    <span class="app-status app-status--neutral"><i class="bx bx-minus"></i>Sin
+                                        notas</span>
+                                @endif
                             </div>
-                        @endif
-                    </article>
-                @empty
-                    <div class="cash-cut-empty"><span><i class="bx bx-cycling"></i></span><div><strong>Sin actividad de delivery</strong><p>Cuando un repartidor tome un pedido, su resumen aparecerá aquí.</p></div></div>
-                @endforelse
-            </div>
-        </section>
+
+                            @if ($driver['settlements']->isNotEmpty())
+                                <div class="delivery-driver-card__history">
+                                    @foreach ($driver['settlements'] as $settlement)
+                                        <div>
+                                            <strong><i class="bx bx-check-circle" aria-hidden="true"></i> Arqueo
+                                                completado</strong>
+                                            <span>{{ $settlement->orders_count }} notas · Efectivo
+                                                ${{ number_format($settlement->declared_cash, 2) }}</span>
+                                            <span
+                                                class="{{ (float) $settlement->difference === 0.0 ? 'is-exact' : 'is-difference' }}">
+                                                {{ (float) $settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $' . number_format($settlement->difference, 2) }}
+                                                · {{ $settlement->completed_at->format('g:i A') }}
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </article>
+                    @empty
+                        <div class="cash-cut-empty"><span><i class="bx bx-cycling"></i></span>
+                            <div><strong>Sin actividad de delivery</strong>
+                                <p>Cuando un repartidor tome un pedido, su resumen aparecerá aquí.</p>
+                            </div>
+                        </div>
+                    @endforelse
+                </div>
+            </section>
         @else
             @php $manualDelivery = $this->manualDeliverySummary; @endphp
-            <section class="app-card delivery-reconciliation delivery-reconciliation--manual" aria-labelledby="manual-delivery-title">
+            <section class="app-card delivery-reconciliation delivery-reconciliation--manual"
+                aria-labelledby="manual-delivery-title">
                 <header class="delivery-reconciliation__header">
                     <div>
                         <span><i class="bx bx-hand" aria-hidden="true"></i></span>
                         <div>
                             <div class="app-eyebrow">Caja global · Delivery</div>
                             <h2 id="manual-delivery-title">Delivery en gestión manual</h2>
-                            <p>No se requieren asignaciones ni mini cortes. El efectivo contra entrega ya forma parte del total esperado.</p>
+                            <p>No se requieren asignaciones ni mini cortes. El efectivo contra entrega ya forma parte
+                                del total esperado.</p>
                         </div>
                     </div>
-                    <span class="app-status app-status--warning"><i class="bx bx-wallet"></i>Conciliación global</span>
+                    <span class="app-status app-status--warning"><i class="bx bx-wallet"></i>Conciliación
+                        global</span>
                 </header>
                 <div class="delivery-manual-summary">
                     <div><small>Pedidos contabilizados</small><strong>{{ $manualDelivery['orders'] }}</strong></div>
-                    <div><small>Efectivo esperado</small><strong>${{ number_format($manualDelivery['cash'], 2) }}</strong></div>
-                    <div><small>Venta delivery manual</small><strong>${{ number_format($manualDelivery['total'], 2) }}</strong></div>
+                    <div><small>Efectivo
+                            esperado</small><strong>${{ number_format($manualDelivery['cash'], 2) }}</strong></div>
+                    <div><small>Venta delivery
+                            manual</small><strong>${{ number_format($manualDelivery['total'], 2) }}</strong></div>
                 </div>
             </section>
         @endif
@@ -248,32 +330,67 @@
             </a>
         </div>
 
-        @if($this->deliveryManagementEnabled && $settlementDriverId)
+        @if ($this->deliveryManagementEnabled && $settlementDriverId)
             @php $settlementRow = $this->deliveryReconciliations->firstWhere('driver_id', $settlementDriverId); @endphp
-            <div class="cash-cut-modal-backdrop" role="presentation" x-data x-on:keydown.escape.window="$wire.closeDeliverySettlement()">
-                <section class="cash-cut-modal delivery-settlement-modal" role="dialog" aria-modal="true" aria-labelledby="delivery-settlement-title">
-                    <header><span><i class="bx bx-cycling"></i></span><div><small>Mini corte · Delivery</small><h2 id="delivery-settlement-title">{{ $settlementRow['name'] ?? 'Repartidor' }}</h2></div></header>
+            <div class="cash-cut-modal-backdrop" role="presentation" x-data
+                x-on:keydown.escape.window="$wire.closeDeliverySettlement()">
+                <section class="cash-cut-modal delivery-settlement-modal" role="dialog" aria-modal="true"
+                    aria-labelledby="delivery-settlement-title">
+                    <header><span><i class="bx bx-cycling"></i></span>
+                        <div><small>Mini corte · Delivery</small>
+                            <h2 id="delivery-settlement-title">{{ $settlementRow['name'] ?? 'Repartidor' }}</h2>
+                        </div>
+                    </header>
                     <div class="cash-cut-modal__body">
-                        <p>Confirma las notas y cuenta el efectivo que entrega el repartidor. Este arqueo quedará ligado al turno y a sus pedidos.</p>
+                        <p>Confirma las notas y cuenta el efectivo que entrega el repartidor. Este arqueo quedará ligado
+                            al turno y a sus pedidos.</p>
                         <dl>
-                            <div><dt>Notas entregadas</dt><dd>{{ $settlementRow['pending_notes'] ?? 0 }}</dd></div>
-                            <div><dt>Venta entregada</dt><dd>${{ number_format($settlementRow['sales_total'] ?? 0, 2) }}</dd></div>
-                            <div><dt>Transferencias / tarjeta</dt><dd>${{ number_format(($settlementRow['transfer_total'] ?? 0) + ($settlementRow['card_total'] ?? 0), 2) }}</dd></div>
-                            <div><dt>Efectivo esperado</dt><dd>${{ number_format($settlementRow['cash_expected'] ?? 0, 2) }}</dd></div>
+                            <div>
+                                <dt>Notas entregadas</dt>
+                                <dd>{{ $settlementRow['pending_notes'] ?? 0 }}</dd>
+                            </div>
+                            <div>
+                                <dt>Venta entregada</dt>
+                                <dd>${{ number_format($settlementRow['sales_total'] ?? 0, 2) }}</dd>
+                            </div>
+                            <div>
+                                <dt>Transferencias / tarjeta</dt>
+                                <dd>${{ number_format(($settlementRow['transfer_total'] ?? 0) + ($settlementRow['card_total'] ?? 0), 2) }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Efectivo esperado</dt>
+                                <dd>${{ number_format($settlementRow['cash_expected'] ?? 0, 2) }}</dd>
+                            </div>
                         </dl>
                         <label class="cash-cut-field">
                             <span>Efectivo entregado <small>Obligatorio</small></span>
-                            <div class="cash-cut-money-input"><b>$</b><input type="number" wire:model="settlementDeclaredCash" step="0.01" min="0" inputmode="decimal" aria-describedby="delivery-settlement-help"></div>
+                            <div class="cash-cut-money-input"><b>$</b><input type="number"
+                                    wire:model="settlementDeclaredCash" step="0.01" min="0"
+                                    inputmode="decimal" aria-describedby="delivery-settlement-help"></div>
                         </label>
-                        @error('settlementDeclaredCash')<p class="cash-cut-error" role="alert"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
-                        @error('deliverySettlement')<p class="cash-cut-error" role="alert"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
-                        <p id="delivery-settlement-help" class="delivery-settlement-help">Si hay diferencia, se registrará para auditoría; no se perderá el detalle de las notas.</p>
-                        <label class="cash-cut-field"><span>Observaciones <small>Opcional</small></span><textarea wire:model="settlementNotes" rows="3" maxlength="500" placeholder="Incidencias, faltantes o aclaraciones…"></textarea></label>
+                        @error('settlementDeclaredCash')
+                            <p class="cash-cut-error" role="alert"><i
+                                    class="bx bx-error-circle"></i>{{ $message }}</p>
+                        @enderror
+                        @error('deliverySettlement')
+                            <p class="cash-cut-error" role="alert"><i
+                                    class="bx bx-error-circle"></i>{{ $message }}</p>
+                        @enderror
+                        <p id="delivery-settlement-help" class="delivery-settlement-help">Si hay diferencia, se
+                            registrará para auditoría; no se perderá el detalle de las notas.</p>
+                        <label class="cash-cut-field"><span>Observaciones <small>Opcional</small></span>
+                            <textarea wire:model="settlementNotes" rows="3" maxlength="500"
+                                placeholder="Incidencias, faltantes o aclaraciones…"></textarea>
+                        </label>
                     </div>
                     <footer>
-                        <button type="button" class="btn btn-outline-secondary" wire:click="closeDeliverySettlement">Cancelar</button>
-                        <button type="button" class="btn btn-primary" wire:click="completeDeliverySettlement" wire:loading.attr="disabled" wire:target="completeDeliverySettlement">
-                            <span wire:loading.remove wire:target="completeDeliverySettlement"><i class="bx bx-check-double"></i> Completar arqueo</span>
+                        <button type="button" class="btn btn-outline-secondary"
+                            wire:click="closeDeliverySettlement">Cancelar</button>
+                        <button type="button" class="btn btn-primary" wire:click="completeDeliverySettlement"
+                            wire:loading.attr="disabled" wire:target="completeDeliverySettlement">
+                            <span wire:loading.remove wire:target="completeDeliverySettlement"><i
+                                    class="bx bx-check-double"></i> Completar arqueo</span>
                             <span wire:loading wire:target="completeDeliverySettlement">Registrando…</span>
                         </button>
                     </footer>
