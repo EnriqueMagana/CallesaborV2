@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Auth;
 
-use App\Models\User;
-use App\Models\BusinessSetting;
 use App\Livewire\Layout\AdminNavbar;
+use App\Models\BusinessSetting;
+use App\Models\User;
 use App\Services\SingleSessionManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Session\ArraySessionHandler;
@@ -177,7 +177,7 @@ class AuthenticationTest extends TestCase
         $this->assertStringContainsString('Aceptar e ir al login', $layout);
         $this->assertStringContainsString("Livewire.hook('request'", $script);
         $this->assertStringContainsString("payload.reason !== 'session_replaced'", $script);
-        $this->assertStringContainsString("if (status !== 419) return;", $script);
+        $this->assertStringContainsString('if (status !== 419) return;', $script);
         $this->assertStringContainsString("'/auth/session-status'", $script);
     }
 
@@ -186,7 +186,7 @@ class AuthenticationTest extends TestCase
         $service = file_get_contents(app_path('Services/SingleSessionManager.php'));
 
         $this->assertStringNotContainsString('deleteOtherDatabaseSessions', $service);
-        $this->assertStringNotContainsString("DB::table", $service);
+        $this->assertStringNotContainsString('DB::table', $service);
     }
 
     public function test_session_status_endpoint_distinguishes_current_and_guest_browsers(): void
@@ -274,9 +274,21 @@ class AuthenticationTest extends TestCase
 
         $component
             ->assertHasErrors()
+            ->assertSee('No pudimos iniciar sesión con esos datos. Revisa tu correo y contraseña e inténtalo de nuevo.')
             ->assertNoRedirect();
 
         $this->assertGuest();
+    }
+
+    public function test_login_validation_messages_are_humanized_in_spanish(): void
+    {
+        Volt::test('pages.auth.login')
+            ->call('login')
+            ->assertHasErrors(['form.email', 'form.password'])
+            ->assertSee('Escribe tu correo electrónico.')
+            ->assertSee('Escribe tu contraseña.')
+            ->assertDontSee('auth.failed')
+            ->assertDontSee('These credentials do not match our records.');
     }
 
     public function test_sql_injection_payloads_cannot_bypass_login(): void

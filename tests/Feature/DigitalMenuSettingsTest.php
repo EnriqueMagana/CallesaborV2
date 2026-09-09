@@ -50,24 +50,44 @@ class DigitalMenuSettingsTest extends TestCase
         Storage::fake('public');
         $owner = User::factory()->create();
         $owner->assignRole('owner');
-        $first = Product::create(['name' => 'Primero', 'price' => 90, 'is_active' => true]);
-        $second = Product::create(['name' => 'Segundo', 'price' => 120, 'is_active' => true]);
+        $category = Category::create(['name' => 'Especiales', 'is_active' => true]);
+        $first = Product::create(['category_id' => $category->id, 'name' => 'Primero', 'price' => 90, 'is_active' => true]);
+        $second = Product::create(['category_id' => $category->id, 'name' => 'Segundo', 'price' => 120, 'is_active' => true]);
 
         $this->actingAs($owner);
 
-        Livewire::test(DigitalMenuManager::class)
-            ->set('categoryStyle', 'circles')
-            ->set('showGallery', false)
+        $component = Livewire::test(DigitalMenuManager::class)
+            ->set('activeSection', 'banners')
+            ->set('showBanners', true)
             ->set('bannerIntervalSeconds', 7)
             ->set('bannerUploads', [
                 UploadedFile::fake()->image('uno.jpg', 1600, 640),
                 UploadedFile::fake()->image('dos.jpg', 1600, 640),
             ])
             ->set('bannerUploadAlts', ['Promoción uno', 'Promoción dos'])
+            ->call('saveSection')
+            ->assertHasNoErrors();
+
+        $component
+            ->set('activeSection', 'featured')
+            ->set('showFeatured', true)
             ->call('toggleFeaturedProduct', $first->id)
             ->call('toggleFeaturedProduct', $second->id)
             ->call('moveFeatured', 1, -1)
-            ->call('save')
+            ->call('saveSection')
+            ->assertHasNoErrors();
+
+        $component
+            ->set('activeSection', 'categories')
+            ->set('showCategories', true)
+            ->set('categoryStyle', 'circles')
+            ->call('saveSection')
+            ->assertHasNoErrors();
+
+        $component
+            ->set('activeSection', 'gallery')
+            ->set('showGallery', false)
+            ->call('saveSection')
             ->assertHasNoErrors()
             ->assertDispatched('notify');
 
@@ -183,21 +203,162 @@ class DigitalMenuSettingsTest extends TestCase
         }
     }
 
-    public function test_validation_opens_the_section_with_the_error_and_notifies_the_user(): void
+    public function test_validation_stays_in_its_section_and_uses_a_human_message(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)->test(DigitalMenuManager::class)
+            ->set('activeSection', 'banners')
+            ->set('bannerPaths', [[
+                'path' => 'business/digital-menu/banners/existing.jpg',
+                'alt' => str_repeat('a', 121),
+            ]])
+            ->call('saveSection')
+            ->assertSet('activeSection', 'banners')
+            ->assertHasErrors('bannerPaths.0.alt')
+            ->assertSee('La descripción de cada banner puede tener máximo 120 caracteres.')
+            ->assertDontSee('validation.max')
+            ->assertDispatched('notify');
+    }
+
+    public function test_saving_banners_does_not_validate_or_persist_other_sections(): void
+    {
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)->test(DigitalMenuManager::class)
+            ->set('activeSection', 'banners')
+            ->set('bannerIntervalSeconds', 9)
+            ->set('bannerUploads', [UploadedFile::fake()->image('banner.jpg', 1600, 640)])
+            ->set('featuredProductIds', [999999])
+            ->set('categoryStyle', 'not-a-style')
+            ->call('saveSection')
+            ->assertHasNoErrors()
+            ->assertSet('featuredProductIds', [999999])
+            ->assertSet('categoryStyle', 'not-a-style');
+
+        $setting = DigitalMenuSetting::current()->fresh();
+        $this->assertSame(9, $setting->banner_interval_seconds);
+        $this->assertSame([], $setting->featured_product_ids);
+        $this->assertSame('cards', $setting->category_style);
+    }
+
+    public function test_general_settings_cannot_change_another_sections_visibility(): void
     {
         $owner = User::factory()->create();
         $owner->assignRole('owner');
 
         Livewire::actingAs($owner)->test(DigitalMenuManager::class)
             ->set('activeSection', 'overview')
+            ->set('primaryColor', '#166534')
+            ->set('showBanners', true)
+            ->set('showFeatured', true)
+            ->set('showCategories', true)
+            ->set('showGallery', true)
+            ->call('saveSection')
+            ->assertHasNoErrors();
+
+        $setting = DigitalMenuSetting::current()->fresh();
+        $this->assertSame('#166534', $setting->primary_color);
+        $this->assertFalse($setting->show_banners);
+        $this->assertFalse($setting->show_featured);
+        $this->assertFalse($setting->show_categories);
+        $this->assertFalse($setting->show_gallery);
+    }
+
+    public function test_enabled_sections_require_content_and_never_expose_validation_keys(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        $component = Livewire::actingAs($owner)->test(DigitalMenuManager::class)
+            ->set('activeSection', 'banners')
+            ->set('showBanners', true)
+            ->set('bannerPaths', [])
+            ->call('saveSection')
+            ->assertHasErrors('showBanners')
+            ->assertSee('Para activar los banners, agrega al menos una imagen.');
+
+        $component
+            ->set('activeSection', 'featured')
+            ->set('showFeatured', true)
+            ->set('featuredProductIds', [999999])
+            ->call('saveSection')
+            ->assertHasErrors('featuredProductIds.0')
+            ->assertSee('Uno de los productos seleccionados ya no está disponible.')
+            ->assertDontSee('validation.exists');
+
+        $component
+            ->set('activeSection', 'categories')
+            ->set('showCategories', true)
+            ->call('saveSection')
+            ->assertHasErrors('showCategories')
+            ->assertSee('primero crea una categoría activa con al menos un producto activo');
+
+        $component
+            ->set('activeSection', 'gallery')
+            ->set('showGallery', true)
+            ->set('galleryPaths', [])
+            ->call('saveSection')
+            ->assertHasErrors('showGallery')
+            ->assertSee('Para activar la galería, agrega al menos una fotografía.');
+    }
+
+    public function test_empty_sections_can_be_saved_when_they_are_disabled(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        $component = Livewire::actingAs($owner)->test(DigitalMenuManager::class);
+        foreach ([
+            'banners' => 'showBanners',
+            'featured' => 'showFeatured',
+            'categories' => 'showCategories',
+            'gallery' => 'showGallery',
+        ] as $section => $visibilityProperty) {
+            $component
+                ->set('activeSection', $section)
+                ->set($visibilityProperty, false)
+                ->call('saveSection')
+                ->assertHasNoErrors();
+        }
+
+        $setting = DigitalMenuSetting::current()->fresh();
+        $this->assertFalse($setting->show_banners);
+        $this->assertFalse($setting->show_featured);
+        $this->assertFalse($setting->show_categories);
+        $this->assertFalse($setting->show_gallery);
+    }
+
+    public function test_an_enabled_section_rejects_missing_files_with_recovery_guidance(): void
+    {
+        Storage::fake('public');
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)->test(DigitalMenuManager::class)
+            ->set('activeSection', 'banners')
+            ->set('showBanners', true)
             ->set('bannerPaths', [[
-                'path' => 'business/digital-menu/banners/existing.jpg',
-                'alt' => str_repeat('a', 121),
+                'path' => 'business/digital-menu/banners/missing.jpg',
+                'alt' => 'Promoción principal',
             ]])
-            ->call('save')
-            ->assertSet('activeSection', 'banners')
-            ->assertHasErrors('bannerPaths.0.alt')
-            ->assertDispatched('notify');
+            ->call('saveSection')
+            ->assertHasErrors('bannerPaths')
+            ->assertSee('Una imagen guardada ya no está disponible en el servidor.')
+            ->assertSee('Quítala o vuelve a subirla');
+    }
+
+    public function test_empty_sections_start_hidden_instead_of_appearing_without_content(): void
+    {
+        $setting = DigitalMenuSetting::current();
+
+        $this->assertFalse($setting->show_banners);
+        $this->assertFalse($setting->show_featured);
+        $this->assertFalse($setting->show_categories);
+        $this->assertFalse($setting->show_gallery);
     }
 
     public function test_temporary_upload_limits_match_the_menu_contract(): void
@@ -226,7 +387,9 @@ class DigitalMenuSettingsTest extends TestCase
 
         $this->assertSame(3, substr_count($view, 'class="digital-menu-section-switch__icon"'));
         $this->assertSame(3, substr_count($view, 'class="digital-menu-section-switch__copy"'));
+        $this->assertSame(1, substr_count($view, 'class="digital-menu-overview-link"'));
+        $this->assertStringContainsString('wire:submit="saveSection"', $view);
         $this->assertStringContainsString('.digital-menu-section-switch__copy{min-width:0;display:grid;gap:3px}', $styles);
-        $this->assertStringContainsString('.digital-menu-toggle,.digital-menu-section-switch{grid-template-columns:42px minmax(0,1fr) 44px', $styles);
+        $this->assertStringContainsString('.digital-menu-overview-link{min-height:92px', $styles);
     }
 }
