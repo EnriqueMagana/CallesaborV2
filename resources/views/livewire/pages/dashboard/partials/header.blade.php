@@ -84,7 +84,7 @@
                 </div>
             </div>
         @endif
-        <span class="dashboard-role"><i class="bx bx-id-card" aria-hidden="true"></i>{{ $dashboard['role_label'] }}</span>
+        <x-user-role-summary :roles="$user->roles" class="dashboard-role" />
         <button type="button" class="dashboard-refresh" wire:click="refreshDashboard" wire:loading.attr="disabled" wire:target="refreshDashboard" aria-label="Actualizar dashboard">
             <i class="bx bx-refresh" aria-hidden="true"></i><span>Actualizar</span>
         </button>

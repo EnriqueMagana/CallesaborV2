@@ -15,11 +15,14 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardDataBuilder
 {
-    public function __construct(private readonly SidebarModuleAccess $menuAccess) {}
+    public function __construct(
+        private readonly SidebarModuleAccess $menuAccess,
+        private readonly UserRoleContext $roleContext,
+    ) {}
 
     public function build(User $user, string $period): array
     {
-        $user->loadMissing('roles');
+        $user->loadMissing('roles.permissions');
         $openRegister = CashRegister::query()
             ->where('is_open', true)
             ->latest('opened_at')
@@ -31,7 +34,7 @@ class DashboardDataBuilder
             ];
         }
 
-        $mode = $this->resolveMode($user);
+        $mode = $this->roleContext->dashboardMode($user);
         [$from, $to] = $this->periodRange($period);
         $isOwner = $mode === 'owner';
         $canViewReports = $isOwner
@@ -89,9 +92,6 @@ class DashboardDataBuilder
             'has_open_register' => true,
             'mode' => $mode,
             'profile' => $profile,
-            'role_label' => $user->roles->pluck('name')
-                ->map(fn (string $role) => str($role)->replace('-', ' ')->title())
-                ->join(', ') ?: $profile['label'],
             'period_label' => match ($period) {
                 'today' => 'Hoy',
                 '30' => 'Últimos 30 días',
@@ -144,31 +144,6 @@ class DashboardDataBuilder
         ];
     }
 
-    private function resolveMode(User $user): string
-    {
-        $roles = $user->roles->pluck('name')->map(fn (string $role) => str($role)->lower()->toString());
-
-        if ($roles->contains(fn (string $role) => in_array($role, ['owner', 'super-admin'], true))) {
-            return 'owner';
-        }
-        if ($roles->contains(fn (string $role) => str_contains($role, 'delivery') || str_contains($role, 'repart') || str_contains($role, 'mensaj'))) {
-            return 'delivery';
-        }
-        if ($roles->contains(fn (string $role) => str_contains($role, 'meser')) || ($user->can('ordenar mesas') && ! $user->can('ver reportes'))) {
-            return 'waiter';
-        }
-        if (! $user->can('ver reportes')
-            && ! $user->can('ver reportes financieros')
-            && ! $user->can('ver ordenes')
-            && ! $user->can('ver mesas')
-            && ! $user->can('ver caja')
-            && ! $user->can('crear ordenes')) {
-            return 'restricted';
-        }
-
-        return 'admin';
-    }
-
     private function periodRange(string $period): array
     {
         $to = now()->endOfDay();
@@ -185,6 +160,7 @@ class DashboardDataBuilder
     {
         return match ($mode) {
             'owner' => ['label' => 'Owner', 'title' => 'Visión general del negocio', 'subtitle' => 'Ventas, operación y puntos que requieren tu atención.', 'icon' => 'bx-line-chart'],
+            'cashier' => ['label' => 'Caja', 'title' => 'Punto de venta bajo control', 'subtitle' => 'Ventas, cobros y pendientes del turno en un solo lugar.', 'icon' => 'bx-money'],
             'waiter' => ['label' => 'Mesero', 'title' => 'Tu turno, organizado', 'subtitle' => 'Tus mesas, pedidos y servicios listos en un solo lugar.', 'icon' => 'bx-dish'],
             'delivery' => ['label' => 'Delivery', 'title' => 'Entregas del turno', 'subtitle' => 'Consulta lo que está listo, en camino y pendiente de cobro.', 'icon' => 'bx-cycling'],
             'restricted' => ['label' => 'Acceso limitado', 'title' => 'Tu espacio de trabajo', 'subtitle' => 'Los indicadores aparecen cuando se asignan permisos operativos o de reportes.', 'icon' => 'bx-lock-alt'],

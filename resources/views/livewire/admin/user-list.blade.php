@@ -1,14 +1,5 @@
-<div class="app-page users-page" x-data="{ toasts: [] }"
-     x-on:notify.window="toasts.push($event.detail); setTimeout(() => toasts.shift(), 3800)">
-    <div class="app-toast-stack" aria-live="polite" aria-atomic="true">
-        <template x-for="(toast, index) in toasts" :key="index">
-            <div class="users-toast" :class="'is-' + (toast.type || 'info')">
-                <i class="bx" :class="toast.type === 'success' ? 'bx-check-circle' : (toast.type === 'error' ? 'bx-error-circle' : 'bx-info-circle')"></i>
-                <span x-text="toast.message"></span>
-                <button type="button" @click="toasts.splice(index, 1)" aria-label="Cerrar aviso"><i class="bx bx-x"></i></button>
-            </div>
-        </template>
-    </div>
+<div class="app-page users-page">
+    <x-ui.toast-stack />
 
     <header class="app-page-header users-hero">
         <div class="app-page-heading">
@@ -105,7 +96,7 @@
                                 </div>
                             </td>
                             <td data-label="Rol y contacto">
-                                <div class="users-roles">@forelse($user->roles as $role)<span>{{ str($role->name)->replace('-', ' ')->title() }}</span>@empty<em>Sin rol</em>@endforelse</div>
+                                <x-user-role-summary :roles="$user->roles" class="users-roles" />
                                 <small class="users-phone"><i class="bx bx-phone"></i>{{ $user->phone ?: 'Sin teléfono' }}</small>
                             </td>
                             <td data-label="Estado">

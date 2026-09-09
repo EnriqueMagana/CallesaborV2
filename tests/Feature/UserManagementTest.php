@@ -50,6 +50,21 @@ class UserManagementTest extends TestCase
         $this->assertTrue($created->hasRole('cajero'));
     }
 
+    public function test_user_directory_summarizes_more_than_two_roles_with_a_counter(): void
+    {
+        $owner = $this->owner();
+        $employee = User::factory()->create(['name' => 'Cajera Multirrol']);
+        $employee->assignRole(['mesero', 'cocinero', 'cajero']);
+
+        $this->actingAs($owner)
+            ->get(route('app.usuarios'))
+            ->assertOk()
+            ->assertSee('Cajera Multirrol')
+            ->assertSee('app-role-summary__label">Cajero', false)
+            ->assertSee('app-role-summary__more" aria-hidden="true">+2', false)
+            ->assertSee('Roles asignados: Cajero, Mesero, Cocinero', false);
+    }
+
     public function test_delete_is_reversible_and_permanent_delete_is_not_exposed(): void
     {
         $owner = $this->owner();

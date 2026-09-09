@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\DigitalMenuManager;
+use App\Models\Category;
 use App\Models\DigitalMenuSetting;
 use App\Models\Product;
 use App\Models\User;
@@ -67,7 +68,8 @@ class DigitalMenuSettingsTest extends TestCase
             ->call('toggleFeaturedProduct', $second->id)
             ->call('moveFeatured', 1, -1)
             ->call('save')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertDispatched('notify');
 
         $setting = DigitalMenuSetting::current()->fresh();
 
@@ -98,7 +100,7 @@ class DigitalMenuSettingsTest extends TestCase
 
     public function test_category_style_and_gallery_visibility_apply_to_every_public_entry_point(): void
     {
-        $category = \App\Models\Category::create([
+        $category = Category::create([
             'name' => 'Especiales',
             'icon' => 'bx-dish',
             'color' => '#15803d',
@@ -125,9 +127,9 @@ class DigitalMenuSettingsTest extends TestCase
         $this->get(route('public.menu'))
             ->assertOk()
             ->assertSee('category-nav--circles', false)
-            ->assertSee('menu-info-links__grid--without-gallery', false)
-            ->assertDontSee('menu-info-card--gallery', false)
-            ->assertDontSee('<i class="bx bx-chevron-right" aria-hidden="true"></i>Galería', false);
+            ->assertSee('data-quick-access-carousel', false)
+            ->assertDontSee('data-access-label="Galería"', false)
+            ->assertDontSee('href="'.route('public.gallery').'"', false);
 
         $this->get(route('public.gallery'))->assertNotFound();
     }
@@ -179,6 +181,31 @@ class DigitalMenuSettingsTest extends TestCase
                 ->assertSet('activeSection', $section)
                 ->assertStatus(200);
         }
+    }
+
+    public function test_validation_opens_the_section_with_the_error_and_notifies_the_user(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+
+        Livewire::actingAs($owner)->test(DigitalMenuManager::class)
+            ->set('activeSection', 'overview')
+            ->set('bannerPaths', [[
+                'path' => 'business/digital-menu/banners/existing.jpg',
+                'alt' => str_repeat('a', 121),
+            ]])
+            ->call('save')
+            ->assertSet('activeSection', 'banners')
+            ->assertHasErrors('bannerPaths.0.alt')
+            ->assertDispatched('notify');
+    }
+
+    public function test_temporary_upload_limits_match_the_menu_contract(): void
+    {
+        $rules = config('livewire.temporary_file_upload.rules');
+
+        $this->assertContains('max:6144', $rules);
+        $this->assertContains('mimes:jpg,jpeg,png,gif,webp', $rules);
     }
 
     public function test_every_digital_menu_manager_icon_exists_in_boxicons(): void
