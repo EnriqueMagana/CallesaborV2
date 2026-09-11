@@ -306,6 +306,32 @@ class DigitalMenuSettingsTest extends TestCase
             ->assertSee('Para activar la galería, agrega al menos una fotografía.');
     }
 
+    public function test_stale_favorite_ids_are_removed_from_state_and_do_not_block_saving(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $active = Product::create(['name' => 'Activo', 'price' => 95, 'is_active' => true]);
+        $another = Product::create(['name' => 'Otro activo', 'price' => 105, 'is_active' => true]);
+        $inactive = Product::create(['name' => 'Inactivo', 'price' => 85, 'is_active' => false]);
+
+        DigitalMenuSetting::current()->update([
+            'show_featured' => true,
+            'featured_product_ids' => [999999, $inactive->id, $active->id],
+        ]);
+
+        Livewire::actingAs($owner)->test(DigitalMenuManager::class)
+            ->assertSet('featuredProductIds', [$active->id])
+            ->set('activeSection', 'featured')
+            ->call('toggleFeaturedProduct', $another->id)
+            ->call('saveSection')
+            ->assertHasNoErrors();
+
+        $this->assertSame(
+            [$active->id, $another->id],
+            DigitalMenuSetting::current()->fresh()->featured_product_ids,
+        );
+    }
+
     public function test_empty_sections_can_be_saved_when_they_are_disabled(): void
     {
         $owner = User::factory()->create();
