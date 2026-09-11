@@ -9,7 +9,6 @@ use App\Models\CashRegister;
 use App\Models\CashRegisterCut;
 use App\Models\Mesa;
 use App\Models\Order;
-use App\Models\Product;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\ThermalTicketRenderer;
@@ -93,7 +92,7 @@ class BusinessSettingsTest extends TestCase
         $this->assertSame('203', TicketTemplate::current('customer')->options['printer_dpi']);
     }
 
-    public function test_deleted_featured_products_do_not_block_updating_business_data(): void
+    public function test_business_settings_do_not_manage_digital_menu_favorites(): void
     {
         $owner = User::factory()->create();
         $owner->assignRole('owner');
@@ -101,29 +100,14 @@ class BusinessSettingsTest extends TestCase
         $this->actingAs($owner);
 
         Livewire::test(BusinessSettingsManager::class)
-            ->assertSet('featuredProductIds', [])
-            ->assertSee('Productos destacados')
+            ->assertDontSee('Productos destacados')
             ->set('businessName', 'Negocio actualizado')
             ->call('saveBusiness')
             ->assertHasNoErrors();
 
         $setting = BusinessSetting::current()->fresh();
         $this->assertSame('Negocio actualizado', $setting->business_name);
-        $this->assertSame([], $setting->featured_product_ids);
-    }
-
-    public function test_business_validation_opens_the_section_that_contains_the_error(): void
-    {
-        $owner = User::factory()->create();
-        $owner->assignRole('owner');
-        $this->actingAs($owner);
-
-        Livewire::test(BusinessSettingsManager::class)
-            ->set('featuredProductIds', [999999])
-            ->call('saveBusiness')
-            ->assertHasErrors('featuredProductIds.0')
-            ->assertSet('businessSection', 'featured')
-            ->assertSee('No se pudo guardar la configuración.');
+        $this->assertSame([999999], $setting->featured_product_ids);
     }
 
     public function test_renderer_uses_blocks_business_data_and_qr_without_inline_css(): void
@@ -481,15 +465,12 @@ class BusinessSettingsTest extends TestCase
         Storage::fake('public');
         $owner = User::factory()->create();
         $owner->assignRole('owner');
-        $product = Product::create(['name' => 'Favorito de prueba', 'price' => 95, 'is_active' => true]);
-
         $this->actingAs($owner);
 
         Livewire::test(BusinessSettingsManager::class)
             ->set('primaryColor', '#166534')
             ->set('instagramUrl', 'https://instagram.com/callesabor')
             ->set('tiktokUrl', 'https://tiktok.com/@callesabor')
-            ->set('featuredProductIds', [(string) $product->id])
             ->set('galleryUploads', [
                 UploadedFile::fake()->image('ambiente.jpg', 1200, 900),
                 UploadedFile::fake()->image('platillo.jpg', 1200, 900),
@@ -500,7 +481,6 @@ class BusinessSettingsTest extends TestCase
         $setting = BusinessSetting::current()->fresh();
         $this->assertSame('#166534', $setting->primary_color);
         $this->assertSame('https://instagram.com/callesabor', $setting->instagram_url);
-        $this->assertSame([$product->id], $setting->featured_product_ids);
         $this->assertCount(2, $setting->gallery_paths);
         Storage::disk('public')->assertExists($setting->gallery_paths[0]['path']);
     }

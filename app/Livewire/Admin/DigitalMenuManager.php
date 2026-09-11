@@ -211,10 +211,6 @@ class DigitalMenuManager extends Component
                 'featured_product_ids' => $featuredIds,
                 'updated_by' => auth()->id(),
             ]);
-            BusinessSetting::current()->update([
-                'featured_product_ids' => $featuredIds,
-                'updated_by' => auth()->id(),
-            ]);
         })) {
             return;
         }
@@ -425,7 +421,9 @@ class DigitalMenuManager extends Component
         }
         if ($section === null || $section === 'featured') {
             $this->showFeatured = $setting->show_featured;
-            $this->featuredProductIds = array_values(array_map('intval', $setting->featured_product_ids ?? []));
+            // Invalid IDs are not rendered in availableProducts. Keeping them in
+            // state would make them impossible to remove and block every save.
+            $this->featuredProductIds = $this->activeProductIds($setting->featured_product_ids ?? []);
         }
         if ($section === null || $section === 'categories') {
             $this->showCategories = $setting->show_categories;
@@ -435,6 +433,31 @@ class DigitalMenuManager extends Component
             $this->showGallery = $setting->show_gallery;
             $this->galleryPaths = $setting->galleryItems();
         }
+    }
+
+    private function activeProductIds(array $ids): array
+    {
+        $configuredIds = collect($ids)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($configuredIds->isEmpty()) {
+            return [];
+        }
+
+        $activeIds = Product::query()
+            ->where('is_active', true)
+            ->whereIn('id', $configuredIds->all())
+            ->pluck('id')
+            ->map(fn (int $id): int => $id)
+            ->flip();
+
+        return $configuredIds
+            ->filter(fn (int $id): bool => $activeIds->has($id))
+            ->values()
+            ->all();
     }
 
     private function storeMediaUploads(array $current, array $uploads, array $texts, string $directory, string $textKey, array &$newMediaPaths): array

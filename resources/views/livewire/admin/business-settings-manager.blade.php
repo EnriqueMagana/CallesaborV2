@@ -50,7 +50,6 @@
         'appearance' => ['06', 'bx-palette', 'Apariencia', 'Color principal y contraste'],
         'homepage' => ['07', 'bx-layout', 'Página principal', 'Titulares y presentación'],
         'gallery' => ['08', 'bx-images', 'Galería pública', 'Fotografías y descripciones'],
-        'featured' => ['09', 'bx-star', 'Productos destacados', 'Favoritos de la casa'],
     ] as $sectionKey => $section)
                     <button type="button" wire:click="setBusinessSection('{{ $sectionKey }}')"
                         class="{{ $businessSection === $sectionKey ? 'is-active' : '' }}"
@@ -401,42 +400,6 @@
                             <span wire:loading wire:target="saveGallery">Guardando galería…</span>
                         </button>
                     @endif
-                @else
-                    <div class="biz-section-heading">
-                        <div><span>09</span>
-                            <div>
-                                <h2>Productos destacados</h2>
-                                <p>Elige hasta 8 opciones para la sección “Favoritos de la casa”.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="business-featured-products">
-                        @forelse($this->availablePublicProducts as $product)
-                            <label wire:key="featured-product-{{ $product->id }}">
-                                <input type="checkbox" wire:model="featuredProductIds" value="{{ $product->id }}">
-                                <span class="business-featured-products__image">
-                                    @if ($product->image)
-                                    <img src="{{ Storage::url($product->image) }}" alt="">@else<i
-                                            class="bx bx-dish"></i>
-                                    @endif
-                                </span>
-                                <span><strong>{{ $product->name }}</strong><small>{{ $product->category?->name ?? 'Sin categoría' }}
-                                        · ${{ number_format((float) $product->price, 2) }}</small></span>
-                                <span class="business-featured-products__star" aria-hidden="true"><i
-                                        class="bx bxs-star"></i></span>
-                            </label>
-                        @empty
-                            <div class="business-section-note"><i class="bx bx-info-circle"></i><span><strong>Aún no
-                                        hay productos activos</strong><small>Activa productos desde el módulo Menú para
-                                        poder destacarlos.</small></span></div>
-                        @endforelse
-                    </div>
-                    @error('featuredProductIds')
-                        <p class="biz-form-error" role="alert">{{ $message }}</p>
-                    @enderror
-                    @error('featuredProductIds.*')
-                        <p class="biz-form-error" role="alert">{{ $message }}</p>
-                    @enderror
                 @endif
 
                 <footer class="biz-form-actions">

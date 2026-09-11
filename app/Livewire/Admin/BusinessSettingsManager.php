@@ -3,7 +3,6 @@
 namespace App\Livewire\Admin;
 
 use App\Models\BusinessSetting;
-use App\Models\Product;
 use App\Models\TicketTemplate;
 use App\Services\ThermalTicketRenderer;
 use Illuminate\Support\Facades\Storage;
@@ -112,8 +111,6 @@ class BusinessSettingsManager extends Component
 
     public array $galleryUploadCaptions = [];
 
-    public array $featuredProductIds = [];
-
     public string $selectedType = 'customer';
 
     public int $paperWidth = 80;
@@ -181,7 +178,7 @@ class BusinessSettingsManager extends Component
     public function setBusinessSection(string $section): void
     {
         $this->authorizeManage();
-        abort_unless(in_array($section, ['identity', 'contact', 'hours', 'social', 'visual', 'appearance', 'homepage', 'gallery', 'featured'], true), 404);
+        abort_unless(in_array($section, ['identity', 'contact', 'hours', 'social', 'visual', 'appearance', 'homepage', 'gallery'], true), 404);
         $this->businessSection = $section;
     }
 
@@ -237,8 +234,6 @@ class BusinessSettingsManager extends Component
                 'galleryPaths.*.caption' => 'nullable|string|max:120',
                 'galleryUploadCaptions' => 'array',
                 'galleryUploadCaptions.*' => 'nullable|string|max:120',
-                'featuredProductIds' => 'array|max:8',
-                'featuredProductIds.*' => 'integer|distinct|exists:products,id',
                 'businessHours' => 'required|array|size:7',
                 'businessHours.*.key' => 'required|string|max:20',
                 'businessHours.*.label' => 'required|string|max:20',
@@ -293,7 +288,6 @@ class BusinessSettingsManager extends Component
             'home_intro_title' => trim($this->homeIntroTitle) ?: null,
             'home_intro_description' => trim($this->homeIntroDescription) ?: null,
             'gallery_paths' => array_values($galleryPaths),
-            'featured_product_ids' => array_values(array_map('intval', $this->featuredProductIds)),
             'updated_by' => auth()->id(),
         ]));
 
@@ -373,17 +367,6 @@ class BusinessSettingsManager extends Component
                 'closed' => false,
             };
         }
-    }
-
-    #[Computed]
-    public function availablePublicProducts()
-    {
-        return Product::query()
-            ->where('is_active', true)
-            ->with('category')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
     }
 
     public function saveTemplate(): void
@@ -582,16 +565,6 @@ class BusinessSettingsManager extends Component
         $this->homeIntroTitle = $setting->home_intro_title ?? '';
         $this->homeIntroDescription = $setting->home_intro_description ?? '';
         $this->galleryPaths = $setting->galleryItems();
-        $configuredProductIds = array_values(array_filter(
-            array_map('intval', $setting->featured_product_ids ?? []),
-            fn (int $id): bool => $id > 0,
-        ));
-        $this->featuredProductIds = Product::query()
-            ->where('is_active', true)
-            ->whereIn('id', $configuredProductIds)
-            ->pluck('id')
-            ->map(fn (int $id): string => (string) $id)
-            ->all();
     }
 
     private function loadTemplate(): void
@@ -691,7 +664,6 @@ class BusinessSettingsManager extends Component
             'appearance' => ['primaryColor'],
             'homepage' => ['homeBadge', 'homeHeadline', 'homeDescription', 'homeIntroKicker', 'homeIntroTitle', 'homeIntroDescription'],
             'gallery' => ['galleryUploads', 'galleryPaths', 'galleryUploadCaptions'],
-            'featured' => ['featuredProductIds'],
         ];
 
         foreach ($sections as $section => $prefixes) {
