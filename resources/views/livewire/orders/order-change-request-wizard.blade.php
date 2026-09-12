@@ -410,6 +410,19 @@
                             <p>La persona autorizadora recibirá exactamente esta información.</p>
                         </div>
                     </div>
+                    @if ($errors->any())
+                        <div class="order-wizard-final-warning" role="alert" aria-live="assertive">
+                            <i class="bx bx-error-circle" aria-hidden="true"></i>
+                            <div>
+                                <strong>No se pudo enviar la solicitud</strong>
+                                <ul>
+                                    @foreach ($errors->all() as $message)
+                                        <li>{{ $message }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
                     <div class="order-wizard-review">
                         <div>
                             <small>Solicitud</small><strong>{{ match ($scope) {'full' => 'Cancelación total','partial' => 'Cancelación parcial','payment' => 'Cambio de método de pago','address' => 'Cambio de dirección',default => 'Ajuste de pedido'} }}</strong>
