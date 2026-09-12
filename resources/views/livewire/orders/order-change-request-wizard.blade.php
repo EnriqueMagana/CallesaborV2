@@ -117,6 +117,20 @@
                         </div>
                     </div>
 
+                    @if ($errors->any())
+                        <div class="order-wizard-final-warning" role="alert" aria-live="assertive">
+                            <i class="bx bx-error-circle" aria-hidden="true"></i>
+                            <div>
+                                <strong>Revisa la información antes de continuar</strong>
+                                <ul>
+                                    @foreach ($errors->all() as $message)
+                                        <li>{{ $message }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
+
                     @if (in_array($scope, ['partial', 'adjustment'], true))
                         <fieldset class="order-wizard-fieldset">
                             <legend>Artículos de la orden</legend>
@@ -418,7 +432,8 @@
                     @if (in_array($scope, ['partial', 'adjustment'], true))
                         <div class="order-wizard-impact">
                             <span><small>Retiradas</small><b>{{ $this->changeSummary['removed'] }}</b></span><span><small>Agregadas</small><b>{{ $this->changeSummary['added'] }}</b></span><span><small>Cantidades
-                                    modificadas</small><b>{{ $this->changeSummary['updated'] }}</b></span></div>
+                                    modificadas</small><b>{{ $this->changeSummary['updated'] }}</b></span>
+                        </div>
                         <div class="orders-total-comparison"><span>Actual
                                 <b>${{ number_format($order->total, 2) }}</b></span><i
                                 class="bx bx-right-arrow-alt"></i><span>Propuesto
@@ -455,7 +470,8 @@
                                 aria-hidden="true"></i>
                             <p>Al aprobar, se registrará una devolución de
                                 <strong>${{ number_format($this->refundAmount, 2) }}</strong>. El autorizador
-                                confirmará el movimiento y capturará la referencia cuando corresponda.</p>
+                                confirmará el movimiento y capturará la referencia cuando corresponda.
+                            </p>
                         </div>
                     @endif
                     @error('requestItems')
