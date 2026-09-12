@@ -198,6 +198,37 @@ class OrderChangeRequestWorkflowTest extends TestCase
         );
     }
 
+    public function test_delivery_cash_on_delivery_can_request_a_change_while_ready(): void
+    {
+        $requester = User::factory()->create();
+        $requester->givePermissionTo(['ver ordenes', 'solicitar modificacion de ordenes']);
+        $register = CashRegister::create(['name' => 'Caja', 'opened_by' => $requester->id, 'initial_amount' => 0, 'opened_at' => now(), 'is_open' => true]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'served_by' => $requester->id,
+            'customer_name' => 'Cliente delivery',
+            'type' => 'delivery',
+            'delivery_method' => 'contra_entrega',
+            'status' => 'lista',
+            'subtotal' => 100,
+            'total' => 100,
+        ]);
+        $item = OrderItem::create(['order_id' => $order->id, 'product_name' => 'Producto', 'product_price' => 100, 'quantity' => 1, 'subtotal' => 100]);
+        OrderPayment::create(['order_id' => $order->id, 'method' => 'efectivo', 'amount' => 100]);
+
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $requester,
+            OrderChangeRequest::TYPE_MODIFICATION,
+            'El cliente solicitó ajustar el pedido antes de entregarlo',
+            [['kind' => 'existing', 'order_item_id' => $item->id, 'quantity' => 2]],
+            ['scope' => 'adjustment']
+        );
+
+        $this->assertSame(OrderChangeRequest::STATUS_PENDING, $request->status);
+        $this->assertSame('unpaid', data_get($request->proposed_changes, 'request_context.payment_state'));
+    }
+
     public function test_wizard_exposes_only_scopes_allowed_by_the_user(): void
     {
         $requester = User::factory()->create();

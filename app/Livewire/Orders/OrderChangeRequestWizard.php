@@ -66,7 +66,8 @@ class OrderChangeRequestWizard extends Component
         abort_unless($this->canRequestCancellation || $this->canRequestModification || $this->canRequestPaymentChange || $this->canRequestAddressChange, 403);
         abort_if($this->order->changeRequests->contains('status', OrderChangeRequest::STATUS_PENDING), 409, 'Esta orden ya tiene una solicitud pendiente.');
         abort_unless(
-            (in_array($this->order->status, ['pendiente', 'en_preparacion', 'lista'], true) && $this->order->payments->isEmpty())
+            (in_array($this->order->status, ['pendiente', 'en_preparacion', 'lista'], true)
+                && ($this->order->payments->isEmpty() || $this->isPendingCashOnDelivery))
                 || $this->isPaidOrder
                 || $this->canRequestAddressChange,
             409,
@@ -355,6 +356,14 @@ class OrderChangeRequestWizard extends Component
     public function render()
     {
         return view('livewire.orders.order-change-request-wizard')->layout('layouts.app');
+    }
+
+    #[Computed]
+    public function isPendingCashOnDelivery(): bool
+    {
+        return $this->order->type === 'delivery'
+            && $this->order->delivery_method === 'contra_entrega'
+            && in_array($this->order->status, ['pendiente', 'en_preparacion', 'lista'], true);
     }
 
     private function validateScope(): void
