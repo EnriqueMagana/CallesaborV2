@@ -703,7 +703,9 @@ class OrderChangeRequestService
             return;
         }
 
-        $isUnpaidActive = in_array($order->status, self::EDITABLE_STATUSES, true) && $order->payments->isEmpty();
+        $isUnpaidActive = in_array($order->status, self::EDITABLE_STATUSES, true)
+            && ($order->payments->isEmpty()
+                || ($order->type === 'delivery' && $order->delivery_method === 'contra_entrega'));
         if (! $isUnpaidActive && ! $this->isPaidOrder($order)) {
             throw ValidationException::withMessages(['requestReason' => 'Solo se admiten órdenes activas sin pago u órdenes pagadas con saldo reembolsable.']);
         }
