@@ -10,6 +10,7 @@ class CashRegisterModuleAccess
     public const ALWAYS_AVAILABLE_ROUTES = [
         'app.caja',
         'app.historial-ventas',
+        'app.historial-ventas.show',
         'app.configuracion-negocio',
         'app.configuracion-negocio.menu',
         'app.menu-digital',

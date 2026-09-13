@@ -52,7 +52,7 @@
             @endif
             <div class="sales-audit-field">
                 <label for="sales-audit-register">Caja / turno</label>
-                <select id="sales-audit-register" wire:model="cashRegisterId" class="form-select"><option value="">Todas las cajas</option>@foreach($this->registers as $register)<option value="{{ $register->id }}">{{ $register->name }} · {{ $register->is_open ? 'Abierta' : optional($register->closed_at)->format('d/m/Y') }}</option>@endforeach</select>
+                <select id="sales-audit-register" wire:model="cashRegisterId" class="form-select"><option value="">Todas las cajas</option>@foreach($this->registers as $register)<option value="{{ $register->id }}">{{ $register->name }} · {{ $register->is_open ? 'Abierta' : \App\Support\BusinessTime::format($register->closed_at, 'd/m/Y') }}</option>@endforeach</select>
             </div>
             <div class="sales-audit-field">
                 <label for="sales-audit-sort">Ordenar resultados</label>

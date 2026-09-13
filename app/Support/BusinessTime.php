@@ -30,6 +30,19 @@ final class BusinessTime
     }
 
     /**
+     * Convert a business-local calendar range to storage-timezone boundaries.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    public static function dateRange(string $from, string $to): array
+    {
+        return [
+            Carbon::parse($from, self::timezone())->startOfDay()->setTimezone(config('app.timezone', 'UTC')),
+            Carbon::parse($to, self::timezone())->endOfDay()->setTimezone(config('app.timezone', 'UTC')),
+        ];
+    }
+
+    /**
      * Return business-local day boundaries converted to the storage timezone.
      *
      * @return array{0: Carbon, 1: Carbon}
