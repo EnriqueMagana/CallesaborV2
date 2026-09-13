@@ -229,6 +229,35 @@ class SalesHistoryAuditTest extends TestCase
             ->assertSee('11:30:00 PM');
     }
 
+    public function test_history_pagination_uses_a_root_relative_url_without_duplicating_app(): void
+    {
+        [$owner, $firstOrder] = $this->sale();
+
+        foreach (range(1, 20) as $index) {
+            Order::create([
+                'cash_register_id' => $firstOrder->cash_register_id,
+                'customer_name' => 'Cliente '.$index,
+                'served_by' => $owner->id,
+                'type' => 'ventanilla',
+                'status' => 'pagada',
+                'subtotal' => 100,
+                'total' => 100,
+                'paid_at' => now(),
+            ]);
+        }
+
+        $component = Livewire::actingAs($owner)
+            ->test(SalesHistory::class)
+            ->set('datePreset', 'all')
+            ->call('runAudit')
+            ->assertHasNoErrors();
+
+        $pageTwoUrl = $component->get('orders')->url(2);
+        $this->assertSame('/app/historial-ventas?page=2', $pageTwoUrl);
+        $this->assertStringNotContainsString('/app/app/', $pageTwoUrl);
+        $component->assertSeeHtml('href="/app/historial-ventas?page=2"');
+    }
+
     private function sale(bool $registerOpen = false): array
     {
         $owner = User::factory()->create();
