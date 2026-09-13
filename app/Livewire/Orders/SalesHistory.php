@@ -160,7 +160,7 @@ class SalesHistory extends Component
     {
         if (! $this->hasSearched) {
             return new LengthAwarePaginator([], 0, $this->perPage, 1, [
-                'path' => request()->url(),
+                'path' => $this->paginationPath(),
                 'pageName' => 'page',
             ]);
         }
@@ -168,7 +168,7 @@ class SalesHistory extends Component
         $query = $this->filteredOrders(true);
         $this->applySorting($query);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->perPage)->withPath($this->paginationPath());
     }
 
     #[Computed]
@@ -396,6 +396,11 @@ class SalesHistory extends Component
     private function forgetResults(): void
     {
         unset($this->orders, $this->summary, $this->analytics);
+    }
+
+    private function paginationPath(): string
+    {
+        return '/'.ltrim(route('app.historial-ventas', [], false), '/');
     }
 
     public function render()
