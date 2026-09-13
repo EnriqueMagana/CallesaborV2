@@ -42,6 +42,7 @@ use App\Livewire\Orders\OrderChangeRequestWizard;
 use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
 use App\Livewire\Orders\SalesHistory;
+use App\Livewire\Orders\SalesHistoryDetail;
 use App\Livewire\Pos\PointOfSale;
 use App\Livewire\Reservas\CalendarioReservas;
 use App\Livewire\SuperAdmin\DeveloperConsole;
@@ -114,6 +115,7 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
         ->name('solicitudes-ordenes');
     Route::get('/clientes', CustomerManager::class)->middleware('can:ver clientes')->name('clientes');
     Route::get('/historial-ventas', SalesHistory::class)->middleware('can:ver reportes')->name('historial-ventas');
+    Route::get('/historial-ventas/{order}', SalesHistoryDetail::class)->middleware('can:ver reportes')->name('historial-ventas.show');
     Route::get('/ordenes/{order}/solicitud', OrderChangeRequestWizard::class)->middleware('can:ver ordenes')->name('ordenes.solicitud');
     Route::get('/ordenes/{order}', OrderDetail::class)->middleware('can:ver ordenes')->name('ordenes.show');
     Route::get('/pos', PointOfSale::class)->middleware('can:usar punto de venta')->name('pos');

@@ -54,7 +54,7 @@
                     {{-- ── Fecha y hora ── --}}
                     <div class="col-sm-4">
                         <div class="small text-muted mb-1">Fecha y hora</div>
-                        <div class="fw-semibold">{{ $order->created_at->format('d/m/Y') }}</div>
+                        <div class="fw-semibold">{{ \App\Support\BusinessTime::format($order->created_at, 'd/m/Y') }}</div>
                         <div class="small text-muted">{{ \App\Support\BusinessTime::format($order->created_at, 'g:i:s A') }}</div>
                     </div>
 

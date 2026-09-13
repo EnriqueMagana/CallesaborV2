@@ -5,6 +5,7 @@ namespace App\Livewire\Orders;
 use App\Models\CashRegister;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
+use App\Support\BusinessTime;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -66,6 +67,8 @@ class OrderList extends Component
     public function orders()
     {
         $register = $this->activeCashRegister;
+        $dateStart = $this->dateFrom !== '' ? BusinessTime::dateRange($this->dateFrom, $this->dateFrom)[0] : null;
+        $dateEnd = $this->dateTo !== '' ? BusinessTime::dateRange($this->dateTo, $this->dateTo)[1] : null;
 
         return Order::with(['seller', 'cashRegister', 'customer', 'payments', 'refunds', 'deliveryAssignment', 'changeRequests' => fn ($q) => $q->where('status', OrderChangeRequest::STATUS_PENDING)])
             ->when($register, fn ($q) => $q->where('cash_register_id', $register->id))
@@ -97,8 +100,8 @@ class OrderList extends Component
                     : $q->where('type', $this->typeFilter);
             })
             ->when($this->cashRegisterFilter, fn ($q) => $q->where('cash_register_id', $this->cashRegisterFilter))
-            ->when($this->dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $this->dateFrom))
-            ->when($this->dateTo, fn ($q) => $q->whereDate('created_at', '<=', $this->dateTo))
+            ->when($dateStart, fn ($q) => $q->where('created_at', '>=', $dateStart))
+            ->when($dateEnd, fn ($q) => $q->where('created_at', '<=', $dateEnd))
             ->latest()->paginate(15);
     }
 

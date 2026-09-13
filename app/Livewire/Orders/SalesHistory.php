@@ -5,6 +5,7 @@ namespace App\Livewire\Orders;
 use App\Models\CashRegister;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Support\BusinessTime;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator as LengthAwarePaginatorContract;
 use Illuminate\Database\Eloquent\Builder;
@@ -212,12 +213,9 @@ class SalesHistory extends Component
         $finalized = $this->filteredOrders()->finalizedForAccounting();
         $finalizedIds = (clone $finalized)->select('orders.id');
         $trendRows = (clone $finalized)
-            ->selectRaw('DATE(COALESCE(paid_at, accounted_at, created_at)) AS audit_date')
-            ->selectRaw('COUNT(*) AS orders_count')
-            ->when($this->canViewFinancials, fn (Builder $query) => $query->selectRaw('SUM(total) AS sales_total'))
-            ->groupBy('audit_date')
-            ->orderBy('audit_date')
-            ->get();
+            ->get(['created_at', 'paid_at', 'accounted_at', 'total'])
+            ->groupBy(fn (Order $order) => BusinessTime::inTimezone($order->paid_at ?? $order->accounted_at ?? $order->created_at)->toDateString())
+            ->sortKeys();
 
         $productRows = OrderItem::query()
             ->whereIn('order_id', $finalizedIds)
@@ -242,9 +240,9 @@ class SalesHistory extends Component
 
         return [
             'trend' => [
-                'labels' => $trendRows->map(fn ($row) => Carbon::parse($row->audit_date)->format('d/m'))->values()->all(),
-                'orders' => $trendRows->pluck('orders_count')->map(fn ($value) => (int) $value)->values()->all(),
-                'sales' => $this->canViewFinancials ? $trendRows->pluck('sales_total')->map(fn ($value) => round((float) $value, 2))->values()->all() : [],
+                'labels' => $trendRows->keys()->map(fn (string $date) => Carbon::parse($date)->format('d/m'))->values()->all(),
+                'orders' => $trendRows->map->count()->values()->all(),
+                'sales' => $this->canViewFinancials ? $trendRows->map(fn (Collection $orders) => round((float) $orders->sum('total'), 2))->values()->all() : [],
             ],
             'products' => [
                 'labels' => $productRows->pluck('label')->values()->all(),
@@ -278,13 +276,15 @@ class SalesHistory extends Component
 
     private function filteredOrders(bool $forListing = false): Builder
     {
+        [$dateStart, $dateEnd] = $this->dateFrom !== '' && $this->dateTo !== ''
+            ? BusinessTime::dateRange($this->dateFrom, $this->dateTo)
+            : [null, null];
         $query = Order::query()
             ->when($this->cashRegisterId !== '', fn (Builder $q) => $q->where('cash_register_id', (int) $this->cashRegisterId))
             ->when($this->statusFilter === 'accounted', fn (Builder $q) => $q->finalizedForAccounting())
             ->when($this->statusFilter !== '' && $this->statusFilter !== 'accounted', fn (Builder $q) => $q->where('status', $this->statusFilter))
             ->when($this->typeFilter !== '', fn (Builder $q) => $q->where('type', $this->typeFilter))
-            ->when($this->dateFrom !== '', fn (Builder $q) => $q->whereDate('created_at', '>=', $this->dateFrom))
-            ->when($this->dateTo !== '', fn (Builder $q) => $q->whereDate('created_at', '<=', $this->dateTo))
+            ->when($dateStart && $dateEnd, fn (Builder $q) => $q->whereBetween('created_at', [$dateStart, $dateEnd]))
             ->when($this->productId !== '', fn (Builder $q) => $q->whereHas('items', fn (Builder $items) => $items->where('product_id', (int) $this->productId)->where('is_cancelled', false)))
             ->when(trim($this->search) !== '', function (Builder $query): void {
                 $rawSearch = trim($this->search);
@@ -348,12 +348,12 @@ class SalesHistory extends Component
 
     private function applyDatePreset(): void
     {
-        $today = now()->toDateString();
+        $today = BusinessTime::now()->toDateString();
         [$this->dateFrom, $this->dateTo] = match ($this->datePreset) {
             'today' => [$today, $today],
-            'last_7_days' => [now()->subDays(6)->toDateString(), $today],
-            'last_30_days' => [now()->subDays(29)->toDateString(), $today],
-            'last_90_days' => [now()->subDays(89)->toDateString(), $today],
+            'last_7_days' => [BusinessTime::now()->subDays(6)->toDateString(), $today],
+            'last_30_days' => [BusinessTime::now()->subDays(29)->toDateString(), $today],
+            'last_90_days' => [BusinessTime::now()->subDays(89)->toDateString(), $today],
             'all' => ['', ''],
             default => [$this->dateFrom, $this->dateTo],
         };

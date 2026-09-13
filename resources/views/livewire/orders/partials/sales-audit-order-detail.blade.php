@@ -27,7 +27,5 @@
             @endforelse
         </div>
     </div>
-    @can('ver ordenes')
-        <a href="{{ route('app.ordenes.show', $order) }}" class="btn btn-sm btn-outline-primary"><i class="bx bx-show" aria-hidden="true"></i> Abrir orden completa</a>
-    @endcan
+    <a href="{{ route('app.historial-ventas.show', $order) }}" class="btn btn-sm btn-outline-primary"><i class="bx bx-show" aria-hidden="true"></i> Abrir auditoría completa</a>
 </div>
