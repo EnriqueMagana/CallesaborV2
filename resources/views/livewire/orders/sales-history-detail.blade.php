@@ -13,8 +13,8 @@
             <a href="{{ route('app.historial-ventas') }}" class="btn btn-outline-secondary"><i class="bx bx-arrow-back" aria-hidden="true"></i> Volver al historial</a>
             @can('reimprimir tickets')
                 <button type="button" wire:click="previewTicket" wire:loading.attr="disabled" wire:target="previewTicket" class="btn btn-primary">
-                    <span wire:loading.remove wire:target="previewTicket"><i class="bx bx-printer" aria-hidden="true"></i> Reimprimir ticket</span>
-                    <span wire:loading wire:target="previewTicket"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Preparando…</span>
+                    <span class="sales-audit-record__button-idle" wire:loading.remove wire:target="previewTicket"><i class="bx bx-printer" aria-hidden="true"></i> Reimprimir ticket</span>
+                    <span class="sales-audit-record__button-loading" wire:loading.inline-flex wire:target="previewTicket"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Preparando…</span>
                 </button>
             @endcan
         </div>
