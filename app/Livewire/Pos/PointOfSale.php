@@ -34,6 +34,7 @@ use App\Services\MesaServiceManager;
 use App\Services\OrderOperationalDataService;
 use App\Services\PromotionPricingService;
 use App\Services\ThermalTicketRenderer;
+use App\Support\BusinessTime;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -942,7 +943,7 @@ class PointOfSale extends Component
 
     public function refreshTableWorkspace(): void
     {
-        $this->tableTrackingRefreshedAt = now()->format('g:i:s A');
+        $this->tableTrackingRefreshedAt = BusinessTime::format(BusinessTime::now(), 'g:i:s A');
         unset(
             $this->tableWorkspaceAllServices,
             $this->tableWorkspaceServices,
@@ -4232,9 +4233,9 @@ class PointOfSale extends Component
         );
 
         $appName = config('app.name');
-        $now = now()->format('d/m/Y H:i');
+        $now = BusinessTime::format(BusinessTime::now());
         $waiterName = $assignment?->waiter?->name ?? '—';
-        $openedAt = $assignment ? $assignment->assigned_at->format('d/m/Y H:i') : '—';
+        $openedAt = $assignment ? BusinessTime::format($assignment->assigned_at) : '—';
 
         $itemsHtml = '';
         foreach ($items as $item) {
@@ -4707,7 +4708,7 @@ HTML;
         );
 
         $appName = config('app.name');
-        $now = now()->format('d/m/Y H:i');
+        $now = BusinessTime::format(BusinessTime::now());
         $typeLabel = $order->source === 'kiosk'
             ? match ($order->fulfillment) {
                 'dine_in' => 'Kiosco - Comer Aqui',
@@ -4871,7 +4872,7 @@ HTML;
         return app(ThermalTicketRenderer::class)->renderOrder($order, 'kitchen_area', autoPrint: false);
 
         $appName = config('app.name');
-        $now = now()->format('d/m/Y H:i');
+        $now = BusinessTime::format(BusinessTime::now());
         $typeLabel = $order->source === 'kiosk'
             ? match ($order->fulfillment) {
                 'dine_in' => 'Kiosco - Mesa '.($order->mesa?->number ?? 'sin asignar'),

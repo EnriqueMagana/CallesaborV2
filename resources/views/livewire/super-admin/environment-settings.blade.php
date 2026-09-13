@@ -17,7 +17,7 @@
                 <span class="environment-clock__icon"><i class="bx bx-time-five" aria-hidden="true"></i></span>
                 <div>
                     <small x-text="zone"></small>
-                    <strong x-text="new Intl.DateTimeFormat('es-MX', { timeZone: zone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now)">--:--:--</strong>
+                    <strong x-text="new Intl.DateTimeFormat('es-MX', { timeZone: zone, hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).format(now)">--:--:--</strong>
                     <span x-text="new Intl.DateTimeFormat('es-MX', { timeZone: zone, weekday: 'short', day: '2-digit', month: 'short' }).format(now)"></span>
                 </div>
             </div>
@@ -156,7 +156,7 @@
                         <tr>
                             <td><strong>{{ $audit->changedBy?->name ?? 'Usuario eliminado' }}</strong></td>
                             <td><div class="environment-key-list">@foreach ($audit->changed_keys as $key)<code>{{ $key }}</code>@endforeach</div></td>
-                            <td>{{ $audit->created_at?->format('d/m/Y H:i:s') }}</td>
+                            <td>{{ \App\Support\BusinessTime::format($audit->created_at, 'd/m/Y g:i:s A') }}</td>
                             <td>{{ $audit->backup_file ? 'Creado' : 'No requerido' }}</td>
                         </tr>
                     @empty

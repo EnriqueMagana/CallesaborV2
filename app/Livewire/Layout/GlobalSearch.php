@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Reservation;
 use App\Services\SidebarModuleAccess;
+use App\Support\BusinessTime;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -148,7 +149,7 @@ class GlobalSearch extends Component
                     'type' => 'reservation',
                     'label' => $r->customer_name,
                     'icon' => 'bx-calendar-check',
-                    'description' => $r->reserved_at->format('d/m/Y g:i A').' · '.$r->guests.'p · '.$r->status_label,
+                    'description' => BusinessTime::format($r->reserved_at).' · '.$r->guests.'p · '.$r->status_label,
                     'url' => route('app.reservas'),
                 ])
                 ->toArray();

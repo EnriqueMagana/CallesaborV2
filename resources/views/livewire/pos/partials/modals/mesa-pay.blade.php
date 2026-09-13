@@ -27,7 +27,7 @@
                         {{ $mpMesa->display_name }} · {{ $mpMesa->area?->name ?? '' }}
                         @if($assignment)
                             &nbsp;·&nbsp;<i class="bx bx-user" data-ui="xui-1dnxcst"></i> {{ $assignment->waiter?->name }}
-                            &nbsp;·&nbsp;Apertura: {{ $assignment->assigned_at->format('H:i') }}
+                            &nbsp;·&nbsp;Apertura: {{ \App\Support\BusinessTime::format($assignment->assigned_at, 'g:i A') }}
                         @endif
                     </div>
                 @endif

@@ -75,7 +75,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->assertSee('Mesa 1')
             ->assertSee('Mesa 2')
             ->assertSee('Orden ORD-101')
-            ->assertSee($service->opened_at->format('g:i A'))
+            ->assertSee(\App\Support\BusinessTime::format($service->opened_at, 'g:i A'))
             ->assertSee('18min activa')
             ->assertSee('Reimprimir cocina')
             ->assertSee('Cuenta lista para cobrar')

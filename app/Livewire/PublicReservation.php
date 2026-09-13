@@ -226,7 +226,7 @@ class PublicReservation extends Component
                 'customer_email' => trim($validated['customerEmail'] ?? '') ?: null,
                 'guests' => $validated['guests'],
                 'occasion' => trim($validated['occasion'] ?? '') ?: null,
-                'reserved_at' => $reservedAt,
+                'reserved_at' => $reservedAt->copy()->setTimezone(config('app.timezone', 'UTC')),
                 'notes' => trim($validated['notes'] ?? '') ?: null,
                 'status' => 'pendiente',
                 'source' => 'public',

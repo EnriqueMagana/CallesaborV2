@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Mail\UserInvitationMail;
 use App\Models\User;
 use App\Models\UserInvitation;
+use App\Support\BusinessTime;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -224,7 +225,7 @@ class UserList extends Component
                 invitationUrl: $invitationUrl,
                 roleLabel: $roleLabel,
                 invitedByName: auth()->user()?->name ?? 'Administración',
-                expiresAt: $expiresAt->translatedFormat('d/m/Y H:i'),
+                expiresAt: BusinessTime::inTimezone($expiresAt)->translatedFormat('d/m/Y g:i A'),
             ));
         } catch (Throwable $exception) {
             if ($invitation && $tokenHash) {

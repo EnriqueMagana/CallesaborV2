@@ -54,7 +54,7 @@
                                     <strong>{{ $service->service_label }}</strong>
                                     <small class="pos-service-opened">
                                         <span>Abrió {{ $service->opener_name_snapshot ?: 'Sin asignar' }}</span>
-                                        <span><i class="bx bx-time-five"></i>{{ $service->opened_at->format('g:i A') }}</span>
+                                        <span><i class="bx bx-time-five"></i>{{ \App\Support\BusinessTime::format($service->opened_at, 'g:i A') }}</span>
                                         <span>{{ $service->duration_label }} activa</span>
                                     </small>
                                 </span>

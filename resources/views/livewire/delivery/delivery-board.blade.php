@@ -421,7 +421,7 @@
                                                 <td data-label="Entrega">
                                                     <time
                                                         datetime="{{ optional($order->deliveryAssignment->delivered_at)->toIso8601String() }}">
-                                                        {{ optional($order->deliveryAssignment->delivered_at)->format('H:i') ?? 'Sin hora' }}
+                                                        {{ \App\Support\BusinessTime::format($order->deliveryAssignment->delivered_at, 'g:i A', 'Sin hora') }}
                                                     </time>
                                                     <small>{{ $order->origin_label }}</small>
                                                 </td>

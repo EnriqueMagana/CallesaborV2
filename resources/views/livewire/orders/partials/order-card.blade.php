@@ -25,7 +25,7 @@
     <dl>
         <div><dt>Canal</dt><dd><i class="bx {{ $isKioskOrder ? 'bx-desktop' : $order->type_icon }}" aria-hidden="true"></i>{{ $isKioskOrder ? "Kiosco · {$fulfillmentLabel}" : $order->type_label }}</dd></div>
         <div><dt>Responsable</dt><dd>{{ $order->seller?->name ?? 'Sin asignar' }}</dd></div>
-        <div><dt>Registro</dt><dd>{{ $order->created_at->format('d/m/Y · H:i') }}</dd></div>
+        <div><dt>Registro</dt><dd>{{ \App\Support\BusinessTime::format($order->created_at, 'd/m/Y · g:i A') }}</dd></div>
     </dl>
     <footer>@include('livewire.orders.partials.order-actions', ['order' => $order, 'mobile' => true])</footer>
 </article>

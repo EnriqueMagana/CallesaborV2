@@ -59,7 +59,7 @@
                     ? 'Cada repartidor toma el pedido, confirma la entrega y entrega su arqueo a caja.'
                     : 'Los pedidos contra entrega se contabilizan automáticamente como efectivo esperado y se cuadran con el responsable del corte.' }}</p>
                 @if($lastDeliveryChange)
-                    <small>Último cambio: {{ $lastDeliveryChange->changed_at?->format('d/m/Y H:i') }} por {{ $lastDeliveryChange->changedBy?->name ?? 'Usuario eliminado' }}.</small>
+                    <small>Último cambio: {{ \App\Support\BusinessTime::format($lastDeliveryChange->changed_at) }} por {{ $lastDeliveryChange->changedBy?->name ?? 'Usuario eliminado' }}.</small>
                 @endif
             </div>
             <dl class="developer-module-control__metrics" aria-label="Impacto del módulo Delivery en la caja activa">
@@ -317,7 +317,7 @@
                             <td><strong>{{ $notification->data['title'] ?? 'Notificación' }}</strong><small>{{ $notification->event_key }}</small></td>
                             <td>{{ $notification->notifiable?->name ?? 'Usuario eliminado' }}</td>
                             <td><span class="developer-state {{ $notification->announced_at ? 'is-announced' : 'is-pending' }}">{{ $notification->announced_at ? 'Anunciada' : 'Pendiente' }}</span></td>
-                            <td>{{ $notification->created_at?->format('d/m/Y H:i:s') }}</td>
+                            <td>{{ \App\Support\BusinessTime::format($notification->created_at, 'd/m/Y g:i:s A') }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="4" class="developer-table__empty">Todavía no existen notificaciones.</td></tr>

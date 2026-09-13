@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
+use App\Support\BusinessTime;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -265,7 +266,7 @@ class NotificationCenter extends Component
             return false;
         }
 
-        $now = now()->format('H:i');
+        $now = BusinessTime::now()->format('H:i');
         $start = $this->quietHoursStart;
         $end = $this->quietHoursEnd;
 

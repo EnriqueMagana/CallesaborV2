@@ -218,8 +218,8 @@
                                 <p>{{ $purchase->notes ?: 'Sin indicaciones adicionales.' }}</p>
                             </div>
                             <dl>
-                                <div><dt>Emisión</dt><dd>{{ $purchase->issued_at?->format('d/m/Y H:i') }}</dd></div>
-                                <div><dt>Recepción</dt><dd>{{ $purchase->received_at?->format('d/m/Y H:i') ?: 'Pendiente' }}</dd></div>
+                                <div><dt>Emisión</dt><dd>{{ \App\Support\BusinessTime::format($purchase->issued_at) }}</dd></div>
+                                <div><dt>Recepción</dt><dd>{{ \App\Support\BusinessTime::format($purchase->received_at, 'd/m/Y g:i A', 'Pendiente') }}</dd></div>
                             </dl>
                             <div class="inventory-purchase-actions">
                                 <button type="button" class="btn btn-sm btn-outline-secondary inventory-action" wire:click="openPurchaseDetail({{ $purchase->id }})" wire:loading.class="is-loading" wire:loading.attr="disabled" wire:target="openPurchaseDetail({{ $purchase->id }})"><i class="bx bx-show"></i><span>Ver</span><b class="inventory-button-loader"></b></button>
@@ -334,7 +334,7 @@
                     <section class="inventory-ticket-summary">
                         <div class="inventory-ticket-summary-head">
                             <span class="inventory-status {{ $detailPurchase->status === 'received' ? 'is-ok' : 'is-pending' }}"><i class="bx {{ $detailPurchase->status === 'received' ? 'bx-check-circle' : 'bx-time-five' }}"></i>{{ $detailPurchase->status === 'received' ? 'Recibido' : 'Pendiente' }}</span>
-                            <small>{{ $detailPurchase->issued_at?->format('d/m/Y H:i') }}</small>
+                            <small>{{ \App\Support\BusinessTime::format($detailPurchase->issued_at) }}</small>
                         </div>
                         <div class="inventory-ticket-person"><span><i class="bx bx-user"></i></span><div><small>Preparó</small><strong>{{ $detailPurchase->requester?->name ?: 'Sin asignar' }}</strong></div></div>
                         <div class="inventory-detail-lines">
@@ -408,7 +408,7 @@
                     @elseif($this->receptionPurchase)
                         <form wire:submit="confirmReception">
                             <div class="inventory-reception-head">
-                                <div><span>Folio</span><strong>{{ $this->receptionPurchase->folio }}</strong><small>Preparó {{ $this->receptionPurchase->requester?->name }} · {{ $this->receptionPurchase->issued_at?->format('d/m/Y H:i') }}</small></div>
+                                <div><span>Folio</span><strong>{{ $this->receptionPurchase->folio }}</strong><small>Preparó {{ $this->receptionPurchase->requester?->name }} · {{ \App\Support\BusinessTime::format($this->receptionPurchase->issued_at) }}</small></div>
                                 <span class="inventory-status is-pending"><i class="bx bx-time-five"></i>Pendiente</span>
                             </div>
                             <div class="inventory-reception-help"><i class="bx bx-check-shield"></i><p>Confirma lo recibido. Si una cantidad cambió, ajústala y explica la diferencia; al guardar se sumará directamente a la existencia.</p></div>

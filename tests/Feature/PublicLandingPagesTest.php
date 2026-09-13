@@ -161,13 +161,13 @@ class PublicLandingPagesTest extends TestCase
             $this->get(route('public.home'))
                 ->assertOk()
                 ->assertSee('home-hero__status--closed', false)
-                ->assertSee('Abre hoy a las 09:30');
+                ->assertSee('Abre hoy a las 9:30 AM');
 
             Carbon::setTestNow(Carbon::parse('2026-08-10 15:30:00', 'UTC'));
             $this->get(route('public.home'))
                 ->assertOk()
                 ->assertSee('home-hero__status--open', false)
-                ->assertSee('Cierra a las 18:00');
+                ->assertSee('Cierra a las 6:00 PM');
 
             Carbon::setTestNow(Carbon::parse('2026-08-11 00:00:00', 'UTC'));
             $this->get(route('public.home'))

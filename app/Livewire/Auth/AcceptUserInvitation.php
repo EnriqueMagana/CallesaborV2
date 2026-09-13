@@ -4,6 +4,7 @@ namespace App\Livewire\Auth;
 
 use App\Models\User;
 use App\Models\UserInvitation;
+use App\Support\BusinessTime;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -146,7 +147,7 @@ class AcceptUserInvitation extends Component
         $this->roleLabel = $this->roleName !== ''
             ? str($this->roleName)->replace('-', ' ')->title()->toString()
             : 'Rol no disponible';
-        $this->expiresAt = $invitation->expires_at->translatedFormat('d/m/Y H:i');
+        $this->expiresAt = BusinessTime::inTimezone($invitation->expires_at)->translatedFormat('d/m/Y g:i A');
         $this->invitationValid = $invitation->isUsable($this->token) && $invitation->role !== null;
 
         if (! $this->invitationValid) {

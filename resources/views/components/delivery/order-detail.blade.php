@@ -70,7 +70,7 @@
                     <span><i class="bx bx-cycling"></i></span>
                     <div><small>Repartidor
                             asignado</small><strong>{{ $assignment->driver?->name ?? 'Usuario eliminado' }}</strong>
-                        <p>Tomó el pedido a las {{ $assignment->assigned_at?->format('H:i') }}.</p>
+                        <p>Tomó el pedido a las {{ \App\Support\BusinessTime::format($assignment->assigned_at, 'g:i A') }}.</p>
                     </div>
                 </div>
             @endif

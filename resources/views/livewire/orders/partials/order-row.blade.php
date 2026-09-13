@@ -33,6 +33,6 @@
     <td><span class="orders-status orders-status--{{ $statusClass }}"><i aria-hidden="true"></i>{{ $order->status_label }}</span></td>
     <td><strong class="orders-total">${{ number_format($order->total, 2) }}</strong></td>
     <td class="orders-col--secondary"><strong class="orders-cell-title">{{ $order->seller?->name ?? 'Sin asignar' }}</strong><small class="orders-muted">{{ $order->cashRegister?->name ?? 'Sin caja' }}</small></td>
-    <td class="orders-col--secondary"><strong class="orders-cell-title">{{ $order->created_at->format('d M Y') }}</strong><small class="orders-muted">{{ $order->created_at->format('H:i') }} h</small></td>
+    <td class="orders-col--secondary"><strong class="orders-cell-title">{{ \App\Support\BusinessTime::format($order->created_at, 'd M Y') }}</strong><small class="orders-muted">{{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</small></td>
     <td class="orders-actions-cell">@include('livewire.orders.partials.order-actions', ['order' => $order])</td>
 </tr>

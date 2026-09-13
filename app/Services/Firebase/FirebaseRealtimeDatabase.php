@@ -3,6 +3,7 @@
 namespace App\Services\Firebase;
 
 use App\Models\AppNotification;
+use App\Support\BusinessTime;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -63,7 +64,7 @@ class FirebaseRealtimeDatabase
             'root' => $this->configuration->rootPath(),
             'total' => 0,
             'shown' => 0,
-            'fetched_at' => now()->format('d/m/Y H:i:s'),
+            'fetched_at' => BusinessTime::format(BusinessTime::now(), 'd/m/Y g:i:s A'),
             'signals' => [],
         ];
 
@@ -105,9 +106,10 @@ class FirebaseRealtimeDatabase
                         'event_key' => (string) ($signal['event_key'] ?? 'unknown'),
                         'created_at_ms' => $createdAtMs,
                         'created_at' => $createdAtMs > 0
-                            ? Carbon::createFromTimestampMs($createdAtMs)
-                                ->timezone((string) config('firebase.realtime.cleanup_timezone', 'America/Mexico_City'))
-                                ->format('d/m/Y H:i:s')
+                            ? BusinessTime::format(
+                                Carbon::createFromTimestampMs($createdAtMs),
+                                'd/m/Y g:i:s A'
+                            )
                             : 'Sin fecha',
                     ];
                 }

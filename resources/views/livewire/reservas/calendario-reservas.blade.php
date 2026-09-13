@@ -220,11 +220,11 @@
                         @endif
                         <div class="d-flex align-items-center gap-2">
                             <i class="bx bx-calendar text-muted"></i>
-                            <span>{{ $r->reserved_at->translatedFormat('l d \d\e F Y') }}</span>
+                            <span>{{ \App\Support\BusinessTime::inTimezone($r->reserved_at)->translatedFormat('l d \d\e F Y') }}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <i class="bx bx-time text-muted"></i>
-                            <span>{{ $r->reserved_at->format('g:i A') }}</span>
+                            <span>{{ \App\Support\BusinessTime::format($r->reserved_at, 'g:i A') }}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <i class="bx bx-group text-muted"></i>
@@ -353,7 +353,7 @@
                 nowIndicator: true,
                 eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
                 eventDidMount: function(info) {
-                    const start = info.event.start ? info.event.start.toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+                    const start = info.event.start ? info.event.start.toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true }) : '';
                     info.el.setAttribute('aria-label', `${info.event.title}. ${start}`);
                     info.el.setAttribute('tabindex', '0');
                     info.el.addEventListener('keydown', function(event) {

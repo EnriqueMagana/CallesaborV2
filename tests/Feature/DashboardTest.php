@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\DashboardDataBuilder;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -213,6 +214,41 @@ class DashboardTest extends TestCase
         $this->assertSame([0, 0, 0, 1], $dashboard['chart_data']['status']['values']);
         $this->assertSame('Producto actual', $dashboard['team_performance']['top_products']->first()['name']);
         $this->assertFalse($dashboard['team_performance']['top_products']->contains('name', 'Producto de caja anterior'));
+    }
+
+    public function test_dashboard_trend_includes_orders_from_previous_registers_and_business_days(): void
+    {
+        config(['app.timezone' => 'UTC', 'app.business_timezone' => 'America/Merida']);
+        Carbon::setTestNow(Carbon::parse('2026-09-13 02:00:00', 'UTC'));
+
+        try {
+            $owner = $this->userWithRole('owner');
+            $closedRegister = CashRegister::create([
+                'name' => 'Caja del día anterior',
+                'opened_by' => $owner->id,
+                'initial_amount' => 0,
+                'opened_at' => Carbon::parse('2026-09-12 00:00:00', 'UTC'),
+                'closed_at' => Carbon::parse('2026-09-12 05:00:00', 'UTC'),
+                'is_open' => false,
+            ]);
+            $previousBusinessDayOrder = $this->order($closedRegister, $owner, 275);
+            $previousBusinessDayOrder->forceFill([
+                // 11 Sep., 7:30 p. m. in America/Merida.
+                'created_at' => Carbon::parse('2026-09-12 01:30:00', 'UTC'),
+            ])->saveQuietly();
+
+            $openRegister = $this->openRegister($owner);
+            $this->order($openRegister, $owner, 80);
+
+            $dashboard = app(DashboardDataBuilder::class)->build($owner, '7');
+            $values = $dashboard['chart_data']['trend']['values'];
+
+            $this->assertSame(275.0, $values[count($values) - 2]);
+            $this->assertSame(80.0, $values[count($values) - 1]);
+            $this->assertSame('$80.00', $dashboard['kpis'][0]['value']);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     private function userWithRole(string $role): User

@@ -55,7 +55,7 @@
                     <div class="col-sm-4">
                         <div class="small text-muted mb-1">Fecha y hora</div>
                         <div class="fw-semibold">{{ $order->created_at->format('d/m/Y') }}</div>
-                        <div class="small text-muted">{{ $order->created_at->format('H:i:s') }}</div>
+                        <div class="small text-muted">{{ \App\Support\BusinessTime::format($order->created_at, 'g:i:s A') }}</div>
                     </div>
 
                     {{-- ── Vendedor / Caja ── --}}
@@ -238,7 +238,7 @@
                                 <div class="ms-4 small text-danger mt-1">
                                     <i class="bx bx-user-x me-1"></i>
                                     Cancelado por {{ $item->cancelledBy->name }}
-                                    {{ $item->cancelled_at?->format('d/m/Y H:i') }}
+                                    {{ \App\Support\BusinessTime::format($item->cancelled_at) }}
                                 </div>
                             @endif
                         </div>
@@ -321,7 +321,7 @@
                         <div class="small fw-semibold text-danger mb-2"><i class="bx bx-undo me-1"></i>Devoluciones registradas</div>
                         @foreach($order->refunds as $refund)
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="small text-muted">{{ $refund->processed_at?->format('d/m/Y H:i') }}<br>{{ $refund->processor?->name }}{{ $refund->external_reference ? ' · Ref. '.$refund->external_reference : '' }}</span>
+                                <span class="small text-muted">{{ \App\Support\BusinessTime::format($refund->processed_at) }}<br>{{ $refund->processor?->name }}{{ $refund->external_reference ? ' · Ref. '.$refund->external_reference : '' }}</span>
                                 <strong class="text-danger">−${{ number_format($refund->amount, 2) }}</strong>
                             </div>
                         @endforeach
@@ -344,7 +344,7 @@
                 @if($order->cancelledBy)
                     <div class="small text-muted">
                         Por: {{ $order->cancelledBy->name }}<br>
-                        {{ $order->cancelled_at?->format('d/m/Y H:i') }}
+                        {{ \App\Support\BusinessTime::format($order->cancelled_at) }}
                     </div>
                 @endif
             </div>

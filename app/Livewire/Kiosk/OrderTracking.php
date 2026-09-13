@@ -3,6 +3,7 @@
 namespace App\Livewire\Kiosk;
 
 use App\Models\Order;
+use App\Support\BusinessTime;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -32,7 +33,7 @@ class OrderTracking extends Component
     public function refreshStatus(): void
     {
         unset($this->order);
-        $this->lastCheckedAt = now()->format('H:i:s');
+        $this->lastCheckedAt = BusinessTime::format(BusinessTime::now(), 'g:i:s A');
     }
 
     public function render()

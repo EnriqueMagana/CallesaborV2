@@ -8,6 +8,7 @@ use App\Notifications\OperationalNotification;
 use App\Services\Firebase\FirebaseConfiguration;
 use App\Services\Firebase\FirebaseCustomTokenFactory;
 use App\Services\Firebase\FirebaseRealtimeDatabase;
+use App\Support\BusinessTime;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -31,7 +32,7 @@ class DeveloperDiagnosticsService
             ->every(fn (string $table): bool => Schema::hasTable($table));
 
         return [
-            'generated_at' => now()->format('d/m/Y H:i:s'),
+            'generated_at' => BusinessTime::format(BusinessTime::now(), 'd/m/Y g:i:s A'),
             'application' => [
                 'environment' => app()->environment(),
                 'debug' => (bool) config('app.debug'),
@@ -107,14 +108,14 @@ class DeveloperDiagnosticsService
                 'database_status' => $read->status(),
                 'signals' => is_array($read->json()) ? count($read->json()) : 0,
                 'latency_ms' => (int) round((microtime(true) - $started) * 1000),
-                'checked_at' => now()->format('H:i:s'),
+                'checked_at' => BusinessTime::format(BusinessTime::now(), 'g:i:s A'),
             ];
         } catch (Throwable $failure) {
             return [
                 'ok' => false,
                 'message' => $failure->getMessage(),
                 'latency_ms' => (int) round((microtime(true) - $started) * 1000),
-                'checked_at' => now()->format('H:i:s'),
+                'checked_at' => BusinessTime::format(BusinessTime::now(), 'g:i:s A'),
             ];
         }
     }
@@ -136,7 +137,7 @@ class DeveloperDiagnosticsService
             'dedupe_key' => 'developer-test:'.$id,
             'data' => [
                 'title' => $publishRealtime ? 'Prueba Firebase completada' : 'Prueba Livewire completada',
-                'message' => 'Notificación técnica generada desde el panel Super Admin a las '.now()->format('H:i:s').'.',
+                'message' => 'Notificación técnica generada desde el panel Super Admin a las '.BusinessTime::format(BusinessTime::now(), 'g:i:s A').'.',
                 'url' => route('app.super-admin', [], false),
                 'sound' => 'success',
             ],

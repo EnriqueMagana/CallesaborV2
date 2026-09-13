@@ -44,7 +44,7 @@
                                 <span><i class="bx {{ $service->status === 'liberada' ? 'bx-error-circle' : ($service->is_grouped ? 'bx-group' : 'bx-table') }}"></i></span>
                                 <div>
                                     <strong>{{ $service->service_label }}</strong>
-                                    <small>{{ $service->status === 'liberada' ? 'Liberada sin cobro' : 'Servicio pagado' }} · {{ $service->opened_at->format('H:i') }}–{{ $service->closed_at?->format('H:i') }} · {{ $service->opener_name_snapshot ?: 'Sin responsable' }}</small>
+                                    <small>{{ $service->status === 'liberada' ? 'Liberada sin cobro' : 'Servicio pagado' }} · {{ \App\Support\BusinessTime::format($service->opened_at, 'g:i A') }}–{{ \App\Support\BusinessTime::format($service->closed_at, 'g:i A', 'En curso') }} · {{ $service->opener_name_snapshot ?: 'Sin responsable' }}</small>
                                 </div>
                             </div>
                             <div class="pos-reprint-table-group__summary">
@@ -83,7 +83,7 @@
                     <article class="pos-reprint-order-card" wire:key="reprint-order-{{ $ro->id }}" role="listitem">
                         <div class="pos-reprint-order-card__identity">
                             <span><i class="bx {{ $reprintType === 'delivery' ? 'bx-cycling' : 'bx-store-alt' }}"></i></span>
-                            <div><strong>Orden {{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ $ro->created_at->format('H:i') }}</small><b>${{ number_format($ro->total, 2) }}</b></div>
+                            <div><strong>Orden {{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ \App\Support\BusinessTime::format($ro->created_at, 'g:i A') }}</small><b>${{ number_format($ro->total, 2) }}</b></div>
                         </div>
                         <div class="pos-reprint-actions">
                             <button type="button" wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-secondary"><i class="bx bx-receipt"></i>Cliente</button>

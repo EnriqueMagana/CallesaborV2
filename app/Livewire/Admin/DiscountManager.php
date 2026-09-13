@@ -6,6 +6,8 @@ use App\Models\Customer;
 use App\Models\Discount;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\BusinessTime;
+use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -123,8 +125,8 @@ class DiscountManager extends Component
         $this->minimumPurchase = (string) $discount->minimum_purchase;
         $this->maximumDiscount = (string) ($discount->maximum_discount ?? '');
         $this->fulfillmentModes = $discount->fulfillment_modes ?: Discount::FULFILLMENT_MODES;
-        $this->startsAt = $discount->starts_at?->format('Y-m-d\TH:i') ?? '';
-        $this->endsAt = $discount->ends_at?->format('Y-m-d\TH:i') ?? '';
+        $this->startsAt = $discount->starts_at ? BusinessTime::format($discount->starts_at, 'Y-m-d\TH:i') : '';
+        $this->endsAt = $discount->ends_at ? BusinessTime::format($discount->ends_at, 'Y-m-d\TH:i') : '';
         $this->priority = $discount->priority;
         $this->combineWithPromotions = $discount->combine_with_promotions;
         $this->isActive = $discount->is_active;
@@ -180,8 +182,8 @@ class DiscountManager extends Component
                 'minimum_purchase' => round((float) $this->minimumPurchase, 2),
                 'maximum_discount' => filled($this->maximumDiscount) ? round((float) $this->maximumDiscount, 2) : null,
                 'fulfillment_modes' => array_values(array_unique($this->fulfillmentModes)),
-                'starts_at' => filled($this->startsAt) ? $this->startsAt : null,
-                'ends_at' => filled($this->endsAt) ? $this->endsAt : null,
+                'starts_at' => $this->storageDateTime($this->startsAt),
+                'ends_at' => $this->storageDateTime($this->endsAt),
                 'priority' => $this->priority,
                 'combine_with_promotions' => $this->combineWithPromotions,
                 'auto_apply' => true,
@@ -196,6 +198,13 @@ class DiscountManager extends Component
         unset($this->discounts);
         $this->showEditor = false;
         $this->dispatch('notify', type: 'success', message: 'Descuento guardado y disponible para el POS.');
+    }
+
+    private function storageDateTime(string $value): ?Carbon
+    {
+        return filled($value)
+            ? Carbon::parse($value, BusinessTime::timezone())->setTimezone(config('app.timezone', 'UTC'))
+            : null;
     }
 
     public function toggleActive(int $discountId): void

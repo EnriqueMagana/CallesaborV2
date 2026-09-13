@@ -56,7 +56,7 @@
                         </div>
                         <div class="d-flex justify-content-between text-muted" data-ui="xui-19cyg9q">
                             <span>Apertura</span>
-                            <span class="fw-semibold text-dark">{{ $reg->opened_at->format('d/m/Y g:i A') }}</span>
+                            <span class="fw-semibold text-dark">{{ \App\Support\BusinessTime::format($reg->opened_at) }}</span>
                         </div>
                         <div class="d-flex justify-content-between text-muted mt-1" data-ui="xui-19cyg9q">
                             <span>Fondo inicial</span>
@@ -194,7 +194,7 @@
                                                 {{ (float) $settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $' . number_format($settlement->difference, 2) }}
                                             </span>
                                             <time
-                                                datetime="{{ $settlement->completed_at->toIso8601String() }}">{{ $settlement->completed_at->format('g:i A') }}</time>
+                                                datetime="{{ \App\Support\BusinessTime::inTimezone($settlement->completed_at)->toIso8601String() }}">{{ \App\Support\BusinessTime::format($settlement->completed_at, 'g:i A') }}</time>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -278,7 +278,7 @@
                                             <span
                                                 class="{{ (float) $settlement->difference === 0.0 ? 'is-exact' : 'is-difference' }}">
                                                 {{ (float) $settlement->difference === 0.0 ? 'Cuadra exacto' : 'Diferencia $' . number_format($settlement->difference, 2) }}
-                                                · {{ $settlement->completed_at->format('g:i A') }}
+                                                · {{ \App\Support\BusinessTime::format($settlement->completed_at, 'g:i A') }}
                                             </span>
                                         </div>
                                     @endforeach

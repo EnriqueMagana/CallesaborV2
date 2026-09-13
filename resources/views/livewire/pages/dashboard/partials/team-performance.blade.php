@@ -7,7 +7,7 @@
             <h2 id="dashboard-team-title">Quién está moviendo la operación</h2>
             <p>Pedidos atendidos y productos con mayor salida durante el día.</p>
         </div>
-        <span class="dashboard-chart-chip">Actualizado {{ now()->format('H:i') }}</span>
+        <span class="dashboard-chart-chip">Actualizado {{ \App\Support\BusinessTime::format(\App\Support\BusinessTime::now(), 'g:i A') }}</span>
     </div>
 
     <div class="dashboard-team__summary" aria-label="Resumen operativo de hoy">

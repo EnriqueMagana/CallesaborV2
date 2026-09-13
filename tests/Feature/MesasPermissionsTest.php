@@ -653,7 +653,7 @@ class MesasPermissionsTest extends TestCase
             ->assertSee('Levantó la orden')
             ->assertSee($waiter->name)
             ->assertSee('Pendiente')
-            ->assertSee('Recibida 14:25 h')
+            ->assertSee('Recibida '.\App\Support\BusinessTime::format($order->created_at, 'g:i A'))
             ->assertSee('avatars/mesero-prueba.webp', false);
     }
 
