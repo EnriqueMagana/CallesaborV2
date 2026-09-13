@@ -19,6 +19,8 @@ class SalesHistory extends Component
 {
     use WithPagination;
 
+    protected string $paginationTheme = 'bootstrap';
+
     public bool $hasSearched = false;
 
     public string $search = '';

@@ -184,6 +184,23 @@ class SalesHistoryAuditTest extends TestCase
                 && str_contains($params['html'] ?? '', 'RETIRADO'));
     }
 
+    public function test_historical_ticket_loader_stays_hidden_until_reprint_is_requested(): void
+    {
+        [$owner, $order] = $this->sale();
+
+        Livewire::actingAs($owner)
+            ->test(SalesHistoryDetail::class, ['order' => $order])
+            ->assertSeeHtml('wire:loading.inline-flex')
+            ->assertSeeHtml('wire:target="previewTicket"');
+
+        $css = file_get_contents(public_path('assets/css/sales-history.css'));
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.sales-audit-record__button-loading\s*\{[^}]*display\s*:/s',
+            $css,
+            'El CSS no debe forzar visible el estado controlado por wire:loading.',
+        );
+    }
+
     public function test_today_filter_uses_the_super_admin_business_timezone(): void
     {
         config()->set('app.timezone', 'UTC');
@@ -229,7 +246,7 @@ class SalesHistoryAuditTest extends TestCase
             ->assertSee('11:30:00 PM');
     }
 
-    public function test_history_pagination_uses_a_root_relative_url_without_duplicating_app(): void
+    public function test_history_pagination_preserves_the_generated_audit_and_uses_livewire_navigation(): void
     {
         [$owner, $firstOrder] = $this->sale();
 
@@ -255,7 +272,14 @@ class SalesHistoryAuditTest extends TestCase
         $pageTwoUrl = $component->get('orders')->url(2);
         $this->assertSame('/app/historial-ventas?page=2', $pageTwoUrl);
         $this->assertStringNotContainsString('/app/app/', $pageTwoUrl);
-        $component->assertSeeHtml('href="/app/historial-ventas?page=2"');
+
+        $component
+            ->assertSeeHtml('wire:click="gotoPage(2, \'page\')"')
+            ->call('gotoPage', 2, 'page')
+            ->assertSet('hasSearched', true);
+
+        $this->assertSame(2, $component->get('orders')->currentPage());
+        $this->assertCount(1, $component->get('orders')->items());
     }
 
     private function sale(bool $registerOpen = false): array

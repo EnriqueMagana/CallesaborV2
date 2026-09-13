@@ -56,6 +56,6 @@
             @endforeach
         </div>
 
-        @if($this->orders->hasPages())<div class="sales-audit-pagination">{{ $this->orders->links('pagination::bootstrap-5') }}</div>@endif
+        @if($this->orders->hasPages())<div class="sales-audit-pagination">{{ $this->orders->links('livewire::bootstrap', ['scrollTo' => '.sales-audit-results']) }}</div>@endif
     @endif
 </section>
