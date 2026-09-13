@@ -1,4 +1,4 @@
-@props(['id', 'title', 'description', 'label'])
+@props(['id', 'title', 'description', 'label', 'ariaLabel' => null])
 
 <section class="dashboard-panel dashboard-chart-panel" aria-labelledby="{{ $id }}-title">
     <div class="dashboard-panel__header">
@@ -9,7 +9,7 @@
         </div>
         {{ $actions ?? '' }}
     </div>
-    <div id="{{ $id }}" class="dashboard-chart" data-dashboard-chart="{{ $id }}" aria-label="{{ $title }}"></div>
+    <div id="{{ $id }}" class="dashboard-chart" data-dashboard-chart="{{ $id }}" role="img" aria-label="{{ $ariaLabel ?? $title }}"></div>
     <div class="dashboard-chart-fallback">
         {{ $fallback ?? '' }}
     </div>

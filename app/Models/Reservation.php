@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\BusinessTime;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,6 +22,17 @@ class Reservation extends Model
         'guests' => 'integer',
         'is_waitlist' => 'boolean',
     ];
+
+    public function setReservedAtAttribute(CarbonInterface|string $value): void
+    {
+        $moment = $value instanceof CarbonInterface
+            ? $value->copy()
+            : Carbon::parse($value, BusinessTime::timezone());
+
+        $this->attributes['reserved_at'] = $moment
+            ->setTimezone(config('app.timezone', 'UTC'))
+            ->format('Y-m-d H:i:s');
+    }
 
     public function customer(): BelongsTo
     {
@@ -56,8 +70,10 @@ class Reservation extends Model
     {
         return [
             'id' => $this->id,
-            'title' => ($this->is_waitlist ? 'EN ESPERA · ' : '').$this->reserved_at->format('g:i A').' · '.$this->customer_name.' · '.$this->guests.' '.($this->guests === 1 ? 'persona' : 'personas'),
-            'start' => $this->reserved_at->toIso8601String(),
+            'title' => ($this->is_waitlist ? 'EN ESPERA · ' : '').BusinessTime::format($this->reserved_at, 'g:i A').' · '.$this->customer_name.' · '.$this->guests.' '.($this->guests === 1 ? 'persona' : 'personas'),
+            // FullCalendar receives the business wall-clock value so a device
+            // in another timezone does not move the reservation to another slot.
+            'start' => BusinessTime::format($this->reserved_at, 'Y-m-d\TH:i:s'),
             'backgroundColor' => $this->is_waitlist ? '#b45309' : $this->status_color,
             'borderColor' => $this->is_waitlist ? '#92400e' : $this->status_color,
             'textColor' => '#ffffff',

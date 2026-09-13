@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BusinessSetting;
 use App\Models\Mesa;
 use App\Models\Reservation;
+use App\Support\BusinessTime;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -27,8 +28,12 @@ class ReservationAvailabilityService
             ->sortDesc()
             ->values();
 
-        $rangeStart = Carbon::parse($dates->first())->startOfDay()->subMinutes(self::OCCUPANCY_MINUTES);
-        $rangeEnd = Carbon::parse($dates->last())->endOfDay()->addMinutes(self::OCCUPANCY_MINUTES);
+        $rangeStart = Carbon::parse($dates->first(), BusinessTime::timezone())
+            ->startOfDay()->subMinutes(self::OCCUPANCY_MINUTES)
+            ->setTimezone(config('app.timezone', 'UTC'));
+        $rangeEnd = Carbon::parse($dates->last(), BusinessTime::timezone())
+            ->endOfDay()->addMinutes(self::OCCUPANCY_MINUTES)
+            ->setTimezone(config('app.timezone', 'UTC'));
         $reservationQuery = Reservation::query()
             ->whereIn('status', ['pendiente', 'confirmada'])
             ->where('is_waitlist', false)
@@ -47,8 +52,16 @@ class ReservationAvailabilityService
 
     public function forMoment(BusinessSetting $business, CarbonInterface $moment, int $guests, bool $lockReservations = false): array
     {
-        $slots = $this->forDates($business, [$moment->format('Y-m-d')], $lockReservations)[$moment->format('Y-m-d')] ?? [];
-        $availability = collect($slots)->firstWhere('time', $moment->format('H:i'));
+        // This public method accepts a business wall-clock selection. Rebuild
+        // it in the configured timezone even if the caller created a naive
+        // Carbon value using the application's storage timezone.
+        $businessMoment = Carbon::createFromFormat(
+            'Y-m-d H:i:s',
+            $moment->format('Y-m-d H:i:s'),
+            BusinessTime::timezone()
+        );
+        $slots = $this->forDates($business, [$businessMoment->format('Y-m-d')], $lockReservations)[$businessMoment->format('Y-m-d')] ?? [];
+        $availability = collect($slots)->firstWhere('time', $businessMoment->format('H:i'));
 
         if (! $availability) {
             return ['can_fit' => false, 'enforced' => false, 'remaining_seats' => null, 'remaining_tables' => null];
@@ -71,7 +84,8 @@ class ReservationAvailabilityService
         $totalTables = $tableCapacities->count();
 
         return collect($business->reservationSlots($date))->map(function (string $time) use ($date, $tableCapacities, $reservations, $enforced, $totalSeats, $totalTables): array {
-            $startsAt = Carbon::createFromFormat('Y-m-d H:i', $date.' '.$time);
+            $businessStartsAt = Carbon::createFromFormat('Y-m-d H:i', $date.' '.$time, BusinessTime::timezone());
+            $startsAt = $businessStartsAt->copy()->setTimezone(config('app.timezone', 'UTC'));
             $endsAt = $startsAt->copy()->addMinutes(self::OCCUPANCY_MINUTES);
             $overlapping = $reservations->filter(function (Reservation $reservation) use ($startsAt, $endsAt): bool {
                 $reservationEndsAt = $reservation->reserved_at->copy()->addMinutes(self::OCCUPANCY_MINUTES);
@@ -88,7 +102,7 @@ class ReservationAvailabilityService
 
             return [
                 'time' => $time,
-                'label' => $startsAt->format('g:i A'),
+                'label' => $businessStartsAt->format('g:i A'),
                 'enforced' => $enforced,
                 'total_seats' => $enforced ? $totalSeats : null,
                 'total_tables' => $enforced ? $totalTables : null,

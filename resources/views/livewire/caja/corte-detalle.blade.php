@@ -23,8 +23,8 @@
                 @endif
             </div>
             <small class="text-muted">
-                {{ $reg->name }} · Apertura {{ $reg->opened_at->format('d/m/Y g:i A') }}
-                · Cierre {{ $cut->generated_at->format('d/m/Y g:i A') }}
+                {{ $reg->name }} · Apertura {{ \App\Support\BusinessTime::format($reg->opened_at) }}
+                · Cierre {{ \App\Support\BusinessTime::format($cut->generated_at) }}
                 · Cerrado por <strong>{{ $cut->generator->name }}</strong>
             </small>
         </div>
@@ -139,7 +139,7 @@
                                         <tr>
                                             <td class="ps-3 text-muted">#{{ $order->id }}</td>
                                             <td>{{ $order->customer_name ?: 'Anónimo' }}</td>
-                                            <td class="text-muted">{{ $order->created_at->format('g:i A') }}</td>
+                                            <td class="text-muted">{{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</td>
                                             <td>{!! $paysSummary !!}</td>
                                             <td class="text-end pe-3 fw-semibold">${{ number_format($order->total,2) }}</td>
                                         </tr>

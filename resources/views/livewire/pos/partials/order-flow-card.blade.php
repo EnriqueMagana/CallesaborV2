@@ -24,7 +24,7 @@
                 <strong>{{ $flowOrder->customer_name ?: ($billingOnly ? 'Consumo de mesa' : 'Cliente sin nombre') }}</strong>
                 <small>{{ $flowArea }} · {{ $flowOrder->items->count() }}
                     {{ $flowOrder->items->count() === 1 ? 'producto' : 'productos' }} ·
-                    {{ $flowOrder->created_at->format('g:i A') }}</small>
+                    {{ \App\Support\BusinessTime::format($flowOrder->created_at, 'g:i A') }}</small>
             </div>
         </div>
         <div class="pos-flow-card__metrics">

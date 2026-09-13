@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
+use App\Support\BusinessTime;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -113,7 +114,7 @@ class DeliveryBoard extends Component
     public function refreshBoard(): void
     {
         $this->clearComputedData();
-        $this->lastCheckedAt = now()->format('H:i:s');
+        $this->lastCheckedAt = BusinessTime::format(BusinessTime::now(), 'g:i:s A');
     }
 
     public function takeOrder(int $orderId, DeliveryWorkflow $workflow): void

@@ -546,7 +546,7 @@ class PublicMenuTest extends TestCase
 
         $this->assertTrue($status['is_open']);
         $this->assertSame('Abierto ahora', $status['label']);
-        $this->assertSame('Cierra a las 02:00', $status['detail']);
+        $this->assertSame('Cierra a las 2:00 AM', $status['detail']);
         $this->assertSame('18:00', $status['opens_at']);
         $this->assertSame('02:00', $status['closes_at']);
         $this->assertTrue($status['closes_next_day']);

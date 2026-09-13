@@ -1,12 +1,12 @@
 <div class="sales-audit-order-detail">
     <div class="sales-audit-order-detail__facts">
         <div><small>Caja / turno</small><strong>{{ $order->cashRegister?->name ?? 'Sin caja asociada' }}</strong><span>{{ $order->cashRegister?->is_open ? 'Turno abierto' : 'Turno cerrado' }}</span></div>
-        <div><small>Responsable</small><strong>{{ $order->seller?->name ?? 'Sin responsable' }}</strong><span>{{ $order->created_at->format('d/m/Y H:i:s') }}</span></div>
-        <div><small>Cobro / cierre</small><strong>{{ $order->paid_at?->format('d/m/Y H:i:s') ?? $order->accounted_at?->format('d/m/Y H:i:s') ?? 'Sin cierre' }}</strong><span>{{ $this->durationLabel($order) }} de ciclo</span></div>
+        <div><small>Responsable</small><strong>{{ $order->seller?->name ?? 'Sin responsable' }}</strong><span>{{ \App\Support\BusinessTime::format($order->created_at, 'd/m/Y g:i:s A') }}</span></div>
+        <div><small>Cobro / cierre</small><strong>{{ \App\Support\BusinessTime::format($order->paid_at ?? $order->accounted_at, 'd/m/Y g:i:s A', 'Sin cierre') }}</strong><span>{{ $this->durationLabel($order) }} de ciclo</span></div>
         @if($order->type === 'mesa')
-            <div><small>Servicio de mesa</small><strong>{{ $order->mesaService?->service_label ?? $order->mesa?->display_name ?? $order->table_identifier ?? 'Sin identificar' }}</strong><span>{{ $order->mesaService?->opened_at?->format('H:i') ?? 'Sin apertura' }} → {{ $order->mesaService?->closed_at?->format('H:i') ?? 'En curso' }}</span></div>
+            <div><small>Servicio de mesa</small><strong>{{ $order->mesaService?->service_label ?? $order->mesa?->display_name ?? $order->table_identifier ?? 'Sin identificar' }}</strong><span>{{ \App\Support\BusinessTime::format($order->mesaService?->opened_at, 'g:i A', 'Sin apertura') }} → {{ \App\Support\BusinessTime::format($order->mesaService?->closed_at, 'g:i A', 'En curso') }}</span></div>
         @elseif($order->type === 'delivery')
-            <div><small>Entrega</small><strong>{{ $order->deliveryAssignment?->driver?->name ?? 'Sin repartidor' }}</strong><span>{{ $order->delivery_method_label }} · {{ $order->deliveryAssignment?->delivered_at?->format('H:i') ?? 'Sin entrega' }}</span></div>
+            <div><small>Entrega</small><strong>{{ $order->deliveryAssignment?->driver?->name ?? 'Sin repartidor' }}</strong><span>{{ $order->delivery_method_label }} · {{ \App\Support\BusinessTime::format($order->deliveryAssignment?->delivered_at, 'g:i A', 'Sin entrega') }}</span></div>
         @else
             <div><small>Origen</small><strong>{{ $order->type_label }}</strong><span>{{ $order->table_identifier ?: 'Venta directa' }}</span></div>
         @endif

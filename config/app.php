@@ -65,9 +65,11 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Keep persisted timestamps in a stable storage timezone. Business-facing
+    // dates are converted through app.business_timezone before presentation.
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
 
-    'business_timezone' => env('BUSINESS_TIMEZONE', 'America/Mexico_City'),
+    'business_timezone' => env('BUSINESS_TIMEZONE', env('APP_TIMEZONE', 'America/Mexico_City')),
 
     /*
     |--------------------------------------------------------------------------

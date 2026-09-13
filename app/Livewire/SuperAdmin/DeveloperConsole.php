@@ -9,6 +9,7 @@ use App\Services\DeliveryModuleManager;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeveloperDiagnosticsService;
 use App\Services\Firebase\FirebaseRealtimeDatabase;
+use App\Support\BusinessTime;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -263,7 +264,7 @@ class DeveloperConsole extends Component
         try {
             Mail::to($validated['testEmailRecipient'])->send(new DeveloperTestMail(
                 testerName: auth()->user()?->name ?? 'Super Admin',
-                sentAt: now()->format('d/m/Y H:i:s T'),
+                sentAt: BusinessTime::format(BusinessTime::now(), 'd/m/Y g:i:s A T'),
             ));
 
             $this->resetErrorBag('testEmailRecipient');

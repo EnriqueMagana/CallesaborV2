@@ -1,5 +1,11 @@
 <div class="dashboard-main-grid">
-    <x-dashboard.chart-card id="dashboard-trend" label="Rendimiento" title="Actividad del periodo" description="Evolución diaria con información real del sistema.">
+    <x-dashboard.chart-card
+        id="dashboard-trend"
+        label="Rendimiento"
+        title="Actividad del periodo"
+        description="Evolución diaria con información real del sistema."
+        :aria-label="'Actividad diaria de '.$dashboard['chart_data']['trend']['name'].' durante '.$dashboard['period_label'].'. Zona horaria: '.config('app.business_timezone').'. Consulta la tabla de datos disponible después de la gráfica.'"
+    >
         <x-slot:actions><span class="dashboard-chart-chip">{{ $dashboard['period_label'] }}</span></x-slot:actions>
         <x-slot:fallback>
             <details>

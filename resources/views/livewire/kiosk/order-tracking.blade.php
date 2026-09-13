@@ -102,7 +102,7 @@
                 <div>
                     <h2>Tu pedido</h2>
                     <p>{{ match ($order->fulfillment) {'dine_in' => 'Comer aquí','delivery' => 'Para domicilio',default => 'Para llevar'} }}
-                        · {{ $order->created_at->format('H:i') }}</p>
+                        · {{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</p>
                 </div>
             </div>
             <div class="kiosk-summary-lines">

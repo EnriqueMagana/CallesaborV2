@@ -49,7 +49,7 @@
             <div>
                 <span class="delivery-bank-card__eyebrow">Pedido</span>
                 <strong id="delivery-order-title-{{ $order->id }}">{{ $order->display_folio }}</strong>
-                <time datetime="{{ $order->created_at->toIso8601String() }}">{{ $order->created_at->format('H:i') }}</time>
+                <time datetime="{{ \App\Support\BusinessTime::inTimezone($order->created_at)->toIso8601String() }}">{{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</time>
             </div>
         </div>
         <x-delivery.status-pill :status="$displayStatus" />

@@ -1392,9 +1392,9 @@
                                             </span>
                                             <span
                                                 class="badge bg-label-{{ $order->status_color }}">{{ $order->status_label }}</span>
-                                            <span class="detail-order-received" title="{{ $order->created_at->format('d/m/Y H:i:s') }}">
+                                            <span class="detail-order-received" title="{{ \App\Support\BusinessTime::format($order->created_at, 'd/m/Y g:i:s A') }}">
                                                 <i class="bx bx-time-five" aria-hidden="true"></i>
-                                                Recibida {{ $order->created_at->format('H:i') }} h
+                                                Recibida {{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}
                                             </span>
                                         </div>
                                         <div class="detail-order-items">
@@ -1455,7 +1455,7 @@
                                             </div>
                                             <div class="d-flex gap-3 mt-1">
                                                 <small class="text-muted"><i
-                                                        class="bx bx-calendar me-1"></i>{{ $order->created_at->format('d/m/Y H:i') }}</small>
+                                                        class="bx bx-calendar me-1"></i>{{ \App\Support\BusinessTime::format($order->created_at) }}</small>
                                                 @if ($order->paid_at)
                                                     <small class="text-success"><i class="bx bx-check me-1"></i>Pagada
                                                         {{ $order->paid_at->diffForHumans() }}</small>
@@ -1509,12 +1509,12 @@
                                             <div class="d-flex gap-3 mt-1 flex-wrap">
                                                 <small class="text-muted">
                                                     <i class="bx bx-log-in me-1"></i>
-                                                    {{ $asgn->assigned_at->format('d/m/Y H:i') }}
+                                                    {{ \App\Support\BusinessTime::format($asgn->assigned_at) }}
                                                 </small>
                                                 @if ($asgn->released_at)
                                                     <small class="text-muted">
                                                         <i class="bx bx-log-out me-1"></i>
-                                                        {{ $asgn->released_at->format('d/m/Y H:i') }}
+                                                        {{ \App\Support\BusinessTime::format($asgn->released_at) }}
                                                     </small>
                                                     <small class="text-muted">
                                                         <i class="bx bx-time me-1"></i>{{ $asgn->duration }}
@@ -1562,7 +1562,7 @@
                                                     <div class="mesa-print-account__status"><i class="bx bx-dish"></i></div>
                                                     <div class="mesa-print-account__summary">
                                                         <strong>{{ $kitchenOrder->display_folio }}</strong>
-                                                        <small>{{ $kitchenOrder->items->where('is_cancelled', false)->count() }} partida(s) · {{ $kitchenOrder->status_label }} · {{ $kitchenOrder->created_at->format('H:i') }} h</small>
+                                                        <small>{{ $kitchenOrder->items->where('is_cancelled', false)->count() }} partida(s) · {{ $kitchenOrder->status_label }} · {{ \App\Support\BusinessTime::format($kitchenOrder->created_at, 'g:i A') }}</small>
                                                     </div>
                                                     <span class="badge bg-label-{{ $kitchenOrder->status_color }}">{{ $kitchenOrder->status_label }}</span>
                                                     <button type="button" class="btn btn-outline-primary btn-sm"

@@ -6,7 +6,7 @@
                 <div class="app-eyebrow">Caja · Cierre de turno</div>
                 <h1 class="app-page-title">Corte de caja</h1>
                 @if(!$cutDone)
-                    <p class="app-page-subtitle">{{ $this->register->name }} · Abierta {{ $this->register->opened_at->format('d/m/Y g:i A') }}</p>
+                    <p class="app-page-subtitle">{{ $this->register->name }} · Abierta {{ \App\Support\BusinessTime::format($this->register->opened_at) }}</p>
                 @else
                     <p class="app-page-subtitle">El turno fue conciliado y cerrado correctamente.</p>
                 @endif
@@ -113,7 +113,7 @@
                                             @if($pendingOrder->mesa) · {{ $pendingOrder->mesa->display_name }}@endif
                                             @if($pendingOrder->kioskTerminal) · {{ $pendingOrder->kioskTerminal->name }}@endif
                                         </p>
-                                        <small>{{ $pendingOrder->display_name }} · {{ $pendingOrder->created_at->format('g:i A') }}</small>
+                                        <small>{{ $pendingOrder->display_name }} · {{ \App\Support\BusinessTime::format($pendingOrder->created_at, 'g:i A') }}</small>
                                     </div>
                                     <div class="cash-cut-pending-item__amount">
                                         <strong>${{ number_format($pendingOrder->total, 2) }}</strong>
@@ -270,7 +270,7 @@
                             <tbody>
                                 @forelse($this->deliverySettlements as $settlement)
                                     <tr>
-                                        <td><strong>{{ $settlement->driver?->name ?? 'Usuario eliminado' }}</strong><small class="d-block app-muted">{{ $settlement->completed_at->format('g:i A') }}</small></td>
+                                        <td><strong>{{ $settlement->driver?->name ?? 'Usuario eliminado' }}</strong><small class="d-block app-muted">{{ \App\Support\BusinessTime::format($settlement->completed_at, 'g:i A') }}</small></td>
                                         <td class="text-end">{{ $settlement->orders_count }}</td>
                                         <td class="text-end cash-column">${{ number_format($settlement->expected_cash, 2) }}</td>
                                         <td class="text-end cash-column">${{ number_format($settlement->declared_cash, 2) }}</td>
@@ -362,7 +362,7 @@
                             @php $cashAmount = $order->payments->where('method', 'efectivo')->sum('amount'); @endphp
                             <article class="cash-cut-order">
                                 <span class="cash-cut-order__number">{{ $order->display_folio }}</span>
-                                <div class="cash-cut-order__copy"><strong>{{ $order->customer_name ?: 'Anónimo' }}</strong><small>{{ $order->type_label }} · {{ $order->created_at->format('g:i A') }}</small></div>
+                                <div class="cash-cut-order__copy"><strong>{{ $order->customer_name ?: 'Anónimo' }}</strong><small>{{ $order->type_label }} · {{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</small></div>
                                 <div class="cash-cut-order__amount"><strong>${{ number_format($order->total, 2) }}</strong>@if($cashAmount > 0)<small><i class="bx bx-money"></i> Efectivo ${{ number_format($cashAmount, 2) }}</small>@endif</div>
                             </article>
                         @empty

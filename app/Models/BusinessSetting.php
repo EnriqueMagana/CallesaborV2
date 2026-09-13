@@ -106,7 +106,7 @@ class BusinessSetting extends Model
                 return [
                     'is_open' => true,
                     'label' => 'Abierto ahora',
-                    'detail' => 'Cierra a las '.$closes->format('H:i'),
+                    'detail' => 'Cierra a las '.$closes->format('g:i A'),
                     'opens_at' => $opens->format('H:i'),
                     'closes_at' => $closes->format('H:i'),
                     'day_label' => $day['label'],
@@ -118,7 +118,7 @@ class BusinessSetting extends Model
                 return [
                     'is_open' => false,
                     'label' => 'Cerrado ahora',
-                    'detail' => ($opens->isSameDay($now) ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('H:i'),
+                    'detail' => ($opens->isSameDay($now) ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('g:i A'),
                     'opens_at' => $opens->format('H:i'),
                     'closes_at' => $closes->format('H:i'),
                     'day_label' => $day['label'],

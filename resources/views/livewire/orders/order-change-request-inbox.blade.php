@@ -94,7 +94,7 @@
                         @forelse($this->requests as $request)
                             <tr wire:key="order-request-{{ $request->id }}" class="{{ $selectedRequestId === $request->id ? 'is-selected' : '' }}">
                                 <td data-label="Orden"><strong>{{ $request->order?->display_folio }}</strong><small>{{ $request->order?->customer?->name ?? $request->order?->customer_name ?? 'Sin cliente' }}</small></td>
-                                <td data-label="Solicitud"><span class="order-request-type is-{{ $request->type }}"><i class="bx {{ match($request->scope) {'full' => 'bx-x-circle', 'partial' => 'bx-minus-circle', 'payment' => 'bx-credit-card', 'address' => 'bx-map', default => 'bx-edit-alt'} }}"></i>{{ $request->type_label }}</span><small>{{ $request->created_at->format('d/m/Y H:i') }}</small></td>
+                                <td data-label="Solicitud"><span class="order-request-type is-{{ $request->type }}"><i class="bx {{ match($request->scope) {'full' => 'bx-x-circle', 'partial' => 'bx-minus-circle', 'payment' => 'bx-credit-card', 'address' => 'bx-map', default => 'bx-edit-alt'} }}"></i>{{ $request->type_label }}</span><small>{{ \App\Support\BusinessTime::format($request->created_at) }}</small></td>
                                 <td data-label="Solicitó">{{ $request->requester?->name }}</td>
                                 <td data-label="Estado"><span class="order-request-status is-{{ $request->status }}"><i class="bx {{ match($request->status) {'approved' => 'bx-check-circle', 'rejected' => 'bx-x-circle', default => 'bx-time-five'} }}"></i>{{ $request->status_label }}</span></td>
                                 <td><button type="button" class="order-request-open" wire:click="selectRequest({{ $request->id }})" aria-label="Revisar solicitud de la orden {{ $request->order?->display_folio }}"><span>Revisar</span><i class="bx bx-chevron-right"></i></button></td>
@@ -120,7 +120,7 @@
                 </header>
                 <dl class="orders-review-meta">
                     <div><dt>Solicita</dt><dd>{{ $review->requester?->name }}</dd></div>
-                    <div><dt>Fecha</dt><dd>{{ $review->created_at->format('d/m/Y H:i') }}</dd></div>
+                    <div><dt>Fecha</dt><dd>{{ \App\Support\BusinessTime::format($review->created_at) }}</dd></div>
                     <div><dt>Cliente</dt><dd>{{ $review->order?->customer?->name ?? $review->order?->customer_name ?? 'Sin cliente' }}</dd></div>
                     <div><dt>Total actual</dt><dd>${{ number_format($review->original_total, 2) }}</dd></div>
                 </dl>
@@ -198,9 +198,9 @@
                         <button type="button" class="orders-button orders-button--primary" wire:click="approveRequest" wire:loading.attr="disabled" wire:target="approveRequest,rejectRequest"><i class="bx bx-check-shield"></i><span>{{ (float) data_get($context, 'refund_amount', 0) > 0 ? 'Aprobar y registrar devolución' : 'Aprobar y aplicar' }}</span></button>
                     </footer>
                 @else
-                    <div class="orders-review-resolution"><strong>{{ $review->status_label }} por {{ $review->reviewer?->name }}</strong><small>{{ $review->reviewed_at?->format('d/m/Y H:i') }}</small><p>{{ $review->reviewer_notes ?: 'Sin notas adicionales.' }}</p></div>
+                    <div class="orders-review-resolution"><strong>{{ $review->status_label }} por {{ $review->reviewer?->name }}</strong><small>{{ \App\Support\BusinessTime::format($review->reviewed_at) }}</small><p>{{ $review->reviewer_notes ?: 'Sin notas adicionales.' }}</p></div>
                     @if($review->refund)
-                        <div class="orders-review-resolution"><strong>Reembolso #{{ $review->refund->id }} registrado</strong><small>{{ $review->refund->processed_at?->format('d/m/Y H:i') }}</small><p>${{ number_format($review->refund->amount, 2) }}{{ $review->refund->external_reference ? ' · Ref. '.$review->refund->external_reference : ' · Efectivo' }}</p></div>
+                        <div class="orders-review-resolution"><strong>Reembolso #{{ $review->refund->id }} registrado</strong><small>{{ \App\Support\BusinessTime::format($review->refund->processed_at) }}</small><p>${{ number_format($review->refund->amount, 2) }}{{ $review->refund->external_reference ? ' · Ref. '.$review->refund->external_reference : ' · Efectivo' }}</p></div>
                     @endif
                 @endif
             @else

@@ -47,7 +47,7 @@
                             </span>
                         @endif
                         <span class="mo-orden-time text-muted">
-                            <i class="bx bx-time"></i> {{ $order->created_at->format('H:i') }}
+                            <i class="bx bx-time"></i> {{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}
                             <small>({{ $order->created_at->diffForHumans() }})</small>
                         </span>
                     </div>

@@ -8,6 +8,7 @@ use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\Order;
 use App\Models\User;
+use App\Support\BusinessTime;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -49,38 +50,43 @@ class DashboardDataBuilder
             && $this->menuAccess()->allows($user, 'app.ordenes');
         $financialAccess = $isOwner || $user->can('ver reportes financieros');
 
-        $orders = Order::query()
-            ->when($canOpenOrders, fn (Builder $query) => $query->with(['mesa.area', 'seller']))
-            ->where('cash_register_id', $openRegister->id)
+        $visibleOrders = Order::query()
             ->whereBetween('created_at', [$from, $to]);
 
         $assignedTableIds = collect();
         if (! $canQueryOrders) {
-            $orders->whereRaw('1 = 0');
+            $visibleOrders->whereRaw('1 = 0');
         } elseif ($mode === 'waiter') {
             $assignedTableIds = MesaAssignment::query()
                 ->where('user_id', $user->id)
                 ->whereNull('released_at')
                 ->pluck('mesa_id');
 
-            $orders->where(function (Builder $query) use ($user, $assignedTableIds): void {
+            $visibleOrders->where(function (Builder $query) use ($user, $assignedTableIds): void {
                 $query->where('served_by', $user->id);
                 if ($assignedTableIds->isNotEmpty()) {
                     $query->orWhereIn('mesa_id', $assignedTableIds);
                 }
             });
         } elseif ($mode === 'delivery') {
-            $orders->where('type', 'delivery');
+            $visibleOrders->where('type', 'delivery');
         }
 
-        $periodOrders = $orders->latest()->get();
+        // Historical charts span every register in the selected business-local
+        // period. Operational widgets remain scoped to the currently open caja.
+        $trendOrders = (clone $visibleOrders)->get();
+        $periodOrders = (clone $visibleOrders)
+            ->when($canOpenOrders, fn (Builder $query) => $query->with(['mesa.area', 'seller']))
+            ->where('cash_register_id', $openRegister->id)
+            ->latest()
+            ->get();
         $statusCounts = $periodOrders->countBy('status');
         $paidOrders = $periodOrders->filter(
             fn (Order $order): bool => $order->isFinalizedForAccounting()
         );
         $profile = $this->profileCopy($mode);
         $trend = $this->trend(
-            $periodOrders,
+            $trendOrders,
             $from,
             $to,
             $financialAccess && in_array($mode, ['owner', 'admin'], true)
@@ -146,14 +152,7 @@ class DashboardDataBuilder
 
     private function periodRange(string $period): array
     {
-        $to = now()->endOfDay();
-        $from = match ($period) {
-            'today' => now()->startOfDay(),
-            '30' => now()->subDays(29)->startOfDay(),
-            default => now()->subDays(6)->startOfDay(),
-        };
-
-        return [$from, $to];
+        return BusinessTime::periodBounds($period);
     }
 
     private function profileCopy(string $mode): array
@@ -226,7 +225,7 @@ class DashboardDataBuilder
                 'info',
                 $canViewTables ? 'Ocupadas o por cobrar' : 'Esperan entrega'
             ),
-            $this->kpi('Caja', 'Abierta', 'bx-wallet', 'success', 'Desde '.$openRegister->opened_at?->format('H:i')),
+            $this->kpi('Caja', 'Abierta', 'bx-wallet', 'success', 'Desde '.BusinessTime::format($openRegister->opened_at, 'g:i A')),
         ];
     }
 
@@ -237,12 +236,16 @@ class DashboardDataBuilder
 
     private function trend(Collection $orders, Carbon $from, Carbon $to, bool $money): array
     {
+        $from = $from->copy()->setTimezone(BusinessTime::timezone())->startOfDay();
+        $to = $to->copy()->setTimezone(BusinessTime::timezone())->startOfDay();
         $days = collect();
         for ($day = $from->copy(); $day->lte($to); $day->addDay()) {
             $days->push($day->copy());
         }
 
-        $ordersByDay = $orders->groupBy(fn (Order $order) => $order->created_at->toDateString());
+        $ordersByDay = $orders->groupBy(
+            fn (Order $order) => BusinessTime::inTimezone($order->created_at)->toDateString()
+        );
 
         return [
             'labels' => $days->map(fn (Carbon $day) => $day->translatedFormat('d M'))->all(),
@@ -260,8 +263,7 @@ class DashboardDataBuilder
 
     private function teamPerformance(Collection $periodOrders, bool $financialAccess, int $cashRegisterId): array
     {
-        $from = now()->startOfDay();
-        $to = now()->endOfDay();
+        [$from, $to] = BusinessTime::periodBounds('today');
         $todayOrders = $periodOrders
             ->filter(fn (Order $order): bool => $order->created_at->betweenIncluded($from, $to))
             ->where('status', '!=', 'cancelada');
@@ -309,7 +311,7 @@ class DashboardDataBuilder
             ]);
 
         $peakHour = $todayOrders
-            ->groupBy(fn (Order $order): string => $order->created_at->format('H:00'))
+            ->groupBy(fn (Order $order): string => BusinessTime::format($order->created_at, 'g:00 A'))
             ->sortByDesc(fn (Collection $orders): int => $orders->count())
             ->keys()
             ->first();

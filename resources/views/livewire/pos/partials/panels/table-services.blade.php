@@ -106,7 +106,7 @@
                                     </span>
                                     <small class="pos-service-opened">
                                         <span>{{ $service->opener_name_snapshot ?: 'Sin asignar' }}</span>
-                                        <span><i class="bx bx-calendar"></i>{{ $service->opened_at->format('g:i A') }}</span>
+                                        <span><i class="bx bx-calendar"></i>{{ \App\Support\BusinessTime::format($service->opened_at, 'g:i A') }}</span>
                                         <span><i class="bx bx-time-five"></i>{{ $service->duration_label }} activa</span>
                                         @if ($activeSplit)
                                             <span><i class="bx bx-git-branch"></i>{{ $pendingSplitAccounts->count() }} {{ $pendingSplitAccounts->count() === 1 ? 'subcuenta pendiente' : 'subcuentas pendientes' }}</span>

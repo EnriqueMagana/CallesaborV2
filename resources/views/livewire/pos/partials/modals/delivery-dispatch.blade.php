@@ -128,7 +128,7 @@
                             <div>
                                 <small>Repartidor actual</small>
                                 <strong>{{ $currentDispatchDriver?->name ?? 'Usuario eliminado' }}</strong>
-                                <span>Asignado {{ optional($selectedDispatchOrder->deliveryAssignment?->assigned_at)->format('g:i A') ?? 'sin hora' }}</span>
+                                <span>Asignado {{ \App\Support\BusinessTime::format($selectedDispatchOrder->deliveryAssignment?->assigned_at, 'g:i A', 'sin hora') }}</span>
                             </div>
                             <div>
                                 <small>Total de la orden</small>
