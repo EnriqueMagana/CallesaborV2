@@ -2496,6 +2496,17 @@ html.dark-style .pos-order-data-guardrail {
 .pos-reprint-order-card__identity strong { color: var(--pos-text); font-size: .78rem; }
 .pos-reprint-order-card__identity small { overflow: hidden; color: var(--pos-muted); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
 .pos-reprint-order-card__identity b { color: var(--pos-text); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.pos-reprint-order-card.is-cancelled .pos-reprint-order-card__identity strong {
+    opacity: .68;
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+}
+.pos-reprint-order-card.has-partial-cancellation .pos-reprint-order-card__identity b {
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-underline-offset: 3px;
+}
 .pos-reprint-actions { display: flex; gap: 7px; }
 .pos-reprint-actions .pos-btn { min-height: 42px; }
 

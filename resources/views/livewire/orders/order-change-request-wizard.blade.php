@@ -62,19 +62,17 @@
                             <button type="button" wire:click="chooseScope('full')" role="radio"
                                 aria-checked="{{ $scope === 'full' ? 'true' : 'false' }}"
                                 class="is-danger {{ $scope === 'full' ? 'is-selected' : '' }}">
-                                <i class="bx bx-x-circle" aria-hidden="true"></i><span><strong>Cancelar toda la
-                                        orden</strong><small>El pedido completo dejará de
-                                        continuar.</small></span><b>Total</b>
+                                <i class="bx bx-x-circle" aria-hidden="true"></i><span><strong>Cancelar toda la orden</strong><small>El pedido completo dejará de continuar.</small></span><b>Total</b>
                             </button>
                         @endif
-                        @if ($this->canRequestModification)
+                        @if ($this->canRequestPartialCancellation)
                             <button type="button" wire:click="chooseScope('partial')" role="radio"
                                 aria-checked="{{ $scope === 'partial' ? 'true' : 'false' }}"
                                 class="is-warning {{ $scope === 'partial' ? 'is-selected' : '' }}">
-                                <i class="bx bx-minus-circle" aria-hidden="true"></i><span><strong>Cancelación
-                                        parcial</strong><small>Retira artículos o reduce
-                                        cantidades.</small></span><b>Parcial</b>
+                                <i class="bx bx-minus-circle" aria-hidden="true"></i><span><strong>Cancelación parcial</strong><small>Retira artículos o reduce cantidades; si la orden ya se pagó, registra el reembolso.</small></span><b>Parcial</b>
                             </button>
+                        @endif
+                        @if ($this->canRequestModification)
                             <button type="button" wire:click="chooseScope('adjustment')" role="radio"
                                 aria-checked="{{ $scope === 'adjustment' ? 'true' : 'false' }}"
                                 class="is-primary {{ $scope === 'adjustment' ? 'is-selected' : '' }}">
@@ -147,7 +145,7 @@
                                                 aria-label="Quitar una unidad de {{ $line['name'] }}"><i
                                                     class="bx bx-minus"></i></button>
                                             <b aria-live="polite">{{ $line['quantity'] }}</b>
-                                            <button type="button"
+                                            <button type="button" @disabled($scope === 'partial' && $line['quantity'] >= $line['original_quantity'])
                                                 wire:click="adjustRequestItem({{ $index }}, 1)"
                                                 aria-label="Agregar una unidad de {{ $line['name'] }}"><i
                                                     class="bx bx-plus"></i></button>
@@ -161,6 +159,7 @@
                             @enderror
                         </fieldset>
 
+                        @if ($scope === 'adjustment')
                         <fieldset class="order-wizard-fieldset">
                             <legend>Agregar otro producto</legend>
                             <label class="visually-hidden" for="wizard-product-search">Buscar producto</label>
@@ -176,6 +175,7 @@
                                 @endforeach
                             </div>
                         </fieldset>
+                        @endif
                     @elseif($scope === 'full')
                         <div class="order-wizard-danger-summary"><i class="bx bx-error-circle"
                                 aria-hidden="true"></i>

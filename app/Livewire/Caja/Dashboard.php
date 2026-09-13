@@ -6,8 +6,9 @@ use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
 use App\Models\Order;
 use App\Models\User;
-use App\Services\DeliverySettlementService;
 use App\Services\DeliveryModulePolicy;
+use App\Services\DeliverySettlementService;
+use App\Services\OrderFinancialSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -73,7 +74,7 @@ class Dashboard extends Component
 
         $assignments = DeliveryAssignment::query()
             ->whereHas('order', fn ($orders) => $orders->where('cash_register_id', $this->activeRegister->id))
-            ->with(['driver', 'order.payments', 'settlement'])
+            ->with(['driver', 'order.payments', 'order.refunds', 'settlement'])
             ->get()
             ->groupBy('driver_id');
 
@@ -82,18 +83,17 @@ class Dashboard extends Component
             $inRoute = $driverAssignments->where('status', 'asignado');
             $delivered = $driverAssignments->where('status', 'entregado');
             $pendingSettlement = $delivered->whereNull('delivery_settlement_id');
-            $orders = $pendingSettlement->pluck('order');
-            $sumMethod = fn (string $method): float => (float) $orders
-                ->flatMap(fn (Order $order) => $order->payments->where('method', $method))
-                ->sum('amount');
+            $orders = $pendingSettlement->pluck('order')->where('status', '!=', 'cancelada')->values();
+            $financial = app(OrderFinancialSummaryService::class)->forOrders($orders);
+            $sumMethod = fn (string $method): float => (float) ($financial['net'][$method] ?? 0);
 
             return [
                 'driver_id' => $driver?->id,
                 'name' => $driver?->name ?? 'Usuario eliminado',
                 'in_route' => $inRoute->count(),
                 'delivered' => $delivered->count(),
-                'pending_notes' => $pendingSettlement->count(),
-                'cash_expected' => $sumMethod('efectivo'),
+                'pending_notes' => $orders->count(),
+                'cash_expected' => $sumMethod('efectivo') + $sumMethod('contra_entrega'),
                 'transfer_total' => $sumMethod('transferencia'),
                 'card_total' => $sumMethod('tarjeta'),
                 'sales_total' => (float) $orders->sum('total'),
@@ -143,12 +143,12 @@ class Dashboard extends Component
             ->where('delivery_flow_mode', 'manual')
             ->whereNotNull('accounted_at')
             ->where('status', '!=', 'cancelada')
-            ->with('payments')
+            ->with(['payments', 'refunds'])
             ->get();
 
         return [
             'orders' => $orders->count(),
-            'cash' => (float) $orders->flatMap(fn (Order $order) => $order->payments->where('method', 'efectivo'))->sum('amount'),
+            'cash' => (float) (app(OrderFinancialSummaryService::class)->forOrders($orders)['net']['efectivo'] ?? 0),
             'total' => (float) $orders->sum('total'),
         ];
     }

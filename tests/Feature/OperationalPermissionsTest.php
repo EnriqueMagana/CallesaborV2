@@ -116,7 +116,7 @@ class OperationalPermissionsTest extends TestCase
 
         Livewire::actingAs($requester)
             ->test(OrderChangeRequestWizard::class, ['order' => $order])
-            ->call('chooseScope', 'partial')
+            ->call('chooseScope', 'adjustment')
             ->call('adjustRequestItem', 0, -1)
             ->call('adjustRequestItem', 0, -1)
             ->call('addProductToRequest', $product->id)
@@ -128,7 +128,7 @@ class OperationalPermissionsTest extends TestCase
 
         $request = OrderChangeRequest::firstOrFail();
         $this->assertSame('75.00', $request->proposed_total);
-        $this->assertSame('partial', data_get($request->proposed_changes, 'request_context.scope'));
+        $this->assertSame('adjustment', data_get($request->proposed_changes, 'request_context.scope'));
         $this->assertDatabaseHas('order_items', ['id' => $item->id, 'is_cancelled' => false]);
 
         $owner = User::factory()->create();

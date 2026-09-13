@@ -232,7 +232,7 @@
 
                 <section class="app-card cash-cut-card">
                     <header class="cash-cut-card__header">
-                        <div><span class="cash-cut-card__icon"><i class="bx bx-bar-chart-alt-2"></i></span><div><h2>Ventas por área</h2><p>Desglose por canal y método de pago.</p></div></div>
+                        <div><span class="cash-cut-card__icon"><i class="bx bx-bar-chart-alt-2"></i></span><div><h2>Ventas por área (netas)</h2><p>Cobros menos reembolsos, por canal y método.</p></div></div>
                         <span class="cash-cut-helper"><i class="bx bx-info-circle"></i> Solo efectivo entra a caja</span>
                     </header>
                     <div class="table-responsive">
@@ -253,7 +253,7 @@
                                     </tr>
                                 @endforeach
                             </tbody>
-                            <tfoot><tr><th>Total del turno</th><th class="text-end cash-column">${{ number_format($this->totalCashIn, 2) }}</th><th class="text-end">${{ number_format($cardTotal, 2) }}</th><th class="text-end">${{ number_format($transferTotal, 2) }}</th><th class="text-end">${{ number_format($salesTotal, 2) }}</th></tr></tfoot>
+                            <tfoot><tr><th>Total neto del turno</th><th class="text-end cash-column">${{ number_format($this->netCashSales, 2) }}</th><th class="text-end">${{ number_format($cardTotal, 2) }}</th><th class="text-end">${{ number_format($transferTotal, 2) }}</th><th class="text-end">${{ number_format($salesTotal, 2) }}</th></tr></tfoot>
                         </table>
                     </div>
                 </section>
@@ -359,11 +359,15 @@
                     </header>
                     <div class="cash-cut-orders">
                         @forelse($this->orders as $order)
-                            @php $cashAmount = $order->payments->where('method', 'efectivo')->sum('amount'); @endphp
+                            @php
+                                $orderFinancial = app(\App\Services\OrderFinancialSummaryService::class)->forOrder($order);
+                                $cashAmount = ($orderFinancial['net']['efectivo'] ?? 0) + ($orderFinancial['net']['contra_entrega'] ?? 0);
+                                $refundedAmount = collect($orderFinancial['refunds'])->sum();
+                            @endphp
                             <article class="cash-cut-order">
                                 <span class="cash-cut-order__number">{{ $order->display_folio }}</span>
                                 <div class="cash-cut-order__copy"><strong>{{ $order->customer_name ?: 'Anónimo' }}</strong><small>{{ $order->type_label }} · {{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</small></div>
-                                <div class="cash-cut-order__amount"><strong>${{ number_format($order->total, 2) }}</strong>@if($cashAmount > 0)<small><i class="bx bx-money"></i> Efectivo ${{ number_format($cashAmount, 2) }}</small>@endif</div>
+                                <div class="cash-cut-order__amount"><strong>${{ number_format($order->total, 2) }}</strong>@if($refundedAmount > 0)<small>Reembolso -${{ number_format($refundedAmount, 2) }}</small>@endif @if($cashAmount > 0)<small><i class="bx bx-money"></i> Efectivo neto ${{ number_format($cashAmount, 2) }}</small>@endif</div>
                             </article>
                         @empty
                             <div class="cash-cut-empty"><span><i class="bx bx-receipt"></i></span><div><strong>Sin pedidos cobrados</strong><p>Este turno todavía no registra ventas pagadas.</p></div></div>
@@ -376,7 +380,7 @@
                 <header><span class="cash-cut-card__icon"><i class="bx bx-calculator"></i></span><div><h2>Conciliación de efectivo</h2><p>Cuenta el dinero físico antes de cerrar.</p></div></header>
                 <div class="cash-cut-equation">
                     <div><span>Fondo inicial</span><strong>${{ number_format($reg->initial_amount, 2) }}</strong></div>
-                    <div><span><i class="bx bx-plus"></i> Ventas en efectivo</span><strong class="cash-cut-positive">+${{ number_format($this->totalCashIn, 2) }}</strong></div>
+                    <div><span><i class="bx bx-plus"></i> Cobros brutos en efectivo</span><strong class="cash-cut-positive">+${{ number_format($this->totalCashIn, 2) }}</strong></div>
                     <div><span><i class="bx bx-plus"></i> Ingresos adicionales</span><strong class="cash-cut-positive">+${{ number_format($this->totalCashIncome, 2) }}</strong></div>
                     <div><span><i class="bx bx-minus"></i> Gastos en efectivo</span><strong class="cash-cut-negative">-${{ number_format($this->totalExpensesCash, 2) }}</strong></div>
                     <div class="cash-cut-equation__total"><span>Efectivo esperado</span><strong>${{ number_format($this->expectedCash, 2) }}</strong></div>

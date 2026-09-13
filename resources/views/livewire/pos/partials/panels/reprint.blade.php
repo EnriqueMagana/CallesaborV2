@@ -80,10 +80,11 @@
                 @endforelse
             @else
                 @forelse ($reprintResults as $ro)
-                    <article class="pos-reprint-order-card" wire:key="reprint-order-{{ $ro->id }}" role="listitem">
+                    @php($hasPartialCancellation = $ro->status !== 'cancelada' && ($ro->items->contains('is_cancelled', true) || $ro->refunds->isNotEmpty()))
+                    <article class="pos-reprint-order-card {{ $ro->status === 'cancelada' ? 'is-cancelled' : ($hasPartialCancellation ? 'has-partial-cancellation' : '') }}" wire:key="reprint-order-{{ $ro->id }}" role="listitem">
                         <div class="pos-reprint-order-card__identity">
                             <span><i class="bx {{ $reprintType === 'delivery' ? 'bx-cycling' : 'bx-store-alt' }}"></i></span>
-                            <div><strong>Orden {{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ \App\Support\BusinessTime::format($ro->created_at, 'g:i A') }}</small><b>${{ number_format($ro->total, 2) }}</b></div>
+                            <div><strong>Orden {{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ \App\Support\BusinessTime::format($ro->created_at, 'g:i A') }}</small><b>${{ number_format($ro->status === 'cancelada' ? 0 : $ro->total, 2) }} · {{ $hasPartialCancellation ? 'Cancelación parcial' : $ro->status_label }}</b></div>
                         </div>
                         <div class="pos-reprint-actions">
                             <button type="button" wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-secondary"><i class="bx bx-receipt"></i>Cliente</button>
@@ -91,7 +92,7 @@
                         </div>
                     </article>
                 @empty
-                    <div class="pos-area-empty"><span><i class="bx bx-printer"></i></span><h3>Sin pedidos para reimprimir</h3><p>No encontramos tickets de hoy con ese criterio.</p></div>
+                    <div class="pos-area-empty"><span><i class="bx bx-printer"></i></span><h3>Sin pedidos para reimprimir</h3><p>No encontramos tickets históricos con ese criterio.</p></div>
                 @endforelse
             @endif
         </div>
