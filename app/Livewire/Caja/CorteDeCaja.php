@@ -10,6 +10,7 @@ use App\Models\Expense;
 use App\Models\Order;
 use App\Services\CashRegisterClosingGuard;
 use App\Services\DeliveryModulePolicy;
+use App\Services\OrderFinancialSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -51,7 +52,7 @@ class CorteDeCaja extends Component
     {
         return Order::where('cash_register_id', $this->registerId)
             ->finalizedForAccounting()
-            ->with(['payments', 'seller', 'deliveryAssignment.driver', 'kioskTerminal'])
+            ->with(['payments', 'refunds', 'seller', 'deliveryAssignment.driver', 'kioskTerminal'])
             ->get();
     }
 
@@ -59,7 +60,7 @@ class CorteDeCaja extends Component
     public function auditOrders(): Collection
     {
         return Order::where('cash_register_id', $this->registerId)
-            ->with(['payments', 'seller', 'cancelledBy'])
+            ->with(['payments', 'refunds', 'seller', 'cancelledBy'])
             ->orderBy('created_at')
             ->get();
     }
@@ -85,7 +86,7 @@ class CorteDeCaja extends Component
     {
         return DeliverySettlement::query()
             ->where('cash_register_id', $this->registerId)
-            ->with(['driver', 'completedBy', 'assignments.order.payments'])
+            ->with(['driver', 'completedBy', 'assignments.order.payments', 'assignments.order.refunds'])
             ->latest('completed_at')
             ->get();
     }
@@ -105,19 +106,21 @@ class CorteDeCaja extends Component
 
         return [
             'orders' => $orders->count(),
-            'cash' => (float) $orders->flatMap(fn (Order $order) => $order->payments->where('method', 'efectivo'))->sum('amount'),
+            'cash' => $this->netPayment($orders, 'efectivo'),
             'total' => (float) $orders->sum('total'),
         ];
     }
 
     // ────────── Totales por área y método ──────────
 
-    private function sumPayments(string $type, string $method): float
+    private function paymentSummary(Collection $orders): array
     {
-        return (float) $this->orders
-            ->filter(fn ($o) => $o->type === $type || ($type === 'ventanilla' && $o->type === 'pick_up'))
-            ->flatMap(fn ($o) => $o->payments->where('method', $method))
-            ->sum('amount');
+        return app(OrderFinancialSummaryService::class)->forOrders($orders->values());
+    }
+
+    private function netPayment(Collection $orders, string $method): float
+    {
+        return (float) ($this->paymentSummary($orders)['net'][$method] ?? 0);
     }
 
     #[Computed]
@@ -130,9 +133,7 @@ class CorteDeCaja extends Component
         $mesas = $orders->filter(fn ($o) => $o->type === 'mesa');
         $delivery = $orders->filter(fn ($o) => $o->type === 'delivery');
 
-        $sum = fn ($col, string $method) => (float) $col
-            ->flatMap(fn ($o) => $o->payments->where('method', $method))
-            ->sum('amount');
+        $sum = fn ($col, string $method) => $this->netPayment($col, $method);
 
         // Delivery contra_entrega se cobra al repartidor → efectivo entra a caja del repartidor
         // aquí solo contamos efectivo que literalmente ingresó a la caja física:
@@ -182,7 +183,7 @@ class CorteDeCaja extends Component
                     'name' => $first->seller?->name ?? 'Usuario eliminado',
                     'orders' => $orders->count(),
                     'total' => (float) $orders->sum('total'),
-                    'cash' => (float) $orders->flatMap(fn ($order) => $order->payments->where('method', 'efectivo'))->sum('amount'),
+                    'cash' => $this->netPayment($orders, 'efectivo'),
                     'areas' => $areaTotals,
                 ];
             })->values()->all();
@@ -191,9 +192,23 @@ class CorteDeCaja extends Component
     #[Computed]
     public function totalCashIn(): float
     {
+        $gross = $this->paymentSummary($this->auditOrders)['gross'];
+
+        return (float) ($gross['efectivo'] ?? 0) + (float) ($gross['contra_entrega'] ?? 0);
+    }
+
+    #[Computed]
+    public function netCashSales(): float
+    {
         return $this->totals['v']['efectivo']
              + $this->totals['m']['efectivo']
              + $this->totals['d']['efectivo'];
+    }
+
+    #[Computed]
+    public function refundTotals(): array
+    {
+        return $this->paymentSummary($this->auditOrders)['refunds'];
     }
 
     #[Computed]
@@ -300,6 +315,7 @@ class CorteDeCaja extends Component
                     'orders_count' => $this->orders->count(),
                     'audit_orders_count' => $this->auditOrders->count(),
                     'cancelled_orders_count' => $this->auditOrders->where('status', 'cancelada')->count(),
+                    'payment_summary' => $this->paymentSummary($this->auditOrders),
                     'operators' => $this->operatorTotals,
                     'delivery_settlements' => $this->deliverySettlements->toArray(),
                     'expenses' => $this->expenses->toArray(),

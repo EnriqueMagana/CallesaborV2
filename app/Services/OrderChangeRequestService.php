@@ -30,7 +30,7 @@ class OrderChangeRequestService
             throw ValidationException::withMessages(['requestType' => 'El tipo de solicitud no es válido.']);
         }
 
-        $this->assertRequester($actor, $type);
+        $this->assertRequester($actor, $type, $context['scope'] ?? null);
         if (mb_strlen(trim($reason)) < 10) {
             throw ValidationException::withMessages(['requestReason' => 'Explica el motivo con al menos 10 caracteres.']);
         }
@@ -48,7 +48,7 @@ class OrderChangeRequestService
             $proposedTotal = null;
 
             if ($type === OrderChangeRequest::TYPE_MODIFICATION) {
-                [$changes, $proposedTotal] = $this->buildChanges($order, $desiredLines);
+                [$changes, $proposedTotal] = $this->buildChanges($order, $desiredLines, $context['scope'] ?? 'adjustment');
             } elseif ($type === OrderChangeRequest::TYPE_PAYMENT_CHANGE) {
                 $changes = ['payment_change' => $this->buildPaymentChange($order, $context)];
                 $proposedTotal = (float) $order->total;
@@ -148,7 +148,7 @@ class OrderChangeRequestService
         return DB::transaction(function () use ($changeRequest, $reviewer, $notes, $financial): OrderChangeRequest {
             $request = OrderChangeRequest::query()->lockForUpdate()->findOrFail($changeRequest->id);
             $this->assertPending($request);
-            $order = Order::query()->with(['items', 'payments', 'refunds', 'customer', 'deliveryAssignment'])->lockForUpdate()->findOrFail($request->order_id);
+            $order = Order::query()->with(['items.addons', 'items.ingredients', 'payments', 'refunds', 'customer', 'deliveryAssignment'])->lockForUpdate()->findOrFail($request->order_id);
             $this->assertActionable($order, $request->type);
             $wasPaid = $this->isPaidOrder($order);
 
@@ -160,12 +160,18 @@ class OrderChangeRequestService
 
             if ($request->type === OrderChangeRequest::TYPE_CANCELLATION) {
                 $previousStatus = $order->status;
+                $order->items()->where('is_cancelled', false)->update([
+                    'is_cancelled' => true,
+                    'cancelled_by' => $reviewer->id,
+                    'cancelled_at' => now(),
+                ]);
                 $order->update([
                     'status' => 'cancelada',
                     'cancelled_by' => $reviewer->id,
                     'cancellation_reason' => $request->reason,
                     'cancelled_at' => now(),
                 ]);
+                $this->refreshMesaTotal($order);
                 DB::afterCommit(fn () => $this->notifications->orderStatusChanged($order->fresh(), $previousStatus));
             } elseif ($request->type === OrderChangeRequest::TYPE_MODIFICATION) {
                 $this->applyModification($order, $request, $reviewer);
@@ -178,6 +184,8 @@ class OrderChangeRequestService
             if ($wasPaid && in_array($request->type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)) {
                 $this->recordRefund($order, $request, $reviewer, $financial);
             }
+
+            app(DeliverySettlementService::class)->refreshForOrder($order);
 
             $request->update([
                 'status' => OrderChangeRequest::STATUS_APPROVED,
@@ -403,7 +411,7 @@ class OrderChangeRequestService
         ];
     }
 
-    private function buildChanges(Order $order, array $desiredLines): array
+    private function buildChanges(Order $order, array $desiredLines, string $scope): array
     {
         $activeItems = $order->items->where('is_cancelled', false)->keyBy('id');
         $existingLines = collect($desiredLines)->where('kind', 'existing')->keyBy(fn (array $line) => (int) ($line['order_item_id'] ?? 0));
@@ -461,6 +469,16 @@ class OrderChangeRequestService
             ];
         }
 
+        if ($scope === 'partial') {
+            $invalidChange = collect($changes)->contains(fn (array $change) => $change['action'] === 'add'
+                || (int) $change['to_quantity'] > (int) $change['from_quantity']);
+            if ($invalidChange) {
+                throw ValidationException::withMessages([
+                    'requestItems' => 'Una cancelación parcial solo permite retirar productos o reducir cantidades.',
+                ]);
+            }
+        }
+
         if ($proposedTotal <= 0) {
             throw ValidationException::withMessages(['requestItems' => 'La modificación debe conservar al menos un producto en la orden.']);
         }
@@ -476,18 +494,21 @@ class OrderChangeRequestService
     {
         foreach (data_get($request->proposed_changes, 'items', []) as $change) {
             if ($change['action'] === 'add') {
-                $product = Product::query()->where('is_active', true)->find($change['product_id']);
+                $product = Product::query()->where('is_active', true)->lockForUpdate()->find($change['product_id']);
                 if (! $product) {
                     throw ValidationException::withMessages(['review' => "El producto {$change['product_name']} ya no está disponible."]);
+                }
+                if (round((float) $product->price, 2) !== round((float) $change['unit_subtotal'], 2)) {
+                    throw ValidationException::withMessages(['review' => "El precio de {$change['product_name']} cambió. Rechaza la solicitud y genera una nueva."]);
                 }
 
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
                     'product_name' => $product->name,
-                    'product_price' => $product->price,
+                    'product_price' => $change['unit_subtotal'],
                     'quantity' => $change['to_quantity'],
-                    'subtotal' => round((float) $product->price * (int) $change['to_quantity'], 2),
+                    'subtotal' => round((float) $change['after_subtotal'], 2),
                     'promotion_discount' => 0,
                 ]);
 
@@ -505,24 +526,68 @@ class OrderChangeRequestService
                 continue;
             }
 
+            if ((int) $change['to_quantity'] < (int) $change['from_quantity']) {
+                $this->recordCancelledQuantity($item, $change, $reviewer);
+            }
+
             $factor = (int) $change['to_quantity'] / max(1, (int) $change['from_quantity']);
             $item->update([
                 'quantity' => (int) $change['to_quantity'],
                 'subtotal' => round((float) $change['after_subtotal'], 2),
                 'promotion_discount' => round((float) $item->promotion_discount * $factor, 2),
+                'discount_amount' => round((float) $item->discount_amount * $factor, 2),
             ]);
         }
 
         $subtotal = (float) OrderItem::query()->where('order_id', $order->id)->where('is_cancelled', false)->sum('subtotal');
         $order->update(['subtotal' => round($subtotal, 2), 'total' => round($subtotal, 2)]);
 
-        if ($order->mesa_service_id) {
-            $order->mesaService()->update([
-                'total_snapshot' => round((float) Order::query()
-                    ->where('mesa_service_id', $order->mesa_service_id)
-                    ->sum('total'), 2),
-            ]);
+        $this->refreshMesaTotal($order);
+    }
+
+    private function recordCancelledQuantity(OrderItem $item, array $change, User $reviewer): void
+    {
+        $factor = ((int) $change['from_quantity'] - (int) $change['to_quantity']) / max(1, (int) $change['from_quantity']);
+        $cancelled = OrderItem::create([
+            'order_id' => $item->order_id,
+            'product_id' => $item->product_id,
+            'promotion_id' => $item->promotion_id,
+            'discount_id' => $item->discount_id,
+            'product_name' => $item->product_name,
+            'product_price' => $item->product_price,
+            'quantity' => (int) $change['from_quantity'] - (int) $change['to_quantity'],
+            'subtotal' => round((float) $change['before_subtotal'] - (float) $change['after_subtotal'], 2),
+            'promotion_discount' => round((float) $item->promotion_discount * $factor, 2),
+            'discount_amount' => round((float) $item->discount_amount * $factor, 2),
+            'notes' => $item->notes,
+            'promotion_selections' => $item->promotion_selections,
+            'promotion_rule_snapshot' => $item->promotion_rule_snapshot,
+            'discount_snapshot' => $item->discount_snapshot,
+            'is_cancelled' => true,
+            'cancelled_by' => $reviewer->id,
+            'cancelled_at' => now(),
+        ]);
+
+        foreach ($item->addons as $addon) {
+            $cancelled->addons()->create($addon->only(['addon_id', 'addon_name', 'extra_price', 'quantity']));
         }
+        foreach ($item->ingredients as $ingredient) {
+            $cancelled->ingredients()->create($ingredient->only(['ingredient_id', 'ingredient_name', 'extra_price', 'quantity']));
+        }
+    }
+
+    private function refreshMesaTotal(Order $order): void
+    {
+        if (! $order->mesa_service_id) {
+            return;
+        }
+
+        $order->mesaService()->update([
+            'total_snapshot' => round((float) Order::query()
+                ->where('mesa_service_id', $order->mesa_service_id)
+                ->where('status', '!=', 'cancelada')
+                ->sum('total'), 2),
+        ]);
     }
 
     private function applyPaymentChange(Order $order, OrderChangeRequest $request): void
@@ -725,8 +790,16 @@ class OrderChangeRequestService
         }
     }
 
-    private function assertRequester(User $actor, string $type): void
+    private function assertRequester(User $actor, string $type, ?string $scope = null): void
     {
+        if ($type === OrderChangeRequest::TYPE_MODIFICATION && $scope === 'partial') {
+            if ($actor->can('solicitar cancelacion de ordenes') || $actor->can('solicitar modificacion de ordenes')) {
+                return;
+            }
+
+            throw new AuthorizationException('No tienes permiso para crear esta solicitud.');
+        }
+
         $permission = match ($type) {
             OrderChangeRequest::TYPE_CANCELLATION => 'solicitar cancelacion de ordenes',
             OrderChangeRequest::TYPE_MODIFICATION => 'solicitar modificacion de ordenes',

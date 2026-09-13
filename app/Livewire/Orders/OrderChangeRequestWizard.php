@@ -104,6 +104,12 @@ class OrderChangeRequestWizard extends Component
     }
 
     #[Computed]
+    public function canRequestPartialCancellation(): bool
+    {
+        return $this->canRequestCancellation || $this->canRequestModification;
+    }
+
+    #[Computed]
     public function canRequestPaymentChange(): bool
     {
         return (auth()->user()?->can('solicitar cambio de metodo de pago') ?? false)
@@ -125,7 +131,7 @@ class OrderChangeRequestWizard extends Component
     #[Computed]
     public function productResults()
     {
-        if (! in_array($this->scope, ['partial', 'adjustment'], true)) {
+        if ($this->scope !== 'adjustment') {
             return collect();
         }
 
@@ -283,8 +289,11 @@ class OrderChangeRequestWizard extends Component
 
     public function adjustRequestItem(int $index, int $delta): void
     {
-        abort_unless($this->canRequestModification && isset($this->requestItems[$index]), 403);
-        $this->requestItems[$index]['quantity'] = max(0, min(99, (int) $this->requestItems[$index]['quantity'] + $delta));
+        abort_unless($this->canUseScope($this->scope) && isset($this->requestItems[$index]), 403);
+        $maximum = $this->scope === 'partial'
+            ? (int) $this->requestItems[$index]['original_quantity']
+            : 99;
+        $this->requestItems[$index]['quantity'] = max(0, min($maximum, (int) $this->requestItems[$index]['quantity'] + $delta));
         if ($this->requestItems[$index]['kind'] === 'new' && $this->requestItems[$index]['quantity'] === 0) {
             array_splice($this->requestItems, $index, 1);
         }
@@ -293,7 +302,7 @@ class OrderChangeRequestWizard extends Component
 
     public function addProductToRequest(int $productId): void
     {
-        abort_unless($this->canRequestModification, 403);
+        abort_unless($this->scope === 'adjustment' && $this->canRequestModification, 403);
         $product = Product::where('is_active', true)->findOrFail($productId);
         foreach ($this->requestItems as $index => $line) {
             if ($line['kind'] === 'new' && (int) $line['product_id'] === $product->id) {
@@ -429,7 +438,8 @@ class OrderChangeRequestWizard extends Component
     {
         return match ($scope) {
             'full' => $this->canRequestCancellation,
-            'partial', 'adjustment' => $this->canRequestModification,
+            'partial' => $this->canRequestPartialCancellation,
+            'adjustment' => $this->canRequestModification,
             'payment' => $this->canRequestPaymentChange,
             'address' => $this->canRequestAddressChange,
             default => false,

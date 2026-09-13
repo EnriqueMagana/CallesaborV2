@@ -27,7 +27,7 @@ class ThermalTicketRenderer
         ?string $printArea = null,
         bool $autoPrint = true,
     ): string {
-        $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'customer', 'mesa.area']);
+        $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'refunds.processor', 'customer', 'mesa.area', 'cancelledBy']);
 
         // La cocina nunca debe preparar partidas retiradas. En los tickets del
         // cliente sí se conservan como evidencia, marcadas y fuera del total.
@@ -70,6 +70,11 @@ class ThermalTicketRenderer
 
     private function orderPayload(Order $order, string $type, ?string $printArea, $items): array
     {
+        $financial = app(OrderFinancialSummaryService::class)->forOrder($order);
+        $refundTotal = round((float) collect($financial['refunds'])->sum(), 2);
+        $paidTotal = round((float) collect($financial['gross'])->sum(), 2);
+        $isCancelled = $order->status === 'cancelada';
+
         return [
             'title' => match ($type) {
                 'delivery' => 'DELIVERY',
@@ -86,11 +91,16 @@ class ThermalTicketRenderer
                 ? ($printArea ?: $order->mesa?->area?->name ?: 'General')
                 : ($order->mesa?->area?->name ?: $printArea),
             'notes' => $order->notes,
+            'status' => $order->status_label,
+            'is_cancelled' => $isCancelled,
+            'cancellation_reason' => $order->cancellation_reason,
+            'cancelled_at' => $this->businessDate($order->cancelled_at),
+            'cancelled_by' => $order->cancelledBy?->name,
             'items' => collect($items)->map(fn ($item) => is_array($item) ? $item : [
                 'name' => $item->product_name,
                 'quantity' => $item->quantity,
                 'subtotal' => (float) $item->subtotal,
-                'is_cancelled' => (bool) $item->is_cancelled,
+                'is_cancelled' => $isCancelled || (bool) $item->is_cancelled,
                 'notes' => $item->notes,
                 'modifiers' => $item->addons->map(fn ($addon) => [
                     'name' => '+ '.$addon->addon_name,
@@ -113,12 +123,30 @@ class ThermalTicketRenderer
                     'price' => 0,
                 ]))->values()->all(),
             ])->values()->all(),
-            'total' => (float) $order->total,
+            'original_total' => max((float) $order->total + $refundTotal, $paidTotal),
+            'refund_total' => $refundTotal,
+            'total' => $isCancelled ? 0.0 : (float) $order->total,
             'payments' => $order->payments->map(fn ($payment) => [
                 'label' => $payment->method_label,
                 'amount' => (float) $payment->amount,
                 'change' => (float) ($payment->change_amount ?? 0),
             ])->values()->all(),
+            'refunds' => $order->refunds->map(fn ($refund) => [
+                'amount' => (float) $refund->amount,
+                'allocations' => collect($refund->allocations ?? [])->mapWithKeys(fn ($amount, $method) => [
+                    match ($method) {
+                        'efectivo', 'cash', 'contra_entrega' => 'Efectivo',
+                        'tarjeta', 'card' => 'Tarjeta',
+                        'transferencia', 'transfer' => 'Transferencia',
+                        default => ucfirst((string) $method),
+                    } => (float) $amount,
+                ])->all(),
+                'reference' => $refund->external_reference,
+                'processed_at' => $this->businessDate($refund->processed_at),
+                'processed_by' => $refund->processor?->name,
+            ])->values()->all(),
+            'paid_total' => $paidTotal,
+            'net_paid' => max(0, round($paidTotal - $refundTotal, 2)),
             'delivery' => [
                 'phone' => $order->customer_phone ?: $order->customer?->phone,
                 'address' => $order->customer_address ?: $order->customer?->address,

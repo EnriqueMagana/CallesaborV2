@@ -258,6 +258,8 @@ class PointOfSale extends Component
 
     public string $reprintType = 'ventanilla'; // ventanilla | mesas | delivery
 
+    public bool $reprintHistoryLoaded = false;
+
     // CorrecciÃ³n directa de datos operativos (nunca productos, importes ni estado).
     public bool $showOrderDataModal = false;
 
@@ -610,12 +612,8 @@ class PointOfSale extends Component
         $search = $this->reprintSearch;
         $cashRegisterId = $this->activeCashRegister?->id;
 
-        if (! $cashRegisterId) {
-            return collect();
-        }
-
-        return Order::with(['items', 'payments', 'mesa.area'])
-            ->where('cash_register_id', $cashRegisterId)
+        return Order::with(['items', 'payments', 'refunds', 'mesa.area'])
+            ->when(! $this->reprintHistoryLoaded, fn ($query) => $query->where('cash_register_id', $cashRegisterId ?? 0))
             ->where(function ($query) {
                 match ($this->reprintType) {
                     'mesas' => $query->where(function ($area) {
@@ -1110,6 +1108,8 @@ class PointOfSale extends Component
     {
         abort_unless(auth()->user()?->can('reimprimir tickets'), 403);
         $this->resetOperationalPanelState();
+        $this->reprintHistoryLoaded = true;
+        unset($this->recentOrders);
     }
 
     public function openSavedOrdersModal(): void
@@ -1130,6 +1130,7 @@ class PointOfSale extends Component
         $this->tableTrackingLoaded = false;
         $this->tablesBillingLoaded = false;
         $this->deliveryPanelLoaded = false;
+        $this->reprintHistoryLoaded = false;
 
         unset(
             $this->tableWorkspaceAllServices,
@@ -4590,8 +4591,7 @@ HTML;
             'items.addons',
             'items.ingredients',
             'items.product.category.printArea',
-        ])->where('cash_register_id', $this->activeCashRegister?->id)
-            ->find($orderId);
+        ])->find($orderId);
 
         if (! $order) {
             return;
@@ -4613,8 +4613,8 @@ HTML;
             'items.ingredients',
             'items.product.category.printArea',
             'payments',
-        ])->where('cash_register_id', $this->activeCashRegister?->id)
-            ->findOrFail($orderId);
+            'refunds',
+        ])->findOrFail($orderId);
 
         $this->dispatchOrderTicketPreview($order);
     }

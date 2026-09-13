@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
 use App\Models\DeliverySettlement;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -45,7 +46,7 @@ class DeliverySettlementService
                 ->where('status', 'entregado')
                 ->whereNull('delivery_settlement_id')
                 ->whereHas('order', fn ($orders) => $orders->where('cash_register_id', $lockedRegister->id))
-                ->with('order.payments')
+                ->with(['order.payments', 'order.refunds'])
                 ->lockForUpdate()
                 ->get();
 
@@ -55,11 +56,10 @@ class DeliverySettlementService
                 ]);
             }
 
-            $orders = $assignments->pluck('order');
-            $sumMethod = fn (string $method): float => (float) $orders
-                ->flatMap(fn ($order) => $order->payments->where('method', $method))
-                ->sum('amount');
-            $expectedCash = $sumMethod('efectivo');
+            $orders = $assignments->pluck('order')->where('status', '!=', 'cancelada')->values();
+            $financial = app(OrderFinancialSummaryService::class)->forOrders($orders);
+            $sumMethod = fn (string $method): float => (float) ($financial['net'][$method] ?? 0);
+            $expectedCash = $sumMethod('efectivo') + $sumMethod('contra_entrega');
 
             $settlement = DeliverySettlement::create([
                 'cash_register_id' => $lockedRegister->id,
@@ -80,7 +80,38 @@ class DeliverySettlementService
                 ->whereKey($assignments->modelKeys())
                 ->update(['delivery_settlement_id' => $settlement->id]);
 
-            return $settlement->load(['driver', 'assignments.order.payments']);
+            return $settlement->load(['driver', 'assignments.order.payments', 'assignments.order.refunds']);
         });
+    }
+
+    public function refreshForOrder(Order $order): void
+    {
+        $settlementId = $order->deliveryAssignment?->delivery_settlement_id;
+        if (! $settlementId) {
+            return;
+        }
+
+        $settlement = DeliverySettlement::query()->lockForUpdate()->find($settlementId);
+        if (! $settlement) {
+            return;
+        }
+
+        $orders = $settlement->assignments()
+            ->with(['order.payments', 'order.refunds'])
+            ->get()
+            ->pluck('order')
+            ->where('status', '!=', 'cancelada')
+            ->values();
+        $financial = app(OrderFinancialSummaryService::class)->forOrders($orders);
+        $cash = (float) ($financial['net']['efectivo'] ?? 0) + (float) ($financial['net']['contra_entrega'] ?? 0);
+
+        $settlement->update([
+            'orders_count' => $orders->count(),
+            'sales_total' => round((float) $orders->sum('total'), 2),
+            'expected_cash' => round($cash, 2),
+            'difference' => round((float) $settlement->declared_cash - $cash, 2),
+            'transfer_total' => round((float) ($financial['net']['transferencia'] ?? 0), 2),
+            'card_total' => round((float) ($financial['net']['tarjeta'] ?? 0), 2),
+        ]);
     }
 }

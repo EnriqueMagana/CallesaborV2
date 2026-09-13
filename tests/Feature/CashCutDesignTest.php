@@ -8,9 +8,13 @@ use App\Models\Area;
 use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
 use App\Models\Mesa;
+use App\Models\MesaService;
 use App\Models\Order;
+use App\Models\OrderChangeRequest;
+use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\User;
+use App\Services\OrderChangeRequestService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -294,6 +298,193 @@ class CashCutDesignTest extends TestCase
             'declared_cash' => 180,
             'notes' => 'Entregó las notas completas.',
         ]);
+    }
+
+    public function test_partial_cash_refund_is_net_in_sales_but_not_double_discounted_from_drawer(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $user->assignRole('owner');
+        $order = $this->createPendingOrder($register, $user, [
+            'type' => 'delivery',
+            'delivery_method' => 'contra_entrega',
+            'delivery_flow_mode' => 'manual',
+            'status' => 'pagada',
+            'subtotal' => 230,
+            'total' => 230,
+            'paid_at' => now(),
+            'accounted_at' => now(),
+        ]);
+        $item = OrderItem::create(['order_id' => $order->id, 'product_name' => 'Producto', 'product_price' => 115, 'quantity' => 2, 'subtotal' => 230]);
+        OrderPayment::create(['order_id' => $order->id, 'method' => 'efectivo', 'amount' => 230]);
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $user,
+            OrderChangeRequest::TYPE_MODIFICATION,
+            'El cliente devolvió una unidad del producto',
+            [['kind' => 'existing', 'order_item_id' => $item->id, 'quantity' => 1]],
+            ['scope' => 'partial', 'inventory_disposition' => 'restock'],
+        );
+        app(OrderChangeRequestService::class)->approve($request, $user);
+
+        $component = Livewire::actingAs($user)->test(CorteDeCaja::class);
+        $this->assertSame(115.0, (float) data_get($component->get('totals'), 'd.efectivo'));
+        $this->assertSame(230.0, (float) $component->get('totalCashIn'));
+        $this->assertSame(615.0, (float) $component->get('expectedCash'));
+        $component->assertSee('Reembolso -$115.00')->assertSee('Efectivo neto $115.00');
+    }
+
+    public function test_partial_cash_refund_from_counter_reduces_the_counter_cut_total(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $user->assignRole('owner');
+        $order = $this->createPendingOrder($register, $user, [
+            'type' => 'ventanilla',
+            'status' => 'pagada',
+            'subtotal' => 230,
+            'total' => 230,
+            'paid_at' => now(),
+        ]);
+        $item = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Producto de ventanilla',
+            'product_price' => 115,
+            'quantity' => 2,
+            'subtotal' => 230,
+        ]);
+        OrderPayment::create(['order_id' => $order->id, 'method' => 'efectivo', 'amount' => 230]);
+
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $user,
+            OrderChangeRequest::TYPE_MODIFICATION,
+            'El cliente devolvió una unidad en ventanilla',
+            [['kind' => 'existing', 'order_item_id' => $item->id, 'quantity' => 1]],
+            ['scope' => 'partial', 'inventory_disposition' => 'restock'],
+        );
+        app(OrderChangeRequestService::class)->approve($request, $user);
+
+        $component = Livewire::actingAs($user)->test(CorteDeCaja::class);
+        $this->assertSame(115.0, (float) data_get($component->get('totals'), 'v.efectivo'));
+        $this->assertSame(115.0, (float) data_get($component->get('totals'), 'v.total'));
+        $this->assertSame(0.0, (float) data_get($component->get('totals'), 'm.total'));
+        $this->assertSame(230.0, (float) $component->get('totalCashIn'));
+        $this->assertSame(115.0, (float) $component->get('totalExpensesCash'));
+        $this->assertSame(615.0, (float) $component->get('expectedCash'));
+    }
+
+    public function test_partial_cash_refund_from_table_reduces_the_table_cut_and_service_total(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $user->assignRole('owner');
+        $area = Area::create(['name' => 'Salón', 'color' => '#123456', 'sort_order' => 1]);
+        $mesa = Mesa::create([
+            'area_id' => $area->id,
+            'number' => 1,
+            'capacity' => 4,
+            'status' => 'en_cuenta',
+        ]);
+        $service = MesaService::create([
+            'cash_register_id' => $register->id,
+            'primary_mesa_id' => $mesa->id,
+            'opened_by' => $user->id,
+            'closed_by' => $user->id,
+            'source' => 'waiter',
+            'status' => 'pagada',
+            'service_label' => 'Mesa 1',
+            'total_snapshot' => 230,
+            'opened_at' => now()->subHour(),
+            'closed_at' => now(),
+        ]);
+        $order = $this->createPendingOrder($register, $user, [
+            'type' => 'mesa',
+            'mesa_id' => $mesa->id,
+            'mesa_service_id' => $service->id,
+            'status' => 'pagada',
+            'subtotal' => 230,
+            'total' => 230,
+            'paid_at' => now(),
+        ]);
+        $item = OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Producto de mesa',
+            'product_price' => 115,
+            'quantity' => 2,
+            'subtotal' => 230,
+        ]);
+        OrderPayment::create(['order_id' => $order->id, 'method' => 'efectivo', 'amount' => 230]);
+
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $user,
+            OrderChangeRequest::TYPE_MODIFICATION,
+            'El cliente devolvió una unidad en mesa',
+            [['kind' => 'existing', 'order_item_id' => $item->id, 'quantity' => 1]],
+            ['scope' => 'partial', 'inventory_disposition' => 'restock'],
+        );
+        app(OrderChangeRequestService::class)->approve($request, $user);
+
+        $component = Livewire::actingAs($user)->test(CorteDeCaja::class);
+        $this->assertSame(115.0, (float) data_get($component->get('totals'), 'm.efectivo'));
+        $this->assertSame(115.0, (float) data_get($component->get('totals'), 'm.total'));
+        $this->assertSame(0.0, (float) data_get($component->get('totals'), 'v.total'));
+        $this->assertSame(115.0, (float) $service->fresh()->total_snapshot);
+        $this->assertSame(230.0, (float) $component->get('totalCashIn'));
+        $this->assertSame(115.0, (float) $component->get('totalExpensesCash'));
+        $this->assertSame(615.0, (float) $component->get('expectedCash'));
+    }
+
+    public function test_cancelled_delivery_is_excluded_from_driver_settlement_and_global_sales(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $user->assignRole('owner');
+        $driver = User::factory()->create(['name' => 'Repartidor']);
+
+        $orders = collect([230, 140])->map(function (int $total) use ($register, $user, $driver): Order {
+            $order = $this->createPendingOrder($register, $user, [
+                'type' => 'delivery',
+                'delivery_method' => 'contra_entrega',
+                'delivery_flow_mode' => 'managed',
+                'status' => 'pagada',
+                'subtotal' => $total,
+                'total' => $total,
+                'paid_at' => now(),
+            ]);
+            OrderItem::create(['order_id' => $order->id, 'product_name' => 'Producto', 'product_price' => $total, 'quantity' => 1, 'subtotal' => $total]);
+            OrderPayment::create(['order_id' => $order->id, 'method' => 'efectivo', 'amount' => $total]);
+            DeliveryAssignment::create([
+                'order_id' => $order->id,
+                'driver_id' => $driver->id,
+                'assigned_by' => $user->id,
+                'delivered_by' => $driver->id,
+                'status' => 'entregado',
+                'assigned_at' => now()->subHour(),
+                'delivered_at' => now(),
+            ]);
+
+            return $order;
+        });
+
+        $cancelled = $orders->first();
+        $request = app(OrderChangeRequestService::class)->create(
+            $cancelled,
+            $user,
+            OrderChangeRequest::TYPE_CANCELLATION,
+            'El cliente canceló completamente esta entrega',
+            [],
+            ['scope' => 'full', 'inventory_disposition' => 'waste'],
+        );
+        app(OrderChangeRequestService::class)->approve($request, $user);
+
+        $this->actingAs($user);
+        $dashboard = Livewire::test(CashDashboard::class);
+        $row = collect($dashboard->get('deliveryReconciliations'))->firstWhere('driver_id', $driver->id);
+        $this->assertSame(1, $row['pending_notes']);
+        $this->assertSame(140.0, (float) $row['cash_expected']);
+        $this->assertSame(140.0, (float) $row['sales_total']);
+
+        $cut = Livewire::test(CorteDeCaja::class);
+        $this->assertSame(140.0, (float) data_get($cut->get('totals'), 'd.total'));
+        $this->assertSame(140.0, (float) data_get($cut->get('totals'), 'd.efectivo'));
     }
 
     private function cashContext(): array

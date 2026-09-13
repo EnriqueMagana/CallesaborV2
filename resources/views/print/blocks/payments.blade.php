@@ -8,6 +8,15 @@
         @if(($payment['change'] ?? 0) > 0)<div class="ticket-row"><span>Cambio</span><span>${{ number_format($payment['change'], 2) }}</span></div>@endif
     @endforeach
     <div class="ticket-row"><strong>Total pagado</strong><strong>${{ number_format($payload['paid_total'] ?? collect($payload['payments'])->sum('amount'), 2) }}</strong></div>
+    @if(!empty($payload['refunds']))
+        @foreach($payload['refunds'] as $refund)
+            @foreach($refund['allocations'] as $method => $amount)
+                <div class="ticket-row"><span>Reembolso · {{ $method }}</span><strong>-${{ number_format($amount, 2) }}</strong></div>
+            @endforeach
+            @if(!empty($refund['reference']))<div class="ticket-row"><small>Referencia {{ $refund['reference'] }}</small><span></span></div>@endif
+        @endforeach
+        <div class="ticket-row"><strong>Pago neto</strong><strong>${{ number_format($payload['net_paid'] ?? 0, 2) }}</strong></div>
+    @endif
     @if(($payload['balance'] ?? 0) > 0.009)
         <div class="ticket-row"><strong>Saldo pendiente</strong><strong>${{ number_format($payload['balance'], 2) }}</strong></div>
     @endif

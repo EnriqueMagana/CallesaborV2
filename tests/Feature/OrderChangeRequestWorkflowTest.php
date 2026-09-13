@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Orders\OrderChangeRequestWizard;
+use App\Livewire\Pos\PointOfSale;
 use App\Models\AppNotification;
 use App\Models\CashRegister;
 use App\Models\Order;
@@ -12,6 +13,7 @@ use App\Models\OrderPayment;
 use App\Models\OrderRefund;
 use App\Models\User;
 use App\Services\OrderChangeRequestService;
+use App\Services\ThermalTicketRenderer;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -176,6 +178,86 @@ class OrderChangeRequestWorkflowTest extends TestCase
         $this->assertDatabaseHas('order_items', ['id' => $item->id, 'quantity' => 1, 'subtotal' => 50]);
         $this->assertDatabaseHas('order_refunds', ['order_id' => $order->id, 'amount' => 50, 'type' => 'partial']);
         $this->assertDatabaseHas('order_payments', ['order_id' => $order->id, 'amount' => 100]);
+
+        $cancelledLine = OrderItem::query()
+            ->where('order_id', $order->id)
+            ->where('is_cancelled', true)
+            ->firstOrFail();
+        $this->assertSame(1, $cancelledLine->quantity);
+        $this->assertSame(50.0, (float) $cancelledLine->subtotal);
+
+        $ticket = app(ThermalTicketRenderer::class)->renderOrder($order->fresh(), 'customer', autoPrint: false);
+        $this->assertStringContainsString('ticket-item--cancelled', $ticket);
+        $this->assertStringContainsString('RETIRADO', $ticket);
+        $this->assertStringContainsString('REEMBOLSO', $ticket);
+        $this->assertStringContainsString('Pago neto', $ticket);
+
+        Livewire::actingAs($owner)
+            ->test(PointOfSale::class)
+            ->assertSee('Cancelación parcial')
+            ->call('openReprintModal', $order->id)
+            ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'ticket-item--cancelled')
+                && str_contains($params['html_cliente'] ?? '', 'RETIRADO'));
+    }
+
+    public function test_total_cancellation_marks_every_line_and_prints_the_cancelled_audit(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $register = CashRegister::create(['name' => 'Caja', 'opened_by' => $owner->id, 'initial_amount' => 0, 'opened_at' => now(), 'is_open' => true]);
+        $order = Order::create(['cash_register_id' => $register->id, 'served_by' => $owner->id, 'customer_name' => 'Cliente', 'type' => 'delivery', 'status' => 'pagada', 'subtotal' => 230, 'total' => 230]);
+        OrderItem::create(['order_id' => $order->id, 'product_name' => 'Hamburguesa', 'product_price' => 90, 'quantity' => 1, 'subtotal' => 90]);
+        OrderItem::create(['order_id' => $order->id, 'product_name' => 'Pasta', 'product_price' => 140, 'quantity' => 1, 'subtotal' => 140]);
+        OrderPayment::create(['order_id' => $order->id, 'method' => 'efectivo', 'amount' => 230]);
+
+        $request = app(OrderChangeRequestService::class)->create(
+            $order,
+            $owner,
+            OrderChangeRequest::TYPE_CANCELLATION,
+            'El cliente solicitó cancelar el pedido completo',
+            [],
+            ['scope' => 'full', 'inventory_disposition' => 'waste'],
+        );
+        app(OrderChangeRequestService::class)->approve($request, $owner);
+
+        $this->assertSame(2, OrderItem::where('order_id', $order->id)->where('is_cancelled', true)->count());
+        $ticket = app(ThermalTicketRenderer::class)->renderOrder($order->fresh(), 'delivery', autoPrint: false);
+        $this->assertStringContainsString('ticket-item--cancelled', $ticket);
+        $this->assertStringContainsString('ORDEN CANCELADA', $ticket);
+        $this->assertStringContainsString('Hamburguesa', $ticket);
+        $this->assertStringContainsString('Pasta', $ticket);
+        $this->assertStringContainsString('$0.00', $ticket);
+    }
+
+    public function test_delivery_reprint_keeps_cancelled_orders_from_closed_registers_available(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $closedRegister = CashRegister::create(['name' => 'Caja anterior', 'opened_by' => $owner->id, 'initial_amount' => 0, 'opened_at' => now()->subDay(), 'closed_at' => now()->subHours(12), 'is_open' => false]);
+        CashRegister::create(['name' => 'Caja actual', 'opened_by' => $owner->id, 'initial_amount' => 0, 'opened_at' => now(), 'is_open' => true]);
+        $order = Order::create([
+            'cash_register_id' => $closedRegister->id,
+            'served_by' => $owner->id,
+            'customer_name' => 'Delivery cancelado histórico',
+            'type' => 'delivery',
+            'status' => 'cancelada',
+            'subtotal' => 90,
+            'total' => 90,
+            'cancelled_by' => $owner->id,
+            'cancelled_at' => now()->subHours(13),
+            'cancellation_reason' => 'Cancelación solicitada por el cliente',
+        ]);
+        OrderItem::create(['order_id' => $order->id, 'product_name' => 'Hamburguesa', 'product_price' => 90, 'quantity' => 1, 'subtotal' => 90, 'is_cancelled' => true]);
+
+        Livewire::actingAs($owner)
+            ->test(PointOfSale::class)
+            ->call('openReprintPanel')
+            ->set('reprintType', 'delivery')
+            ->assertSee('Delivery cancelado histórico')
+            ->assertSee('Cancelada')
+            ->call('openReprintModal', $order->id)
+            ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'ticket-item--cancelled')
+                && str_contains($params['html_cliente'] ?? '', 'ORDEN CANCELADA'));
     }
 
     public function test_paid_change_cannot_increase_the_already_collected_total(): void
@@ -241,12 +323,12 @@ class OrderChangeRequestWorkflowTest extends TestCase
             ->get(route('app.ordenes.solicitud', $order))
             ->assertOk()
             ->assertSee('Cancelar toda la orden')
-            ->assertDontSee('Cancelación parcial');
+            ->assertSee('Cancelación parcial');
 
         Livewire::actingAs($requester)
             ->test(OrderChangeRequestWizard::class, ['order' => $order])
             ->call('chooseScope', 'partial')
-            ->assertForbidden();
+            ->assertSet('scope', 'partial');
     }
 
     public function test_partial_cancellation_cannot_leave_the_order_empty(): void
