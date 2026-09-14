@@ -63,9 +63,7 @@
       series: [{ name: data.name, data: data.values }],
       colors: [palette.primary],
       dataLabels: { enabled: false },
-      // Daily totals are discrete observations; a straight line avoids
-      // suggesting activity between days that is not present in the data.
-      stroke: { curve: 'straight', width: 3 },
+      stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
       markers: { size: 4, strokeWidth: 2, hover: { size: 6 } },
       fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: .28, opacityTo: .03, stops: [0, 92, 100] } },
       grid: { borderColor: palette.grid, strokeDashArray: 4, padding: { left: 8, right: 12 } },
