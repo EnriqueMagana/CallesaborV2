@@ -34,8 +34,26 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropUnique('orders_register_folio_unique');
+        if (! Schema::hasTable('orders') || ! Schema::hasColumn('orders', 'folio')) {
+            return;
+        }
+
+        // InnoDB can replace the implicit cash_register_id foreign-key index
+        // with this composite unique index. Preserve a compatible index before
+        // dropping the unique constraint during rollback.
+        if (! Schema::hasIndex('orders', ['cash_register_id'])) {
+            Schema::table('orders', function (Blueprint $table): void {
+                $table->index('cash_register_id', 'orders_cash_register_id_rollback_index');
+            });
+        }
+
+        if (Schema::hasIndex('orders', 'orders_register_folio_unique')) {
+            Schema::table('orders', function (Blueprint $table): void {
+                $table->dropUnique('orders_register_folio_unique');
+            });
+        }
+
+        Schema::table('orders', function (Blueprint $table): void {
             $table->dropColumn('folio');
         });
     }

@@ -73,18 +73,26 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('mesa_splits', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('mesa_service_id');
-        });
+        if (Schema::hasTable('mesa_splits') && Schema::hasColumn('mesa_splits', 'mesa_service_id')) {
+            Schema::table('mesa_splits', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('mesa_service_id');
+            });
+        }
 
-        Schema::table('mesa_assignments', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('mesa_service_id');
-        });
+        if (Schema::hasTable('mesa_assignments') && Schema::hasColumn('mesa_assignments', 'mesa_service_id')) {
+            Schema::table('mesa_assignments', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('mesa_service_id');
+            });
+        }
 
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropIndex(['mesa_service_id', 'status']);
-            $table->dropConstrainedForeignId('mesa_service_id');
-        });
+        if (Schema::hasTable('orders') && Schema::hasColumn('orders', 'mesa_service_id')) {
+            Schema::table('orders', function (Blueprint $table) {
+                // Dropping the constrained column also removes every index that
+                // contains it. Removing the composite index first is unsafe in
+                // MySQL when InnoDB selected it to support the foreign key.
+                $table->dropConstrainedForeignId('mesa_service_id');
+            });
+        }
 
         Schema::dropIfExists('mesa_service_mesa');
         Schema::dropIfExists('mesa_services');
