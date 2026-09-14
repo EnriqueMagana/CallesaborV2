@@ -1,6 +1,7 @@
 *.log
 .DS_Store
 .env
+/tests
 /.claude/
 /.agents/
 .env.backup
