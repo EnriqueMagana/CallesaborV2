@@ -9,6 +9,7 @@ use App\Models\CashRegister;
 use App\Models\CashRegisterCut;
 use App\Models\Mesa;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\ThermalTicketRenderer;
@@ -202,6 +203,49 @@ class BusinessSettingsTest extends TestCase
         $this->assertStringNotContainsString('02/09/2026 00:30', $html);
     }
 
+    public function test_reprinted_customer_ticket_identifies_cancelled_items_promotions_and_discounts(): void
+    {
+        $user = User::factory()->create();
+        $register = CashRegister::create([
+            'name' => 'Caja principal',
+            'opened_by' => $user->id,
+            'initial_amount' => 0,
+            'opened_at' => now(),
+            'is_open' => true,
+        ]);
+        $order = Order::create([
+            'cash_register_id' => $register->id,
+            'served_by' => $user->id,
+            'type' => 'ventanilla',
+            'status' => 'pagada',
+            'subtotal' => 130,
+            'total' => 100,
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Baguette Calle Sabor',
+            'product_price' => 130,
+            'quantity' => 1,
+            'subtotal' => 130,
+            'promotion_discount' => 20,
+            'discount_amount' => 10,
+            'promotion_rule_snapshot' => ['label' => 'Combo del día'],
+            'discount_snapshot' => ['name' => 'Cliente frecuente'],
+            'is_cancelled' => true,
+        ]);
+
+        $html = app(ThermalTicketRenderer::class)->renderOrder($order, 'customer', autoPrint: false);
+
+        $this->assertStringContainsString('Baguette Calle Sabor', $html);
+        $this->assertStringContainsString('CANCELADO / RETIRADO', $html);
+        $this->assertStringContainsString('Promoción: Combo del día (-$20.00)', $html);
+        $this->assertStringContainsString('Combo del día', $html);
+        $this->assertStringContainsString('Descuento: Cliente frecuente (-$10.00)', $html);
+        $this->assertStringContainsString('Cliente frecuente', $html);
+        $this->assertStringContainsString('-$20.00', $html);
+        $this->assertStringContainsString('-$10.00', $html);
+    }
+
     public function test_kitchen_area_ticket_includes_table_and_order_and_item_notes(): void
     {
         $preview = app(ThermalTicketRenderer::class)->renderPreview(
@@ -343,7 +387,7 @@ class BusinessSettingsTest extends TestCase
 
         $this->assertSame([
             'header', 'business', 'cut_meta', 'cut_sales_channels', 'cut_payment_methods',
-            'cut_cash_movements', 'cut_reconciliation', 'cut_notes', 'footer',
+            'cut_order_benefits', 'cut_cash_movements', 'cut_reconciliation', 'cut_notes', 'footer',
         ], $keys);
 
         $html = app(ThermalTicketRenderer::class)->renderPreview(
@@ -354,6 +398,9 @@ class BusinessSettingsTest extends TestCase
 
         $this->assertStringContainsString('VENTAS POR CANAL', $html);
         $this->assertStringContainsString('RESUMEN POR FORMA DE PAGO', $html);
+        $this->assertStringContainsString('PROMOCIONES Y DESCUENTOS POR ORDEN', $html);
+        $this->assertStringContainsString('Detalle informativo · no modifica el corte', $html);
+        $this->assertStringContainsString('ORD-027', $html);
         $this->assertStringContainsString('aria-label="Formas de pago de Ventanilla"', $html);
         $this->assertStringContainsString('ticket-cut-method-row', $html);
         $this->assertStringContainsString('Transferencia', $html);

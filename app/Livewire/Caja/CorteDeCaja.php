@@ -10,6 +10,7 @@ use App\Models\Expense;
 use App\Models\Order;
 use App\Services\CashRegisterClosingGuard;
 use App\Services\DeliveryModulePolicy;
+use App\Services\OrderBenefitSummaryService;
 use App\Services\OrderFinancialSummaryService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +53,7 @@ class CorteDeCaja extends Component
     {
         return Order::where('cash_register_id', $this->registerId)
             ->finalizedForAccounting()
-            ->with(['payments', 'refunds', 'seller', 'deliveryAssignment.driver', 'kioskTerminal'])
+            ->with(['payments', 'refunds', 'seller', 'deliveryAssignment.driver', 'kioskTerminal', 'customer', 'items.promotion', 'items.discount'])
             ->get();
     }
 
@@ -289,6 +290,7 @@ class CorteDeCaja extends Component
             app(CashRegisterClosingGuard::class)->assertCanClose($register->id, $blockers);
 
             $t = $this->totals;
+            $benefitOrders = app(OrderBenefitSummaryService::class)->forOrders($this->orders);
             $folio = 'CORTE-'.str_pad($register->id, 4, '0', STR_PAD_LEFT);
 
             $cut = CashRegisterCut::create([
@@ -320,6 +322,7 @@ class CorteDeCaja extends Component
                     'delivery_settlements' => $this->deliverySettlements->toArray(),
                     'expenses' => $this->expenses->toArray(),
                     'cash_incomes' => $this->cashIncomes->toArray(),
+                    'benefit_orders' => $benefitOrders,
                 ],
                 'generated_at' => now(),
             ]);

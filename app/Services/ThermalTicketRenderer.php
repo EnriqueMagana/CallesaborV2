@@ -31,7 +31,7 @@ class ThermalTicketRenderer
         // relations that happened to be loaded before a change was approved.
         // Refresh both attributes (notably the total) and relations so removed
         // and newly-added lines can never be printed from a stale snapshot.
-        $order->refresh()->load(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'refunds.processor', 'customer', 'mesa.area', 'cancelledBy']);
+        $order->refresh()->load(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'items.promotion', 'items.discount', 'seller', 'payments', 'refunds.processor', 'customer', 'mesa.area', 'cancelledBy']);
 
         // La cocina nunca debe preparar partidas retiradas. En los tickets del
         // cliente sí se conservan como evidencia, marcadas y fuera del total.
@@ -75,6 +75,7 @@ class ThermalTicketRenderer
     private function orderPayload(Order $order, string $type, ?string $printArea, $items): array
     {
         $financial = app(OrderFinancialSummaryService::class)->forOrder($order);
+        $benefitSummary = app(OrderBenefitSummaryService::class);
         $refundTotal = round((float) collect($financial['refunds'])->sum(), 2);
         $paidTotal = round((float) collect($financial['gross'])->sum(), 2);
         $isCancelled = $order->status === 'cancelada';
@@ -106,6 +107,7 @@ class ThermalTicketRenderer
                 'subtotal' => (float) $item->subtotal,
                 'is_cancelled' => $isCancelled || (bool) $item->is_cancelled,
                 'notes' => $item->notes,
+                'benefits' => $type === 'kitchen_area' ? [] : $benefitSummary->forItem($item),
                 'modifiers' => $item->addons->map(fn ($addon) => [
                     'name' => '+ '.$addon->addon_name,
                     'price' => (float) $addon->extra_price * max(1, (int) $addon->quantity),
@@ -117,15 +119,7 @@ class ThermalTicketRenderer
                         'name' => '• '.($selected['product_name'] ?? 'Producto').((int) ($selected['quantity'] ?? 1) > 1 ? ' x'.(int) $selected['quantity'] : ''),
                         'price' => 0,
                     ])
-                ))->when((float) ($item->promotion_discount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
-                    'name' => '• Oferta: '.data_get($item->promotion_rule_snapshot, 'label', 'promoción automática')
-                        .' (-$'.number_format((float) $item->promotion_discount, 2).')',
-                    'price' => 0,
-                ]))->when($type !== 'kitchen_area' && (float) ($item->discount_amount ?? 0) > 0, fn ($modifiers) => $modifiers->push([
-                    'name' => '• Descuento: '.data_get($item->discount_snapshot, 'name', 'descuento automático')
-                        .' (-$'.number_format((float) $item->discount_amount, 2).')',
-                    'price' => 0,
-                ]))->values()->all(),
+                ))->values()->all(),
             ])->values()->all(),
             'original_total' => max((float) $order->total + $refundTotal, $paidTotal),
             'refund_total' => $refundTotal,
@@ -497,6 +491,7 @@ class ThermalTicketRenderer
             'expected_cash' => (float) $cut->expected_cash,
             'declared_cash' => (float) $cut->declared_cash,
             'difference' => (float) $cut->difference,
+            'benefit_orders' => data_get($cut->cut_data, 'benefit_orders', []),
             'notes' => $cut->cashRegister?->closing_notes,
             'generated_at' => $this->businessDate($cut->generated_at, 'd/m/Y h:i A'),
         ];
@@ -521,6 +516,13 @@ class ThermalTicketRenderer
             ],
             'sales_total' => 3245.50, 'initial_amount' => 500.00, 'cash_sales' => 2040.00, 'cash_incomes' => 0.00,
             'cash_expenses' => 180.00, 'expected_cash' => 2360.00, 'declared_cash' => 2350.00,
+            'benefit_orders' => [[
+                'folio' => 'ORD-027', 'customer' => 'Cliente de ejemplo', 'total_discount' => 35.00,
+                'benefits' => [
+                    ['type' => 'promotion', 'type_label' => 'Promoción', 'name' => 'Combo del día', 'product' => 'Hamburguesa especial', 'amount' => 20.00],
+                    ['type' => 'discount', 'type_label' => 'Descuento', 'name' => 'Cliente frecuente', 'product' => 'Agua fresca', 'amount' => 15.00],
+                ],
+            ]],
             'difference' => -10.00, 'notes' => 'Diferencia revisada por gerencia.',
             'generated_at' => $this->businessNow('d/m/Y h:i A'),
         ];

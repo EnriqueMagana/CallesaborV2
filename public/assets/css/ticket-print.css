@@ -41,6 +41,7 @@ hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-item-main { font-size: 1.02em; }
 .ticket-item--cancelled .ticket-item-main { opacity: .72; text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .ticket-item-cancelled-note { font-weight: 700; letter-spacing: .02em; }
+.ticket-item-benefit { margin: 3px 0 3px 8px; padding: 2px 3px; border: 1px solid #000; font-size: .88em; font-weight: 700; break-inside: avoid; }
 .ticket-items-font-courier .ticket-items { font-family: "Courier New", monospace; }
 .ticket-items-font-arial .ticket-items { font-family: Arial, sans-serif; }
 .ticket-items-font-verdana .ticket-items { font-family: Verdana, sans-serif; }
@@ -68,6 +69,10 @@ hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-cut-method-row { margin-bottom: 1px; }
 .ticket-cut-method-row span:first-child::before { content: "- "; }
 .ticket-cut-payment-row { padding: 2px 0; font-size: 1em; }
+.ticket-cut-caption { margin-bottom: 3px; font-size: .78em; font-weight: 600; }
+.ticket-cut-benefit-order { margin: 6px 0; padding-top: 4px; border-top: 1px dotted #000; break-inside: avoid; }
+.ticket-cut-benefit-order-title { margin-bottom: 1px; }
+.ticket-cut-benefit-line { padding-left: 7px; font-size: .84em; line-height: 1.35; }
 .ticket-cut-subtotal { margin-top: 7px; padding-top: 5px; border-top: 2px solid #000; font-size: 1.06em; }
 .ticket-cut-reconciliation .ticket-row { padding: 2px 0; }
 .ticket-cut-difference { margin-top: 4px; padding-top: 4px!important; border-top: 2px solid #000; font-size: 1.1em; }

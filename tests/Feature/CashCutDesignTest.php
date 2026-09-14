@@ -6,6 +6,7 @@ use App\Livewire\Caja\CorteDeCaja;
 use App\Livewire\Caja\Dashboard as CashDashboard;
 use App\Models\Area;
 use App\Models\CashRegister;
+use App\Models\CashRegisterCut;
 use App\Models\DeliveryAssignment;
 use App\Models\Mesa;
 use App\Models\MesaService;
@@ -15,6 +16,7 @@ use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\User;
 use App\Services\OrderChangeRequestService;
+use App\Services\ThermalTicketRenderer;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -485,6 +487,64 @@ class CashCutDesignTest extends TestCase
         $cut = Livewire::test(CorteDeCaja::class);
         $this->assertSame(140.0, (float) data_get($cut->get('totals'), 'd.total'));
         $this->assertSame(140.0, (float) data_get($cut->get('totals'), 'd.efectivo'));
+    }
+
+    public function test_cash_cut_persists_and_prints_discounted_orders_without_changing_totals(): void
+    {
+        [$user, $register] = $this->cashContext();
+        $order = $this->createPendingOrder($register, $user, [
+            'customer_name' => 'Cliente con beneficio',
+            'status' => 'pagada',
+            'subtotal' => 130,
+            'total' => 100,
+            'paid_at' => now(),
+        ]);
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_name' => 'Hamburguesa especial',
+            'product_price' => 130,
+            'quantity' => 1,
+            'subtotal' => 130,
+            'promotion_discount' => 20,
+            'discount_amount' => 10,
+            'promotion_rule_snapshot' => ['label' => 'Combo del día'],
+            'discount_snapshot' => ['name' => 'Cliente frecuente'],
+        ]);
+        OrderPayment::create([
+            'order_id' => $order->id,
+            'method' => 'efectivo',
+            'amount' => 100,
+            'received_amount' => 100,
+            'change_amount' => 0,
+        ]);
+
+        $this->actingAs($user);
+        $component = Livewire::test(CorteDeCaja::class);
+        $this->assertSame(100.0, (float) data_get($component->get('totals'), 'v.efectivo'));
+        $this->assertSame(600.0, (float) $component->get('expectedCash'));
+
+        $component
+            ->set('declaredCash', '600.00')
+            ->call('confirmCut')
+            ->assertHasNoErrors()
+            ->call('generateCut')
+            ->assertHasNoErrors()
+            ->assertSet('cutDone', true);
+
+        $cut = CashRegisterCut::query()->where('cash_register_id', $register->id)->firstOrFail();
+        $this->assertSame(100.0, (float) $cut->v_efectivo);
+        $this->assertSame(600.0, (float) $cut->expected_cash);
+        $this->assertSame(0.0, (float) $cut->difference);
+        $this->assertSame($order->display_folio, data_get($cut->cut_data, 'benefit_orders.0.folio'));
+        $this->assertSame(30.0, (float) data_get($cut->cut_data, 'benefit_orders.0.total_discount'));
+
+        $html = app(ThermalTicketRenderer::class)->renderCashCut($cut);
+        $this->assertStringContainsString('PROMOCIONES Y DESCUENTOS POR ORDEN', $html);
+        $this->assertStringContainsString('Detalle informativo · no modifica el corte', $html);
+        $this->assertStringContainsString($order->display_folio, $html);
+        $this->assertStringContainsString('Combo del día', $html);
+        $this->assertStringContainsString('Cliente frecuente', $html);
+        $this->assertStringContainsString('$100.00', $html);
     }
 
     private function cashContext(): array
