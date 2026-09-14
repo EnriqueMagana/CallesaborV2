@@ -22,10 +22,20 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropColumn('delivery_method');
-        });
+        if (Schema::hasColumn('orders', 'delivery_method')) {
+            Schema::table('orders', function (Blueprint $table) {
+                $table->dropColumn('delivery_method');
+            });
+        }
+
         if (DB::getDriverName() !== 'sqlite') {
+            // The previous enum cannot be restored while pick-up orders still
+            // use the value introduced by this migration. Map them to the
+            // equivalent legacy counter-sale type before narrowing the enum.
+            DB::table('orders')
+                ->where('type', 'pick_up')
+                ->update(['type' => 'ventanilla']);
+
             DB::statement("ALTER TABLE orders MODIFY COLUMN type ENUM('mesa','ventanilla','delivery') NOT NULL DEFAULT 'ventanilla'");
         }
     }
