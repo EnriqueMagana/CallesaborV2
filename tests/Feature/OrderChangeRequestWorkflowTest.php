@@ -267,7 +267,7 @@ class OrderChangeRequestWorkflowTest extends TestCase
         $this->assertStringContainsString('$0.00', $ticket);
     }
 
-    public function test_delivery_reprint_keeps_cancelled_orders_from_closed_registers_available(): void
+    public function test_delivery_reprint_excludes_cancelled_orders_from_closed_registers(): void
     {
         $owner = User::factory()->create();
         $owner->assignRole('owner');
@@ -291,11 +291,8 @@ class OrderChangeRequestWorkflowTest extends TestCase
             ->test(PointOfSale::class)
             ->call('openReprintPanel')
             ->set('reprintType', 'delivery')
-            ->assertSee('Delivery cancelado histórico')
-            ->assertSee('Cancelada')
-            ->call('openReprintModal', $order->id)
-            ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'ticket-item--cancelled')
-                && str_contains($params['html_cliente'] ?? '', 'ORDEN CANCELADA'));
+            ->assertDontSee('Delivery cancelado histórico')
+            ->assertDontSee('Cancelada');
     }
 
     public function test_paid_change_cannot_increase_the_already_collected_total(): void

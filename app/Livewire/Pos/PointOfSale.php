@@ -340,9 +340,15 @@ class PointOfSale extends Component
             return collect();
         }
 
+        $cashRegisterId = $this->activeCashRegister?->id;
+        if (! $cashRegisterId) {
+            return collect();
+        }
+
         $search = $this->reprintSearch;
 
         return Order::with(['items', 'payments', 'refunds', 'mesa.area'])
+            ->where('cash_register_id', $cashRegisterId)
             ->where(function ($query) {
                 match ($this->reprintType) {
                     'mesas' => $query->where(function ($area) {
@@ -2792,7 +2798,8 @@ HTML;
             'items.addons',
             'items.ingredients',
             'items.product.category.printArea',
-        ])->find($orderId);
+        ])->where('cash_register_id', $this->activeCashRegister?->id)
+            ->find($orderId);
 
         if (! $order) {
             return;
@@ -2815,7 +2822,8 @@ HTML;
             'items.product.category.printArea',
             'payments',
             'refunds',
-        ])->findOrFail($orderId);
+        ])->where('cash_register_id', $this->activeCashRegister?->id)
+            ->findOrFail($orderId);
 
         $this->dispatchOrderTicketPreview($order);
     }

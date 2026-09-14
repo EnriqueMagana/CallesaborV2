@@ -20,6 +20,7 @@ use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Services\MesaServiceManager;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -374,7 +375,7 @@ class KioskPosWorkflowTest extends TestCase
         $script = file_get_contents(public_path('assets/js/pos-root.js'));
         $this->assertStringContainsString('trapFocus(event, container)', $script);
         $this->assertStringContainsString('[tabindex]:not([tabindex="-1"])', $script);
-        $this->assertStringContainsString("Alpine.data(\"posRoot\"", $script);
+        $this->assertStringContainsString('Alpine.data("posRoot"', $script);
 
         // El layout debe cargarlo, o la pantalla queda sin estado.
         $this->assertStringContainsString('assets/js/pos-root.min.js', $html);
@@ -994,8 +995,8 @@ class KioskPosWorkflowTest extends TestCase
             'is_open' => false,
         ]);
 
-        $this->kioskOrder($previousRegister->id, $user->id, $terminal->id, 'Pedido caja anterior', 'takeaway');
-        $this->kioskOrder($currentRegister->id, $user->id, $terminal->id, 'Pedido caja vigente', 'takeaway');
+        $previousOrder = $this->kioskOrder($previousRegister->id, $user->id, $terminal->id, 'Pedido caja anterior', 'takeaway');
+        $currentOrder = $this->kioskOrder($currentRegister->id, $user->id, $terminal->id, 'Pedido caja vigente', 'takeaway');
 
         $oldMesa = Mesa::create([
             'area_id' => $mesa->area_id,
@@ -1006,13 +1007,26 @@ class KioskPosWorkflowTest extends TestCase
         $this->kioskOrder($previousRegister->id, $user->id, $terminal->id, 'Mesa de caja anterior', 'dine_in', $oldMesa->id, 'lista');
 
         $this->actingAs($user);
-        Livewire::test(PointOfSale::class)
+        $component = Livewire::test(PointOfSale::class)
             ->call('openPickupPanel')
             ->assertSee('Pedido caja vigente')
             ->call('openTablesBilling')
             ->assertDontSee('Pedido caja anterior')
             ->assertDontSee('Mesa de caja anterior')
-            ->assertDontSee('Mesa 99');
+            ->assertDontSee('Mesa 99')
+            ->call('openReprintPanel')
+            ->assertSee('Pedido caja vigente')
+            ->assertDontSee('Pedido caja anterior');
+
+        $this->assertSame([$currentOrder->id], $component->get('recentOrders')->pluck('id')->all());
+
+        Livewire::test(PointOfSale::class)
+            ->call('reprintKitchenOrder', $previousOrder->id)
+            ->assertNotDispatched('pos-reprint-show-cocina');
+
+        $this->expectException(ModelNotFoundException::class);
+        Livewire::test(PointOfSale::class)
+            ->call('openReprintModal', $previousOrder->id);
     }
 
     public function test_pos_prints_counter_orders_with_the_counter_ticket_maker_template(): void
