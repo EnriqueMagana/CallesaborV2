@@ -200,15 +200,16 @@ class PosCustomizationTest extends TestCase
             $css,
         );
         $this->assertMatchesRegularExpression(
-            '/\.prod-card\s*\{[^}]*display:\s*flex;[^}]*min-height:\s*172px;/s',
+            '/\.prod-card\s*\{[^}]*display:\s*flex;[^}]*min-height:\s*(?:17[2-9]|1[89]\d|[2-9]\d{2,})px;/s',
             $css,
+            'Las tarjetas del catálogo deben conservar una altura mínima de 172px.',
         );
         $this->assertMatchesRegularExpression(
             '/\.prod-name\s*\{[^}]*white-space:\s*normal;[^}]*-webkit-line-clamp:\s*2;/s',
             $css,
         );
         $this->assertMatchesRegularExpression(
-            '/\.prod-price\s*\{[^}]*margin-top:\s*auto;/s',
+            '/\.prod-card-footer\s*\{[^}]*margin-top:\s*auto;/s',
             $css,
         );
     }
@@ -216,7 +217,7 @@ class PosCustomizationTest extends TestCase
     public function test_catalog_product_action_uses_only_the_add_or_customize_icon(): void
     {
         $css = file_get_contents(public_path('assets/css/pos-modern.css'));
-        $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
+        $catalog = file_get_contents(resource_path('views/livewire/pos/catalog.blade.php'));
 
         $this->assertIsString($css);
         $this->assertIsString($catalog);

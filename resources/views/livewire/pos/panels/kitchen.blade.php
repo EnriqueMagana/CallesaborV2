@@ -1,6 +1,8 @@
 <x-pos.area-panel panel="kitchen" title="Flujo de preparación" title-id="pos-kitchen-title"
     eyebrow="Cocina" description="Consulta las órdenes recibidas y avanza su preparación sin perder el contexto."
-    icon="bx-restaurant" tone="kitchen" panel-class="pos-kitchen-panel" close-label="Cerrar Cocina">
+    icon="bx-restaurant" tone="kitchen" panel-class="pos-kitchen-panel" close-label="Cerrar Cocina"
+    x-data="{ busyId: null }"
+    @pos-orders-changed.window="busyId = null">
         <x-slot:tools>
             <label class="pos-area-search">
                 <i class="bx bx-search" data-ui="xui-r3yeoq"></i>
@@ -103,18 +105,18 @@
                     {{-- Actions --}}
                     <div data-ui="xui-6bm9x1">
                         @can($order->status === 'pendiente' ? 'iniciar preparacion en punto de venta' : 'marcar pedidos listos en punto de venta')
-                        <button wire:click="markKitchenReady({{ $order->id }})"
-                                wire:loading.attr="disabled" wire:target="markKitchenReady({{ $order->id }})"
+                        <button wire:click="$parent.markKitchenReady({{ $order->id }})"
+                                @click="busyId = {{ $order->id }}" :disabled="busyId === {{ $order->id }}"
                                 class="pos-btn pos-btn-primary"
                                 data-ui="xui-1g8aqme">
-                            <span wire:loading wire:target="markKitchenReady({{ $order->id }})" class="pos-btn-spinner"></span>
-                            <i wire:loading.remove wire:target="markKitchenReady({{ $order->id }})" class="bx {{ $order->status === 'pendiente' ? 'bx-restaurant' : 'bx-check-circle' }} me-1"></i>
-                            <span wire:loading.remove wire:target="markKitchenReady({{ $order->id }})">{{ $order->status === 'pendiente' ? 'Iniciar preparación' : 'Marcar como listo' }}</span>
-                            <span wire:loading wire:target="markKitchenReady({{ $order->id }})">Actualizando…</span>
-                        </button>
+                                    <span class="pos-btn-spinner" x-show="busyId === {{ $order->id }}" x-cloak></span>
+                                    <i class="bx {{ $order->status === 'pendiente' ? 'bx-restaurant' : 'bx-check-circle' }} me-1" x-show="busyId !== {{ $order->id }}"></i>
+                                    <span x-show="busyId !== {{ $order->id }}">{{ $order->status === 'pendiente' ? 'Iniciar preparación' : 'Marcar como listo' }}</span>
+                                    <span x-show="busyId === {{ $order->id }}" x-cloak>Actualizando…</span>
+                                </button>
                         @endcan
                         @can('reimprimir tickets')
-                        <button wire:click="reprintKitchenOrder({{ $order->id }})"
+                        <button wire:click="$parent.reprintKitchenOrder({{ $order->id }})"
                                 class="pos-btn pos-btn-ghost"
                                 data-ui="xui-1jziqnb"
                                 title="Solo reimprimir">

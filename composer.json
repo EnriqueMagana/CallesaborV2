@@ -3,7 +3,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -75,6 +78,20 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "deploy": [
+            "@php scripts/build-pos-assets.php",
+            "@php artisan optimize:clear --ansi",
+            "@php artisan config:cache --ansi",
+            "@php artisan route:cache --ansi",
+            "@php artisan view:cache --ansi",
+            "@php artisan event:cache --ansi"
+        ],
+        "dev-clear": [
+            "@php artisan optimize:clear --ansi"
+        ],
+        "build-pos-assets": [
+            "@php scripts/build-pos-assets.php"
         ]
     },
     "extra": {

@@ -88,6 +88,7 @@ class GroupedMesaServiceWorkflowTest extends TestCase
             ->set('mesaPayReceived', '150')
             ->call('addMesaPayment')
             ->call('confirmMesaPayment')
+            ->call('openReprintPanel')
             ->set('reprintType', 'mesas')
             ->assertSee('Servicio pagado')
             ->assertSee('Grupo Terraza')

@@ -9,7 +9,7 @@
                 <input type="search" class="pos-input" wire:model.live.debounce.600ms="deliverySearch" placeholder="Pedido, cliente, teléfono o dirección">
             </label>
             <div class="pos-area-summary"><strong>{{ $this->deliveryOrders->count() }}</strong><span>entregas activas</span></div>
-            @if(!app(\App\Services\DeliveryModulePolicy::class)->enabled())
+            @if(! $this->deliveryModuleEnabled)
                 <span class="app-status app-status--warning"><i class="bx bx-wallet"></i> Corte global</span>
             @endif
         </x-slot:tools>

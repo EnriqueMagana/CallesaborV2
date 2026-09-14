@@ -46,6 +46,7 @@ class KioskPosWorkflowTest extends TestCase
         $this->actingAs($user);
 
         $component = Livewire::test(PointOfSale::class)
+            ->call('openPickupPanel')
             ->assertSee('Cliente Pickup')
             ->call('openDeliveryPanel')
             ->assertSee('Cliente Delivery')
@@ -231,7 +232,7 @@ class KioskPosWorkflowTest extends TestCase
         $view = file_get_contents(resource_path('views/livewire/pos/point-of-sale.blade.php'));
         $cart = file_get_contents(resource_path('views/livewire/pos/partials/cart.blade.php'));
         $checkout = file_get_contents(resource_path('views/livewire/pos/partials/modals/checkout.blade.php'));
-        $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
+        $catalog = file_get_contents(resource_path('views/livewire/pos/catalog.blade.php'));
         $header = file_get_contents(resource_path('views/livewire/pos/partials/header.blade.php'));
         $toolbar = file_get_contents(resource_path('views/livewire/pos/partials/toolbar.blade.php'));
         $mobileNavigation = file_get_contents(resource_path('views/livewire/pos/partials/mobile-navigation.blade.php'));
@@ -250,9 +251,14 @@ class KioskPosWorkflowTest extends TestCase
         $this->assertIsString($css);
         $this->assertIsString($mobileCss);
         $this->assertStringContainsString('@keydown.window="handleKeyboardShortcut($event)"', $view);
-        $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $view);
         $this->assertStringContainsString('@resize.window.debounce.150ms="syncSearchBreakpoint()"', $view);
-        $this->assertStringContainsString('if (!this.isDesktop) this.searchExpanded = false;', $view);
+
+        // El estado raíz se mudó a `assets/js/pos-root.js`; la plantilla solo lo
+        // invoca. La lógica de escritorio se afirma sobre el archivo.
+        $posRoot = file_get_contents(public_path('assets/js/pos-root.js'));
+        $this->assertIsString($posRoot);
+        $this->assertStringContainsString("matchMedia('(min-width: 1025px)')", $posRoot);
+        $this->assertStringContainsString('if (!this.isDesktop) this.searchExpanded = false;', $posRoot);
         $this->assertStringContainsString('aria-keyshortcuts="F2"', $cart);
         $this->assertStringNotContainsString('data-pos-save-cart', $cart);
         $this->assertStringContainsString('data-pos-save-draft', $checkout);
@@ -276,7 +282,7 @@ class KioskPosWorkflowTest extends TestCase
             $this->assertStringContainsString('aria-keyshortcuts="'.$shortcut.'"', $toolbar);
         }
         $this->assertStringContainsString('data-pos-more', $toolbar);
-        $this->assertStringContainsString("F11: '[data-pos-more]'", $view);
+        $this->assertStringContainsString("F11: '[data-pos-more]'", $posRoot);
         $this->assertStringNotContainsString('wire:click="openOperationsModal', $toolbar);
         foreach (['Por cobrar', 'Mesas', 'Pedidos', 'Más'] as $mobileArea) {
             $this->assertStringContainsString($mobileArea, $mobileNavigation);
@@ -357,9 +363,21 @@ class KioskPosWorkflowTest extends TestCase
         $root = $xpath->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' pos-root ')]")->item(0);
 
         $this->assertNotNull($root);
-        $this->assertStringContainsString('trapFocus(event, container)', $root->getAttribute('x-data'));
-        $this->assertStringContainsString('[tabindex]:not([tabindex="-1"])', $root->getAttribute('x-data'));
+
+        // El estado raíz se mudó a `assets/js/pos-root.js`: eran 6.3 KB que
+        // Livewire reenviaba en cada respuesta. En la plantilla solo queda la
+        // invocación con el único dato que depende del servidor.
+        $this->assertStringStartsWith('posRoot(', $root->getAttribute('x-data'));
+        $this->assertStringNotContainsString('trapFocus', $root->getAttribute('x-data'));
         $this->assertStringNotContainsString('element.offsetParent !== null', $root->textContent);
+
+        $script = file_get_contents(public_path('assets/js/pos-root.js'));
+        $this->assertStringContainsString('trapFocus(event, container)', $script);
+        $this->assertStringContainsString('[tabindex]:not([tabindex="-1"])', $script);
+        $this->assertStringContainsString("Alpine.data(\"posRoot\"", $script);
+
+        // El layout debe cargarlo, o la pantalla queda sin estado.
+        $this->assertStringContainsString('assets/js/pos-root.min.js', $html);
     }
 
     public function test_kiosk_cash_on_delivery_is_visible_but_cannot_be_charged_early_in_pos(): void
@@ -989,6 +1007,7 @@ class KioskPosWorkflowTest extends TestCase
 
         $this->actingAs($user);
         Livewire::test(PointOfSale::class)
+            ->call('openPickupPanel')
             ->assertSee('Pedido caja vigente')
             ->call('openTablesBilling')
             ->assertDontSee('Pedido caja anterior')
@@ -1034,7 +1053,7 @@ class KioskPosWorkflowTest extends TestCase
 
     public function test_pos_product_images_use_card_skeletons_and_viewport_loading(): void
     {
-        $catalog = file_get_contents(resource_path('views/livewire/pos/partials/catalog.blade.php'));
+        $catalog = file_get_contents(resource_path('views/livewire/pos/catalog.blade.php'));
         $layout = file_get_contents(resource_path('views/layouts/pos.blade.php'));
         $css = file_get_contents(public_path('assets/css/pos-modern.css'));
 
