@@ -194,10 +194,48 @@ class OrderChangeRequestWorkflowTest extends TestCase
 
         Livewire::actingAs($owner)
             ->test(PointOfSale::class)
+            ->call('openReprintPanel')
             ->assertSee('Cancelación parcial')
             ->call('openReprintModal', $order->id)
             ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'ticket-item--cancelled')
                 && str_contains($params['html_cliente'] ?? '', 'RETIRADO'));
+    }
+
+    public function test_reprint_refreshes_a_previously_loaded_order_after_items_are_removed_and_added(): void
+    {
+        $owner = User::factory()->create();
+        $owner->assignRole('owner');
+        $register = CashRegister::create(['name' => 'Caja', 'opened_by' => $owner->id, 'initial_amount' => 0, 'opened_at' => now(), 'is_open' => true]);
+        $order = Order::create(['cash_register_id' => $register->id, 'served_by' => $owner->id, 'customer_name' => 'Cliente', 'type' => 'delivery', 'status' => 'pendiente', 'subtotal' => 260, 'total' => 260]);
+        OrderItem::create(['order_id' => $order->id, 'product_name' => 'Pasta Grande', 'product_price' => 165, 'quantity' => 1, 'subtotal' => 165]);
+        $baguette = OrderItem::create(['order_id' => $order->id, 'product_name' => 'Baguette Calle Sabor', 'product_price' => 95, 'quantity' => 1, 'subtotal' => 95]);
+
+        // Simulate the order instance retained by a long-lived Livewire action
+        // before the approved changes are persisted by another code path.
+        $order->load(['items.addons', 'items.ingredients', 'payments']);
+
+        $baguette->update(['is_cancelled' => true, 'cancelled_by' => $owner->id, 'cancelled_at' => now()]);
+        OrderItem::create(['order_id' => $order->id, 'product_name' => 'Papas a la francesa', 'product_price' => 55, 'quantity' => 1, 'subtotal' => 55]);
+        OrderItem::create(['order_id' => $order->id, 'product_name' => 'Hamburguesa de pollo', 'product_price' => 90, 'quantity' => 1, 'subtotal' => 90]);
+        $order->update(['subtotal' => 310, 'total' => 310]);
+
+        $ticket = app(ThermalTicketRenderer::class)->renderOrder($order, 'delivery', autoPrint: false);
+
+        $this->assertStringContainsString('Baguette Calle Sabor', $ticket);
+        $this->assertStringContainsString('ticket-item--cancelled', $ticket);
+        $this->assertStringContainsString('RETIRADO', $ticket);
+        $this->assertStringContainsString('Papas a la francesa', $ticket);
+        $this->assertStringContainsString('Hamburguesa de pollo', $ticket);
+        $this->assertStringContainsString('$310.00', $ticket);
+
+        Livewire::actingAs($owner)
+            ->test(PointOfSale::class)
+            ->call('openReprintModal', $order->id)
+            ->assertDispatched('pos-reprint-show', fn ($event, $params) => str_contains($params['html_cliente'] ?? '', 'Baguette Calle Sabor')
+                && str_contains($params['html_cliente'] ?? '', 'ticket-item--cancelled')
+                && str_contains($params['html_cliente'] ?? '', 'Papas a la francesa')
+                && str_contains($params['html_cliente'] ?? '', 'Hamburguesa de pollo')
+                && str_contains($params['html_cliente'] ?? '', '$310.00'));
     }
 
     public function test_total_cancellation_marks_every_line_and_prints_the_cancelled_audit(): void

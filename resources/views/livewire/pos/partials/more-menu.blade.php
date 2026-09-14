@@ -97,7 +97,7 @@
                 </a>
             @endcanany
 
-            @if (app(\App\Services\DeliveryModulePolicy::class)->enabled())
+            @if ($this->deliveryModuleEnabled)
                 @canany(['reasignar pedidos delivery', 'editar datos de ordenes en punto de venta'])
                     <button type="button" class="pos-more-action" data-tone="green"
                         @click="closeMore(false)" wire:click="openDeliveryDispatchModal"

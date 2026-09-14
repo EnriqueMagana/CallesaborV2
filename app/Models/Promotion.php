@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Promotion extends Model
 {
@@ -62,6 +63,29 @@ class Promotion extends Model
                 $promotion->recurrence_type = ($promotion->weekdays ?? []) === [] ? 'date_range' : 'weekdays';
             }
         });
+
+        // El POS lee las promociones vigentes desde cache; publicar o retirar
+        // una debe reflejarse en la caja sin esperar al TTL.
+        static::saved(fn () => static::flushPosCache());
+        static::deleted(fn () => static::flushPosCache());
+    }
+
+    /**
+     * Clave de cache de las promociones que el POS ofrece para un modo de entrega.
+     */
+    public static function posCacheKey(?string $fulfillment): string
+    {
+        return 'pos.promotions.'.($fulfillment ?: 'any');
+    }
+
+    /**
+     * Olvida las promociones cacheadas de todos los modos de entrega.
+     */
+    public static function flushPosCache(): void
+    {
+        foreach ([...self::POS_FULFILLMENT_MODES, null] as $fulfillment) {
+            Cache::forget(self::posCacheKey($fulfillment));
+        }
     }
 
     public function groups(): HasMany

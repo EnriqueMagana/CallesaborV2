@@ -38,24 +38,24 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <link rel="stylesheet" href="{{ asset('assets/vendor/fonts/boxicons.css') }}"/>
 
 <!-- Core CSS del tema (variables de color, componentes) -->
-<link rel="stylesheet" href="{{ asset('assets/vendor/css/core.css') }}" class="template-customizer-core-css"/>
-<link rel="stylesheet" href="{{ asset('assets/vendor/css/theme-default.css') }}" class="template-customizer-theme-css"/>
-<link rel="stylesheet" href="{{ asset('assets/css/demo.css') }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/pos.css') }}?v={{ filemtime(public_path('assets/css/pos.css')) }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}?v={{ filemtime(public_path('assets/css/extracted-ui.css')) }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/pos-modern.css') }}?v={{ filemtime(public_path('assets/css/pos-modern.css')) }}"/>
+<link rel="stylesheet" href="@assetVersion('assets/vendor/css/core.min.css')" class="template-customizer-core-css"/>
+<link rel="stylesheet" href="@assetVersion('assets/vendor/css/theme-default.min.css')" class="template-customizer-theme-css"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/demo.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/pos.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/extracted-ui.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/pos-modern.min.css')"/>
 {{-- Modo oscuro pausado temporalmente.
 <link rel="stylesheet" href="{{ asset('assets/css/dark-theme.css') }}?v={{ filemtime(public_path('assets/css/dark-theme.css')) }}"/>
 --}}
-<link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/pos-mobile-navigation.css') }}?v={{ filemtime(public_path('assets/css/pos-mobile-navigation.css')) }}"/>
-<link rel="stylesheet" href="{{ asset('assets/css/ticket-preview-modal.css') }}?v={{ filemtime(public_path('assets/css/ticket-preview-modal.css')) }}"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/confirm-modal.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/notification-center.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/pos-mobile-navigation.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/ticket-preview-modal.min.css')"/>
 
 <!-- Helpers -->
-<script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
-<script src="{{ asset('assets/js/config.js') }}"></script>
-<script src="{{ asset('assets/js/ticket-preview-modal.js') }}?v={{ filemtime(public_path('assets/js/ticket-preview-modal.js')) }}"></script>
+<script src="@assetVersion('assets/vendor/js/helpers.min.js')"></script>
+<script src="@assetVersion('assets/js/config.min.js')"></script>
+<script src="@assetVersion('assets/js/ticket-preview-modal.min.js')"></script>
 {{-- Modo oscuro pausado temporalmente.
 <script src="{{ asset('assets/js/theme.js') }}?v={{ filemtime(public_path('assets/js/theme.js')) }}"></script>
 --}}
@@ -73,10 +73,20 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 {{ $slot }}
 <livewire:ui.confirm-modal />
 
-<!-- Core JS (mismo que app.blade.php) -->
-<script src="{{ asset('assets/vendor/libs/jquery/jquery.js') }}"></script>
-<script src="{{ asset('assets/vendor/libs/popper/popper.js') }}"></script>
-<script src="{{ asset('assets/vendor/js/bootstrap.js') }}"></script>
+{{-- jQuery, Popper y Bootstrap JS se retiraron de esta pantalla: eran 642 KB
+     que el POS descargaba sin usar. La interactividad es de Alpine (que viene
+     con Livewire), no de Bootstrap.
+
+     La comprobación está automatizada en `PosVendorUsageTest`: si alguien
+     agrega un `data-bs-*`, un `$(...)` o un `new bootstrap.Modal` a una vista
+     del POS, la prueba falla y explica que hay que volver a cargarlos aquí.
+
+     El CSS del tema (`core.min.css`) sí se queda: las clases de Bootstrap se
+     siguen usando para el diseño, y eso no necesita su JavaScript. --}}
+
+{{-- Estado raíz del POS. Va antes de Livewire para que su `alpine:init` corra
+     antes de que Alpine arranque los componentes. --}}
+<script src="@assetVersion('assets/js/pos-root.min.js')"></script>
 
 <script>
 document.addEventListener('alpine:init', () => {
@@ -145,7 +155,7 @@ document.addEventListener('alpine:init', () => {
 
 @livewireScripts
 @vite('resources/js/app.js')
-<script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>
+<script src="@assetVersion('assets/js/notification-center.min.js')" data-navigate-once></script>
 @stack('scripts')
 
 <script>

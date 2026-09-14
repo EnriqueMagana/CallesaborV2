@@ -27,7 +27,11 @@ class ThermalTicketRenderer
         ?string $printArea = null,
         bool $autoPrint = true,
     ): string {
-        $order->loadMissing(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'refunds.processor', 'customer', 'mesa.area', 'cancelledBy']);
+        // A reprint is an auditable view of the persisted order, not of the
+        // relations that happened to be loaded before a change was approved.
+        // Refresh both attributes (notably the total) and relations so removed
+        // and newly-added lines can never be printed from a stale snapshot.
+        $order->refresh()->load(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'seller', 'payments', 'refunds.processor', 'customer', 'mesa.area', 'cancelledBy']);
 
         // La cocina nunca debe preparar partidas retiradas. En los tickets del
         // cliente sí se conservan como evidencia, marcadas y fuera del total.

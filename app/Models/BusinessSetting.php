@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DeliveryModulePolicy;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -28,13 +29,27 @@ class BusinessSetting extends Model
         ['key' => 'sunday', 'label' => 'Domingo', 'enabled' => false, 'opens' => '09:00', 'closes' => '18:00'],
     ];
 
+    protected static function booted(): void
+    {
+        // Cualquier escritura de la configuracion invalida el interruptor del
+        // modulo de delivery, que el POS lee cacheado en cada render.
+        static::saved(fn () => DeliveryModulePolicy::flush());
+        static::deleted(fn () => DeliveryModulePolicy::flush());
+    }
+
     public static function current(): self
     {
-        return static::query()->firstOrCreate([], [
+        $settings = static::query()->firstOrCreate([], [
             'business_name' => config('app.name', 'Calle Sabor'),
             'platform_name' => config('app.name', 'Calle Sabor'),
             'business_hours' => self::DEFAULT_HOURS,
         ]);
+
+        // Al crear la fila, las columnas con valor por defecto en la base
+        // (`delivery_management_enabled` entre ellas) quedan en null en la
+        // instancia en memoria. Sin este refresh la primera lectura devuelve
+        // algo distinto a las siguientes.
+        return $settings->wasRecentlyCreated ? $settings->refresh() : $settings;
     }
 
     public function getFullAddressAttribute(): string

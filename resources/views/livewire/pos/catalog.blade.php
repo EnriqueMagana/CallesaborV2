@@ -1,7 +1,9 @@
 <div class="pos-catalog"
+     @pos-catalog-settled.window="pendingId = null"
      x-data="{
         category: null,
         mode: $wire.entangle('catalogMode'),
+        pendingId: null,
         normalize(value) {
             return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         },
@@ -96,8 +98,8 @@
                         $promotionDescription = $promotion->short_description
                             ?: ($isAutomatic ? 'Se aplica automáticamente al completar las cantidades requeridas.' : 'Configura los productos incluidos en este combo.');
                     @endphp
-                    <button type="button" wire:click="selectPromotionFromCatalog({{ $promotion->id }})"
-                            wire:loading.attr="disabled" wire:target="selectPromotionFromCatalog({{ $promotion->id }})"
+                    <button type="button" wire:click="$parent.selectPromotionFromCatalog({{ $promotion->id }})"
+                            @click="pendingId = {{ $promotion->id }}" :disabled="pendingId === {{ $promotion->id }}"
                             wire:key="pos-promotion-{{ $promotion->id }}" x-show="matches(@js($promotion->name.' '.$promotionDescription), null, catalogQuery)" x-cloak
                             class="prod-card pos-promotion-card"
                             aria-label="{{ $isAutomatic ? 'Agregar producto para' : 'Configurar' }} {{ $promotion->name }}, {{ $promotion->pricingRuleLabel() ?: 'precio $'.number_format($promotion->price, 2) }}">
@@ -128,23 +130,25 @@
         </section>
     @endif
 
+    {{-- El distintivo "en el pedido" lo resuelve Alpine con `cartQtyFor()`, que
+         vive en la raiz del POS. Asi el catalogo no depende del carrito y deja
+         de reconstruirse en cada click. --}}
     <div class="catalog-grid" x-show="mode === 'products'" x-cloak>
-        @php $cartProductIds = collect($cart)->groupBy('product_id')->map->sum('quantity'); @endphp
-
         @foreach($this->categoriesWithProducts as $category)
             @foreach($category->products as $product)
                 @php
-                    $inCart = isset($cartProductIds[$product->id]);
-                    $cartQty = $cartProductIds[$product->id] ?? 0;
                     $hasOptions = $product->is_customizable || $product->addon_groups_count > 0 || $product->ingredients_count > 0;
+                    $productLabel = ($hasOptions ? 'Personalizar' : 'Agregar').' '.$product->name.' por $'.number_format($product->price, 2);
                 @endphp
                 <button type="button"
                      x-show="matches(@js($product->name), {{ $category->id }}, catalogQuery)" x-cloak
-                     wire:click="openCustomizeModal({{ $product->id }})"
-                     wire:loading.attr="disabled" wire:target="openCustomizeModal({{ $product->id }})"
+                     wire:click="$parent.openCustomizeModal({{ $product->id }})"
+                     @click="pendingId = {{ $product->id }}" :disabled="pendingId === {{ $product->id }}"
                      wire:key="pos-product-{{ $product->id }}"
-                     class="prod-card {{ $inCart ? 'in-cart' : '' }}"
-                     aria-label="{{ $hasOptions ? 'Personalizar' : 'Agregar' }} {{ $product->name }} por ${{ number_format($product->price, 2) }}{{ $inCart ? ', '.$cartQty.' en el pedido' : '' }}">
+                     class="prod-card"
+                     :class="{ 'in-cart': cartQtyFor({{ $product->id }}) > 0 }"
+                     data-label="{{ $productLabel }}" aria-label="{{ $productLabel }}"
+                     :aria-label="cartQtyFor({{ $product->id }}) > 0 ? $el.dataset.label + ', ' + cartQtyFor({{ $product->id }}) + ' en el pedido' : $el.dataset.label">
                     <div class="prod-img {{ $product->image ? 'pos-product-image-shell' : '' }}"
                          @if($product->image) x-data="posProductImage"
                          :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
@@ -155,7 +159,8 @@
                         @else
                             <i class="bx bx-dish no-img" aria-hidden="true"></i>
                         @endif
-                        @if($inCart)<span class="prod-badge-qty">{{ $cartQty }}</span>@endif
+                        <span class="prod-badge-qty" x-show="cartQtyFor({{ $product->id }}) > 0" x-cloak
+                              x-text="cartQtyFor({{ $product->id }})"></span>
                         @if($hasOptions)<span class="prod-badge-addon"><i class="bx bx-customize" aria-hidden="true"></i> Personalizar</span>@endif
                     </div>
                     <div class="prod-info">
@@ -173,17 +178,18 @@
 
         @foreach($this->productsWithoutCategory as $product)
             @php
-                $inCart = isset($cartProductIds[$product->id]);
-                $cartQty = $cartProductIds[$product->id] ?? 0;
                 $hasOptions = $product->is_customizable || $product->addon_groups_count > 0 || $product->ingredients_count > 0;
+                $productLabel = ($hasOptions ? 'Personalizar' : 'Agregar').' '.$product->name.' por $'.number_format($product->price, 2);
             @endphp
             <button type="button"
                  x-show="matches(@js($product->name), null, catalogQuery)" x-cloak
-                 wire:click="openCustomizeModal({{ $product->id }})"
-                 wire:loading.attr="disabled" wire:target="openCustomizeModal({{ $product->id }})"
+                 wire:click="$parent.openCustomizeModal({{ $product->id }})"
+                     @click="pendingId = {{ $product->id }}" :disabled="pendingId === {{ $product->id }}"
                  wire:key="pos-product-{{ $product->id }}"
-                 class="prod-card {{ $inCart ? 'in-cart' : '' }}"
-                 aria-label="{{ $hasOptions ? 'Personalizar' : 'Agregar' }} {{ $product->name }} por ${{ number_format($product->price, 2) }}{{ $inCart ? ', '.$cartQty.' en el pedido' : '' }}">
+                 class="prod-card"
+                 :class="{ 'in-cart': cartQtyFor({{ $product->id }}) > 0 }"
+                 data-label="{{ $productLabel }}" aria-label="{{ $productLabel }}"
+                 :aria-label="cartQtyFor({{ $product->id }}) > 0 ? $el.dataset.label + ', ' + cartQtyFor({{ $product->id }}) + ' en el pedido' : $el.dataset.label">
                 <div class="prod-img {{ $product->image ? 'pos-product-image-shell' : '' }}"
                      @if($product->image) x-data="posProductImage"
                      :class="{ 'is-image-pending': state === 'waiting' || state === 'loading' || state === 'decoding', 'is-image-ready': state === 'ready', 'is-image-error': state === 'error' }" @endif>
@@ -194,7 +200,8 @@
                     @else
                         <i class="bx bx-dish no-img" aria-hidden="true"></i>
                     @endif
-                    @if($inCart)<span class="prod-badge-qty">{{ $cartQty }}</span>@endif
+                    <span class="prod-badge-qty" x-show="cartQtyFor({{ $product->id }}) > 0" x-cloak
+                          x-text="cartQtyFor({{ $product->id }})"></span>
                     @if($hasOptions)<span class="prod-badge-addon"><i class="bx bx-customize" aria-hidden="true"></i> Personalizar</span>@endif
                 </div>
                 <div class="prod-info">

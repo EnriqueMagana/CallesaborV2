@@ -46,7 +46,7 @@
                 </button>
             </div>
         </div>
-        <livewire:layout.notification-center placement="pos" />
+        <livewire:layout.notification-center placement="pos" wire:key="pos-notification-center" />
         <a href="{{ route('app.dashboard') }}" class="btn-header-action">
             <i class="bx bx-home-alt"></i>
             <span>Dashboard</span>

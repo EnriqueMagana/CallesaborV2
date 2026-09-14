@@ -12,7 +12,9 @@ use App\Models\DeliveryAssignment;
 use App\Models\Order;
 use App\Observers\DeliveryAssignmentObserver;
 use App\Observers\OrderObserver;
+use App\Support\AssetVersion;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
@@ -35,6 +37,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Reemplaza a `filemtime()` en linea dentro de las plantillas: resuelve
+        // la version del asset una vez y la memoriza, en vez de leer el disco
+        // por cada etiqueta <link> y <script> (doce por request en el POS).
+        Blade::directive('assetVersion', function (string $expression): string {
+            return "<?php echo \\".AssetVersion::class."::url({$expression}); ?>";
+        });
+
         // Owner y super-admin bypassan todos los permisos.
         Gate::before(function ($user, $ability) {
             return $user->hasAnyRole(['owner', 'super-admin']) ? true : null;
