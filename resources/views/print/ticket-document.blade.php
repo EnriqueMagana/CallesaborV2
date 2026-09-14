@@ -25,7 +25,7 @@
 <body data-printer-dpi="{{ $printerDpi }}" class="ticket-document ticket-info-font-{{ $informationFont }} ticket-info-size-{{ $informationFontSize }} ticket-dpi-{{ $printerDpi }} ticket-paper-{{ $template->paper_width_mm }} ticket-margin-{{ $template->margin_mm }} ticket-logo-size-{{ $logoWidth }} ticket-items-font-{{ $itemFontFamily }} ticket-items-size-{{ $itemFontSize }}">
     <main class="ticket-sheet">
         @foreach($template->blocks as $block)
-            @if(($block['enabled'] ?? false) && in_array($block['key'] ?? '', ['header','business','order_meta','delivery','items','cut_summary','cut_meta','cut_sales_channels','cut_payment_methods','cut_cash_movements','cut_reconciliation','cut_notes','totals','payments','qr','footer','inventory_purchase_meta','inventory_purchase_items','inventory_purchase_notes'], true))
+            @if(($block['enabled'] ?? false) && in_array($block['key'] ?? '', ['header','business','order_meta','delivery','items','cut_summary','cut_meta','cut_sales_channels','cut_payment_methods','cut_order_benefits','cut_cash_movements','cut_reconciliation','cut_notes','totals','payments','qr','footer','inventory_purchase_meta','inventory_purchase_items','inventory_purchase_notes'], true))
                 @include('print.blocks.'.$block['key'])
             @endif
         @endforeach

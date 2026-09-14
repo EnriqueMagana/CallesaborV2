@@ -3124,6 +3124,11 @@ html.dark-style .pos-order-data-guardrail {
     .pos-root .modal-footer-pos > .pos-btn { width: 100%; justify-content: center; }
 }
 
+/* Las tabletas aprovechan el ancho extra sin reducir los objetivos táctiles. */
+@media (min-width: 600px) and (max-width: 1024px) {
+    .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (max-width: 390px) {
     .catalog-grid { gap: 8px; padding-inline: 9px; }
 }

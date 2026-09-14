@@ -11,7 +11,7 @@
         <div>
             <div class="dashboard-context">
                 <span><i class="bx {{ $dashboard['profile']['icon'] }}" aria-hidden="true"></i>{{ $dashboard['profile']['label'] }}</span>
-                <span>{{ now()->translatedFormat('l d \d\e F') }}</span>
+                <span>{{ \App\Support\BusinessTime::now()->locale('es')->translatedFormat('l d \d\e F') }}</span>
             </div>
             <h1>Hola, {{ str($user->name)->before(' ') }}</h1>
             <p><strong>{{ $dashboard['profile']['title'] }}.</strong> {{ $dashboard['profile']['subtitle'] }}</p>

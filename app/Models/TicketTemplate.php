@@ -125,6 +125,7 @@ class TicketTemplate extends Model
             ['key' => 'cut_meta', 'label' => 'Caja, folio y responsable', 'enabled' => true],
             ['key' => 'cut_sales_channels', 'label' => 'Ventas por canal', 'enabled' => true],
             ['key' => 'cut_payment_methods', 'label' => 'Resumen por forma de pago', 'enabled' => true],
+            ['key' => 'cut_order_benefits', 'label' => 'Promociones y descuentos por orden', 'enabled' => true],
             ['key' => 'cut_cash_movements', 'label' => 'Movimientos de efectivo', 'enabled' => true],
             ['key' => 'cut_reconciliation', 'label' => 'Conciliación y diferencia', 'enabled' => true],
             ['key' => 'cut_notes', 'label' => 'Notas del cierre', 'enabled' => true],
