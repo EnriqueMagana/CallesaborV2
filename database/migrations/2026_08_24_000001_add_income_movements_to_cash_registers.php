@@ -78,8 +78,22 @@ return new class extends Migration
         }
 
         if (Schema::hasTable('expenses') && Schema::hasColumn('expenses', 'type')) {
+            // InnoDB may use the composite index below to support the
+            // cash_register_id foreign key and discard its original implicit
+            // index. Keep a dedicated compatible index before removing it.
+            if (! Schema::hasIndex('expenses', ['cash_register_id'])) {
+                Schema::table('expenses', function (Blueprint $table): void {
+                    $table->index('cash_register_id', 'expenses_cash_register_id_rollback_index');
+                });
+            }
+
+            if (Schema::hasIndex('expenses', 'cash_movement_register_type_created_index')) {
+                Schema::table('expenses', function (Blueprint $table): void {
+                    $table->dropIndex('cash_movement_register_type_created_index');
+                });
+            }
+
             Schema::table('expenses', function (Blueprint $table): void {
-                $table->dropIndex('cash_movement_register_type_created_index');
                 $table->dropColumn('type');
             });
         }
