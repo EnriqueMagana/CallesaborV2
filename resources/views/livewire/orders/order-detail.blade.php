@@ -27,6 +27,9 @@
                 || ($order->type === 'delivery' && in_array($order->status, ['pendiente', 'en_preparacion', 'lista', 'pagada'], true) && $order->deliveryAssignment?->status !== 'entregado' && $user?->can('solicitar cambio de direccion'));
         @endphp
         @if($order->cashRegister?->is_open && $order->changeRequests->where('status', 'pending')->isEmpty())
+            @if($user?->can('solicitar modificacion de ordenes') && ($activeUnpaid || $paid || ($order->is_collected_on_delivery && in_array($order->status, ['pendiente', 'en_preparacion', 'lista'], true))))
+                <a class="btn btn-sm btn-primary" href="{{ route('app.ordenes.productos', ['order' => $order, 'source' => 'detail']) }}"><i class="bx bx-food-menu me-1"></i>Modificar productos</a>
+            @endif
             @if($canRequestOrderChange)
                 <a class="btn btn-sm btn-outline-primary" href="{{ route('app.ordenes.solicitud', ['order' => $order, 'source' => 'detail']) }}"><i class="bx bx-git-compare me-1"></i>Solicitar cambio</a>
             @endif
@@ -304,18 +307,32 @@
                             <div class="small text-success">Cambio: ${{ number_format($payment->change_amount, 2) }}</div>
                         @endif
                     </div>
-                    <span class="fw-semibold">${{ number_format($payment->amount, 2) }}</span>
+                    <span class="fw-semibold">
+                        ${{ number_format($payment->amount, 2) }}
+                        @if($payment->is_provisional)
+                            <small class="d-block text-warning fw-normal">Lo trae el repartidor</small>
+                        @endif
+                    </span>
                 </div>
                 @endforeach
 
                 {{-- Paid total --}}
-                @php $totalPaid = $order->payments->sum('amount'); @endphp
+                @php $totalPaid = $order->paid_amount; @endphp
                 <div class="d-flex justify-content-between pt-2 border-top">
                     <span class="text-muted small">Total pagado</span>
                     <span class="fw-semibold {{ $totalPaid >= $order->total ? 'text-success' : 'text-danger' }}">
                         ${{ number_format($totalPaid, 2) }}
                     </span>
                 </div>
+                @if($order->balance_due > 0.009)
+                    <div class="d-flex justify-content-between pt-2">
+                        <span class="{{ $order->uncovered_amount > 0.009 ? 'text-danger' : 'text-warning' }} small fw-semibold">
+                            <i class="bx {{ $order->uncovered_amount > 0.009 ? 'bx-error-circle' : 'bx-cycling' }} me-1"></i>
+                            {{ $order->uncovered_amount > 0.009 ? 'Saldo por cobrar en caja' : 'Por cobrar contra entrega' }}
+                        </span>
+                        <span class="fw-bold {{ $order->uncovered_amount > 0.009 ? 'text-danger' : 'text-warning' }}">${{ number_format($order->balance_due, 2) }}</span>
+                    </div>
+                @endif
                 @if($order->refunds->isNotEmpty())
                     <div class="mt-3 pt-3 border-top">
                         <div class="small fw-semibold text-danger mb-2"><i class="bx bx-undo me-1"></i>Devoluciones registradas</div>

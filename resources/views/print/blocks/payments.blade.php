@@ -18,8 +18,14 @@
         <div class="ticket-row"><strong>Pago neto</strong><strong>${{ number_format($payload['net_paid'] ?? 0, 2) }}</strong></div>
     @endif
     @if(($payload['balance'] ?? 0) > 0.009)
-        <div class="ticket-row"><strong>Saldo pendiente</strong><strong>${{ number_format($payload['balance'], 2) }}</strong></div>
+        <div class="ticket-row"><strong>{{ $payload['balance_label'] ?? 'Saldo pendiente' }}</strong><strong>${{ number_format($payload['balance'], 2) }}</strong></div>
     @endif
+</section>
+<hr>
+@elseif(($payload['balance_label'] ?? null) === 'Por cobrar contra entrega' && ($payload['balance'] ?? 0) > 0.009)
+{{-- Contra entrega sin cobros aún: el repartidor necesita ver el importe exacto. --}}
+<section class="ticket-payments">
+    <div class="ticket-row"><strong>{{ $payload['balance_label'] }}</strong><strong>${{ number_format($payload['balance'], 2) }}</strong></div>
 </section>
 <hr>
 @endif

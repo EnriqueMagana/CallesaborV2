@@ -9,6 +9,13 @@
         $areas      = $this->ordersByArea;
     @endphp
 
+    @if ($cut->is_reopened)
+        <div class="alert alert-warning d-flex align-items-start gap-2" role="status">
+            <i class="bx bx-revision fs-4" aria-hidden="true"></i>
+            <div><strong>Corte anulado por reapertura.</strong> {{ $cut->reopener?->name ?? 'Un super admin' }} reabrió la caja el {{ \App\Support\BusinessTime::format($cut->reopened_at) }}. Motivo: «{{ $cut->reopen_reason }}». Las cifras de abajo son las de este cierre anulado, no las vigentes.</div>
+        </div>
+    @endif
+
     {{-- Header --}}
     <div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
         <div>

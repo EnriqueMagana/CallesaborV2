@@ -22,7 +22,7 @@ class CorteDetalle extends Component
     #[Computed]
     public function cut(): CashRegisterCut
     {
-        return CashRegisterCut::with(['cashRegister.opener', 'cashRegister.closer', 'generator'])
+        return CashRegisterCut::with(['cashRegister.opener', 'cashRegister.closer', 'generator', 'reopener'])
             ->findOrFail($this->cutId);
     }
 

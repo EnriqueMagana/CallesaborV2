@@ -310,3 +310,55 @@ html.dark-style .cash-cut-delivery-blockers__list { border-color:#715d2c; backgr
 html.dark-style .cash-cut-delivery-blockers__list article { background:#28271f; }
 .delivery-manual-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:18px 22px}.delivery-manual-summary>div{display:grid;gap:4px;padding:14px 16px;border:1px solid var(--app-border,#e5e7eb);border-radius:14px;background:var(--app-surface-soft,#f8fafc)}.delivery-manual-summary small{color:var(--app-muted,#667085);font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.delivery-manual-summary strong{font-size:20px;font-variant-numeric:tabular-nums}.delivery-reconciliation--manual .delivery-reconciliation__header>div>span{background:#fff3dc;color:#81520b}
 @media(max-width:767px){.delivery-manual-summary{grid-template-columns:1fr;padding:16px}}
+
+/* ── Corte: pedidos por área (Delivery, Cocina, Ventanilla) ─────────────── */
+.cash-cut-area-summary { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin:0 0 16px; padding:0 18px; }
+.cash-cut-area-summary > div { min-width:0; padding:12px 14px; border:1px solid var(--app-border); border-radius:14px; background:var(--app-surface); }
+.cash-cut-area-summary dt { display:flex; align-items:center; gap:6px; color:var(--app-muted); font-size:.74rem; font-weight:700; }
+.cash-cut-area-summary dd { margin:3px 0 0; color:var(--app-ink); font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.cash-cut-area-summary .is-delivery dt i { color:var(--app-info); }
+.cash-cut-area-summary .is-cocina dt i { color:#b45309; }
+.cash-cut-area-summary .is-ventanilla dt i { color:var(--app-primary); }
+.cash-cut-area-summary .is-grand { border-color:var(--app-primary); background:var(--app-primary-soft); }
+.cash-cut-area-summary .is-grand dt { color:var(--app-primary-dark); }
+
+.cash-cut-area-tables { display:grid; gap:16px; padding:0 18px 18px; }
+.cash-cut-area-table { overflow:hidden; border:1px solid var(--app-border); border-radius:14px; background:var(--app-surface); }
+.cash-cut-area-table > header { display:grid; grid-template-columns:42px minmax(0, 1fr) auto; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--app-border); background:var(--app-surface-soft); }
+.cash-cut-area-table h3 { margin:0; color:var(--app-ink); font-size:.95rem; font-weight:800; }
+.cash-cut-area-table > header p { margin:2px 0 0; color:var(--app-muted); font-size:.74rem; }
+.cash-cut-area-table__mark { width:42px; height:42px; display:grid; place-items:center; border-radius:12px; font-size:21px; }
+.cash-cut-area-table__mark.is-delivery { color:var(--app-info); background:var(--cash-cut-soft-blue); }
+.cash-cut-area-table__mark.is-cocina { color:#b45309; background:#fff3dc; }
+.cash-cut-area-table__mark.is-ventanilla { color:var(--app-primary); background:var(--app-primary-soft); }
+.cash-cut-area-table__due { display:grid; justify-items:end; }
+.cash-cut-area-table__due small { color:var(--app-muted); font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+.cash-cut-area-table__due strong { color:var(--app-ink); font-size:1.1rem; font-weight:850; font-variant-numeric:tabular-nums; }
+.cash-cut-area-table__empty { margin:0; padding:18px 16px; color:var(--app-muted); font-size:.8rem; }
+.cash-cut-area-table__table { min-width:720px; margin:0; }
+.cash-cut-area-table__table td, .cash-cut-area-table__table th { vertical-align:middle; font-variant-numeric:tabular-nums; }
+.cash-cut-area-table__table td small { display:block; margin-top:2px; color:var(--app-muted); font-size:.68rem; font-weight:500; }
+.cash-cut-area-table__table tr.is-excluded td { color:var(--app-muted); background:repeating-linear-gradient(135deg, transparent 0 8px, rgba(120,113,140,.05) 8px 16px); }
+.cash-cut-area-table__table tr.is-excluded td.app-money, .cash-cut-area-table__table tr.is-excluded td.cash-column { text-decoration:line-through; }
+.cash-cut-area-table__status { display:inline-block; padding:2px 8px; border-radius:999px; color:var(--app-ink); background:var(--app-surface-soft); font-size:.7rem; font-weight:750; }
+.cash-cut-area-table__status.is-pagada { color:var(--app-success); background:var(--cash-cut-soft-green); }
+.cash-cut-area-table__status.is-cancelada { color:var(--app-danger); background:var(--cash-cut-soft-red); }
+.cash-cut-area-table__table tfoot th { background:var(--app-surface-soft); }
+
+@media (max-width: 767.98px) {
+    .cash-cut-area-summary { grid-template-columns:1fr 1fr; padding:0 14px; }
+    .cash-cut-area-summary .is-grand { grid-column:1 / -1; }
+    .cash-cut-area-tables { padding:0 14px 14px; }
+    .cash-cut-area-table > header { grid-template-columns:42px minmax(0, 1fr); }
+    .cash-cut-area-table__due { grid-column:1 / -1; justify-items:start; }
+}
+
+html.dark-style .cash-cut-area-summary > div,
+html.dark-style .cash-cut-area-table { border-color:rgba(255,255,255,.1); background:#1f1b2e; }
+html.dark-style .cash-cut-area-table > header,
+html.dark-style .cash-cut-area-table__table tfoot th { background:#1a1727; }
+html.dark-style .cash-cut-area-summary dd,
+html.dark-style .cash-cut-area-table h3,
+html.dark-style .cash-cut-area-table__due strong { color:#f3f1fb; }
+html.dark-style .cash-cut-area-summary .is-grand { background:rgba(105,86,232,.16); }
+html.dark-style .cash-cut-area-table__mark.is-cocina { color:#fbbf24; background:rgba(245,158,11,.14); }

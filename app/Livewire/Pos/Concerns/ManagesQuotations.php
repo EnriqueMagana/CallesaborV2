@@ -251,8 +251,8 @@ trait ManagesQuotations
 
     /**
      * Snapshot versionado de todos los datos editables del pedido.
-     * Las partidas tambiÃ©n se guardan en tablas relacionales para conservar
-     * compatibilidad con los borradores creados antes de esta versiÃ³n.
+     * Las partidas también se guardan en tablas relacionales para conservar
+     * compatibilidad con los borradores creados antes de esta versión.
      */
     private function draftCheckoutState(): array
     {

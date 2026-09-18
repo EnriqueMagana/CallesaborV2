@@ -226,8 +226,8 @@ class DeliveryBoard extends Component
             'reassignDriverId' => ['required', 'integer', 'exists:users,id'],
             'reassignReason' => ['required', 'string', 'min:8', 'max:500'],
         ], [
-            'reassignDriverId.required' => 'Selecciona al repartidor que recibirÃ¡ el pedido.',
-            'reassignReason.required' => 'Indica por quÃ© se reasigna el pedido.',
+            'reassignDriverId.required' => 'Selecciona al repartidor que recibirá el pedido.',
+            'reassignReason.required' => 'Indica por qué se reasigna el pedido.',
             'reassignReason.min' => 'Describe el motivo con al menos 8 caracteres.',
         ]);
 
@@ -251,7 +251,7 @@ class DeliveryBoard extends Component
         $this->closeReassign();
         $this->tab = 'drivers';
         $this->clearComputedData();
-        $this->dispatch('notify', type: 'success', message: 'Pedido reasignado. El cambio quedÃ³ registrado.');
+        $this->dispatch('notify', type: 'success', message: 'Pedido reasignado. El cambio quedó registrado.');
     }
 
     public function dismissDeliveryError(): void

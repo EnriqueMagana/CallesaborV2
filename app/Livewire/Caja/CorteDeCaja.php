@@ -8,7 +8,10 @@ use App\Models\CashRegisterCut;
 use App\Models\DeliverySettlement;
 use App\Models\Expense;
 use App\Models\Order;
+use App\Models\OrderPayment;
+use App\Services\CashCutAreaBreakdown;
 use App\Services\CashRegisterClosingGuard;
+use App\Services\CashRegisterReopenService;
 use App\Services\DeliveryModulePolicy;
 use App\Services\OrderBenefitSummaryService;
 use App\Services\OrderFinancialSummaryService;
@@ -61,9 +64,19 @@ class CorteDeCaja extends Component
     public function auditOrders(): Collection
     {
         return Order::where('cash_register_id', $this->registerId)
-            ->with(['payments', 'refunds', 'seller', 'cancelledBy'])
+            ->with(['payments', 'refunds', 'seller', 'cancelledBy', 'mesa'])
             ->orderBy('created_at')
             ->get();
+    }
+
+    /**
+     * Todos los pedidos del turno en tres tablas (Delivery, Cocina, Ventanilla)
+     * con lo que debe haber en cada una. Mismas reglas que totals().
+     */
+    #[Computed]
+    public function areaBreakdown(): array
+    {
+        return app(CashCutAreaBreakdown::class)->build($this->auditOrders);
     }
 
     #[Computed]
@@ -121,7 +134,16 @@ class CorteDeCaja extends Component
 
     private function netPayment(Collection $orders, string $method): float
     {
-        return (float) ($this->paymentSummary($orders)['net'][$method] ?? 0);
+        $net = $this->paymentSummary($orders)['net'];
+
+        // Un cobro contra entrega que se recibe en caja es efectivo: el resto del
+        // sistema (efectivo esperado, arqueo de repartidores, reembolsos) ya lo
+        // cuenta así; el desglose por área también debe hacerlo o no cuadra.
+        if ($method === 'efectivo') {
+            return round((float) ($net['efectivo'] ?? 0) + (float) ($net['contra_entrega'] ?? 0), 2);
+        }
+
+        return (float) ($net[$method] ?? 0);
     }
 
     #[Computed]
@@ -156,7 +178,7 @@ class CorteDeCaja extends Component
                 'total' => $mesas->sum('total'),
             ],
             'd' => [
-                'efectivo' => $sum($delivery, 'efectivo'),   // contra_entrega no entra aquí en la lógica normal
+                'efectivo' => $sum($delivery, 'efectivo'),   // incluye cobros guardados como contra_entrega
                 'tarjeta' => $sum($delivery, 'tarjeta'),
                 'transfer' => $sum($delivery, 'transferencia'),
                 'total' => $delivery->sum('total'),
@@ -196,6 +218,21 @@ class CorteDeCaja extends Component
         $gross = $this->paymentSummary($this->auditOrders)['gross'];
 
         return (float) ($gross['efectivo'] ?? 0) + (float) ($gross['contra_entrega'] ?? 0);
+    }
+
+    /**
+     * Parte del efectivo esperado que aún traen los repartidores: cobros
+     * contra entrega registrados como provisión. Debe estar en la caja antes
+     * de contar; al generar el corte se da por entregado.
+     */
+    #[Computed]
+    public function provisionalCash(): float
+    {
+        return round((float) $this->auditOrders
+            ->where('status', '!=', 'cancelada')
+            ->flatMap->payments
+            ->where('is_provisional', true)
+            ->sum('amount'), 2);
     }
 
     #[Computed]
@@ -291,7 +328,14 @@ class CorteDeCaja extends Component
 
             $t = $this->totals;
             $benefitOrders = app(OrderBenefitSummaryService::class)->forOrders($this->orders);
-            $folio = 'CORTE-'.str_pad($register->id, 4, '0', STR_PAD_LEFT);
+            $folio = app(CashRegisterReopenService::class)->nextFolio($register);
+
+            // Se guarda qué provisiones liquida este corte: si la caja se
+            // reabre, vuelven a ser efectivo pendiente del repartidor.
+            $provisionalQuery = OrderPayment::query()
+                ->where('is_provisional', true)
+                ->whereIn('order_id', Order::query()->where('cash_register_id', $register->id)->select('id'));
+            $settledProvisionalIds = (clone $provisionalQuery)->pluck('id')->all();
 
             $cut = CashRegisterCut::create([
                 'cash_register_id' => $register->id,
@@ -323,9 +367,15 @@ class CorteDeCaja extends Component
                     'expenses' => $this->expenses->toArray(),
                     'cash_incomes' => $this->cashIncomes->toArray(),
                     'benefit_orders' => $benefitOrders,
+                    'area_breakdown' => collect($this->areaBreakdown['areas'])->map(fn (array $area) => $area['totals'])->all() + ['grand' => $this->areaBreakdown['grand']],
+                    'settled_provisional_payment_ids' => $settledProvisionalIds,
                 ],
                 'generated_at' => now(),
             ]);
+
+            // El repartidor entrega el efectivo contra entrega en el corte: lo
+            // que seguía como provisión pasa a ser dinero recibido.
+            $provisionalQuery->update(['is_provisional' => false]);
 
             $register->update([
                 'is_open' => false,

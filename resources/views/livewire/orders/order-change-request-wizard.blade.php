@@ -28,12 +28,16 @@
         @endforeach
     </nav>
 
-    @if ($this->isPaidOrder)
+    @if ($this->netPaidAmount > 0.009)
         <div class="order-wizard-paid-notice" role="status">
             <i class="bx bx-credit-card" aria-hidden="true"></i>
-            <div><strong>Esta orden ya fue pagada</strong>
+            <div><strong>Esta orden ya recibió ${{ number_format($this->netPaidAmount, 2) }}</strong>
                 <p>
-                    @if (in_array($scope, ['full', 'partial', 'adjustment'], true))
+                    @if (in_array($scope, ['partial', 'adjustment'], true) && $this->pendingBalance > 0.009)
+                        El pago registrado se conservará. Como el nuevo total queda por encima de lo cobrado,
+                        quedarán ${{ number_format($this->pendingBalance, 2) }} por cobrar
+                        {{ $order->is_collected_on_delivery ? 'contra entrega por el repartidor' : 'en el POS por el cajero' }}.
+                    @elseif (in_array($scope, ['full', 'partial', 'adjustment'], true))
                         El pago original se conservará. Si se autoriza un importe menor, se registrará una devolución
                         auditada por ${{ number_format($this->refundAmount, 2) }}.
                     @elseif($scope === 'payment')
@@ -132,24 +136,40 @@
                     @if (in_array($scope, ['partial', 'adjustment'], true))
                         <fieldset class="order-wizard-fieldset">
                             <legend>Artículos de la orden</legend>
+                            @if ($scope === 'adjustment')
+                                <div class="order-wizard-draft-head">
+                                    <p>Estos son los productos que armaste. Para agregar, quitar o personalizar, vuelve al editor.</p>
+                                    <a class="orders-button orders-button--ghost" href="{{ route('app.ordenes.productos', ['order' => $order, 'source' => $source]) }}">
+                                        <i class="bx bx-edit-alt" aria-hidden="true"></i><span>Editar productos</span>
+                                    </a>
+                                </div>
+                            @endif
                             <div class="orders-change-lines">
                                 @foreach ($requestItems as $index => $line)
                                     <div class="orders-change-line {{ $line['quantity'] === 0 ? 'is-removed' : '' }}"
                                         wire:key="wizard-line-{{ $line['key'] }}">
-                                        <span><strong>{{ $line['name'] }}</strong><small>{{ $line['kind'] === 'new' ? 'Artículo nuevo' : 'Antes: ' . $line['original_quantity'] }}
-                                                · ${{ number_format($line['unit_subtotal'], 2) }} c/u</small></span>
-                                        <div class="orders-quantity-control"
-                                            aria-label="Cantidad de {{ $line['name'] }}">
-                                            <button type="button"
-                                                wire:click="adjustRequestItem({{ $index }}, -1)"
-                                                aria-label="Quitar una unidad de {{ $line['name'] }}"><i
-                                                    class="bx bx-minus"></i></button>
-                                            <b aria-live="polite">{{ $line['quantity'] }}</b>
-                                            <button type="button" @disabled($scope === 'partial' && $line['quantity'] >= $line['original_quantity'])
-                                                wire:click="adjustRequestItem({{ $index }}, 1)"
-                                                aria-label="Agregar una unidad de {{ $line['name'] }}"><i
-                                                    class="bx bx-plus"></i></button>
-                                        </div>
+                                        <span><strong>{{ $line['name'] }}</strong><small>
+                                                @if ($line['kind'] === 'new') Artículo nuevo
+                                                @elseif ($line['quantity'] === 0) Se retira (antes {{ $line['original_quantity'] }})
+                                                @else Antes: {{ $line['original_quantity'] }}
+                                                @endif
+                                                · ${{ number_format($line['unit_subtotal'], 2) }} c/u</small>
+                                            @if (filled($line['modifiers'] ?? null))
+                                                <small class="orders-change-line__modifiers"><i class="bx bx-customize" aria-hidden="true"></i> {{ $line['modifiers'] }}</small>
+                                            @endif
+                                        </span>
+                                        @if ($scope === 'partial')
+                                            <div class="orders-quantity-control" aria-label="Cantidad de {{ $line['name'] }}">
+                                                <button type="button" wire:click="adjustRequestItem({{ $index }}, -1)"
+                                                    aria-label="Quitar una unidad de {{ $line['name'] }}"><i class="bx bx-minus"></i></button>
+                                                <b aria-live="polite">{{ $line['quantity'] }}</b>
+                                                <button type="button" @disabled($line['quantity'] >= $line['original_quantity'])
+                                                    wire:click="adjustRequestItem({{ $index }}, 1)"
+                                                    aria-label="Agregar una unidad de {{ $line['name'] }}"><i class="bx bx-plus"></i></button>
+                                            </div>
+                                        @else
+                                            <b class="order-wizard-draft-qty" aria-label="Cantidad">× {{ $line['quantity'] }}</b>
+                                        @endif
                                         <strong>${{ number_format($line['unit_subtotal'] * $line['quantity'], 2) }}</strong>
                                     </div>
                                 @endforeach
@@ -159,23 +179,6 @@
                             @enderror
                         </fieldset>
 
-                        @if ($scope === 'adjustment')
-                        <fieldset class="order-wizard-fieldset">
-                            <legend>Agregar otro producto</legend>
-                            <label class="visually-hidden" for="wizard-product-search">Buscar producto</label>
-                            <div class="orders-control"><i class="bx bx-search" aria-hidden="true"></i><input
-                                    id="wizard-product-search" type="search"
-                                    wire:model.live.debounce.350ms="productSearch" placeholder="Buscar en el menú"
-                                    autocomplete="off"></div>
-                            <div class="orders-product-results" aria-label="Productos disponibles">
-                                @foreach ($this->productResults as $product)
-                                    <button type="button"
-                                        wire:click="addProductToRequest({{ $product->id }})"><span>{{ $product->name }}</span><b>${{ number_format($product->price, 2) }}</b><i
-                                            class="bx bx-plus-circle" aria-hidden="true"></i></button>
-                                @endforeach
-                            </div>
-                        </fieldset>
-                        @endif
                     @elseif($scope === 'full')
                         <div class="order-wizard-danger-summary"><i class="bx bx-error-circle"
                                 aria-hidden="true"></i>
@@ -362,7 +365,7 @@
                         </div>
                     </div>
 
-                    @if ($this->isPaidOrder && in_array($scope, ['full', 'partial', 'adjustment'], true))
+                    @if ($this->netPaidAmount > 0.009 && in_array($scope, ['full', 'partial', 'adjustment'], true) && ($this->pendingBalance <= 0.009 || $this->hasProductReductions))
                         <fieldset class="order-wizard-fieldset">
                             <legend>Destino de los productos retirados</legend>
                             <p class="orders-field-help">Esto deja evidencia operativa; no modifica existencias
@@ -478,7 +481,23 @@
                             </div>
                         @endif
                     @endif
-                    @if ($this->isPaidOrder && in_array($scope, ['full', 'partial', 'adjustment'], true))
+                    @if ($this->pendingBalance > 0.009 && in_array($scope, ['partial', 'adjustment'], true))
+                        <div class="order-wizard-final-warning is-refund"><i class="bx bx-money"
+                                aria-hidden="true"></i>
+                            <p>Ya se recibieron <strong>${{ number_format($this->netPaidAmount, 2) }}</strong> y el
+                                nuevo total es <strong>${{ number_format($this->proposedTotal, 2) }}</strong>. Aprobar
+                                no cobra nada: quedarán <strong>${{ number_format($this->pendingBalance, 2) }}</strong>
+                                en Pendientes del POS y los cobrará
+                                {{ $order->is_collected_on_delivery ? 'el repartidor contra entrega' : 'el cajero' }}.
+                            </p>
+                        </div>
+                    @elseif ($order->is_collected_on_delivery && in_array($scope, ['partial', 'adjustment'], true))
+                        <div class="order-wizard-final-warning"><i class="bx bx-cycling" aria-hidden="true"></i>
+                            <p>Pedido contra entrega: al aprobar, reimprime el ticket para el repartidor; indicará el
+                                nuevo total a cobrar de <strong>${{ number_format($this->proposedTotal, 2) }}</strong>.
+                            </p>
+                        </div>
+                    @elseif ($this->netPaidAmount > 0.009 && in_array($scope, ['full', 'partial', 'adjustment'], true))
                         <div class="order-wizard-final-warning is-refund"><i class="bx bx-receipt"
                                 aria-hidden="true"></i>
                             <p>Al aprobar, se registrará una devolución de

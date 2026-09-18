@@ -74,7 +74,7 @@ class ThermalTicketRenderer
 
     private function orderPayload(Order $order, string $type, ?string $printArea, $items): array
     {
-        $financial = app(OrderFinancialSummaryService::class)->forOrder($order);
+        $financial = app(OrderFinancialSummaryService::class)->forOrder($order, includeProvisional: false);
         $benefitSummary = app(OrderBenefitSummaryService::class);
         $refundTotal = round((float) collect($financial['refunds'])->sum(), 2);
         $paidTotal = round((float) collect($financial['gross'])->sum(), 2);
@@ -124,7 +124,7 @@ class ThermalTicketRenderer
             'original_total' => max((float) $order->total + $refundTotal, $paidTotal),
             'refund_total' => $refundTotal,
             'total' => $isCancelled ? 0.0 : (float) $order->total,
-            'payments' => $order->payments->map(fn ($payment) => [
+            'payments' => $order->payments->where('is_provisional', false)->map(fn ($payment) => [
                 'label' => $payment->method_label,
                 'amount' => (float) $payment->amount,
                 'change' => (float) ($payment->change_amount ?? 0),
@@ -145,6 +145,10 @@ class ThermalTicketRenderer
             ])->values()->all(),
             'paid_total' => $paidTotal,
             'net_paid' => max(0, round($paidTotal - $refundTotal, 2)),
+            // Sin esta línea el ticket imprime un total mayor al cobrado sin
+            // avisar de nada; el bloque de pagos ya sabe mostrarla.
+            'balance' => $isCancelled ? 0.0 : max(0, round((float) $order->total - ($paidTotal - $refundTotal), 2)),
+            'balance_label' => $order->is_collected_on_delivery ? 'Por cobrar contra entrega' : 'Saldo pendiente',
             'delivery' => [
                 'phone' => $order->customer_phone ?: $order->customer?->phone,
                 'address' => $order->customer_address ?: $order->customer?->address,

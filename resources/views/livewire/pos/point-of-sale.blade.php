@@ -65,6 +65,7 @@
 @include('livewire.pos.partials.panels.table-services')
 @include('livewire.pos.partials.panels.pickup')
 @include('livewire.pos.partials.panels.delivery')
+<livewire:pos.panels.balances-panel wire:key="pos-panel-balances" />
 <livewire:pos.panels.kitchen-panel wire:key="pos-panel-kitchen" />
 @include('livewire.pos.partials.panels.reprint')
 

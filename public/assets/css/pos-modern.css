@@ -2340,6 +2340,7 @@ html.dark-style .pos-order-data-guardrail {
 .tb-btn--tables .tb-btn__icon { color: #a56207; background: #fff3dc; }
 .tb-btn--kitchen .tb-btn__icon { color: #b45309; background: #fff0d6; }
 .tb-btn--reprint .tb-btn__icon { color: #315d9b; background: #eaf2ff; }
+.tb-btn--balances .tb-btn__icon { color: #b45309; background: #fff0d6; }
 .tb-btn--expense .tb-btn__icon { color: #9b3d67; background: #fcecf4; }
 .tb-btn--operations .tb-btn__icon { color: #8b3f76; background: #f8eaf4; }
 .tb-btn--saved .tb-btn__icon { color: #7c5b16; background: #fff5d7; }
@@ -5419,3 +5420,151 @@ html.dark-style .cart-item-note { color: #c9c4e8; background: #343245; }
     .cart-item-action,
     .qty-btn { transition: none; }
 }
+/* ─────────────────────────────────────────────────────────────────────────
+   Saldos pendientes
+   Órdenes que recibieron dinero y no cubren su total. Dos cobradores: el
+   cajero (ámbar) y el repartidor (verde). El color refuerza, nunca informa
+   solo: cada tarjeta dice con icono y texto quién cobra.
+   ───────────────────────────────────────────────────────────────────────── */
+.pos-balances {
+    --bal-register: #b45309;
+    --bal-register-soft: #fff4e0;
+    --bal-driver: #0b7c67;
+    --bal-driver-soft: #e6f7f2;
+    --bal-surface: #fff;
+    --bal-subtle: #f8f7fb;
+    --bal-radius: 14px;
+    --bal-ease: cubic-bezier(.2, .8, .2, 1);
+}
+html.dark-style .pos-balances {
+    --bal-register: #fbbf24;
+    --bal-register-soft: rgba(245, 158, 11, .14);
+    --bal-driver: #34d399;
+    --bal-driver-soft: rgba(16, 185, 129, .14);
+    --bal-surface: var(--pos-surface);
+    --bal-subtle: rgba(255, 255, 255, .04);
+}
+.pos-area-panel__mark.is-balances { color: #b45309; background: #fff4e0; }
+html.dark-style .pos-area-panel__mark.is-balances { color: #fbbf24; background: rgba(245, 158, 11, .14); }
+
+.pos-balances-body { display: grid; gap: 14px; }
+
+/* Resumen */
+.pos-balances-summary { display: grid; gap: 12px; }
+.pos-balances-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pos-balances-kpi { min-width: 0; display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--pos-border); border-radius: var(--bal-radius); background: var(--bal-surface); }
+.pos-balances-kpi > span { display: flex; align-items: center; gap: 5px; color: var(--pos-muted); font-size: .72rem; font-weight: 700; }
+.pos-balances-kpi > strong { color: var(--pos-text); font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.pos-balances-kpi > small { color: var(--pos-muted); font-size: .72rem; }
+.pos-balances-kpi.is-total { border-color: color-mix(in srgb, var(--pos-accent) 35%, var(--pos-border)); background: color-mix(in srgb, var(--pos-accent) 6%, var(--bal-surface)); }
+.pos-balances-kpi.is-register > span i { color: var(--bal-register); }
+.pos-balances-kpi.is-driver > span i { color: var(--bal-driver); }
+
+/* Filtro segmentado */
+.pos-balances-filter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid var(--pos-border); border-radius: 12px; background: var(--bal-subtle); }
+.pos-balances-filter button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; color: var(--pos-muted); border: 0; border-radius: 9px; background: transparent; font-size: .8rem; font-weight: 700; cursor: pointer; touch-action: manipulation; transition: background-color .18s var(--bal-ease), color .18s var(--bal-ease); }
+.pos-balances-filter button b { min-width: 22px; padding: 1px 6px; border-radius: 999px; background: var(--pos-border); color: var(--pos-text); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.pos-balances-filter button:hover { color: var(--pos-text); }
+.pos-balances-filter button.is-active { color: var(--pos-text); background: var(--bal-surface); box-shadow: 0 1px 2px rgba(31, 25, 62, .1); }
+.pos-balances-filter button.is-active b { color: #fff; background: var(--pos-accent); }
+
+/* Lista */
+.pos-balance-list { display: grid; gap: 12px; transition: opacity .18s var(--bal-ease); }
+.pos-balance-list.is-refreshing { opacity: .55; }
+
+/* Tarjeta */
+.pos-balance-card { --bal-tone: var(--bal-register); --bal-tone-soft: var(--bal-register-soft); position: relative; display: grid; gap: 14px; padding: 16px 16px 14px 20px; overflow: hidden; border: 1px solid var(--pos-border); border-radius: var(--bal-radius); background: var(--bal-surface); }
+.pos-balance-card.is-driver { --bal-tone: var(--bal-driver); --bal-tone-soft: var(--bal-driver-soft); }
+.pos-balance-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--bal-tone); }
+
+.pos-balance-card__head { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.pos-balance-card__mark { width: 40px; height: 40px; display: grid; place-items: center; color: var(--bal-tone); border-radius: 12px; background: var(--bal-tone-soft); font-size: 20px; }
+.pos-balance-card__title { min-width: 0; }
+.pos-balance-card__title h3 { margin: 0; overflow: hidden; color: var(--pos-text); font-size: .9rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.pos-balance-card__title h3 span { color: var(--pos-muted); font-weight: 600; }
+.pos-balance-card__title p { margin: 2px 0 0; color: var(--pos-muted); font-size: .75rem; }
+.pos-balance-card__who { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; color: var(--bal-tone); border-radius: 999px; background: var(--bal-tone-soft); font-size: .72rem; font-weight: 800; white-space: nowrap; }
+
+.pos-balance-card__amounts { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 18px; padding: 12px 14px; border-radius: 12px; background: var(--bal-subtle); }
+.pos-balance-card__due { display: grid; }
+.pos-balance-card__due span { color: var(--pos-muted); font-size: .72rem; font-weight: 700; }
+.pos-balance-card__due strong { color: var(--bal-tone); font-size: 1.45rem; font-weight: 850; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.pos-balance-card__progress { min-width: 0; display: grid; gap: 6px; }
+.pos-balance-card__bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--pos-border); }
+.pos-balance-card__bar span { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--bal-tone); transform: scaleX(var(--bal-progress, 0)); transform-origin: left center; transition: transform .3s var(--bal-ease); }
+.pos-balance-card__progress p { margin: 0; color: var(--pos-muted); font-size: .75rem; line-height: 1.45; }
+.pos-balance-card__progress b { color: var(--pos-text); font-variant-numeric: tabular-nums; }
+
+.pos-balance-card__items { border-top: 1px dashed var(--pos-border); }
+.pos-balance-card__items summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; color: var(--pos-text); font-size: .8rem; font-weight: 700; list-style: none; cursor: pointer; }
+.pos-balance-card__items summary::-webkit-details-marker { display: none; }
+.pos-balance-card__items summary i { font-size: 20px; transition: transform .2s var(--bal-ease); }
+.pos-balance-card__items[open] summary i { transform: rotate(180deg); }
+.pos-balance-card__items ul { display: grid; gap: 6px; margin: 0 0 4px; padding: 0; list-style: none; color: var(--pos-muted); font-size: .8rem; }
+.pos-balance-card__items li { display: flex; justify-content: space-between; gap: 12px; }
+.pos-balance-card__items li span:last-child { color: var(--pos-text); font-variant-numeric: tabular-nums; }
+
+.pos-balance-card__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.pos-balance-card__hint { display: inline-flex; align-items: center; gap: 5px; margin: 0 auto 0 0; color: var(--pos-muted); font-size: .75rem; }
+
+/* Botones del panel: 44px de alto mínimo y foco visible */
+.pos-balance-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 16px; border: 1px solid transparent; border-radius: 11px; font-size: .82rem; font-weight: 800; cursor: pointer; touch-action: manipulation; transition: background-color .18s var(--bal-ease), transform .12s var(--bal-ease), box-shadow .18s var(--bal-ease); }
+.pos-balance-btn i { font-size: 19px; }
+.pos-balance-btn.is-primary { color: #fff; background: var(--pos-accent); box-shadow: 0 6px 14px color-mix(in srgb, var(--pos-accent) 28%, transparent); }
+.pos-balance-btn.is-primary:hover { background: color-mix(in srgb, var(--pos-accent) 88%, #000); }
+.pos-balance-btn.is-secondary { color: var(--pos-text); border-color: var(--pos-border); background: var(--bal-surface); }
+.pos-balance-btn.is-secondary:hover { background: var(--bal-subtle); }
+.pos-balance-btn:active { transform: scale(.97); }
+.pos-balance-btn:disabled { opacity: .5; cursor: progress; transform: none; }
+.pos-balance-btn:focus-visible,
+.pos-balances-filter button:focus-visible,
+.pos-balance-card__items summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--pos-accent) 55%, transparent); outline-offset: 2px; }
+
+/* Carga inicial: misma forma que el contenido para que no brinque el layout */
+.pos-balances-skeleton { display: grid; gap: 14px; }
+.pos-balances-skeleton__kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pos-balances-skeleton__card { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--pos-border); border-radius: var(--bal-radius); background: var(--bal-surface); }
+.pos-balances-skeleton__head { display: grid; grid-template-columns: 40px minmax(0, 1fr) 120px; align-items: center; gap: 12px; }
+.pos-balances-skeleton__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pos-balances-skeleton__kpis span,
+.pos-balances-skeleton__filter,
+.pos-balances-skeleton__head span,
+.pos-balances-skeleton__amount,
+.pos-balances-skeleton__actions span { display: block; border-radius: 10px; background: linear-gradient(90deg, var(--bal-subtle) 25%, var(--pos-border) 50%, var(--bal-subtle) 75%); background-size: 200% 100%; animation: pos-balances-shimmer 1.2s ease-in-out infinite; }
+.pos-balances-skeleton__kpis span { height: 84px; border-radius: var(--bal-radius); }
+.pos-balances-skeleton__filter { height: 54px; border-radius: 12px; }
+.pos-balances-skeleton__head .is-mark { width: 40px; height: 40px; border-radius: 12px; }
+.pos-balances-skeleton__head .is-title { height: 30px; }
+.pos-balances-skeleton__head .is-chip { height: 28px; border-radius: 999px; }
+.pos-balances-skeleton__amount { height: 66px; border-radius: 12px; }
+.pos-balances-skeleton__actions span { width: 110px; height: 44px; border-radius: 11px; }
+.pos-balances-skeleton__actions span:last-child { width: 150px; }
+@keyframes pos-balances-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 640px) {
+    .pos-balances-kpis,
+    .pos-balances-skeleton__kpis { grid-template-columns: 1fr 1fr; }
+    .pos-balances-skeleton__kpis span:first-child { grid-column: 1 / -1; }
+    .pos-balances-kpi.is-total { grid-column: 1 / -1; }
+    .pos-balance-card__head { grid-template-columns: 40px minmax(0, 1fr); }
+    .pos-balance-card__who { grid-column: 1 / -1; justify-self: start; }
+    .pos-balance-card__amounts { grid-template-columns: 1fr; gap: 10px; }
+    .pos-balance-card__actions .pos-balance-btn { flex: 1 1 auto; }
+    .pos-balances-filter button span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pos-balance-list,
+    .pos-balance-card__bar span,
+    .pos-balance-card__items summary i,
+    .pos-balance-btn,
+    .pos-balances-filter button { transition: none; }
+    .pos-balances-skeleton :is(span, div) { animation: none; }
+    .pos-balance-btn:active { transform: none; }
+}
+
+/* Errores de formulario en modales del POS */
+.pos-field-error { display: flex; align-items: flex-start; gap: 5px; margin: 6px 0 0; color: #b4233a; font-size: .74rem; font-weight: 650; line-height: 1.4; }
+.pos-field-error i { flex: 0 0 auto; font-size: 16px; }
+.co-input[aria-invalid="true"] { border-color: #dc2626; }
+html.dark-style .pos-field-error { color: #fca5a5; }

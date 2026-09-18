@@ -181,7 +181,7 @@ class NotificationCenter extends Component
                 $workflow->assignTo($order, auth()->user());
             } catch (ValidationException $exception) {
                 $message = collect($exception->errors())->flatten()->first()
-                    ?? 'El pedido ya no estÃ¡ disponible para asignaciÃ³n.';
+                    ?? 'El pedido ya no está disponible para asignación.';
                 $this->dispatch('notify', type: 'warning', message: $message);
 
                 return;

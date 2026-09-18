@@ -41,6 +41,14 @@
                 </button>
             @endcan
 
+            @can('ver pedidos en punto de venta')
+                <button type="button" class="pos-more-action" data-tone="orange"
+                    @click="closeMore(false); showOnlyPanel('balances'); $wire.openBalancesPanel()">
+                    <span class="pos-more-action__icon"><i class="bx bx-time-five" aria-hidden="true"></i></span>
+                    <strong>Pendientes</strong><small>Saldos por cobrar</small>
+                </button>
+            @endcan
+
             @can('reimprimir tickets')
                 <button type="button" class="pos-more-action" data-tone="blue"
                     @click="closeMore(false); showOnlyPanel('reprint'); $wire.openReprintPanel()"

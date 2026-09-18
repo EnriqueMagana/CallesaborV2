@@ -493,7 +493,7 @@
             x-on:keydown.escape.window="$wire.closeReassign()"
             x-init="$nextTick(() => $refs.reassignDriver?.focus())">
             <button type="button" class="delivery-modal-layer__backdrop" wire:click="closeReassign"
-                aria-label="Cerrar reasignaciÃ³n"></button>
+                aria-label="Cerrar reasignación"></button>
             <section class="delivery-reassign-modal" role="dialog" aria-modal="true"
                 aria-labelledby="delivery-reassign-title" aria-describedby="delivery-reassign-copy">
                 <header class="delivery-reassign-modal__header">

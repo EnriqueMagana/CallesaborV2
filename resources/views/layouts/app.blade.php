@@ -51,7 +51,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/promotions.css') }}?v={{ filemtime(public_path('assets/css/promotions.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/discounts.css') }}?v={{ filemtime(public_path('assets/css/discounts.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/kiosk-admin.css') }}" />
-    <link rel="stylesheet" href="{{ asset('assets/css/cash-cut.css') }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/cash-cut.css') }}?v={{ filemtime(public_path('assets/css/cash-cut.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/confirm-modal.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/extracted-ui.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/sales-history.css') }}?v={{ filemtime(public_path('assets/css/sales-history.css')) }}" />

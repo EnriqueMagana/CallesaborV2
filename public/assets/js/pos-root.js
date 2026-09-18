@@ -17,7 +17,7 @@ document.addEventListener("alpine:init", () => {
         isDesktop: window.matchMedia('(min-width: 1025px)').matches,
         catalogQuery: '',
         overlayTrigger: null,
-        panels: { tables: false, pickup: false, delivery: false, orders: false, reprint: false, kitchen: false },
+        panels: { tables: false, pickup: false, delivery: false, balances: false, orders: false, reprint: false, kitchen: false },
         cartQuantities: initialCartQuantities,
         cartQtyFor(productId) {
             return this.cartQuantities[productId] ?? 0;
