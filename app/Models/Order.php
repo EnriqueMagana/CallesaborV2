@@ -233,13 +233,86 @@ class Order extends Model
         return 'Ventanilla · POS';
     }
 
+    /**
+     * Dinero que realmente entró por la orden, sin descontar devoluciones.
+     * Excluye el cobro contra entrega que el repartidor todavía trae en la calle.
+     */
+    public function getPaidAmountAttribute(): float
+    {
+        return round((float) $this->payments->where('is_provisional', false)->sum('amount'), 2);
+    }
+
+    /**
+     * Efectivo contra entrega que el repartidor cobrará y entregará en el corte.
+     */
+    public function getProvisionalAmountAttribute(): float
+    {
+        return round((float) $this->payments->where('is_provisional', true)->sum('amount'), 2);
+    }
+
+    public function getRefundedAmountAttribute(): float
+    {
+        return round((float) $this->refunds->sum('amount'), 2);
+    }
+
+    /**
+     * Dinero real que la caja conserva por esta orden: pagos menos devoluciones.
+     */
+    public function getNetPaidAmountAttribute(): float
+    {
+        return round($this->paid_amount - $this->refunded_amount, 2);
+    }
+
+    /**
+     * Lo que falta por cobrar de la orden, lo cobre quien lo cobre: el cajero
+     * en el POS o el repartidor contra entrega.
+     */
+    public function getBalanceDueAttribute(): float
+    {
+        if ($this->status === 'cancelada') {
+            return 0;
+        }
+
+        return max(0, round((float) $this->total - $this->net_paid_amount, 2));
+    }
+
+    /**
+     * Saldo que nadie tiene asignado cobrar. Una orden sana siempre lo tiene
+     * en cero; si no, es un descuadre real.
+     */
+    public function getUncoveredAmountAttribute(): float
+    {
+        return max(0, round($this->balance_due - $this->provisional_amount, 2));
+    }
+
+    public function getIsFullyPaidAttribute(): bool
+    {
+        return $this->balance_due <= 0.009;
+    }
+
+    /**
+     * La orden ya recibió dinero real pero no cubre el total vigente: se
+     * agregaron productos después de cobrar y el cajero debe cobrar el resto.
+     */
+    public function getHasPartialPaymentAttribute(): bool
+    {
+        return $this->net_paid_amount > 0.009 && $this->uncovered_amount > 0.009;
+    }
+
+    /**
+     * El cobro de esta orden lo hace el repartidor, no la caja.
+     */
+    public function getIsCollectedOnDeliveryAttribute(): bool
+    {
+        return $this->type === 'delivery' && $this->delivery_method === 'contra_entrega';
+    }
     public function getAmountToCollectAttribute(): float
     {
         if ($this->delivery_method !== 'contra_entrega') {
             return 0;
         }
 
-        return max(0, round((float) $this->total - (float) $this->payments->sum('amount'), 2));
+        return $this->balance_due;
     }
 
     public function getDeliveryPaymentLabelAttribute(): string
@@ -259,6 +332,28 @@ class Order extends Model
         }
 
         return $this->payments->isNotEmpty() ? 'Pagado en sucursal' : 'Pago por confirmar';
+    }
+
+    /**
+     * Condición SQL de "recibió algo y no cubre su total". Es la misma regla que
+     * `balance_due`, expresada en SQL para filtrar y contar en la base sin
+     * cargar órdenes. La usan el panel de pendientes y el contador del POS.
+     */
+    public static function pendingBalanceSql(string $ordersTable = 'orders'): string
+    {
+        $payments = (new OrderPayment)->getTable();
+        $refunds = (new OrderRefund)->getTable();
+        $realPaid = "coalesce((select sum(rp.amount) from {$payments} rp where rp.order_id = {$ordersTable}.id and rp.is_provisional = 0), 0)";
+        $refunded = "coalesce((select sum(rf.amount) from {$refunds} rf where rf.order_id = {$ordersTable}.id), 0)";
+
+        return "{$ordersTable}.status <> 'cancelada'"
+            ." and exists (select 1 from {$payments} ap where ap.order_id = {$ordersTable}.id)"
+            ." and {$ordersTable}.total - ({$realPaid} - {$refunded}) > 0.009";
+    }
+
+    public function scopeWithPendingBalance(Builder $query): Builder
+    {
+        return $query->whereRaw(static::pendingBalanceSql($this->getTable()));
     }
 
     public function scopeFinalizedForAccounting(Builder $query): Builder

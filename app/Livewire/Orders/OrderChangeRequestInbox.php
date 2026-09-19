@@ -103,9 +103,7 @@ class OrderChangeRequestInbox extends Component
     {
         $this->authorizeReviewer();
         $this->selectedRequestId = OrderChangeRequest::query()->findOrFail($requestId)->id;
-        $this->reviewNotes = '';
-        $this->refundReference = '';
-        $this->refundConfirmed = false;
+        $this->resetReviewInputs();
         unset($this->selectedRequest);
     }
 
@@ -134,7 +132,14 @@ class OrderChangeRequestInbox extends Component
             ]);
         }
         $service->approve($request, auth()->user(), $this->reviewNotes, ['external_reference' => $this->refundReference]);
-        $this->afterReview('Solicitud aprobada y aplicada a la orden.');
+
+        $pending = (float) data_get($request->proposed_changes, 'request_context.pending_balance', 0);
+        $collector = data_get($request->proposed_changes, 'request_context.collected_by') === 'delivery'
+            ? 'el repartidor'
+            : 'el cajero en el POS';
+        $this->afterReview($pending > 0
+            ? 'Solicitud aprobada. Quedan $'.number_format($pending, 2).' por cobrar; los cobrará '.$collector.'.'
+            : 'Solicitud aprobada y aplicada a la orden.');
     }
 
     public function rejectRequest(OrderChangeRequestService $service): void
@@ -153,13 +158,17 @@ class OrderChangeRequestInbox extends Component
 
     private function afterReview(string $message): void
     {
-        $this->reviewNotes = '';
-        $this->refundReference = '';
-        $this->refundConfirmed = false;
+        $this->resetReviewInputs();
         unset($this->requests, $this->selectedRequest, $this->summary);
         $this->dispatch('notify', type: 'success', message: $message);
     }
 
+    private function resetReviewInputs(): void
+    {
+        $this->reviewNotes = '';
+        $this->refundReference = '';
+        $this->refundConfirmed = false;
+    }
     private function authorizeReviewer(): void
     {
         $user = auth()->user();

@@ -21,7 +21,7 @@ final class PermissionCatalog
                 'marcar pedidos listos en punto de venta' => 'Permite cambiar en el POS una orden de En preparación a Lista para cobro o entrega.',
                 'cobrar pedidos en punto de venta' => 'Permite cobrar desde el POS pedidos listos de ventanilla, recoger, kiosco o delivery y registrar sus formas de pago.',
                 'convertir pedidos a delivery en punto de venta' => 'Permite convertir desde el POS un pedido activo de ventanilla o recoger en un pedido de delivery.',
-                'editar datos de ordenes en punto de venta' => 'Permite corregir desde el POS el contacto, direcciÃ³n y forma de pago de una orden de la caja abierta; no permite cambiar productos, importes, descuentos ni estado.',
+                'editar datos de ordenes en punto de venta' => 'Permite corregir desde el POS el contacto, dirección y forma de pago de una orden de la caja abierta; no permite cambiar productos, importes, descuentos ni estado.',
                 'usar punto de venta' => 'Permite abrir el POS, consultar el catálogo y preparar una venta; las acciones de cobro, mesas y caja requieren sus permisos propios.',
                 'ver menu' => 'Permite consultar el catálogo del punto de venta para armar la venta y validar disponibilidad antes de cobrar.',
                 'ver clientes' => 'Permite buscar clientes y revisar sus datos básicos desde el punto de venta antes de registrar una venta.',

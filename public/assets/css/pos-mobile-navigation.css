@@ -259,7 +259,7 @@ html.pos-overlay-open body {
     scrollbar-gutter: stable;
 }
 
-/* En escritorio el menÃº funciona como paleta compacta; tablet y mÃ³vil conservan el sheet ancho. */
+/* En escritorio el menú funciona como paleta compacta; tablet y móvil conservan el sheet ancho. */
 @media (min-width: 1025px) {
     .pos-more-sheet {
         right: 25vw;

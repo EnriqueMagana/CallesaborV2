@@ -127,8 +127,16 @@ trait ManagesCheckout
 
         if ($this->payMethod === 'cash') {
             $received = (float) $this->payCashReceived;
+            // Vacío = pago exacto. Menor al monto = el cajón quedaría corto.
+            if ($received > 0 && $this->moneyInCents($received) < $amountInCents) {
+                $message = 'El efectivo recibido ($'.number_format($received, 2).') no cubre el monto ($'.number_format($amount, 2).').';
+                $this->addError('payCashReceived', $message);
+                $this->dispatch('notify', type: 'warning', message: $message);
+
+                return;
+            }
             $payment['cash_received'] = $received > 0 ? $received : $amount;
-            $payment['cash_change'] = max(0, ($received > 0 ? $received : $amount) - $amount);
+            $payment['cash_change'] = max(0, round(($received > 0 ? $received : $amount) - $amount, 2));
         } elseif ($this->payMethod === 'card') {
             $payment['card_last4'] = $this->payCardLast4;
         } elseif ($this->payMethod === 'transfer') {
@@ -244,6 +252,15 @@ trait ManagesCheckout
                 $status,
                 $isManualDelivery ? 'manual' : null,
             );
+
+            // persistOrder recalcula promociones: si el total guardado ya no es lo
+            // que se cobró, se revierte la venta completa en vez de guardarla
+            // descuadrada.
+            if (! $isContraEntrega && $this->paymentSumInCents($this->payments) !== $this->moneyInCents($order->total)) {
+                throw ValidationException::withMessages([
+                    'payments' => 'El total cambió al confirmar (promociones o descuentos). Revisa el cobro e intenta de nuevo.',
+                ]);
+            }
 
             if (! $isContraEntrega && $this->payments !== []) {
                 $timestamp = now();

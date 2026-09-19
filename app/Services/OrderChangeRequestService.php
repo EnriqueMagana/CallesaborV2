@@ -17,7 +17,10 @@ class OrderChangeRequestService
 {
     private const EDITABLE_STATUSES = ['pendiente', 'en_preparacion', 'lista'];
 
-    public function __construct(private OperationalNotificationService $notifications) {}
+    public function __construct(
+        private OperationalNotificationService $notifications,
+        private ProductCustomizationService $customization,
+    ) {}
 
     public function create(Order $order, User $actor, string $type, string $reason, array $desiredLines = [], array $context = []): OrderChangeRequest
     {
@@ -58,7 +61,7 @@ class OrderChangeRequestService
             }
 
             $changes = array_merge($changes ?? [], [
-                'request_context' => $this->buildRequestContext($context, $type, $order, $proposedTotal),
+                'request_context' => $this->buildRequestContext($context, $type, $order, $proposedTotal, $changes),
             ]);
 
             $request = OrderChangeRequest::create([
@@ -79,7 +82,22 @@ class OrderChangeRequestService
         });
     }
 
-    private function buildRequestContext(array $context, string $type, Order $order, ?float $proposedTotal): array
+    /**
+     * Mismas reglas que al crear una modificación, para pantallas que preparan
+     * el cambio antes de enviarlo (el editor de productos).
+     */
+    public function ensureModifiable(Order $order, User $actor): void
+    {
+        $this->assertRequester($actor, OrderChangeRequest::TYPE_MODIFICATION, 'adjustment');
+        $order->loadMissing(['payments', 'refunds', 'deliveryAssignment']);
+        $this->assertActionable($order, OrderChangeRequest::TYPE_MODIFICATION);
+
+        if ($order->changeRequests()->where('status', OrderChangeRequest::STATUS_PENDING)->exists()) {
+            throw ValidationException::withMessages(['requestReason' => 'Esta orden ya tiene una solicitud pendiente de revisión.']);
+        }
+    }
+
+    private function buildRequestContext(array $context, string $type, Order $order, ?float $proposedTotal, ?array $changes = null): array
     {
         $allowedScopes = match ($type) {
             OrderChangeRequest::TYPE_CANCELLATION => ['full'],
@@ -108,12 +126,46 @@ class OrderChangeRequestService
                 ? $context['preparation_stage']
                 : 'unknown',
             'source' => in_array($context['source'] ?? null, ['list', 'detail'], true) ? $context['source'] : 'detail',
-            'payment_state' => $this->isPaidOrder($order) ? 'paid' : 'unpaid',
+            'payment_state' => $this->paymentState($order),
         ];
 
-        if (! in_array($type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)
-            || ! $this->isPaidOrder($order)) {
+        if (! in_array($type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)) {
             return $result;
+        }
+
+        // El dinero ya recibido manda sobre el estado de la orden: un delivery
+        // contra entrega en estado "lista" puede tener un cobro registrado, y
+        // una orden pagada puede haber quedado con saldo tras una modificación.
+        $netPaid = $order->net_paid_amount;
+        if ($netPaid <= 0.009) {
+            // Sin dinero real todavía. En contra entrega el repartidor cobrará el
+            // nuevo total; se deja a la vista para quien autoriza.
+            if ($type === OrderChangeRequest::TYPE_MODIFICATION && $order->is_collected_on_delivery) {
+                $result += ['pending_balance' => round((float) $proposedTotal, 2), 'collected_by' => 'delivery'];
+            }
+
+            return $result;
+        }
+
+        $targetTotal = $type === OrderChangeRequest::TYPE_CANCELLATION ? 0.0 : (float) $proposedTotal;
+        $delta = round($targetTotal - $netPaid, 2);
+
+        // Delta positivo: la orden crece por encima del dinero real recibido.
+        // La aprobación no cobra: el saldo lo cobra quien recibe el dinero,
+        // el repartidor contra entrega o el cajero en el POS.
+        if ($delta > 0.009) {
+            $disposition = $context['inventory_disposition'] ?? null;
+            if ($this->removesProducts($changes) && ! in_array($disposition, ['restock', 'waste', 'not_applicable'], true)) {
+                throw ValidationException::withMessages(['inventoryDisposition' => 'Indica qué ocurrirá con los productos retirados.']);
+            }
+
+            return $result + [
+                'inventory_disposition' => in_array($disposition, ['restock', 'waste'], true) ? $disposition : 'not_applicable',
+                'refund_amount' => 0.0,
+                'refund_allocations' => [],
+                'pending_balance' => $delta,
+                'collected_by' => $order->is_collected_on_delivery ? 'delivery' : 'register',
+            ];
         }
 
         $disposition = $context['inventory_disposition'] ?? null;
@@ -121,14 +173,7 @@ class OrderChangeRequestService
             throw ValidationException::withMessages(['inventoryDisposition' => 'Indica qué ocurrirá con los productos cancelados.']);
         }
 
-        $targetTotal = $type === OrderChangeRequest::TYPE_CANCELLATION ? 0.0 : (float) $proposedTotal;
-        $refundAmount = round((float) $order->total - $targetTotal, 2);
-        if ($refundAmount < -0.009) {
-            throw ValidationException::withMessages([
-                'requestItems' => 'Una orden pagada no puede aumentar su total desde este flujo. Genera una orden adicional para cobrar la diferencia.',
-            ]);
-        }
-
+        $refundAmount = max(0, -$delta);
         $available = $this->availableRefundsByMethod($order);
         if ($refundAmount > round(array_sum($available), 2) + 0.009) {
             throw ValidationException::withMessages(['requestItems' => 'El importe solicitado supera el saldo pagado disponible para devolución.']);
@@ -136,9 +181,27 @@ class OrderChangeRequestService
 
         return $result + [
             'inventory_disposition' => $disposition,
-            'refund_amount' => max(0, $refundAmount),
-            'refund_allocations' => $this->allocateRefund($available, max(0, $refundAmount)),
+            'refund_amount' => $refundAmount,
+            'refund_allocations' => $this->allocateRefund($available, $refundAmount),
+            'pending_balance' => 0.0,
         ];
+    }
+
+    private function paymentState(Order $order): string
+    {
+        if ($order->net_paid_amount <= 0.009) {
+            return 'unpaid';
+        }
+
+        return $order->is_fully_paid ? 'paid' : 'partial';
+    }
+
+    private function removesProducts(?array $changes): bool
+    {
+        return collect(data_get($changes, 'items', []))->contains(
+            fn (array $change) => ($change['action'] ?? null) === 'remove'
+                || (int) ($change['to_quantity'] ?? 0) < (int) ($change['from_quantity'] ?? 0)
+        );
     }
 
     public function approve(OrderChangeRequest $changeRequest, User $reviewer, ?string $notes = null, array $financial = []): OrderChangeRequest
@@ -150,11 +213,10 @@ class OrderChangeRequestService
             $this->assertPending($request);
             $order = Order::query()->with(['items.addons', 'items.ingredients', 'payments', 'refunds', 'customer', 'deliveryAssignment'])->lockForUpdate()->findOrFail($request->order_id);
             $this->assertActionable($order, $request->type);
-            $wasPaid = $this->isPaidOrder($order);
+            $requestContext = data_get($request->proposed_changes, 'request_context', []);
+            $refundAmount = round((float) data_get($requestContext, 'refund_amount', 0), 2);
 
-            if ($wasPaid
-                && in_array($request->type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)
-                && ! $reviewer->can('anular pagos')) {
+            if ($refundAmount > 0 && ! $reviewer->can('anular pagos')) {
                 throw new AuthorizationException('No tienes permiso para registrar devoluciones de pagos.');
             }
 
@@ -181,8 +243,12 @@ class OrderChangeRequestService
                 $this->applyAddressChange($order, $request);
             }
 
-            if ($wasPaid && in_array($request->type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)) {
+            if ($refundAmount > 0) {
                 $this->recordRefund($order, $request, $reviewer, $financial);
+            }
+
+            if (in_array($request->type, [OrderChangeRequest::TYPE_CANCELLATION, OrderChangeRequest::TYPE_MODIFICATION], true)) {
+                $this->settleCollectionAfterChange($order);
             }
 
             app(DeliverySettlementService::class)->refreshForOrder($order);
@@ -201,6 +267,23 @@ class OrderChangeRequestService
         });
     }
 
+    /**
+     * Después de un cambio, el saldo vivo decide qué pasa con la orden:
+     * - Contra entrega manual: la provisión se ajusta al nuevo total y el
+     *   nuevo ticket indica lo que cobrará el repartidor.
+     * - Saldo que nadie tiene asignado (ya se había cobrado en caja): la orden
+     *   vuelve a "lista" para que el cajero cobre la diferencia en el POS, y
+     *   bloquea el corte hasta que se cobre.
+     */
+    private function settleCollectionAfterChange(Order $order): void
+    {
+        app(ManualDeliveryAccountingService::class)->syncProvision($order);
+
+        $order->refresh()->load(['payments', 'refunds']);
+        if ($order->status === 'pagada' && $order->uncovered_amount > 0.009) {
+            $order->update(['status' => 'lista', 'paid_at' => null]);
+        }
+    }
     private function recordRefund(Order $order, OrderChangeRequest $request, User $reviewer, array $financial): void
     {
         $context = data_get($request->proposed_changes, 'request_context', []);
@@ -450,22 +533,27 @@ class OrderChangeRequestService
                 continue;
             }
 
-            $product = Product::query()->where('is_active', true)->find($line['product_id'] ?? 0);
+            $product = $this->customization->find((int) ($line['product_id'] ?? 0));
             if (! $product) {
                 throw ValidationException::withMessages(['productSearch' => 'Uno de los productos agregados ya no está disponible.']);
             }
 
-            $subtotal = round((float) $product->price * $quantity, 2);
-            $proposedTotal += $subtotal;
+            $built = $this->buildCustomizedLine($product, $line, $quantity);
+            $proposedTotal += $built['subtotal'];
             $changes[] = [
                 'action' => 'add',
                 'product_id' => $product->id,
                 'product_name' => $product->name,
                 'from_quantity' => 0,
                 'to_quantity' => $quantity,
-                'unit_subtotal' => (float) $product->price,
+                'base_price' => $built['base_price'],
+                'unit_subtotal' => $built['unit_total'],
                 'before_subtotal' => 0,
-                'after_subtotal' => $subtotal,
+                'after_subtotal' => $built['subtotal'],
+                'addons' => $built['addons'],
+                'ingredients' => $built['ingredients'],
+                'notes' => $built['notes'],
+                'modifiers' => $built['summary'],
             ];
         }
 
@@ -494,23 +582,7 @@ class OrderChangeRequestService
     {
         foreach (data_get($request->proposed_changes, 'items', []) as $change) {
             if ($change['action'] === 'add') {
-                $product = Product::query()->where('is_active', true)->lockForUpdate()->find($change['product_id']);
-                if (! $product) {
-                    throw ValidationException::withMessages(['review' => "El producto {$change['product_name']} ya no está disponible."]);
-                }
-                if (round((float) $product->price, 2) !== round((float) $change['unit_subtotal'], 2)) {
-                    throw ValidationException::withMessages(['review' => "El precio de {$change['product_name']} cambió. Rechaza la solicitud y genera una nueva."]);
-                }
-
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'product_price' => $change['unit_subtotal'],
-                    'quantity' => $change['to_quantity'],
-                    'subtotal' => round((float) $change['after_subtotal'], 2),
-                    'promotion_discount' => 0,
-                ]);
+                $this->applyAddedLine($order, $change);
 
                 continue;
             }
@@ -543,6 +615,75 @@ class OrderChangeRequestService
         $order->update(['subtotal' => round($subtotal, 2), 'total' => round($subtotal, 2)]);
 
         $this->refreshMesaTotal($order);
+    }
+
+    /**
+     * @return array{addons: array, ingredients: array, notes: ?string, base_price: float, unit_extra: float, unit_total: float, subtotal: float, quantity: int, summary: string}
+     */
+    private function buildCustomizedLine(Product $product, array $line, int $quantity): array
+    {
+        try {
+            return $this->customization->build(
+                $product,
+                (array) ($line['addons'] ?? []),
+                (array) ($line['ingredients'] ?? []),
+                $quantity,
+                isset($line['notes']) ? (string) $line['notes'] : null,
+            );
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages([
+                'requestItems' => $product->name.': '.collect($exception->errors())->flatten()->first(),
+            ]);
+        }
+    }
+
+    /**
+     * Crea la línea agregada tal como la habría guardado el POS: precio base
+     * en `product_price`, extras dentro del subtotal y cada complemento e
+     * ingrediente en su tabla, para que cocina y ticket los muestren.
+     */
+    private function applyAddedLine(Order $order, array $change): void
+    {
+        $product = $this->customization->find((int) $change['product_id']);
+        if (! $product) {
+            throw ValidationException::withMessages(['review' => "El producto {$change['product_name']} ya no está disponible."]);
+        }
+
+        // Se recotiza con la configuración guardada: si cambió un precio o se
+        // desactivó un extra desde que se pidió, no se aplica a ciegas.
+        try {
+            $built = $this->customization->build(
+                $product,
+                collect($change['addons'] ?? [])->pluck('addon_id')->all(),
+                collect($change['ingredients'] ?? [])->mapWithKeys(fn (array $item) => [$item['ingredient_id'] => $item['quantity']])->all(),
+                (int) $change['to_quantity'],
+                $change['notes'] ?? null,
+            );
+        } catch (ValidationException) {
+            throw ValidationException::withMessages(['review' => "La configuración de {$change['product_name']} ya no es válida. Rechaza la solicitud y genera una nueva."]);
+        }
+
+        if (abs($built['unit_total'] - round((float) $change['unit_subtotal'], 2)) > 0.009) {
+            throw ValidationException::withMessages(['review' => "El precio de {$change['product_name']} cambió. Rechaza la solicitud y genera una nueva."]);
+        }
+
+        $item = OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'product_price' => $built['base_price'],
+            'quantity' => $built['quantity'],
+            'subtotal' => $built['subtotal'],
+            'promotion_discount' => 0,
+            'notes' => $built['notes'],
+        ]);
+
+        foreach ($built['addons'] as $addon) {
+            $item->addons()->create($addon + ['quantity' => 1]);
+        }
+        foreach ($built['ingredients'] as $ingredient) {
+            $item->ingredients()->create($ingredient);
+        }
     }
 
     private function recordCancelledQuantity(OrderItem $item, array $change, User $reviewer): void
@@ -671,6 +812,7 @@ class OrderChangeRequestService
                 'id' => $payment->id,
                 'method' => $payment->method,
                 'amount' => (float) $payment->amount,
+                'is_provisional' => (bool) $payment->is_provisional,
                 'transfer_reference' => $payment->transfer_reference,
             ])->values()->all(),
             'delivery' => [
@@ -694,6 +836,7 @@ class OrderChangeRequestService
     private function availableRefundsByMethod(Order $order): array
     {
         $paid = $order->payments
+            ->where('is_provisional', false)
             ->groupBy('method')
             ->map(fn ($payments) => round((float) $payments->sum('amount'), 2));
         $refunded = collect();

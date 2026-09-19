@@ -74,7 +74,7 @@
                                     {{ $actionLabel }}
                                 </span>
                                 <span wire:loading wire:target="performAction('{{ $notification->id }}')">
-                                    <i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Procesandoâ€¦
+                                    <i class="bx bx-loader-alt bx-spin" aria-hidden="true"></i> Procesando…
                                 </span>
                             </button>
                         @endif

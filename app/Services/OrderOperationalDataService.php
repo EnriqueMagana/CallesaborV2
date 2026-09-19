@@ -82,16 +82,52 @@ class OrderOperationalDataService
             $after = $this->snapshot($lockedOrder, $lockedOrder->payments->all());
 
             if ($before !== $after) {
-                OrderDataChangeAudit::create([
+                $audit = OrderDataChangeAudit::create([
                     'order_id' => $lockedOrder->id,
                     'cash_register_id' => $lockedOrder->cash_register_id,
                     'changed_by' => $actorId,
                     'changes' => ['before' => $before, 'after' => $after],
                 ]);
+
+                // Cambiar la forma de pago mueve dinero entre métodos del corte
+                // sin pasar por autorización: el dueño se entera de cada una.
+                $paymentChanges = $this->paymentTypeChanges($before, $after);
+                if ($paymentChanges !== []) {
+                    DB::afterCommit(fn () => app(OperationalNotificationService::class)
+                        ->paymentTypeChanged($audit, $lockedOrder->fresh(), $paymentChanges));
+                }
             }
 
             return $lockedOrder;
         });
+    }
+
+    /**
+     * Cambios de tipo de pago entre dos fotos de la orden: el método de cada
+     * pago registrado y, si aún no hay pagos, la forma de pago del delivery.
+     *
+     * @return array<int, array{amount: ?float, from: string, to: string}>
+     */
+    private function paymentTypeChanges(array $before, array $after): array
+    {
+        $previous = collect($before['payments'])->keyBy('id');
+        $changes = collect($after['payments'])
+            ->filter(fn (array $payment) => ($previous[$payment['id']]['method'] ?? $payment['method']) !== $payment['method'])
+            ->map(fn (array $payment) => [
+                'amount' => (float) $payment['amount'],
+                'from' => $previous[$payment['id']]['method'],
+                'to' => $payment['method'],
+            ])
+            ->values()
+            ->all();
+
+        $fromMethod = $before['customer']['delivery_method'] ?? null;
+        $toMethod = $after['customer']['delivery_method'] ?? null;
+        if ($changes === [] && $fromMethod !== null && $toMethod !== null && $fromMethod !== $toMethod) {
+            $changes[] = ['amount' => null, 'from' => $fromMethod, 'to' => $toMethod];
+        }
+
+        return $changes;
     }
 
     private function snapshot(Order $order, array $payments): array

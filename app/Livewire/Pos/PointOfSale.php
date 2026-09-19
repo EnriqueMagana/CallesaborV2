@@ -25,11 +25,13 @@ use App\Models\User;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
 use App\Services\InventoryService;
+use App\Services\CashRegisterOpenService;
 use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
 use App\Services\OrderOperationalDataService;
 use App\Services\ThermalTicketRenderer;
 use App\Support\BusinessTime;
+use App\Support\PaymentAllocator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -260,7 +262,7 @@ class PointOfSale extends Component
      */
     public bool $pickupPanelLoaded = false;
 
-    // CorrecciÃ³n directa de datos operativos (nunca productos, importes ni estado).
+    // Corrección directa de datos operativos (nunca productos, importes ni estado).
     public bool $showOrderDataModal = false;
 
     public string $orderDataSearch = '';
@@ -549,7 +551,7 @@ class PointOfSale extends Component
         $cashRegisterId = $this->activeCashRegister?->id;
 
         if (! $cashRegisterId) {
-            return ['pickup' => 0, 'tables' => 0, 'delivery' => 0];
+            return ['pickup' => 0, 'tables' => 0, 'delivery' => 0, 'balances' => 0];
         }
 
         $activeStatuses = ['pendiente', 'en_preparacion', 'lista'];
@@ -571,6 +573,8 @@ class PointOfSale extends Component
 
         $deliveryCondition = "{$ordersTable}.type = 'delivery' and {$ordersTable}.status = 'pendiente'";
 
+        $balanceCondition = Order::pendingBalanceSql($ordersTable);
+
         $legacyTableCondition = "{$ordersTable}.mesa_service_id is null"
             ." and {$ordersTable}.mesa_id is not null"
             ." and {$ordersTable}.status in ({$statusList})";
@@ -579,6 +583,7 @@ class PointOfSale extends Component
             ->where('cash_register_id', $cashRegisterId)
             ->selectRaw("sum(case when {$pickupCondition} then 1 else 0 end) as pickup_count")
             ->selectRaw("sum(case when {$deliveryCondition} then 1 else 0 end) as delivery_count")
+            ->selectRaw("sum(case when {$balanceCondition} then 1 else 0 end) as balances_count")
             ->selectRaw("count(distinct case when {$legacyTableCondition} then {$ordersTable}.mesa_id end) as legacy_table_count")
             ->first();
 
@@ -591,6 +596,7 @@ class PointOfSale extends Component
             'pickup' => (int) ($counts->pickup_count ?? 0),
             'tables' => $tables + (int) ($counts->legacy_table_count ?? 0),
             'delivery' => (int) ($counts->delivery_count ?? 0),
+            'balances' => (int) ($counts->balances_count ?? 0),
         ];
     }
 
@@ -813,8 +819,8 @@ class PointOfSale extends Component
             'deliveryDispatchDriverId' => ['required', 'integer', 'exists:users,id'],
             'deliveryDispatchReason' => ['required', 'string', 'min:8', 'max:500'],
         ], [
-            'deliveryDispatchDriverId.required' => 'Selecciona al repartidor que recibirÃ¡ el pedido.',
-            'deliveryDispatchReason.required' => 'Indica por quÃ© se reasigna el pedido.',
+            'deliveryDispatchDriverId.required' => 'Selecciona al repartidor que recibirá el pedido.',
+            'deliveryDispatchReason.required' => 'Indica por qué se reasigna el pedido.',
             'deliveryDispatchReason.min' => 'Describe el motivo con al menos 8 caracteres.',
         ]);
 
@@ -860,6 +866,19 @@ class PointOfSale extends Component
         $this->resetOperationalPanelState();
         $this->pickupPanelLoaded = true;
         unset($this->pickupOrders);
+    }
+
+
+    /**
+     * El panel vive en su propio componente. El padre cierra los demás paneles
+     * primero y luego lo abre: ambos eventos salen en este orden, así el cierre
+     * general no apaga al panel recién abierto.
+     */
+    public function openBalancesPanel(): void
+    {
+        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
+        $this->resetOperationalPanelState();
+        $this->dispatch('pos-open-balances');
     }
 
     public function openReprintPanel(): void
@@ -1193,13 +1212,14 @@ class PointOfSale extends Component
             'cashInitialAmount' => 'required|numeric|min:0',
         ]);
 
-        CashRegister::create([
-            'name' => $this->cashName,
-            'opened_by' => auth()->id(),
-            'initial_amount' => $this->cashInitialAmount,
-            'opened_at' => now(),
-            'is_open' => true,
-        ]);
+        try {
+            app(CashRegisterOpenService::class)->open(auth()->user(), $this->cashName, (float) $this->cashInitialAmount);
+        } catch (ValidationException $exception) {
+            $this->addError('cashName', collect($exception->errors())->flatten()->first());
+            unset($this->activeCashRegister);
+
+            return;
+        }
 
         $this->showCashModal = false;
         unset($this->activeCashRegister);
@@ -1211,6 +1231,12 @@ class PointOfSale extends Component
     // ─── Customize product modal ───────────────────────────────────────────────
 
     // ─── Cart operations ───────────────────────────────────────────────────────
+
+    #[On('pos-balances-changed')]
+    public function refreshBalanceCounters(): void
+    {
+        unset($this->toolbarPendingCounts, $this->deliveryOrders);
+    }
 
     #[On('modal-confirmed')]
     public function handleConfirmed(string $action, array $params = []): void
@@ -1333,7 +1359,7 @@ class PointOfSale extends Component
         $errors = [];
         if ($order->type === 'delivery') {
             if (blank($this->orderDataCustomerAddress)) {
-                $errors['orderDataCustomerAddress'] = 'La direcciÃ³n es obligatoria para delivery.';
+                $errors['orderDataCustomerAddress'] = 'La dirección es obligatoria para delivery.';
             }
             if (blank($this->orderDataCustomerNeighborhood)) {
                 $errors['orderDataCustomerNeighborhood'] = 'La colonia o zona es obligatoria para delivery.';
@@ -1348,7 +1374,7 @@ class PointOfSale extends Component
                 $errors["orderDataPayments.{$index}.received_amount"] = 'El efectivo recibido debe cubrir este importe.';
             }
             if ($method === 'tarjeta' && ! preg_match('/^\d{4}$/', (string) ($payment['card_last4'] ?? ''))) {
-                $errors["orderDataPayments.{$index}.card_last4"] = 'Captura los Ãºltimos 4 dÃ­gitos.';
+                $errors["orderDataPayments.{$index}.card_last4"] = 'Captura los últimos 4 dígitos.';
             }
             if ($method === 'transferencia' && mb_strlen(trim((string) ($payment['transfer_reference'] ?? ''))) < 4) {
                 $errors["orderDataPayments.{$index}.transfer_reference"] = 'Captura una referencia de al menos 4 caracteres.';
@@ -2100,6 +2126,41 @@ class PointOfSale extends Component
         }, 3);
     }
 
+    /**
+     * Registra los pagos repartidos entre órdenes en centavos exactos (ver
+     * PaymentAllocator). El cambio entregado queda en el primer tramo de cada
+     * pago en efectivo para que recibido y cambio también sumen exacto.
+     *
+     * @param  array<int, int>  $orderCents  order_id => centavos a cubrir
+     * @param  array<int, array<string, mixed>>  $payments
+     */
+    private function recordAllocatedPayments(array $orderCents, array $payments): void
+    {
+        $paymentCents = collect($payments)->map(fn (array $payment) => $this->moneyInCents($payment['amount'] ?? 0))->all();
+        $changeRecorded = [];
+
+        foreach (PaymentAllocator::allocate($orderCents, $paymentCents) as $chunk) {
+            $payment = $payments[$chunk['payment']];
+            $amount = $chunk['cents'] / 100;
+            $isCash = $payment['method'] === 'cash';
+            $change = 0.0;
+            if ($isCash && ! isset($changeRecorded[$chunk['payment']])) {
+                $change = round((float) ($payment['cash_change'] ?? 0), 2);
+                $changeRecorded[$chunk['payment']] = true;
+            }
+
+            OrderPayment::create([
+                'order_id' => $chunk['target'],
+                'method' => $this->mapPaymentMethod($payment['method']),
+                'amount' => $amount,
+                'received_amount' => $isCash ? round($amount + $change, 2) : null,
+                'change_amount' => $isCash ? $change : null,
+                'card_last4' => $payment['method'] === 'card' ? ($payment['card_last4'] ?? null) : null,
+                'transfer_reference' => $payment['method'] === 'transfer' ? ($payment['transfer_ref'] ?? null) : null,
+            ]);
+        }
+    }
+
     private function performFullMesaPayment(): void
     {
         $cashRegisterId = $this->activeCashRegister?->id;
@@ -2140,27 +2201,11 @@ class PointOfSale extends Component
             return;
         }
 
+        $this->recordAllocatedPayments(
+            $orders->mapWithKeys(fn (Order $order) => [$order->id => $this->moneyInCents($order->total)])->all(),
+            $this->mesaPayments,
+        );
         foreach ($orders as $order) {
-            $share = $mesaTotal > 0 ? $order->total / $mesaTotal : (count($orders) > 0 ? 1.0 / count($orders) : 1.0);
-            foreach ($this->mesaPayments as $p) {
-                $amt = round((float) $p['amount'] * $share, 2);
-                if ($amt <= 0) {
-                    continue;
-                }
-                $pay = OrderPayment::create([
-                    'order_id' => $order->id,
-                    'method' => $this->mapPaymentMethod($p['method']),
-                    'amount' => $amt,
-                    'card_last4' => $p['method'] === 'card' ? ($p['card_last4'] ?? null) : null,
-                    'transfer_reference' => $p['method'] === 'transfer' ? ($p['transfer_ref'] ?? null) : null,
-                ]);
-                if ($p['method'] === 'cash') {
-                    $pay->update([
-                        'received_amount' => round(($p['cash_received'] ?? $p['amount']) * $share, 2),
-                        'change_amount' => round(($p['cash_change'] ?? 0) * $share, 2),
-                    ]);
-                }
-            }
             $order->update(['status' => 'pagada', 'paid_at' => now()]);
         }
 
@@ -2305,28 +2350,10 @@ class PointOfSale extends Component
             }
         }
 
-        foreach ($this->mesaPayments as $p) {
-            foreach ($orderAmounts as $orderId => $orderAmt) {
-                $ratio = $accountTotal > 0 ? $orderAmt / $accountTotal : 1.0 / count($orderAmounts);
-                $amt = round((float) $p['amount'] * $ratio, 2);
-                if ($amt <= 0) {
-                    continue;
-                }
-                $pay = OrderPayment::create([
-                    'order_id' => $orderId,
-                    'method' => $this->mapPaymentMethod($p['method']),
-                    'amount' => $amt,
-                    'card_last4' => $p['method'] === 'card' ? ($p['card_last4'] ?? null) : null,
-                    'transfer_reference' => $p['method'] === 'transfer' ? ($p['transfer_ref'] ?? null) : null,
-                ]);
-                if ($p['method'] === 'cash') {
-                    $pay->update([
-                        'received_amount' => round(($p['cash_received'] ?? $p['amount']) * $ratio, 2),
-                        'change_amount' => round(($p['cash_change'] ?? 0) * $ratio, 2),
-                    ]);
-                }
-            }
-        }
+        $this->recordAllocatedPayments(
+            PaymentAllocator::toCentsSummingTo($orderAmounts, $this->moneyInCents($accountTotal)),
+            $this->mesaPayments,
+        );
 
         // Mark account paid
         $splitData[$this->mesaSplitAccountIdx]['paid'] = true;
@@ -2611,7 +2638,9 @@ HTML;
         $order = Order::where('cash_register_id', $this->activeCashRegister?->id)
             ->find($this->pickupPayOrderId);
         $paid = collect($this->pickupPayments)->sum('amount');
-        $rem = $order ? max(0, $order->total - $paid) : 0;
+        // Contra el saldo vivo: una orden que ya recibió un pago parcial sólo
+        // debe cobrar lo que falta, no el total otra vez.
+        $rem = $order ? max(0, $order->balance_due - $paid) : 0;
         $amount = (float) $this->pickupPayAmount ?: $rem;
         if ($amount <= 0) {
             return;
@@ -2629,9 +2658,16 @@ HTML;
 
         if ($this->pickupPayMethod === 'cash') {
             $received = (float) $this->pickupPayReceived;
-            // Si no ingresaron recibido, asumen pago exacto
+            // Vacío = pago exacto. Menor al monto = el cajón quedaría corto.
+            if ($received > 0 && $this->moneyInCents($received) < $this->moneyInCents($amount)) {
+                $message = 'El efectivo recibido ($'.number_format($received, 2).') no cubre el monto ($'.number_format($amount, 2).').';
+                $this->addError('pickupPayReceived', $message);
+                $this->dispatch('notify', type: 'warning', message: $message);
+
+                return;
+            }
             $payment['cash_received'] = $received > 0 ? $received : $amount;
-            $payment['cash_change'] = max(0, ($received > 0 ? $received : $amount) - $amount);
+            $payment['cash_change'] = max(0, round(($received > 0 ? $received : $amount) - $amount, 2));
         } elseif ($this->pickupPayMethod === 'card') {
             $payment['card_last4'] = $this->pickupPayCard;
         } elseif ($this->pickupPayMethod === 'transfer') {
@@ -2653,49 +2689,65 @@ HTML;
     public function confirmPickupPayment(): void
     {
         abort_unless(auth()->user()?->can('cobrar pedidos en punto de venta'), 403);
-        $order = Order::with(['items'])
-            ->where('cash_register_id', $this->activeCashRegister?->id)
-            ->find($this->pickupPayOrderId);
-        if (! $order) {
-            return;
-        }
 
-        $isPayableArea = $order->source === 'kiosk'
-            || in_array($order->type, ['pick_up', 'ventanilla', 'delivery', 'mesa'], true);
+        // Validar y registrar bajo bloqueo: dos pestañas cobrando la misma
+        // orden a la vez no pueden registrar el pago dos veces.
+        $result = DB::transaction(function (): Order|string|null {
+            $order = Order::with(['items', 'payments', 'refunds'])
+                ->where('cash_register_id', $this->activeCashRegister?->id)
+                ->lockForUpdate()
+                ->find($this->pickupPayOrderId);
+            if (! $order) {
+                return null;
+            }
 
-        if (! $isPayableArea || $order->status !== 'lista') {
-            $this->dispatch('notify', type: 'warning', message: 'El pedido debe estar listo antes de cobrarlo.');
+            $isPayableArea = $order->source === 'kiosk'
+                || in_array($order->type, ['pick_up', 'ventanilla', 'delivery', 'mesa'], true);
 
-            return;
-        }
+            if (! $isPayableArea || $order->status !== 'lista') {
+                return 'El pedido debe estar listo antes de cobrarlo.';
+            }
 
-        $paidInCents = $this->paymentSumInCents($this->pickupPayments);
-        $totalInCents = $this->moneyInCents($order->total);
-        if ($paidInCents !== $totalInCents) {
-            $message = $paidInCents > $totalInCents
-                ? 'El monto pagado no puede superar el total del pedido.'
-                : 'El monto es insuficiente.';
-            $this->dispatch('notify', type: 'warning', message: $message);
+            $balanceDue = $order->balance_due;
+            if ($balanceDue <= 0.009) {
+                return 'Este pedido ya no tiene saldo pendiente.';
+            }
 
-            return;
-        }
+            $paidInCents = $this->paymentSumInCents($this->pickupPayments);
+            $totalInCents = $this->moneyInCents($balanceDue);
+            if ($paidInCents !== $totalInCents) {
+                return $paidInCents > $totalInCents
+                    ? 'El monto pagado no puede superar el saldo pendiente del pedido.'
+                    : 'El monto es insuficiente.';
+            }
 
-        foreach ($this->pickupPayments as $p) {
-            $payment = OrderPayment::create([
-                'order_id' => $order->id,
-                'method' => $this->mapPaymentMethod($p['method']),
-                'amount' => $p['amount'],
-            ]);
-
-            if ($p['method'] === 'cash') {
-                $payment->update([
-                    'received_amount' => $p['cash_received'] ?? $p['amount'],
-                    'change_amount' => $p['cash_change'] ?? 0,
+            foreach ($this->pickupPayments as $p) {
+                $isCash = $p['method'] === 'cash';
+                OrderPayment::create([
+                    'order_id' => $order->id,
+                    'method' => $this->mapPaymentMethod($p['method']),
+                    'amount' => $p['amount'],
+                    'received_amount' => $isCash ? ($p['cash_received'] ?? $p['amount']) : null,
+                    'change_amount' => $isCash ? ($p['cash_change'] ?? 0) : null,
+                    'card_last4' => $p['method'] === 'card' ? (($p['card_last4'] ?? '') ?: null) : null,
+                    'transfer_reference' => $p['method'] === 'transfer' ? (($p['transfer_ref'] ?? '') ?: null) : null,
                 ]);
             }
-        }
 
-        $order->update(['status' => 'pagada', 'paid_at' => now()]);
+            $order->update(['status' => 'pagada', 'paid_at' => now()]);
+            app(ManualDeliveryAccountingService::class)->syncProvision($order);
+
+            return $order;
+        });
+
+        if (! $result instanceof Order) {
+            if (is_string($result)) {
+                $this->dispatch('notify', type: 'warning', message: $result);
+            }
+
+            return;
+        }
+        $order = $result;
 
         $mesaWasReleased = false;
         if ($order->mesa_id) {
@@ -2705,7 +2757,9 @@ HTML;
         $this->showPickupPayModal = false;
         $this->pickupPayOrderId = null;
         $this->pickupPayments = [];
+        $this->dispatch('pos-orders-changed');
         unset(
+            $this->toolbarPendingCounts,
             $this->pickupOrders,
             $this->deliveryOrders,
             $this->kioskDineInOrders,

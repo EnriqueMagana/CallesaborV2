@@ -131,6 +131,17 @@
                         <div><dt>Preparación</dt><dd>{{ match(data_get($context, 'preparation_stage')) {'not_started' => 'No iniciada', 'in_progress' => 'En proceso', 'ready' => 'Lista', default => 'Sin confirmar'} }}</dd></div>
                     </dl>
                 @endif
+                @php($pendingBalance = (float) data_get($context, 'pending_balance', 0))
+                @if($pendingBalance > 0)
+                    <section class="order-request-refund" aria-label="Saldo que quedará pendiente">
+                        <header><i class="bx bx-time-five"></i><span><small>Quedará por cobrar</small><strong>${{ number_format($pendingBalance, 2) }}</strong></span></header>
+                        <dl>
+                            <div><dt>Nuevo total</dt><dd>${{ number_format($review->proposed_total, 2) }}</dd></div>
+                            <div><dt>Lo cobra</dt><dd>{{ data_get($context, 'collected_by') === 'delivery' ? 'El repartidor, contra entrega' : 'El cajero en el POS' }}</dd></div>
+                        </dl>
+                        <p class="orders-field-help">Aprobar no registra ningún cobro: sólo autoriza el cambio. El saldo aparecerá en Pendientes del POS.</p>
+                    </section>
+                @endif
                 @if((float) data_get($context, 'refund_amount', 0) > 0)
                     @php($requiresExternalReference = collect(data_get($context, 'refund_allocations', []))->except(['efectivo', 'contra_entrega'])->sum() > 0)
                     <section class="order-request-refund" aria-label="Devolución requerida">
@@ -153,6 +164,7 @@
                                 <span class="is-{{ $change['action'] }}">{{ match($change['action']) {'add' => 'Agregar', 'remove' => 'Retirar', default => 'Cambiar'} }}</span>
                                 <strong>{{ $change['product_name'] }}</strong>
                                 <small>{{ $change['from_quantity'] }} → {{ $change['to_quantity'] }} unidades</small>
+                                @if (filled($change['modifiers'] ?? null))<small class="orders-change-line__modifiers"><i class="bx bx-customize" aria-hidden="true"></i> {{ $change['modifiers'] }}</small>@endif
                                 <b>${{ number_format($change['after_subtotal'], 2) }}</b>
                             </div>
                         @endforeach

@@ -1,11 +1,15 @@
 @if($showPickupPayModal)
 @php
-    $ppo = \App\Models\Order::with(['items.addons','items.product','customer','payments'])->find($pickupPayOrderId);
+    $ppo = \App\Models\Order::with(['items.addons','items.product','customer','payments','refunds'])->find($pickupPayOrderId);
     $ppoItems = $ppo ? $ppo->items : collect();
     $ppoPaidAmt = collect($pickupPayments)->sum('amount');
-    $ppoRem = $ppo ? max(0, $ppo->total - $ppoPaidAmt) : 0;
+    // El cobro se mide contra el saldo: si la orden creció tras un pago previo
+    // aquí sólo se cobra la diferencia.
+    $ppoPrevPaid = $ppo ? $ppo->net_paid_amount : 0;
+    $ppoDue = $ppo ? $ppo->balance_due : 0;
+    $ppoRem = max(0, $ppoDue - $ppoPaidAmt);
     $ppoCanConfirm = !empty($pickupPayments)
-        && round($ppoPaidAmt * 100) === round(($ppo->total ?? 0) * 100);
+        && round($ppoPaidAmt * 100) === round($ppoDue * 100);
     $ppoIsContraDelivery = $ppo && $ppo->type === 'delivery' && $ppo->delivery_method === 'contra_entrega';
 @endphp
 <div class="pos-modal-wrap show" data-ui="xui-6jaq3m" wire:click.self="closePickupPayModal"
@@ -44,6 +48,16 @@
                     <span>Total</span>
                     <span>${{ number_format($ppo->total, 2) }}</span>
                 </div>
+                @if($ppoPrevPaid > 0.009)
+                    <div data-ui="xui-1iolvfd">
+                        <span>Ya cobrado</span>
+                        <span data-ui="xui-y9mhin">-${{ number_format($ppoPrevPaid, 2) }}</span>
+                    </div>
+                    <div data-ui="xui-1s0et43">
+                        <span>Saldo por cobrar</span>
+                        <span>${{ number_format($ppoDue, 2) }}</span>
+                    </div>
+                @endif
             </div>
             @endif
 

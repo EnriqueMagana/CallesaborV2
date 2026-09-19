@@ -16,6 +16,7 @@ class CashRegisterCut extends Model
         'initial_amount', 'total_cash_in', 'total_cash_income', 'total_expenses_cash',
         'expected_cash', 'declared_cash', 'difference',
         'cut_data', 'generated_at',
+        'reopened_at', 'reopened_by', 'reopen_reason',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class CashRegisterCut extends Model
         'difference' => 'decimal:2',
         'cut_data' => 'array',
         'generated_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
 
     public function cashRegister(): BelongsTo
@@ -42,5 +44,19 @@ class CashRegisterCut extends Model
     public function generator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'generated_by');
+    }
+
+    public function reopener(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reopened_by');
+    }
+
+    /**
+     * Un corte anulado por reapertura sigue en el historial, pero ya no es el
+     * cierre vigente de su caja.
+     */
+    public function getIsReopenedAttribute(): bool
+    {
+        return $this->reopened_at !== null;
     }
 }

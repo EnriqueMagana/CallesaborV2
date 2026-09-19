@@ -6,6 +6,7 @@ use App\Models\CashRegister;
 use App\Models\DeliveryAssignment;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\CashRegisterOpenService;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeliverySettlementService;
 use App\Services\OrderFinancialSummaryService;
@@ -50,13 +51,14 @@ class Dashboard extends Component
             'initialAmount.min' => 'El fondo no puede ser negativo.',
         ]);
 
-        CashRegister::create([
-            'name' => trim($this->registerName),
-            'opened_by' => auth()->id(),
-            'initial_amount' => (float) $this->initialAmount,
-            'opened_at' => now(),
-            'is_open' => true,
-        ]);
+        try {
+            app(CashRegisterOpenService::class)->open(auth()->user(), $this->registerName, (float) $this->initialAmount);
+        } catch (ValidationException $exception) {
+            $this->addError('registerName', collect($exception->errors())->flatten()->first());
+            unset($this->activeRegister);
+
+            return;
+        }
 
         $this->registerName = '';
         $this->initialAmount = '';
@@ -148,7 +150,11 @@ class Dashboard extends Component
 
         return [
             'orders' => $orders->count(),
-            'cash' => (float) (app(OrderFinancialSummaryService::class)->forOrders($orders)['net']['efectivo'] ?? 0),
+            'cash' => (function () use ($orders): float {
+                $net = app(OrderFinancialSummaryService::class)->forOrders($orders)['net'];
+
+                return round((float) ($net['efectivo'] ?? 0) + (float) ($net['contra_entrega'] ?? 0), 2);
+            })(),
             'total' => (float) $orders->sum('total'),
         ];
     }

@@ -352,26 +352,24 @@
                     @endif
                 </section>
 
-                <section class="app-card cash-cut-card">
+                @php($breakdown = $this->areaBreakdown)
+                <section class="app-card cash-cut-card" aria-labelledby="cash-cut-by-area-title">
                     <header class="cash-cut-card__header">
-                        <div><span class="cash-cut-card__icon cash-cut-card__icon--info"><i class="bx bx-list-ul"></i></span><div><h2>Pedidos cobrados</h2><p>Historial del turno actual.</p></div></div>
-                        <span class="app-count-pill">{{ $this->orders->count() }} pedidos</span>
+                        <div><span class="cash-cut-card__icon cash-cut-card__icon--info"><i class="bx bx-list-ul"></i></span><div><h2 id="cash-cut-by-area-title">Pedidos por área</h2><p>Todos los pedidos del turno. Los cancelados o sin cobrar se muestran pero no suman.</p></div></div>
+                        <span class="app-count-pill">{{ $breakdown['grand']['listed'] }} pedidos</span>
                     </header>
-                    <div class="cash-cut-orders">
-                        @forelse($this->orders as $order)
-                            @php
-                                $orderFinancial = app(\App\Services\OrderFinancialSummaryService::class)->forOrder($order);
-                                $cashAmount = ($orderFinancial['net']['efectivo'] ?? 0) + ($orderFinancial['net']['contra_entrega'] ?? 0);
-                                $refundedAmount = collect($orderFinancial['refunds'])->sum();
-                            @endphp
-                            <article class="cash-cut-order">
-                                <span class="cash-cut-order__number">{{ $order->display_folio }}</span>
-                                <div class="cash-cut-order__copy"><strong>{{ $order->customer_name ?: 'Anónimo' }}</strong><small>{{ $order->type_label }} · {{ \App\Support\BusinessTime::format($order->created_at, 'g:i A') }}</small></div>
-                                <div class="cash-cut-order__amount"><strong>${{ number_format($order->total, 2) }}</strong>@if($refundedAmount > 0)<small>Reembolso -${{ number_format($refundedAmount, 2) }}</small>@endif @if($cashAmount > 0)<small><i class="bx bx-money"></i> Efectivo neto ${{ number_format($cashAmount, 2) }}</small>@endif</div>
-                            </article>
-                        @empty
-                            <div class="cash-cut-empty"><span><i class="bx bx-receipt"></i></span><div><strong>Sin pedidos cobrados</strong><p>Este turno todavía no registra ventas pagadas.</p></div></div>
-                        @endforelse
+
+                    <dl class="cash-cut-area-summary">
+                        @foreach ($breakdown['areas'] as $key => $area)
+                            <div class="is-{{ $key }}"><dt><i class="bx {{ $area['icon'] }}" aria-hidden="true"></i> {{ $area['label'] }}</dt><dd>${{ number_format($area['totals']['total'], 2) }}</dd></div>
+                        @endforeach
+                        <div class="is-grand"><dt>Debe haber en total</dt><dd>${{ number_format($breakdown['grand']['total'], 2) }}</dd></div>
+                    </dl>
+
+                    <div class="cash-cut-area-tables">
+                        @foreach ($breakdown['areas'] as $key => $area)
+                            @include('livewire.caja.partials.area-orders-table', ['key' => $key, 'area' => $area])
+                        @endforeach
                     </div>
                 </section>
             </main>
@@ -385,6 +383,9 @@
                     <div><span><i class="bx bx-minus"></i> Gastos en efectivo</span><strong class="cash-cut-negative">-${{ number_format($this->totalExpensesCash, 2) }}</strong></div>
                     <div class="cash-cut-equation__total"><span>Efectivo esperado</span><strong>${{ number_format($this->expectedCash, 2) }}</strong></div>
                 </div>
+                @if ($this->provisionalCash > 0.009)
+                    <p class="cash-cut-helper"><i class="bx bx-cycling"></i> Incluye <strong>${{ number_format($this->provisionalCash, 2) }}</strong> contra entrega que traen los repartidores. Recíbelo antes de contar; al generar el corte se dará por entregado.</p>
+                @endif
 
                 <label class="cash-cut-field">
                     <span>Efectivo contado en caja <small>Obligatorio</small></span>

@@ -100,7 +100,7 @@ class DeliveryWorkflow
             $this->ensureOrderBelongsToOpenRegister($lockedOrder);
 
             if ($lockedOrder->type !== 'delivery' || ! $this->policy->isManaged($lockedOrder)) {
-                throw ValidationException::withMessages(['reassignDriverId' => 'Este pedido no admite asignaciÃ³n digital.']);
+                throw ValidationException::withMessages(['reassignDriverId' => 'Este pedido no admite asignación digital.']);
             }
 
             if (! in_array($lockedOrder->status, ['pendiente', 'en_preparacion', 'lista', 'pagada', 'en_reparto'], true)) {
@@ -113,7 +113,7 @@ class DeliveryWorkflow
                 ->first();
 
             if (! $assignment || $assignment->status !== 'asignado') {
-                throw ValidationException::withMessages(['reassignDriverId' => 'El pedido no tiene una asignaciÃ³n activa.']);
+                throw ValidationException::withMessages(['reassignDriverId' => 'El pedido no tiene una asignación activa.']);
             }
 
             if ($newDriver->isBanned() || $newDriver->trashed() || ! $newDriver->hasAnyPermission(['entregar delivery', 'gestionar delivery'])) {
@@ -121,7 +121,7 @@ class DeliveryWorkflow
             }
 
             if ($assignment->driver_id === $newDriver->id) {
-                throw ValidationException::withMessages(['reassignDriverId' => 'El pedido ya estÃ¡ asignado a ese repartidor.']);
+                throw ValidationException::withMessages(['reassignDriverId' => 'El pedido ya está asignado a ese repartidor.']);
             }
 
             $previousDriverId = $assignment->driver_id;

@@ -8,12 +8,15 @@
         </div>
         <div class="modal-body-pos">
             <div data-ui="xui-n3c866">
-                <label class="co-label">Nombre de la caja</label>
-                <input type="text" wire:model="cashName" class="co-input" placeholder="Caja 1">
+                <label class="co-label" for="pos-cash-name">Nombre de la caja</label>
+                <input id="pos-cash-name" type="text" wire:model="cashName" class="co-input" placeholder="Caja 1"
+                    aria-invalid="{{ $errors->has('cashName') ? 'true' : 'false' }}">
+                @error('cashName')<p class="pos-field-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i> {{ $message }}</p>@enderror
             </div>
             <div>
-                <label class="co-label">Fondo inicial</label>
-                <input type="number" wire:model="cashInitialAmount" class="co-input" placeholder="500.00" step="0.01" min="0">
+                <label class="co-label" for="pos-cash-initial">Fondo inicial</label>
+                <input id="pos-cash-initial" type="number" wire:model="cashInitialAmount" class="co-input" placeholder="500.00" step="0.01" min="0">
+                @error('cashInitialAmount')<p class="pos-field-error" role="alert"><i class="bx bx-error-circle" aria-hidden="true"></i> {{ $message }}</p>@enderror
             </div>
         </div>
         <div class="modal-footer-pos">

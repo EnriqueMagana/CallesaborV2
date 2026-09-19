@@ -10,6 +10,7 @@ use App\Models\Mesa;
 use App\Models\MesaHelpRequest;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
+use App\Models\OrderDataChangeAudit;
 use App\Models\User;
 use App\Notifications\OperationalNotification;
 use Illuminate\Database\Eloquent\Model;
@@ -112,10 +113,59 @@ class OperationalNotificationService
             $assignment->order,
             $recipients,
             'Delivery reasignado',
-            "Pedido {$assignment->order->display_folio}: {$from} â†’ {$to}. Motivo: {$event->reason}",
+            "Pedido {$assignment->order->display_folio}: {$from} → {$to}. Motivo: {$event->reason}",
             $this->urlFor($assignment->order),
             'delivery',
             'reassignment-'.$event->id,
+        );
+    }
+
+    /**
+     * Un cajero cambió la forma de pago de una orden sin pasar por
+     * autorización. Cada cambio genera su propio aviso (el sujeto es el
+     * registro de auditoría), con el efecto sobre el efectivo esperado.
+     *
+     * @param  array<int, array{amount: ?float, from: string, to: string}>  $changes
+     */
+    public function paymentTypeChanged(OrderDataChangeAudit $audit, Order $order, array $changes): void
+    {
+        $audit->loadMissing('changedBy');
+        $label = fn (string $method) => match ($method) {
+            'efectivo' => 'Efectivo',
+            'tarjeta' => 'Tarjeta',
+            'transferencia' => 'Transferencia',
+            'contra_entrega' => 'Contra entrega',
+            default => ucfirst($method),
+        };
+        $isCash = fn (string $method) => in_array($method, ['efectivo', 'contra_entrega'], true);
+
+        $cashDelta = 0.0;
+        $parts = [];
+        foreach ($changes as $change) {
+            $amount = $change['amount'] !== null ? '$'.number_format($change['amount'], 2).' ' : '';
+            $parts[] = $amount.$label($change['from']).' → '.$label($change['to']);
+            if ($change['amount'] !== null) {
+                $cashDelta += ($isCash($change['to']) ? 1 : 0) * $change['amount'] - ($isCash($change['from']) ? 1 : 0) * $change['amount'];
+            }
+        }
+
+        $effect = match (true) {
+            $cashDelta < -0.009 => ' El efectivo esperado del corte baja $'.number_format(abs($cashDelta), 2).'.',
+            $cashDelta > 0.009 => ' El efectivo esperado del corte sube $'.number_format($cashDelta, 2).'.',
+            default => '',
+        };
+
+        $this->send(
+            eventKey: 'order.payment_reclassified',
+            category: 'orders',
+            priority: $cashDelta < -0.009 ? 'urgent' : 'high',
+            subject: $audit,
+            recipients: $this->usersByRoles(['owner', 'super-admin']),
+            title: 'Cambio de forma de pago',
+            message: "Pedido {$order->display_folio} · ".($audit->changedBy?->name ?? 'Usuario').': '.implode(', ', $parts).'.'.$effect,
+            url: route('app.ordenes.show', $order, false),
+            sound: $cashDelta < -0.009 ? 'alert' : 'order',
+            dedupeSuffix: 'payment-type'
         );
     }
 

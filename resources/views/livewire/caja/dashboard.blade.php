@@ -1,5 +1,9 @@
 <div class="app-page cash-page">
 
+    @if (session('success'))
+        <div class="alert alert-success d-flex align-items-center gap-2" role="status"><i class="bx bx-check-circle" aria-hidden="true"></i><span>{{ session('success') }}</span></div>
+    @endif
+
     @if (session('cash_register_required'))
         <div class="cash-access-notice" role="alert">
             <span><i class="bx bx-lock-alt" aria-hidden="true"></i></span>

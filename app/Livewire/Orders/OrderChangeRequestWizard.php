@@ -5,8 +5,8 @@ namespace App\Livewire\Orders;
 use App\Models\CashRegister;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
-use App\Models\Product;
 use App\Services\OrderChangeRequestService;
+use App\Support\OrderChangeDraft;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -21,8 +21,6 @@ class OrderChangeRequestWizard extends Component
     public string $scope = '';
 
     public array $requestItems = [];
-
-    public string $productSearch = '';
 
     public string $reasonCode = '';
 
@@ -62,7 +60,7 @@ class OrderChangeRequestWizard extends Component
         $activeRegisterId = CashRegister::where('is_open', true)->latest('opened_at')->value('id');
         abort_unless($activeRegisterId && $order->cash_register_id === (int) $activeRegisterId, 404);
 
-        $this->order = $order->load(['customer', 'items' => fn ($query) => $query->where('is_cancelled', false), 'changeRequests', 'payments', 'refunds', 'deliveryAssignment']);
+        $this->order = $order->load(['customer', 'items' => fn ($query) => $query->where('is_cancelled', false)->with(['addons', 'ingredients']), 'changeRequests', 'payments', 'refunds', 'deliveryAssignment']);
         abort_unless($this->canRequestCancellation || $this->canRequestModification || $this->canRequestPaymentChange || $this->canRequestAddressChange, 403);
         abort_if($this->order->changeRequests->contains('status', OrderChangeRequest::STATUS_PENDING), 409, 'Esta orden ya tiene una solicitud pendiente.');
         abort_unless(
@@ -129,21 +127,6 @@ class OrderChangeRequestWizard extends Component
     }
 
     #[Computed]
-    public function productResults()
-    {
-        if ($this->scope !== 'adjustment') {
-            return collect();
-        }
-
-        return Product::query()
-            ->where('is_active', true)
-            ->when(trim($this->productSearch) !== '', fn ($query) => $query->where('name', 'like', '%'.trim($this->productSearch).'%'))
-            ->orderBy('name')
-            ->limit(10)
-            ->get(['id', 'name', 'price']);
-    }
-
-    #[Computed]
     public function proposedTotal(): float
     {
         return round(collect($this->requestItems)->sum(
@@ -157,22 +140,62 @@ class OrderChangeRequestWizard extends Component
         return $this->order->status === 'pagada' && $this->order->payments->isNotEmpty();
     }
 
+    /**
+     * Dinero ya recibido por la orden. Es lo que decide si hay que devolver o
+     * cobrar, sin importar si el estado es "pagada" o sigue operativo.
+     */
+    #[Computed]
+    public function netPaidAmount(): float
+    {
+        return $this->order->net_paid_amount;
+    }
+
     #[Computed]
     public function refundAmount(): float
     {
-        if (! $this->isPaidOrder || ! in_array($this->scope, ['full', 'partial', 'adjustment'], true)) {
+        if ($this->netPaidAmount <= 0.009 || ! in_array($this->scope, ['full', 'partial', 'adjustment'], true)) {
             return 0;
         }
 
         $target = $this->scope === 'full' ? 0 : $this->proposedTotal;
 
-        return max(0, round((float) $this->order->total - $target, 2));
+        return max(0, round($this->netPaidAmount - $target, 2));
+    }
+
+    #[Computed]
+    public function hasProductReductions(): bool
+    {
+        if ($this->scope === 'full') {
+            return true;
+        }
+
+        return collect($this->requestItems)->contains(
+            fn (array $line) => ($line['kind'] ?? null) !== 'new'
+                && (int) ($line['quantity'] ?? 0) < (int) ($line['original_quantity'] ?? 0)
+        );
+    }
+
+    /**
+     * Lo que la orden sube por encima del dinero real recibido. No se cobra al
+     * autorizar: queda pendiente para el cajero o el repartidor.
+     */
+    #[Computed]
+    public function pendingBalance(): float
+    {
+        if ($this->netPaidAmount <= 0.009 || ! in_array($this->scope, ['partial', 'adjustment'], true)) {
+            return 0;
+        }
+
+        return max(0, round($this->proposedTotal - $this->netPaidAmount, 2));
     }
 
     #[Computed]
     public function refundAllocations(): array
     {
-        $available = $this->order->payments->groupBy('method')->map(fn ($payments) => (float) $payments->sum('amount'));
+        $available = $this->order->payments
+            ->where('is_provisional', false)
+            ->groupBy('method')
+            ->map(fn ($payments) => (float) $payments->sum('amount'));
         foreach ($this->order->refunds as $refund) {
             foreach ($refund->allocations ?? [] as $method => $amount) {
                 $available[$method] = max(0, round((float) ($available[$method] ?? 0) - (float) $amount, 2));
@@ -247,8 +270,23 @@ class OrderChangeRequestWizard extends Component
         $this->scope = $scope;
         $this->reasonCode = '';
         $this->reasonDetail = '';
-        $this->productSearch = '';
-        $this->requestItems = in_array($scope, ['partial', 'adjustment'], true) ? $this->originalLines() : [];
+
+        // Agregar y quitar productos se hace en el editor (mini POS); el wizard
+        // sólo recibe su borrador para pedir el motivo y enviarlo.
+        if ($scope === 'adjustment') {
+            $draft = OrderChangeDraft::load($this->order);
+            if ($draft === null) {
+                $this->redirectRoute('app.ordenes.productos', ['order' => $this->order, 'source' => $this->source]);
+
+                return;
+            }
+            $this->requestItems = $draft;
+            $this->step = 2;
+
+            return;
+        }
+
+        $this->requestItems = $scope === 'partial' ? $this->originalLines() : [];
         if ($scope === 'payment') {
             $this->newPaymentMethod = '';
             $this->previousPaymentReceived = '';
@@ -289,7 +327,8 @@ class OrderChangeRequestWizard extends Component
 
     public function adjustRequestItem(int $index, int $delta): void
     {
-        abort_unless($this->canUseScope($this->scope) && isset($this->requestItems[$index]), 403);
+        // En un ajuste las cantidades se editan en el editor de productos.
+        abort_unless($this->scope === 'partial' && $this->canUseScope($this->scope) && isset($this->requestItems[$index]), 403);
         $maximum = $this->scope === 'partial'
             ? (int) $this->requestItems[$index]['original_quantity']
             : 99;
@@ -297,33 +336,13 @@ class OrderChangeRequestWizard extends Component
         if ($this->requestItems[$index]['kind'] === 'new' && $this->requestItems[$index]['quantity'] === 0) {
             array_splice($this->requestItems, $index, 1);
         }
-        unset($this->proposedTotal, $this->changeSummary);
+        $this->forgetMoneyCache();
     }
 
-    public function addProductToRequest(int $productId): void
+    private function forgetMoneyCache(): void
     {
-        abort_unless($this->scope === 'adjustment' && $this->canRequestModification, 403);
-        $product = Product::where('is_active', true)->findOrFail($productId);
-        foreach ($this->requestItems as $index => $line) {
-            if ($line['kind'] === 'new' && (int) $line['product_id'] === $product->id) {
-                $this->adjustRequestItem($index, 1);
-
-                return;
-            }
-        }
-
-        $this->requestItems[] = [
-            'key' => 'new-'.$product->id,
-            'kind' => 'new',
-            'product_id' => $product->id,
-            'name' => $product->name,
-            'quantity' => 1,
-            'original_quantity' => 0,
-            'unit_subtotal' => (float) $product->price,
-        ];
-        unset($this->proposedTotal, $this->changeSummary);
+        unset($this->proposedTotal, $this->changeSummary, $this->refundAmount, $this->refundAllocations, $this->pendingBalance, $this->hasProductReductions);
     }
-
     public function submit(OrderChangeRequestService $service)
     {
         $this->validateScope();
@@ -357,6 +376,7 @@ class OrderChangeRequestWizard extends Component
             'update_customer_profile' => $this->updateCustomerProfile,
         ]);
 
+        OrderChangeDraft::forget($this->order);
         session()->flash('success', 'Solicitud enviada. La orden no cambiará hasta que sea autorizada.');
 
         return redirect()->route($this->source === 'list' ? 'app.ordenes' : 'app.ordenes.show', $this->source === 'list' ? [] : ['order' => $this->order->id]);
@@ -392,7 +412,11 @@ class OrderChangeRequestWizard extends Component
         if ($this->reasonCode === 'other') {
             $rules['reasonDetail'] = ['required', 'string', 'min:10', 'max:1000'];
         }
-        if ($this->isPaidOrder && in_array($this->scope, ['full', 'partial', 'adjustment'], true)) {
+        // Sólo se pregunta por el destino del producto cuando algo sale de la
+        // orden. Un ajuste que únicamente agrega no tiene nada que reintegrar.
+        if ($this->netPaidAmount > 0.009
+            && in_array($this->scope, ['full', 'partial', 'adjustment'], true)
+            && ($this->pendingBalance <= 0.009 || $this->hasProductReductions)) {
             $rules['inventoryDisposition'] = ['required', Rule::in(['restock', 'waste', 'not_applicable'])];
         }
         if ($this->scope === 'payment') {
@@ -423,8 +447,8 @@ class OrderChangeRequestWizard extends Component
             if ($summary['removed'] === 0 && $summary['added'] === 0 && $summary['updated'] === 0) {
                 $this->addError('requestItems', 'Ajusta una cantidad, retira un artículo o agrega uno nuevo.');
             }
-            if ($this->isPaidOrder && $this->proposedTotal > (float) $this->order->total + 0.009) {
-                $this->addError('requestItems', 'En una orden pagada el nuevo total no puede ser mayor. Genera otra orden para cobrar productos adicionales.');
+            if ($this->order->status === 'cancelada') {
+                $this->addError('requestItems', 'Una orden cancelada no admite modificaciones.');
             }
             if ($this->getErrorBag()->has('requestItems')) {
                 throw ValidationException::withMessages([
@@ -448,15 +472,6 @@ class OrderChangeRequestWizard extends Component
 
     private function originalLines(): array
     {
-        return $this->order->items->map(fn ($item) => [
-            'key' => 'existing-'.$item->id,
-            'kind' => 'existing',
-            'order_item_id' => $item->id,
-            'product_id' => $item->product_id,
-            'name' => $item->product_name,
-            'quantity' => (int) $item->quantity,
-            'original_quantity' => (int) $item->quantity,
-            'unit_subtotal' => round((float) $item->subtotal / max(1, (int) $item->quantity), 2),
-        ])->values()->all();
+        return OrderChangeDraft::linesFromOrder($this->order);
     }
 }

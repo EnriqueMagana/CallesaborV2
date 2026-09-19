@@ -8,16 +8,23 @@ use Illuminate\Support\Collection;
 class OrderFinancialSummaryService
 {
     /**
+     * El corte incluye las provisiones contra entrega porque el repartidor
+     * entrega ese efectivo al cierre; el ticket del cliente no, porque ese
+     * dinero todavía no se ha cobrado.
+     *
      * @param  Collection<int, Order>  $orders
      * @return array{gross: array<string, float>, refunds: array<string, float>, net: array<string, float>}
      */
-    public function forOrders(Collection $orders): array
+    public function forOrders(Collection $orders, bool $includeProvisional = true): array
     {
         $gross = collect();
         $refunds = collect();
 
         foreach ($orders as $order) {
             foreach ($order->payments as $payment) {
+                if (! $includeProvisional && $payment->is_provisional) {
+                    continue;
+                }
                 $gross->put($payment->method, round((float) $gross->get($payment->method, 0) + (float) $payment->amount, 2));
             }
 
@@ -43,8 +50,8 @@ class OrderFinancialSummaryService
     /**
      * @return array{gross: array<string, float>, refunds: array<string, float>, net: array<string, float>}
      */
-    public function forOrder(Order $order): array
+    public function forOrder(Order $order, bool $includeProvisional = true): array
     {
-        return $this->forOrders(collect([$order]));
+        return $this->forOrders(collect([$order]), $includeProvisional);
     }
 }

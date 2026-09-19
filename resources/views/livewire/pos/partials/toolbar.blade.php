@@ -38,6 +38,18 @@
     </button>
     @endcan
 
+    @can('ver pedidos en punto de venta')
+    @if ($this->toolbarPendingCounts['balances'] > 0)
+    <button type="button" class="tb-btn tb-btn--balances" :class="panels.balances ? 'is-active' : ''"
+        @click="showOnlyPanel('balances'); $wire.openBalancesPanel()" data-pos-panel="balances"
+        aria-label="Abrir saldos pendientes" title="Órdenes con saldo por cobrar">
+        <span class="tb-btn__icon"><i class="bx bx-time-five"></i></span>
+        <span class="tb-btn__copy"><strong>Pendientes</strong><small>Saldos por cobrar</small></span>
+        <span class="tb-btn__badge" aria-label="{{ $this->toolbarPendingCounts['balances'] }} órdenes con saldo pendiente">{{ $this->toolbarPendingCounts['balances'] }}</span>
+    </button>
+    @endif
+    @endcan
+
     @can('reimprimir tickets')
     <button type="button" class="tb-btn tb-btn--reprint" :class="panels.reprint ? 'is-active' : ''"
         @click="showOnlyPanel('reprint'); $wire.openReprintPanel()" data-pos-panel="reprint" aria-keyshortcuts="F9"
