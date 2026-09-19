@@ -206,6 +206,9 @@ html.dark-style .orders-change-line__modifiers{color:#b7acff!important}
 .order-editor-actions{display:grid;grid-template-columns:auto 1fr;gap:8px}
 .order-editor-actions .orders-button{min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .order-editor-actions .orders-button:disabled{opacity:.5;cursor:not-allowed}
+.order-editor-actions .orders-button--primary{color:#fff;border-color:var(--oe-primary);background:linear-gradient(135deg,var(--oe-primary),#5643d7);box-shadow:0 8px 18px rgba(105,86,232,.28);transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease}
+.order-editor-actions .orders-button--primary:hover:not(:disabled){border-color:#4f3bc9;background:#5643d7;box-shadow:0 10px 22px rgba(105,86,232,.34)}
+.order-editor-actions .orders-button--primary:disabled{opacity:1;color:#5f596d;border-color:#d4cfdf;background:#e5e2eb;box-shadow:none}
 .order-editor-mobile-bar,.order-editor-scrim{display:none}
 .order-editor-page :is(button,a,input):focus-visible{outline:3px solid rgba(105,86,232,.45);outline-offset:2px}
 
@@ -243,4 +246,5 @@ html.dark-style .order-editor-line.is-new{background:rgba(105,86,232,.12)}
 html.dark-style .order-editor-line.is-changed{background:rgba(245,158,11,.08)}
 html.dark-style .order-editor-line.is-removed{background:rgba(220,38,38,.08)}
 html.dark-style .order-editor-product__media{background:linear-gradient(135deg,rgba(105,86,232,.2),rgba(105,86,232,.06))}
+html.dark-style .order-editor-actions .orders-button--primary:disabled{color:#c5bfce;border-color:#4e485b;background:#393440}
 html.dark-style .order-wizard-draft-head,html.dark-style .order-customize__notice{color:#c9c0ff;border-color:rgba(105,86,232,.35);background:rgba(105,86,232,.12)}
