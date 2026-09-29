@@ -81,10 +81,21 @@
             @else
                 @forelse ($reprintResults as $ro)
                     @php($hasPartialCancellation = $ro->status !== 'cancelada' && ($ro->items->contains('is_cancelled', true) || $ro->refunds->isNotEmpty()))
-                    <article class="pos-reprint-order-card {{ $ro->status === 'cancelada' ? 'is-cancelled' : ($hasPartialCancellation ? 'has-partial-cancellation' : '') }}" wire:key="reprint-order-{{ $ro->id }}" role="listitem">
+                    @php($auditCount = $ro->changeRequests->count())
+                    <article class="pos-reprint-order-card {{ $ro->status === 'cancelada' ? 'is-cancelled' : ($hasPartialCancellation ? 'has-partial-cancellation' : '') }} {{ $auditCount > 0 ? 'has-order-audit' : '' }}" wire:key="reprint-order-{{ $ro->id }}" role="listitem">
                         <div class="pos-reprint-order-card__identity">
                             <span><i class="bx {{ $reprintType === 'delivery' ? 'bx-cycling' : 'bx-store-alt' }}"></i></span>
-                            <div><strong>Orden {{ $ro->display_folio }}</strong><small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ \App\Support\BusinessTime::format($ro->created_at, 'g:i A') }}</small><b>${{ number_format($ro->status === 'cancelada' ? 0 : $ro->total, 2) }} · {{ $hasPartialCancellation ? 'Cancelación parcial' : $ro->status_label }}</b></div>
+                            <div>
+                                <strong>Orden {{ $ro->display_folio }}</strong>
+                                <small>{{ $ro->customer_name ?: 'Cliente sin nombre' }} · {{ \App\Support\BusinessTime::format($ro->created_at, 'g:i A') }}</small>
+                                <b>${{ number_format($ro->status === 'cancelada' ? 0 : $ro->total, 2) }} · {{ $hasPartialCancellation ? 'Cancelación parcial' : $ro->status_label }}</b>
+                                @if($auditCount > 0)
+                                    <em class="pos-reprint-audit-badge">
+                                        <i class="bx bx-history" aria-hidden="true"></i>
+                                        {{ $auditCount }} {{ $auditCount === 1 ? 'cambio auditado' : 'cambios auditados' }}
+                                    </em>
+                                @endif
+                            </div>
                         </div>
                         <div class="pos-reprint-actions">
                             <button type="button" wire:click="openReprintModal({{ $ro->id }})" @click="panels.reprint = false" class="pos-btn pos-btn-secondary"><i class="bx bx-receipt"></i>Cliente</button>

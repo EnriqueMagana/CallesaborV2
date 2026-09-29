@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BusinessTime;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -75,7 +76,7 @@ class Promotion extends Model
      */
     public static function posCacheKey(?string $fulfillment): string
     {
-        return 'pos.promotions.'.($fulfillment ?: 'any');
+        return 'pos.promotions.'.BusinessTime::now()->toDateString().'.'.($fulfillment ?: 'any');
     }
 
     /**
@@ -196,7 +197,7 @@ class Promotion extends Model
         ?CarbonInterface $at = null,
         ?string $fulfillment = null,
     ): Builder {
-        $at ??= now();
+        $at ??= BusinessTime::now();
         $column = match ($channel) {
             'digital_menu' => 'show_on_digital_menu',
             'kiosk' => 'show_on_kiosk',
@@ -224,7 +225,7 @@ class Promotion extends Model
         ?string $fulfillment = null,
     ): Builder
     {
-        $at ??= now();
+        $at ??= BusinessTime::now();
         $column = match ($channel) {
             'digital_menu' => 'show_on_digital_menu',
             'kiosk' => 'show_on_kiosk',
@@ -386,7 +387,8 @@ class Promotion extends Model
     public function weekdayLabel(): string
     {
         $labels = [1 => 'Lun', 2 => 'Mar', 3 => 'Mié', 4 => 'Jue', 5 => 'Vie', 6 => 'Sáb', 7 => 'Dom'];
-        $weekdays = array_map('intval', $this->weekdays ?? []);
+        $weekdays = array_values(array_unique(array_map('intval', $this->weekdays ?? [])));
+        sort($weekdays);
 
         return $weekdays === []
             ? 'Todos los días'

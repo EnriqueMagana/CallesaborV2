@@ -164,7 +164,7 @@ class OrderChangeRequestService
                 'refund_amount' => 0.0,
                 'refund_allocations' => [],
                 'pending_balance' => $delta,
-                'collected_by' => $order->is_collected_on_delivery ? 'delivery' : 'register',
+                'collected_by' => $order->type === 'delivery' ? 'delivery' : 'register',
             ];
         }
 

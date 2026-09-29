@@ -10,6 +10,7 @@ use App\Models\Mesa;
 use App\Models\MesaAssignment;
 use App\Models\MesaService;
 use App\Models\Order;
+use App\Models\OrderChangeRequest;
 use App\Models\Product;
 use App\Models\TicketTemplate;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -31,7 +32,23 @@ class ThermalTicketRenderer
         // relations that happened to be loaded before a change was approved.
         // Refresh both attributes (notably the total) and relations so removed
         // and newly-added lines can never be printed from a stale snapshot.
-        $order->refresh()->load(['items.addons', 'items.ingredients', 'items.product.category.printArea', 'items.promotion', 'items.discount', 'seller', 'payments', 'refunds.processor', 'customer', 'mesa.area', 'cancelledBy']);
+        $order->refresh()->load([
+            'items.addons',
+            'items.ingredients',
+            'items.product.category.printArea',
+            'items.promotion',
+            'items.discount',
+            'seller',
+            'payments',
+            'refunds.processor',
+            'customer',
+            'mesa.area',
+            'cancelledBy',
+            'changeRequests' => fn ($query) => $query
+                ->where('status', OrderChangeRequest::STATUS_APPROVED)
+                ->with(['requester', 'reviewer'])
+                ->oldest('applied_at'),
+        ]);
 
         // La cocina nunca debe preparar partidas retiradas. En los tickets del
         // cliente sí se conservan como evidencia, marcadas y fuera del total.
@@ -143,6 +160,7 @@ class ThermalTicketRenderer
                 'processed_at' => $this->businessDate($refund->processed_at),
                 'processed_by' => $refund->processor?->name,
             ])->values()->all(),
+            'order_audits' => $this->orderAuditPayload($order),
             'paid_total' => $paidTotal,
             'net_paid' => max(0, round($paidTotal - $refundTotal, 2)),
             // Sin esta línea el ticket imprime un total mayor al cobrado sin
@@ -157,6 +175,48 @@ class ThermalTicketRenderer
             ],
             'tracking_url' => route('kiosk.track', $order->ensurePublicToken()),
         ];
+    }
+
+    /**
+     * Historial inmutable de cambios aprobados que acompaña cada reimpresión.
+     */
+    private function orderAuditPayload(Order $order): array
+    {
+        return $order->changeRequests->map(function ($request): array {
+            $context = data_get($request->proposed_changes, 'request_context', []);
+            $items = collect(data_get($request->proposed_changes, 'items', []))
+                ->map(function (array $change): array {
+                    $action = (string) ($change['action'] ?? 'update');
+
+                    return [
+                        'action' => $action,
+                        'action_label' => match ($action) {
+                            'add' => 'Agregado',
+                            'remove' => 'Retirado',
+                            default => 'Cantidad modificada',
+                        },
+                        'product' => (string) ($change['product_name'] ?? 'Producto'),
+                        'from_quantity' => (int) ($change['from_quantity'] ?? 0),
+                        'to_quantity' => (int) ($change['to_quantity'] ?? 0),
+                        'before_subtotal' => (float) ($change['before_subtotal'] ?? 0),
+                        'after_subtotal' => (float) ($change['after_subtotal'] ?? 0),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return [
+                'type' => $request->type_label,
+                'reason' => $request->reason,
+                'requested_by' => $request->requester?->name,
+                'approved_by' => $request->reviewer?->name,
+                'approved_at' => $this->businessDate($request->applied_at),
+                'original_total' => (float) $request->original_total,
+                'proposed_total' => (float) ($request->proposed_total ?? $request->original_total),
+                'pending_balance' => (float) data_get($context, 'pending_balance', 0),
+                'items' => $items,
+            ];
+        })->values()->all();
     }
 
     /**

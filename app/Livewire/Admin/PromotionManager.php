@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Models\Product;
 use App\Models\Promotion;
+use App\Support\BusinessTime;
 use App\Traits\ConvertsToWebp;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -90,7 +91,7 @@ class PromotionManager extends Component
     public function mount(): void
     {
         $this->authorize('ver promociones');
-        $this->calendarMonth = now()->format('Y-m');
+        $this->calendarMonth = BusinessTime::now()->format('Y-m');
 
         $productId = (int) request()->query('product', 0);
         if ($productId > 0 && auth()->user()?->can('crear promociones')) {
@@ -99,7 +100,7 @@ class PromotionManager extends Component
                 $this->resetForm();
                 $this->presentationType = 'new';
                 $this->primaryProductId = $product->id;
-                $this->startsOn = now()->toDateString();
+                $this->startsOn = BusinessTime::now()->toDateString();
                 $this->showOnPos = false;
                 $this->showOnKiosk = false;
                 $this->updatedPrimaryProductId($product->id);
@@ -132,7 +133,7 @@ class PromotionManager extends Component
     #[Computed]
     public function calendarDays(): array
     {
-        $month = CarbonImmutable::createFromFormat('Y-m-d', $this->calendarMonth.'-01')->startOfDay();
+        $month = CarbonImmutable::createFromFormat('Y-m-d', $this->calendarMonth.'-01', BusinessTime::timezone())->startOfDay();
         $start = $month->startOfMonth()->startOfWeek();
         $end = $month->endOfMonth()->endOfWeek();
         $days = [];
@@ -163,19 +164,19 @@ class PromotionManager extends Component
 
     public function previousMonth(): void
     {
-        $this->calendarMonth = CarbonImmutable::createFromFormat('Y-m-d', $this->calendarMonth.'-01')->subMonth()->format('Y-m');
+        $this->calendarMonth = CarbonImmutable::createFromFormat('Y-m-d', $this->calendarMonth.'-01', BusinessTime::timezone())->subMonth()->format('Y-m');
         unset($this->calendarDays);
     }
 
     public function nextMonth(): void
     {
-        $this->calendarMonth = CarbonImmutable::createFromFormat('Y-m-d', $this->calendarMonth.'-01')->addMonth()->format('Y-m');
+        $this->calendarMonth = CarbonImmutable::createFromFormat('Y-m-d', $this->calendarMonth.'-01', BusinessTime::timezone())->addMonth()->format('Y-m');
         unset($this->calendarDays);
     }
 
     public function goToCurrentMonth(): void
     {
-        $this->calendarMonth = now()->format('Y-m');
+        $this->calendarMonth = BusinessTime::now()->format('Y-m');
         unset($this->calendarDays);
     }
 
@@ -183,7 +184,7 @@ class PromotionManager extends Component
     {
         $this->authorize('crear promociones');
         $this->resetForm();
-        $this->startsOn = now()->toDateString();
+        $this->startsOn = BusinessTime::now()->toDateString();
         $this->addGroup();
         $this->showEditor = true;
     }
@@ -211,6 +212,7 @@ class PromotionManager extends Component
             Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE => 'fixed_product_price',
             Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT => match (true) {
                 $pricingRule['buy_quantity'] === 1 && $pricingRule['reward_quantity'] === 1 && $pricingRule['reward_discount_percentage'] === 100 => 'two_for_one',
+                $pricingRule['buy_quantity'] === 2 && $pricingRule['reward_quantity'] === 1 && $pricingRule['reward_discount_percentage'] === 100 => 'three_for_two',
                 $pricingRule['buy_quantity'] === 1 && $pricingRule['reward_quantity'] === 1 && $pricingRule['reward_discount_percentage'] === 50 => 'second_half',
                 default => 'custom_quantity',
             },
@@ -295,13 +297,15 @@ class PromotionManager extends Component
 
     public function updatedPricingMechanic(string $mechanic): void
     {
-        if (! in_array($mechanic, ['catalog_price', 'fixed_price', 'fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'], true)) {
+        if (! in_array($mechanic, ['catalog_price', 'fixed_price', 'fixed_product_price', 'percentage_discount', 'two_for_one', 'three_for_two', 'second_half', 'custom_quantity'], true)) {
             return;
         }
 
         $this->launchOfferEnabled = $this->isAutomaticMechanic();
         if ($mechanic === 'two_for_one') {
             [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [1, 1, 100];
+        } elseif ($mechanic === 'three_for_two') {
+            [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [2, 1, 100];
         } elseif ($mechanic === 'second_half') {
             [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [1, 1, 50];
         }
@@ -668,7 +672,7 @@ class PromotionManager extends Component
                     'pricing_rule_type' => match ($this->pricingMechanic) {
                         'percentage_discount' => Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT,
                         'fixed_product_price' => Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE,
-                        'two_for_one', 'second_half', 'custom_quantity' => Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
+                        'two_for_one', 'three_for_two', 'second_half', 'custom_quantity' => Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT,
                         default => null,
                     },
                     'pricing_rule_config' => $this->isAutomaticMechanic()
@@ -697,7 +701,7 @@ class PromotionManager extends Component
                     'ends_on' => filled($validated['endsOn'] ?? null) ? $validated['endsOn'] : null,
                     'recurrence_type' => $validated['scheduleType'],
                     'weekdays' => $validated['scheduleType'] === 'weekdays'
-                        ? array_values(array_map('intval', $validated['weekdays'] ?? []))
+                        ? collect($validated['weekdays'] ?? [])->map(fn ($day) => (int) $day)->unique()->sort()->values()->all()
                         : [],
                     'monthly_day' => $validated['scheduleType'] === 'monthly' ? (int) $validated['monthlyDay'] : null,
                     'fulfillment_modes' => $this->pricingMechanic === 'catalog_price'
@@ -848,20 +852,20 @@ class PromotionManager extends Component
 
     private function isAutomaticMechanic(): bool
     {
-        return in_array($this->pricingMechanic, ['fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'], true);
+        return in_array($this->pricingMechanic, ['fixed_product_price', 'percentage_discount', 'two_for_one', 'three_for_two', 'second_half', 'custom_quantity'], true);
     }
 
     private function usesEligibleProductGroup(): bool
     {
-        return in_array($this->pricingMechanic, ['two_for_one', 'second_half', 'custom_quantity'], true);
+        return in_array($this->pricingMechanic, ['two_for_one', 'three_for_two', 'second_half', 'custom_quantity'], true);
     }
 
     private function allowedPricingMechanics(): array
     {
         return match ($this->presentationType) {
-            'new' => ['catalog_price', 'fixed_product_price', 'percentage_discount', 'two_for_one', 'second_half', 'custom_quantity'],
+            'new' => ['catalog_price', 'fixed_product_price', 'percentage_discount', 'two_for_one', 'three_for_two', 'second_half', 'custom_quantity'],
             'discount' => ['fixed_product_price', 'percentage_discount'],
-            default => ['fixed_price', 'two_for_one', 'second_half', 'custom_quantity'],
+            default => ['fixed_price', 'two_for_one', 'three_for_two', 'second_half', 'custom_quantity'],
         };
     }
 

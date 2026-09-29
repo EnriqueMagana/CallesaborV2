@@ -4,9 +4,6 @@
 /tests
 /.claude/
 /.agents/
-
-# Utilidades de desarrollo. `build-pos-assets.php` SI se versiona: `composer
-# deploy` lo ejecuta para minificar los assets que carga el POS en produccion.
 /scripts/*
 !/scripts/build-pos-assets.php
 .env.backup
