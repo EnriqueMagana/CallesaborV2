@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class BusinessSetting extends Model
 {
+    public const STATUS_ATTENTION_WINDOW_MINUTES = 60;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -118,10 +120,16 @@ class BusinessSetting extends Model
             }
 
             if ($now->greaterThanOrEqualTo($opens) && $now->lessThan($closes)) {
+                $minutesUntilClose = (int) ceil($now->diffInMinutes($closes));
+                $isClosingSoon = $minutesUntilClose <= self::STATUS_ATTENTION_WINDOW_MINUTES;
+
                 return [
                     'is_open' => true,
-                    'label' => 'Abierto ahora',
-                    'detail' => 'Cierra a las '.$closes->format('g:i A'),
+                    'state' => $isClosingSoon ? 'closing-soon' : 'open',
+                    'label' => $isClosingSoon ? 'Cierra pronto' : 'Abierto ahora',
+                    'detail' => $isClosingSoon
+                        ? 'Cierra en '.$this->durationLabel($minutesUntilClose).', a las '.$closes->format('g:i A')
+                        : 'Cierra a las '.$closes->format('g:i A'),
                     'opens_at' => $opens->format('H:i'),
                     'closes_at' => $closes->format('H:i'),
                     'day_label' => $day['label'],
@@ -130,10 +138,16 @@ class BusinessSetting extends Model
             }
 
             if ($opens->isAfter($now)) {
+                $minutesUntilOpen = (int) ceil($now->diffInMinutes($opens));
+                $isOpeningSoon = $minutesUntilOpen <= self::STATUS_ATTENTION_WINDOW_MINUTES;
+
                 return [
                     'is_open' => false,
-                    'label' => 'Cerrado ahora',
-                    'detail' => ($opens->isSameDay($now) ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('g:i A'),
+                    'state' => $isOpeningSoon ? 'opening-soon' : 'closed',
+                    'label' => $isOpeningSoon ? 'Abre pronto' : 'Cerrado ahora',
+                    'detail' => $isOpeningSoon
+                        ? 'Abre en '.$this->durationLabel($minutesUntilOpen).', a las '.$opens->format('g:i A')
+                        : ($opens->isSameDay($now) ? 'Abre hoy' : 'Abre '.$day['label']).' a las '.$opens->format('g:i A'),
                     'opens_at' => $opens->format('H:i'),
                     'closes_at' => $closes->format('H:i'),
                     'day_label' => $day['label'],
@@ -144,6 +158,7 @@ class BusinessSetting extends Model
 
         return [
             'is_open' => false,
+            'state' => 'unavailable',
             'label' => 'Horario no disponible',
             'detail' => 'Consulta nuestros horarios',
             'opens_at' => null,
@@ -151,6 +166,18 @@ class BusinessSetting extends Model
             'day_label' => null,
             'closes_next_day' => false,
         ];
+    }
+
+    private function durationLabel(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $hours = intdiv($minutes, 60);
+        $remainingMinutes = $minutes % 60;
+
+        return collect([
+            $hours > 0 ? $hours.' h' : null,
+            $remainingMinutes > 0 ? $remainingMinutes.' min' : null,
+        ])->filter()->implode(' ') ?: 'menos de 1 min';
     }
 
     /**

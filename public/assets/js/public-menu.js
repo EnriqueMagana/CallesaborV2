@@ -149,15 +149,12 @@
         const dayEnabled = timeline.dataset.hoursDayEnabled === 'true'
             && Number.isFinite(opensAt)
             && Number.isFinite(closesAt);
+        const attentionWindowMs = Math.max(1, Number(timeline.dataset.hoursAttentionWindow) || 60) * 60000;
         const clock = timeline.querySelector('[data-hours-clock]');
         const date = timeline.querySelector('[data-hours-date]');
         const statusLabel = timeline.querySelector('[data-hours-status-label]');
         const statusDetail = timeline.querySelector('[data-hours-status-detail]');
         const statusIcon = timeline.querySelector('[data-hours-status-icon]');
-        const progressLabel = timeline.querySelector('[data-hours-progress-label]');
-        const progressPercent = timeline.querySelector('[data-hours-progress-percent]');
-        const progressbar = timeline.querySelector('[data-hours-progressbar]');
-        const progressFill = timeline.querySelector('[data-hours-progress-fill]');
         const clockFormatter = new Intl.DateTimeFormat('es-MX', {
             timeZone: timezone,
             hour: 'numeric',
@@ -212,47 +209,51 @@
             }
 
             let state = 'closed-day';
-            let progress = 0;
             if (dayEnabled && timestamp < opensAt) {
-                state = 'upcoming';
+                state = opensAt - timestamp <= attentionWindowMs ? 'opening-soon' : 'upcoming';
             } else if (dayEnabled && timestamp < closesAt) {
-                state = 'open';
-                progress = Math.max(0, Math.min(1, (timestamp - opensAt) / Math.max(1, closesAt - opensAt)));
+                state = closesAt - timestamp <= attentionWindowMs ? 'closing-soon' : 'open';
             } else if (dayEnabled) {
                 state = 'closed';
-                progress = 1;
             }
 
             const copy = {
                 open: {
                     label: 'Abierto ahora',
-                    detail: `Quedan ${durationLabel(closesAt - timestamp)} de servicio.`,
-                    progress: 'Jornada en curso',
+                    detail: `Cerramos a las ${clockFormatter.format(new Date(closesAt))}.`,
                     icon: 'bx-check-circle',
+                },
+                'closing-soon': {
+                    label: 'Cierra pronto',
+                    detail: `Cerramos en ${durationLabel(closesAt - timestamp)}, a las ${clockFormatter.format(new Date(closesAt))}.`,
+                    icon: 'bx-alarm-exclamation',
+                },
+                'opening-soon': {
+                    label: 'Abrimos pronto',
+                    detail: `Abrimos en ${durationLabel(opensAt - timestamp)}, a las ${clockFormatter.format(new Date(opensAt))}.`,
+                    icon: 'bx-time',
                 },
                 upcoming: {
                     label: 'Abrimos más tarde',
-                    detail: `Abrimos en ${durationLabel(opensAt - timestamp)}.`,
-                    progress: 'La jornada comienza pronto',
+                    detail: `Abrimos en ${durationLabel(opensAt - timestamp)}, a las ${clockFormatter.format(new Date(opensAt))}.`,
                     icon: 'bx-time',
                 },
                 closed: {
                     label: 'Cerrado por hoy',
                     detail: 'La jornada de hoy ha finalizado. Te esperamos en nuestra próxima apertura.',
-                    progress: 'Jornada finalizada',
                     icon: 'bx-moon',
                 },
                 'closed-day': {
                     label: 'Hoy no abrimos',
                     detail: 'Consulta la semana completa para planear tu próxima visita.',
-                    progress: 'Sin servicio hoy',
                     icon: 'bx-calendar-x',
                 },
             }[state];
-            const percentage = Math.round(progress * 100);
 
             timeline.classList.remove(
                 'info-status-card--open',
+                'info-status-card--closing-soon',
+                'info-status-card--opening-soon',
                 'info-status-card--upcoming',
                 'info-status-card--closed',
                 'info-status-card--closed-day',
@@ -261,15 +262,8 @@
             timeline.dataset.hoursState = state;
             if (statusLabel) statusLabel.textContent = copy.label;
             if (statusDetail) statusDetail.textContent = copy.detail;
-            if (progressLabel) progressLabel.textContent = copy.progress;
-            if (progressPercent) progressPercent.textContent = `${percentage}%`;
-            if (progressFill) progressFill.style.setProperty('--hours-progress', String(progress));
-            if (progressbar) {
-                progressbar.setAttribute('aria-valuenow', String(percentage));
-                progressbar.setAttribute('aria-valuetext', `${copy.label}, ${percentage}% de la jornada`);
-            }
             if (statusIcon) {
-                statusIcon.classList.remove('bx-check-circle', 'bx-time', 'bx-moon', 'bx-calendar-x');
+                statusIcon.classList.remove('bx-check-circle', 'bx-alarm-exclamation', 'bx-time', 'bx-moon', 'bx-calendar-x');
                 statusIcon.classList.add(copy.icon);
             }
         };
@@ -439,7 +433,7 @@
         const current = carousel.querySelector('[data-quick-access-current]');
         const currentLabel = carousel.querySelector('[data-quick-access-label]');
         const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        let activeIndex = 0;
+        let activeIndex = Math.max(0, items.findIndex((item) => item.classList.contains('is-current')));
         let scrollFrame = null;
         let programmaticScroll = false;
         let settleTimer = null;
@@ -449,6 +443,29 @@
         const itemLabel = (item) => item.dataset.accessLabel
             || item.querySelector(':scope > span:last-child')?.textContent.trim()
             || '';
+
+        const syncCurrentLocation = () => {
+            const currentUrl = new URL(window.location.href);
+            const exactItem = items.find((item) => {
+                const target = new URL(item.href, window.location.origin);
+                return target.pathname === currentUrl.pathname
+                    && target.hash === currentUrl.hash
+                    && (target.hash !== '' || currentUrl.hash === '');
+            });
+
+            if (!exactItem) return;
+
+            items.forEach((item) => {
+                const isCurrent = item === exactItem;
+                item.classList.toggle('is-current', isCurrent);
+                if (isCurrent) {
+                    item.setAttribute('aria-current', 'page');
+                } else {
+                    item.removeAttribute('aria-current');
+                }
+            });
+            activeIndex = items.indexOf(exactItem);
+        };
 
         const renderState = () => {
             items.forEach((item, index) => item.classList.toggle('is-active', index === activeIndex));
@@ -533,8 +550,23 @@
             }
         });
         window.addEventListener('resize', requestStateUpdate, { passive: true });
-        updateState();
+        syncCurrentLocation();
+        if (items[activeIndex]?.classList.contains('is-current')) {
+            window.requestAnimationFrame(() => goTo(activeIndex));
+        } else {
+            updateState();
+        }
     });
+
+    const legacyContactRouter = document.querySelector('[data-legacy-contact-router]');
+    if (legacyContactRouter) {
+        const legacyDestination = {
+            '#redes-sociales': legacyContactRouter.dataset.socialUrl,
+            '#ubicacion': legacyContactRouter.dataset.locationUrl,
+        }[window.location.hash];
+
+        if (legacyDestination) window.location.replace(legacyDestination);
+    }
 
     const input = document.getElementById('menu-search-input');
     const clear = document.getElementById('menu-search-clear');
@@ -744,6 +776,8 @@
         const badge = promotionModal.querySelector('[data-promotion-modal-badge]');
         const name = promotionModal.querySelector('[data-promotion-modal-name]');
         const price = promotionModal.querySelector('[data-promotion-modal-price]');
+        const offerCaption = promotionModal.querySelector('[data-promotion-modal-offer-caption]');
+        const pricing = promotionModal.querySelector('[data-promotion-modal-pricing]');
         const summary = promotionModal.querySelector('[data-promotion-modal-summary]');
         const description = promotionModal.querySelector('[data-promotion-modal-description]');
         const days = promotionModal.querySelector('[data-promotion-modal-days]');
@@ -771,7 +805,9 @@
                 }
                 lastTrigger = trigger;
                 name.textContent = promotion.name;
-                price.textContent = promotion.price;
+                price.textContent = promotion.offerValue;
+                offerCaption.textContent = promotion.offerCaption;
+                pricing.textContent = promotion.pricingExplanation;
                 summary.textContent = promotion.summary;
                 description.textContent = promotion.description || '';
                 description.hidden = !promotion.description;

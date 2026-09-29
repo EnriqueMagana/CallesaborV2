@@ -9,6 +9,12 @@
     'livewire' => false,
 ])
 
+@php
+    $loaderLogoUrl = $business->logo_path
+        ? Storage::url($business->logo_path)
+        : asset('assets/img/restaurant/logo_light.png');
+@endphp
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -17,6 +23,7 @@
     <meta name="theme-color" content="{{ $menuSettings->primary_color ?? '#15803d' }}">
     <meta name="description" content="{{ $description }}">
     <title>{{ $title }}</title>
+    <link rel="preload" href="{{ $loaderLogoUrl }}" as="image" fetchpriority="high">
     @include('partials.favicon')
     @if ($fontUrl)
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,7 +43,9 @@
         @livewireStyles
     @endif
 </head>
-<body @if (filled($bodyClass)) class="{{ $bodyClass }}" @endif style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
+<body class="{{ trim($bodyClass.' has-public-page-loader') }}" aria-busy="true"
+    style="--menu-primary: {{ $menuSettings->primary_color ?? '#15803d' }}">
+    <x-public-menu.page-loader :business="$business" />
     {{ $slot }}
     @if ($livewire)
         @livewireScripts

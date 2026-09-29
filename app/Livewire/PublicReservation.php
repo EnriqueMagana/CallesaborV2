@@ -40,8 +40,9 @@ class PublicReservation extends Component
 
     public ?string $confirmationCode = null;
 
-    public function mount(): void
+    public function mount(bool $autoOpen = false): void
     {
+        $this->isOpen = $autoOpen;
         $this->selectedDate = array_key_first($this->dateOptions) ?? $this->businessNow()->format('Y-m-d');
     }
 

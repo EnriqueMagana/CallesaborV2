@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\DigitalMenuSetting;
 use App\Models\Product;
 use App\Models\Promotion;
+use App\Support\BusinessTime;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -17,7 +18,7 @@ class PublicMenuController extends Controller
     {
         $business = BusinessSetting::current();
         $menuSettings = DigitalMenuSetting::current();
-        $moment = now(config('app.business_timezone', 'America/Mexico_City'));
+        $moment = BusinessTime::now();
         $categories = Category::query()
             ->where('is_active', true)
             ->whereHas('products', fn ($query) => $query->where('is_active', true))
@@ -50,7 +51,7 @@ class PublicMenuController extends Controller
             ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
             ->values();
         $campaigns = Promotion::query()
-            ->available('digital_menu')
+            ->available('digital_menu', $moment)
             ->with([
                 'groups.products' => fn ($query) => $query
                     ->where('is_active', true)
