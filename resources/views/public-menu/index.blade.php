@@ -31,7 +31,7 @@
                 <p class="menu-search__status" id="menu-search-status" aria-live="polite"></p>
             </div>
 
-            @if ($menuSettings->show_categories)
+            @if ($menuSettings->show_categories || $promotions->isNotEmpty() || $discountCampaigns->isNotEmpty() || $newProductCampaigns->isNotEmpty())
                 <nav @class([
                     'category-nav',
                     'category-nav--circles' => $menuSettings->category_style === 'circles',
@@ -75,6 +75,7 @@
                                             {{ $newProductCampaigns->count() === 1 ? 'novedad' : 'novedades' }}</small></span>
                                 </a>
                             @endif
+                            @if ($menuSettings->show_categories)
                             @foreach ($categories as $category)
                                 @php
                                     $categoryPreview = $category->products->first(
@@ -111,6 +112,7 @@
                                             opciones</small></span>
                                 </a>
                             @endif
+                            @endif
                         </div>
                         <button class="category-nav__control category-nav__control--next" type="button"
                             data-category-next aria-label="Ver más categorías" aria-controls="category-nav-scroll"
@@ -144,7 +146,9 @@
                                             160,
                                         ),
                                     'description' => $promotion->description,
-                                    'price' => '$' . number_format((float) $promotion->price, 2),
+                                    'offerCaption' => $promotion->publicOfferCaption(),
+                                    'offerValue' => $promotion->publicOfferValue(),
+                                    'pricingExplanation' => $promotion->publicPricingExplanation(),
                                     'image' => $promotion->image ? Storage::url($promotion->image) : null,
                                     'badge' => $promotion->presentationLabel(),
                                     'icon' => $promotion->presentationIcon(),
@@ -159,7 +163,7 @@
                                         ->map(
                                             fn($group) => [
                                                 'name' => $group->name,
-                                                'rule' => "Elige de {$group->min_selections} a {$group->max_selections}",
+                                                'rule' => $promotion->publicGroupRule($group),
                                                 'products' => $group->products
                                                     ->map(
                                                         fn($product) => [
@@ -199,7 +203,7 @@
                                     </div>
                                 </div>
                                 <strong
-                                    class="promotion-banner__price"><small>{{ $promotion->pricing_rule_type === \App\Models\Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE || !$promotion->hasAutomaticPricingRule() ? 'Precio promo' : 'Precio base' }}</small><span>${{ number_format($promotion->price, 2) }}</span></strong>
+                                    class="promotion-banner__price"><small>{{ $promotion->publicOfferCaption() }}</small><span>{{ $promotion->publicOfferValue() }}</span></strong>
                             </article>
                         @endforeach
                     </div>
@@ -363,72 +367,7 @@
             </div>
         </section>
 
-        @php
-            $socialUrl = $business->instagram_url
-                ?: ($business->facebook_url ?: ($business->tiktok_url ?: route('public.contact')));
-            $locationUrl = $business->maps_url ?: route('public.contact');
-            $quickAccesses = [
-                ['label' => 'Inicio', 'mobile_label' => 'Inicio', 'icon' => 'bx-home-alt', 'mobile_icon' => 'bx-home', 'href' => route('public.home'), 'external' => false],
-                ['label' => 'Haz una reservación', 'mobile_label' => 'Reservar', 'icon' => 'bx-calendar-check', 'mobile_icon' => 'bx-calendar', 'href' => route('public.home') . '#reservar', 'external' => false],
-                ['label' => 'Horarios', 'mobile_label' => 'Horarios', 'icon' => 'bx-time-five', 'mobile_icon' => 'bx-time-five', 'href' => route('public.hours'), 'external' => false],
-                ['label' => 'Redes sociales', 'mobile_label' => 'Redes', 'icon' => 'bxl-instagram', 'mobile_icon' => 'bxl-instagram', 'href' => $socialUrl, 'external' => $socialUrl !== route('public.contact')],
-                ['label' => 'Ubicación', 'mobile_label' => 'Ubicación', 'icon' => 'bx-map-pin', 'mobile_icon' => 'bx-map', 'href' => $locationUrl, 'external' => filled($business->maps_url)],
-            ];
-        @endphp
-        <section class="menu-farewell" aria-labelledby="menu-farewell-title" data-quick-access-carousel>
-            <div class="menu-container">
-                <header class="menu-farewell__heading">
-                    <h2 id="menu-farewell-title">Gracias por tu visita</h2>
-                    <p>Esperamos volver a verte pronto.</p>
-                </header>
-
-                <div class="menu-farewell__carousel">
-                    <button class="menu-farewell__control menu-farewell__control--previous" type="button"
-                        data-quick-access-previous aria-label="Ver acceso anterior"
-                        aria-controls="menu-quick-access-rail">
-                        <i class="bx bx-chevron-left" aria-hidden="true"></i>
-                    </button>
-                    <nav class="menu-farewell__rail" id="menu-quick-access-rail" data-quick-access-rail
-                        aria-label="Accesos rápidos" aria-roledescription="carrusel" tabindex="0">
-                        @foreach ($quickAccesses as $access)
-                            <a @class(['menu-farewell__item', 'is-active' => $loop->first]) href="{{ $access['href'] }}" data-quick-access-item
-                                data-access-label="{{ $access['label'] }}"
-                                @if ($access['external']) target="_blank" rel="noopener noreferrer" @endif>
-                                <span class="menu-farewell__icon" aria-hidden="true">
-                                    <i class="bx {{ $access['icon'] }} menu-farewell__icon-desktop"></i>
-                                    <i class="bx {{ $access['mobile_icon'] }} menu-farewell__icon-mobile"></i>
-                                </span>
-                                <span class="menu-farewell__label">
-                                    <span class="menu-farewell__label-desktop">{{ $access['label'] }}</span>
-                                    <span class="menu-farewell__label-mobile">{{ $access['mobile_label'] }}</span>
-                                </span>
-                            </a>
-                        @endforeach
-                    </nav>
-                    <button class="menu-farewell__control menu-farewell__control--next" type="button"
-                        data-quick-access-next aria-label="Ver siguiente acceso"
-                        aria-controls="menu-quick-access-rail">
-                        <i class="bx bx-chevron-right" aria-hidden="true"></i>
-                    </button>
-                </div>
-
-                <div class="menu-farewell__pagination">
-                    <span class="menu-farewell__position" aria-hidden="true">
-                        <strong data-quick-access-current>1</strong><span>de</span><strong>{{ count($quickAccesses) }}</strong>
-                    </span>
-                    <div class="menu-farewell__dots" aria-label="Elegir acceso rápido">
-                        @foreach ($quickAccesses as $access)
-                            <button type="button" data-quick-access-dot="{{ $loop->index }}"
-                                aria-label="Mostrar {{ $access['label'] }}"
-                                aria-pressed="{{ $loop->first ? 'true' : 'false' }}"
-                                @class(['is-active' => $loop->first])></button>
-                        @endforeach
-                    </div>
-                    <p class="menu-farewell__current-label" data-quick-access-label aria-live="polite"
-                        aria-atomic="true">Inicio</p>
-                </div>
-            </div>
-        </section>
+        <x-public-menu.quick-access />
     </main>
 
     <x-public-menu.footer :business="$business" :menu-settings="$menuSettings" />
@@ -450,6 +389,7 @@
                                 data-promotion-modal-price></strong>
                             <p data-promotion-modal-summary></p>
                         </div>
+                        <div class="promotion-detail-modal__pricing"><i class="bx bx-purchase-tag-alt" aria-hidden="true"></i><span><small data-promotion-modal-offer-caption></small><strong data-promotion-modal-pricing></strong></span></div>
                         <div class="product-modal__limits">
                             <div class="product-modal__limit"><i class="bx bx-calendar-check"></i><span><small>Días
                                         válidos</small><strong data-promotion-modal-days></strong></span></div>
@@ -467,8 +407,7 @@
                         <div class="product-modal__groups" data-promotion-modal-groups></div>
                     </div>
                 </div>
-                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>El
-                        precio mostrado cubre la promoción completa; los combos conservan el precio publicado</span><button type="button"
+                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La disponibilidad y el beneficio se validan al realizar el pedido</span><button type="button"
                         data-promotion-modal-close>Cerrar detalle</button></footer>
             </div>
         </dialog>

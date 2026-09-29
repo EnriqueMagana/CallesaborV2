@@ -59,8 +59,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', PublicHomeController::class)->name('public.home');
 Route::get('/menu', PublicMenuController::class)->name('public.menu');
 Route::redirect('/men', '/menu', 301);
+Route::get('/reservar', [PublicInfoController::class, 'reservation'])->name('public.reservation');
 Route::get('/horarios', [PublicInfoController::class, 'hours'])->name('public.hours');
 Route::get('/galeria', [PublicInfoController::class, 'gallery'])->name('public.gallery');
+Route::get('/redes-sociales', [PublicInfoController::class, 'social'])->name('public.social');
+Route::get('/ubicacion', [PublicInfoController::class, 'location'])->name('public.location');
 Route::get('/contacto', [PublicInfoController::class, 'contact'])->name('public.contact');
 
 Route::get('/admin', function () {

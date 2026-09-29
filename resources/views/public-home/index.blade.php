@@ -5,8 +5,7 @@
     :description="'Descubre el menú, reserva una mesa y conoce '.$business->business_name.'.'"
     body-class="public-home"
     :styles="['assets/css/public-home.css']"
-    font-url="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
-    livewire>
+    font-url="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
     <a class="menu-skip-link" href="#experiencia">Saltar al contenido</a>
     @php
         $heroSlides = collect($menuSettings->show_banners ? $menuSettings->bannerItems() : []);
@@ -43,7 +42,7 @@
             </a>
             <nav class="home-hero__links" aria-label="Accesos principales">
                 <a href="{{ route('public.menu') }}">Menú</a>
-                <a href="#reservar">Reservaciones</a>
+                <a href="{{ route('public.reservation') }}">Reservaciones</a>
                 @if ($menuSettings->show_gallery)
                     <a href="#galeria">Galería</a>
                 @endif
@@ -69,7 +68,7 @@
                     <a class="home-hero__primary" href="{{ route('public.menu') }}">
                         <span>Explorar el menú</span><i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
                     </a>
-                    <a class="home-hero__secondary" href="#reservar">
+                    <a class="home-hero__secondary" href="{{ route('public.reservation') }}">
                         <i class="bx bx-calendar-check" aria-hidden="true"></i><span>Reservar una mesa</span>
                     </a>
                 </div>
@@ -85,7 +84,7 @@
     <nav class="home-nav" aria-label="Navegación principal">
         <div class="menu-container">
             <a href="{{ route('public.menu') }}"><i class="bx bx-food-menu" aria-hidden="true"></i>Menú</a>
-            <a href="#reservar"><i class="bx bx-calendar-check" aria-hidden="true"></i>Reservar</a>
+            <a href="{{ route('public.reservation') }}"><i class="bx bx-calendar-check" aria-hidden="true"></i>Reservar</a>
             <a href="#horarios"><i class="bx bx-time-five" aria-hidden="true"></i>Horarios</a>
             @if ($menuSettings->show_gallery)
                 <a href="#galeria"><i class="bx bx-images" aria-hidden="true"></i>Galería</a>
@@ -114,10 +113,10 @@
                             aria-hidden="true"></i></span><span><small>Descubre nuestros
                             sabores</small><strong>Explorar
                             el menú</strong></span><i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a>
-                <a href="#reservar" class="home-secondary-action"><span><i class="bx bx-calendar-check"
+                <a href="{{ route('public.reservation') }}" class="home-secondary-action"><span><i class="bx bx-calendar-check"
                             aria-hidden="true"></i></span><span><small>Planea tu experiencia</small><strong>Reservar
                             una
-                            mesa</strong></span><i class="bx bx-down-arrow-alt" aria-hidden="true"></i></a>
+                            mesa</strong></span><i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a>
             </div>
         </section>
 
@@ -202,7 +201,11 @@
                     <h2 id="reservation-section-title">Reserva fácil, llega y disfruta</h2>
                     <p>Elige una fecha, consulta los horarios disponibles y registra tu mesa en menos de un minuto.</p>
                 </div>
-                <livewire:public-reservation />
+                <a class="reservation-launch" href="{{ route('public.reservation') }}">
+                    <span><i class="bx bx-calendar-check" aria-hidden="true"></i></span>
+                    <span><small>Abrir página de reservación</small><strong>Consultar disponibilidad</strong></span>
+                    <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+                </a>
             </div>
         </section>
 

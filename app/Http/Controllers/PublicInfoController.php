@@ -4,12 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\BusinessSetting;
 use App\Models\DigitalMenuSetting;
+use App\Support\BusinessTime;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class PublicInfoController extends Controller
 {
+    public function reservation(): View
+    {
+        return view('public-menu.reservation', $this->sharedData());
+    }
+
     public function hours(): View
     {
         return view('public-menu.hours', $this->sharedData());
@@ -25,10 +31,20 @@ class PublicInfoController extends Controller
 
     public function contact(): View
     {
+        return view('public-menu.contact', $this->sharedData());
+    }
+
+    public function social(): View
+    {
+        return view('public-menu.social', $this->sharedData());
+    }
+
+    public function location(): View
+    {
         $data = $this->sharedData();
         $data['locationMap'] = $this->locationMap($data['business']);
 
-        return view('public-menu.contact', $data);
+        return view('public-menu.location', $data);
     }
 
     private function locationMap(BusinessSetting $business): array
@@ -81,7 +97,7 @@ class PublicInfoController extends Controller
     {
         $business = BusinessSetting::current();
         $menuSettings = DigitalMenuSetting::current();
-        $moment = now(config('app.business_timezone', 'America/Mexico_City'));
+        $moment = BusinessTime::now();
         $weeklySchedule = collect($business->weeklySchedule($moment))
             ->map(fn (array $day): array => array_merge($day, [
                 'opens_label' => $day['enabled'] ? $this->formatTime12($day['opens']) : null,
@@ -128,28 +144,29 @@ class PublicInfoController extends Controller
         $todayWindow = $windowFor($now->copy());
 
         if ($activeWindow) {
-            $state = 'open';
             $window = $activeWindow;
-            $progress = ($now->timestamp - $window['opens']->timestamp)
-                / max(1, $window['closes']->timestamp - $window['opens']->timestamp);
-            $statusLabel = 'Abierto ahora';
-            $statusDetail = 'Quedan '.$this->durationLabel($now->diffInMinutes($window['closes'])).' de servicio.';
+            $remainingMinutes = (int) ceil($now->diffInMinutes($window['closes']));
+            $isClosingSoon = $remainingMinutes <= BusinessSetting::STATUS_ATTENTION_WINDOW_MINUTES;
+            $state = $isClosingSoon ? 'closing-soon' : 'open';
+            $statusLabel = $isClosingSoon ? 'Cierra pronto' : 'Abierto ahora';
+            $statusDetail = $isClosingSoon
+                ? 'Cerramos en '.$this->durationLabel($remainingMinutes).', a las '.$this->formatDateTime12($window['closes']).'.'
+                : 'Cerramos a las '.$this->formatDateTime12($window['closes']).'.';
         } elseif ($todayWindow && $now->lessThan($todayWindow['opens'])) {
-            $state = 'upcoming';
             $window = $todayWindow;
-            $progress = 0;
-            $statusLabel = 'Abrimos más tarde';
-            $statusDetail = 'Abrimos en '.$this->durationLabel($now->diffInMinutes($window['opens'])).'.';
+            $remainingMinutes = (int) ceil($now->diffInMinutes($window['opens']));
+            $isOpeningSoon = $remainingMinutes <= BusinessSetting::STATUS_ATTENTION_WINDOW_MINUTES;
+            $state = $isOpeningSoon ? 'opening-soon' : 'upcoming';
+            $statusLabel = $isOpeningSoon ? 'Abrimos pronto' : 'Abrimos más tarde';
+            $statusDetail = 'Abrimos en '.$this->durationLabel($remainingMinutes).', a las '.$this->formatDateTime12($window['opens']).'.';
         } elseif ($todayWindow) {
             $state = 'closed';
             $window = $todayWindow;
-            $progress = 1;
             $statusLabel = 'Cerrado por hoy';
             $statusDetail = 'La jornada de hoy ha finalizado. Te esperamos en nuestra próxima apertura.';
         } else {
             $state = 'closed-day';
             $window = null;
-            $progress = 0;
             $statusLabel = 'Hoy no abrimos';
             $statusDetail = 'Consulta la semana completa para planear tu próxima visita.';
         }
@@ -158,7 +175,7 @@ class PublicInfoController extends Controller
             'state' => $state,
             'status_label' => $statusLabel,
             'status_detail' => $statusDetail,
-            'progress' => round(max(0, min(1, $progress)), 4),
+            'attention_window_minutes' => BusinessSetting::STATUS_ATTENTION_WINDOW_MINUTES,
             'timezone' => config('app.business_timezone', 'America/Mexico_City'),
             'timezone_label' => str((string) config('app.business_timezone', 'America/Mexico_City'))
                 ->afterLast('/')

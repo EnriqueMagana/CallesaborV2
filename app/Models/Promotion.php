@@ -191,6 +191,79 @@ class Promotion extends Model
         return "Compra {$rule['buy_quantity']} + {$rule['reward_quantity']} con -{$rule['reward_discount_percentage']}%";
     }
 
+    public function publicOfferCaption(): string
+    {
+        if (! $this->hasAutomaticPricingRule()) {
+            return 'Precio promo';
+        }
+
+        return match ($this->pricing_rule_type) {
+            self::PRICING_RULE_PERCENTAGE_DISCOUNT => 'Descuento',
+            self::PRICING_RULE_FIXED_PRODUCT_PRICE => 'Precio especial',
+            self::PRICING_RULE_BUY_X_GET_Y_DISCOUNT => 'Beneficio',
+            default => 'Promoción',
+        };
+    }
+
+    public function publicOfferValue(): string
+    {
+        if (! $this->hasAutomaticPricingRule()) {
+            return '$'.number_format((float) $this->price, 2);
+        }
+
+        return match ($this->pricing_rule_type) {
+            self::PRICING_RULE_FIXED_PRODUCT_PRICE => '$'.number_format($this->normalizedPricingRule()['fixed_price'], 2),
+            default => $this->pricingRuleShortLabel() ?? '$'.number_format((float) $this->price, 2),
+        };
+    }
+
+    public function publicPricingExplanation(): string
+    {
+        if (! $this->hasAutomaticPricingRule()) {
+            return 'Completa la selección indicada por '.$this->publicOfferValue().'.';
+        }
+
+        $rule = $this->normalizedPricingRule();
+
+        if ($this->pricing_rule_type === self::PRICING_RULE_PERCENTAGE_DISCOUNT) {
+            return "Se descuenta {$rule['discount_percentage']}% del precio base del producto.";
+        }
+
+        if ($this->pricing_rule_type === self::PRICING_RULE_FIXED_PRODUCT_PRICE) {
+            return 'El producto tendrá un precio especial de $'.number_format($rule['fixed_price'], 2).'.';
+        }
+
+        $cycle = $rule['buy_quantity'] + $rule['reward_quantity'];
+        if ($rule['reward_discount_percentage'] === 100) {
+            $explanation = "Elige {$cycle} productos participantes y paga solamente {$rule['buy_quantity']}.";
+        } else {
+            $explanation = "Al elegir {$cycle} productos, {$rule['reward_quantity']} recibe {$rule['reward_discount_percentage']}% de descuento.";
+        }
+
+        if ($rule['reward_scope'] === 'eligible_group') {
+            $explanation .= ' Puedes combinarlos o repetirlos; el beneficio se aplica a los de menor precio.';
+        }
+
+        return $explanation;
+    }
+
+    public function publicGroupRule(PromotionGroup $group): string
+    {
+        if ($this->pricing_rule_type === self::PRICING_RULE_BUY_X_GET_Y_DISCOUNT
+            && $this->normalizedPricingRule()['reward_scope'] === 'eligible_group') {
+            $rule = $this->normalizedPricingRule();
+            $cycle = $rule['buy_quantity'] + $rule['reward_quantity'];
+
+            return "Elige {$cycle} por cada aplicación; puedes combinar o repetir.";
+        }
+
+        if ((int) $group->min_selections === (int) $group->max_selections) {
+            return 'Elige exactamente '.(int) $group->min_selections;
+        }
+
+        return "Elige de {$group->min_selections} a {$group->max_selections}";
+    }
+
     public function scopeAutomaticPricingAvailable(
         Builder $query,
         string $channel,
