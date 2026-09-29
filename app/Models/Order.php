@@ -356,6 +356,32 @@ class Order extends Model
         return $query->whereRaw(static::pendingBalanceSql($this->getTable()));
     }
 
+    /**
+     * Saldo que debe resolver fisicamente el cajero en ventanilla.
+     * Delivery queda fuera: su diferencia pertenece a su propio flujo.
+     */
+    public static function registerPendingBalanceSql(string $ordersTable = 'orders'): string
+    {
+        $payments = (new OrderPayment)->getTable();
+        $refunds = (new OrderRefund)->getTable();
+        $realPaid = "coalesce((select sum(rp.amount) from {$payments} rp where rp.order_id = {$ordersTable}.id and rp.is_provisional = 0), 0)";
+        $refunded = "coalesce((select sum(rf.amount) from {$refunds} rf where rf.order_id = {$ordersTable}.id), 0)";
+        $netPaid = "({$realPaid} - {$refunded})";
+        $counterArea = "(({$ordersTable}.type in ('ventanilla', 'pick_up')"
+            ." and ({$ordersTable}.source is null or {$ordersTable}.source <> 'kiosk'))"
+            ." or ({$ordersTable}.source = 'kiosk' and {$ordersTable}.fulfillment = 'takeaway'))";
+
+        return "{$ordersTable}.status <> 'cancelada'"
+            ." and {$counterArea}"
+            ." and {$netPaid} > 0.009"
+            ." and {$ordersTable}.total - {$netPaid} > 0.009";
+    }
+
+    public function scopeWithRegisterPendingBalance(Builder $query): Builder
+    {
+        return $query->whereRaw(static::registerPendingBalanceSql($this->getTable()));
+    }
+
     public function scopeFinalizedForAccounting(Builder $query): Builder
     {
         return $query

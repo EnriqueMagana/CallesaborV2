@@ -17,6 +17,7 @@ use App\Models\MesaGroup;
 use App\Models\MesaService;
 use App\Models\MesaSplit;
 use App\Models\Order;
+use App\Models\OrderChangeRequest;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\Product;
@@ -349,7 +350,16 @@ class PointOfSale extends Component
 
         $search = $this->reprintSearch;
 
-        return Order::with(['items', 'payments', 'refunds', 'mesa.area'])
+        return Order::with([
+            'items',
+            'payments',
+            'refunds',
+            'mesa.area',
+            'changeRequests' => fn ($query) => $query
+                ->where('status', OrderChangeRequest::STATUS_APPROVED)
+                ->with(['requester', 'reviewer'])
+                ->latest('applied_at'),
+        ])
             ->where('cash_register_id', $cashRegisterId)
             ->where(function ($query) {
                 match ($this->reprintType) {
@@ -573,7 +583,7 @@ class PointOfSale extends Component
 
         $deliveryCondition = "{$ordersTable}.type = 'delivery' and {$ordersTable}.status = 'pendiente'";
 
-        $balanceCondition = Order::pendingBalanceSql($ordersTable);
+        $balanceCondition = Order::registerPendingBalanceSql($ordersTable);
 
         $legacyTableCondition = "{$ordersTable}.mesa_service_id is null"
             ." and {$ordersTable}.mesa_id is not null"
@@ -965,6 +975,18 @@ class PointOfSale extends Component
             })
             ->orderByDesc('created_at')
             ->get();
+    }
+
+    #[Computed]
+    public function pickupPayOrder(): ?Order
+    {
+        if (! $this->showPickupPayModal || ! $this->pickupPayOrderId) {
+            return null;
+        }
+
+        return Order::with(['items.addons', 'items.product', 'customer', 'payments', 'refunds'])
+            ->where('cash_register_id', $this->activeCashRegister?->id)
+            ->find($this->pickupPayOrderId);
     }
 
     #[Computed]
@@ -1666,10 +1688,13 @@ class PointOfSale extends Component
         $order = Order::where('cash_register_id', $this->activeCashRegister?->id)
             ->findOrFail($orderId);
 
-        $isPayableArea = $order->source === 'kiosk'
-            || in_array($order->type, ['pick_up', 'ventanilla', 'delivery', 'mesa'], true);
+        if (! $this->isPosCollectionOrder($order)) {
+            $this->dispatch('notify', type: 'warning', message: 'Los pedidos delivery se cobran y liquidan desde su propio flujo.');
 
-        if (! $isPayableArea || $order->status !== 'lista') {
+            return;
+        }
+
+        if ($order->status !== 'lista') {
             $this->dispatch('notify', type: 'warning', message: 'Marca el pedido como listo antes de cobrarlo.');
 
             return;
@@ -1677,14 +1702,13 @@ class PointOfSale extends Component
 
         $this->pickupPayOrderId = $orderId;
         $this->pickupPayments = [];
-        $this->pickupPayMethod = ($order->type === 'delivery' && $order->delivery_method === 'contra_entrega')
-            ? 'contra_entrega'
-            : 'cash';
+        $this->pickupPayMethod = 'cash';
         $this->pickupPayAmount = '';
         $this->pickupPayReceived = '';
         $this->pickupPayCard = '';
         $this->pickupPayRef = '';
         $this->showPickupPayModal = true;
+        unset($this->pickupPayOrder);
     }
 
     public function closePickupPayModal(): void
@@ -1692,6 +1716,16 @@ class PointOfSale extends Component
         $this->showPickupPayModal = false;
         $this->pickupPayOrderId = null;
         $this->pickupPayments = [];
+        unset($this->pickupPayOrder);
+    }
+
+    private function isPosCollectionOrder(Order $order): bool
+    {
+        if ($order->source === 'kiosk') {
+            return $order->fulfillment !== 'delivery';
+        }
+
+        return in_array($order->type, ['mesa', 'pick_up', 'ventanilla'], true);
     }
 
     // ─── Mesa pay modal ───────────────────────────────────────────────────────
@@ -2701,10 +2735,11 @@ HTML;
                 return null;
             }
 
-            $isPayableArea = $order->source === 'kiosk'
-                || in_array($order->type, ['pick_up', 'ventanilla', 'delivery', 'mesa'], true);
+            if (! $this->isPosCollectionOrder($order)) {
+                return 'Los pedidos delivery se cobran y liquidan desde su propio flujo.';
+            }
 
-            if (! $isPayableArea || $order->status !== 'lista') {
+            if ($order->status !== 'lista') {
                 return 'El pedido debe estar listo antes de cobrarlo.';
             }
 
@@ -2757,6 +2792,7 @@ HTML;
         $this->showPickupPayModal = false;
         $this->pickupPayOrderId = null;
         $this->pickupPayments = [];
+        unset($this->pickupPayOrder);
         $this->dispatch('pos-orders-changed');
         unset(
             $this->toolbarPendingCounts,

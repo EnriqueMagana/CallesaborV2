@@ -230,6 +230,29 @@ html.dark-style .pos-operation-static { color: #bde8dc; border-color: #355e54; b
     padding: 12px 16px;
 }
 
+.pos-reprint-order-card.has-order-audit {
+    border-color: color-mix(in srgb, var(--pos-accent) 34%, var(--pos-border));
+}
+
+.pos-reprint-audit-badge {
+    width: fit-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: var(--pos-accent);
+    background: color-mix(in srgb, var(--pos-accent) 10%, var(--pos-card));
+    font-size: .66rem;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.pos-reprint-audit-badge i {
+    font-size: 15px;
+}
+
 .pos-history-meta .is-audit-reason {
     color: #a33b4b;
     border-color: rgba(201, 72, 91, .25);
@@ -3152,12 +3175,72 @@ html.dark-style .pos-order-data-guardrail {
 .pos-pickup-pay-modal {
     width: min(620px, 100%);
     max-width: 620px !important;
+    max-height: min(860px, calc(100dvh - 32px));
+    overflow: hidden;
 }
 
 .pos-pickup-pay-modal .modal-body-pos {
     display: grid;
     gap: 16px;
 }
+
+.pos-charge-dialog { z-index: 1450; }
+.pos-charge-dialog__header { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--pos-border); }
+.pos-charge-dialog__mark { width: 48px; height: 48px; display: grid; place-items: center; color: #087c62; border-radius: 14px; background: #e4f7f1; font-size: 24px; }
+.pos-charge-dialog__heading { min-width: 0; }
+.pos-charge-dialog__heading > span { color: var(--pos-accent); font-size: .62rem; font-weight: 850; letter-spacing: .08em; }
+.pos-charge-dialog__heading h4 { margin: 2px 0; color: var(--pos-text); font-size: 1.08rem; }
+.pos-charge-dialog__heading p { margin: 0; color: var(--pos-muted); font-size: .72rem; line-height: 1.4; }
+.pos-charge-dialog__header-actions { display: flex; align-items: center; gap: 8px; }
+.pos-charge-dialog__folio { padding: 6px 9px; border: 1px solid var(--pos-border); border-radius: 999px; color: var(--pos-text); background: var(--pos-card); font-size: .7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pos-charge-dialog__close { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 1px solid var(--pos-border); border-radius: 12px; color: var(--pos-muted); background: var(--pos-card); cursor: pointer; }
+.pos-charge-dialog__close:hover { color: var(--pos-text); background: var(--pos-bg); }
+.pos-charge-dialog__close:focus-visible { outline: 3px solid color-mix(in srgb, var(--pos-accent) 40%, transparent); outline-offset: 2px; }
+.pos-charge-dialog__body { min-height: 0; max-height: none !important; padding: 18px 20px !important; overflow-y: auto; background: var(--pos-bg); }
+
+.pos-charge-summary { overflow: hidden; border: 1px solid var(--pos-border); border-radius: 16px; background: var(--pos-card); box-shadow: 0 8px 24px rgba(37, 34, 56, .06); }
+.pos-charge-summary__identity { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; border-bottom: 1px solid var(--pos-border); }
+.pos-charge-summary__identity > div { display: grid; gap: 2px; }
+.pos-charge-summary__identity span { color: var(--pos-muted); font-size: .68rem; font-weight: 700; }
+.pos-charge-summary__identity strong { color: var(--pos-text); font-size: .86rem; }
+.pos-charge-summary__totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.pos-charge-summary__totals > div { min-width: 0; display: grid; gap: 4px; padding: 13px 15px; border-right: 1px solid var(--pos-border); }
+.pos-charge-summary__totals > div:last-child { border-right: 0; }
+.pos-charge-summary__totals dt { color: var(--pos-muted); font-size: .65rem; font-weight: 700; }
+.pos-charge-summary__totals dd { margin: 0; color: var(--pos-text); font-size: .94rem; font-weight: 850; font-variant-numeric: tabular-nums; }
+.pos-charge-summary__totals .is-due { background: color-mix(in srgb, var(--pos-accent) 8%, var(--pos-card)); }
+.pos-charge-summary__totals .is-due dd { color: var(--pos-accent); font-size: 1.16rem; }
+.pos-charge-summary__items { border-top: 1px solid var(--pos-border); }
+.pos-charge-summary__items summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; color: var(--pos-muted); font-size: .72rem; font-weight: 750; cursor: pointer; list-style: none; }
+.pos-charge-summary__items summary::-webkit-details-marker { display: none; }
+.pos-charge-summary__items summary i { font-size: 19px; transition: transform .18s ease; }
+.pos-charge-summary__items[open] summary i { transform: rotate(180deg); }
+.pos-charge-summary__items ul { display: grid; gap: 6px; margin: 0; padding: 0 15px 13px; list-style: none; }
+.pos-charge-summary__items li { display: flex; justify-content: space-between; gap: 12px; color: var(--pos-muted); font-size: .72rem; }
+.pos-charge-summary__items li strong { color: var(--pos-text); font-variant-numeric: tabular-nums; }
+
+.pos-charge-entry, .pos-charge-payments { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--pos-border); border-radius: 16px; background: var(--pos-card); }
+.pos-charge-entry__title, .pos-charge-payments > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pos-charge-entry__title > div { display: flex; align-items: center; gap: 8px; }
+.pos-charge-entry__title span { padding: 4px 7px; border-radius: 999px; color: var(--pos-accent); background: color-mix(in srgb, var(--pos-accent) 10%, transparent); font-size: .58rem; font-weight: 850; text-transform: uppercase; }
+.pos-charge-entry__title h5 { margin: 0; color: var(--pos-text); font-size: .8rem; }
+.pos-charge-entry__title > strong, .pos-charge-payments > header strong { color: var(--pos-accent); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.pos-charge-entry__title.is-fields { padding-top: 2px; border-top: 1px dashed var(--pos-border); }
+.pos-pickup-pay-modal .pos-payment-method-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pos-charge-method { min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px; border: 1px solid var(--pos-border); border-radius: 12px; color: var(--pos-muted); background: var(--pos-card); font-size: .72rem; font-weight: 800; cursor: pointer; transition: border-color .18s ease, background-color .18s ease, color .18s ease; }
+.pos-charge-method i { font-size: 19px; }
+.pos-charge-method:hover { border-color: color-mix(in srgb, var(--pos-accent) 35%, var(--pos-border)); }
+.pos-charge-method.is-active { color: var(--pos-accent); border-color: color-mix(in srgb, var(--pos-accent) 58%, transparent); background: color-mix(in srgb, var(--pos-accent) 9%, var(--pos-card)); }
+.pos-charge-method:focus-visible { outline: 3px solid color-mix(in srgb, var(--pos-accent) 35%, transparent); outline-offset: 2px; }
+.pos-charge-payments > header span { color: var(--pos-text); font-size: .78rem; font-weight: 800; }
+.pos-charge-payment { min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto 40px; align-items: center; gap: 9px; padding: 7px 8px 7px 11px; border-radius: 11px; background: var(--pos-bg); }
+.pos-charge-payment > span { display: flex; align-items: center; gap: 6px; color: var(--pos-text); font-size: .72rem; font-weight: 700; }
+.pos-charge-payment > span i { color: #16875c; font-size: 18px; }
+.pos-charge-payment > strong { font-size: .78rem; font-variant-numeric: tabular-nums; }
+.pos-charge-payment button { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; color: var(--pos-danger); background: transparent; cursor: pointer; }
+.pos-charge-payment button:hover { background: color-mix(in srgb, var(--pos-danger) 10%, transparent); }
+.pos-charge-dialog__footer { position: sticky; bottom: 0; display: grid; grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr); gap: 10px; padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--pos-border); background: var(--pos-card); }
+.pos-charge-dialog__footer .pos-btn { width: 100%; min-height: 48px; justify-content: center; }
 
 .pos-payment-method-tabs {
     display: grid !important;
@@ -3357,8 +3440,18 @@ html.dark-style .pos-mesa-pay-modal .pos-payment-received.is-pending {
 }
 
 @media (max-width: 640px) {
+    .pos-pickup-pay-modal { width: 100%; max-height: calc(100dvh - 10px); border-radius: 18px 18px 0 0; }
+    .pos-charge-dialog { align-items: flex-end; padding: 0; }
+    .pos-charge-dialog__header { grid-template-columns: 42px minmax(0, 1fr) 44px; gap: 9px; padding: 14px; }
+    .pos-charge-dialog__mark { width: 42px; height: 42px; border-radius: 12px; font-size: 21px; }
+    .pos-charge-dialog__heading p, .pos-charge-dialog__folio { display: none; }
+    .pos-charge-dialog__body { padding: 14px !important; }
+    .pos-charge-summary__totals { grid-template-columns: 1fr 1fr; }
+    .pos-charge-summary__totals > div { border-bottom: 1px solid var(--pos-border); }
+    .pos-charge-summary__totals .is-due { grid-column: 1 / -1; border-bottom: 0; }
+    .pos-charge-dialog__footer { padding-inline: 14px; }
     .pos-payment-method-tabs {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .pos-payment-entry-grid {
@@ -3369,6 +3462,11 @@ html.dark-style .pos-mesa-pay-modal .pos-payment-received.is-pending {
     .pos-payment-field > small {
         min-height: 0;
     }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pos-charge-method,
+    .pos-charge-summary__items summary i { transition: none; }
 }
 
 /* POS operativo: navegación en una fila y paneles especializados. */
@@ -5452,6 +5550,8 @@ html.dark-style .pos-area-panel__mark.is-balances { color: #fbbf24; background: 
 /* Resumen */
 .pos-balances-summary { display: grid; gap: 12px; }
 .pos-balances-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pos-balances-kpis.is-register-only { grid-template-columns: minmax(0, 1fr); }
+.pos-balances-kpis.is-register-only .pos-balances-kpi.is-total { grid-column: auto; }
 .pos-balances-kpi { min-width: 0; display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--pos-border); border-radius: var(--bal-radius); background: var(--bal-surface); }
 .pos-balances-kpi > span { display: flex; align-items: center; gap: 5px; color: var(--pos-muted); font-size: .72rem; font-weight: 700; }
 .pos-balances-kpi > strong { color: var(--pos-text); font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }

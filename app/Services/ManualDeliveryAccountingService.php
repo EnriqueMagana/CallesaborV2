@@ -64,16 +64,48 @@ class ManualDeliveryAccountingService
     }
 
     /**
-     * Mantiene la provisión contra entrega igual a lo que falta por cobrar.
-     * Si se agregan productos sube, si se retiran baja y si se cancela la
-     * orden desaparece: el ticket y el corte siempre reflejan lo que el
-     * repartidor debe traer, sin que nadie tenga que cobrar al autorizar.
+     * Mantiene una entrega manual sincronizada con su total vigente.
+     * Contra entrega ajusta la provisión del repartidor; los demás métodos
+     * registran automáticamente cualquier incremento con el método original.
      */
     public function syncProvision(Order $order): void
     {
         $order->refresh()->load(['payments', 'refunds']);
 
-        if (! $this->tracksProvision($order)) {
+        if (! $this->tracksManualCollection($order)) {
+            return;
+        }
+
+        if ($order->delivery_method !== 'contra_entrega') {
+            if ($order->status === 'cancelada') {
+                return;
+            }
+
+            $needed = max(0, round((float) $order->total - $order->net_paid_amount, 2));
+            if ($needed <= 0.009) {
+                return;
+            }
+
+            $paymentMethod = match ($order->delivery_method) {
+                'cash' => 'efectivo',
+                'tarjeta', 'card' => 'tarjeta',
+                'transferencia', 'transfer' => 'transferencia',
+                default => null,
+            };
+
+            if ($paymentMethod === null) {
+                return;
+            }
+
+            OrderPayment::create([
+                'order_id' => $order->id,
+                'method' => $paymentMethod,
+                'amount' => $needed,
+                'received_amount' => $paymentMethod === 'efectivo' ? $needed : null,
+                'change_amount' => $paymentMethod === 'efectivo' ? 0 : null,
+            ]);
+            $order->load('payments');
+
             return;
         }
 
@@ -122,10 +154,9 @@ class ManualDeliveryAccountingService
         });
     }
 
-    private function tracksProvision(Order $order): bool
+    private function tracksManualCollection(Order $order): bool
     {
         return $order->type === 'delivery'
-            && $order->delivery_method === 'contra_entrega'
             && $order->delivery_flow_mode === 'manual'
             && $order->accounted_at !== null;
     }

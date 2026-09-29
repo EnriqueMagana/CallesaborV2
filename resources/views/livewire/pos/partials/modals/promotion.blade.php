@@ -43,17 +43,22 @@
 @endif
 
 @if($this->automaticPromotionPicker)
-    @php $automaticPromotion = $this->automaticPromotionPicker; $eligibleProducts = $automaticPromotion->groups->flatMap->products->unique('id')->values(); @endphp
+    @php
+        $automaticPromotion = $this->automaticPromotionPicker;
+        $eligibleProducts = $automaticPromotion->groups->flatMap->products->unique('id')->values();
+        $automaticRule = $automaticPromotion->normalizedPricingRule();
+        $automaticCycle = $automaticRule['buy_quantity'] + $automaticRule['reward_quantity'];
+    @endphp
     <div class="pos-modal-backdrop" wire:click="closeAutomaticPromotionPicker"></div>
     <div class="pos-modal-wrap is-open promotion-picker-wrap" role="dialog" aria-modal="true" aria-labelledby="automatic-promotion-picker-title">
         <section class="promotion-picker">
             <header class="promotion-picker__header">
-                <div><span><i class="bx bx-group"></i></span><div><small>Grupo promocional</small><h2 id="automatic-promotion-picker-title">{{ $automaticPromotion->name }}</h2><p>Elige cualquier artículo elegible. El descuento se calculará al completar la pareja.</p></div></div>
+                <div><span><i class="bx bx-group"></i></span><div><small>Grupo promocional</small><h2 id="automatic-promotion-picker-title">{{ $automaticPromotion->name }}</h2><p>Elige cualquier artículo elegible. El beneficio se calculará al completar {{ $automaticCycle }} productos.</p></div></div>
                 <strong>{{ $automaticPromotion->pricingRuleShortLabel() }}</strong>
                 <button type="button" wire:click="closeAutomaticPromotionPicker" aria-label="Cerrar"><i class="bx bx-x"></i></button>
             </header>
             <div class="promotion-picker__body">
-                <div class="promotion-picker__terms"><span><i class="bx bx-info-circle"></i>En cada pareja, el producto de menor precio recibe el beneficio.</span></div>
+                <div class="promotion-picker__terms"><span><i class="bx bx-info-circle"></i>En cada grupo de {{ $automaticCycle }}, {{ $automaticRule['reward_quantity'] }} producto(s) de menor precio reciben el beneficio.</span></div>
                 <fieldset class="promotion-picker__group">
                     <legend><span><strong>Productos elegibles</strong><small>Puedes combinar sabores, presentaciones o repetir el mismo artículo.</small></span><b>{{ $eligibleProducts->count() }} opciones</b></legend>
                     <div>
