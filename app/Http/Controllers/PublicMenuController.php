@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\DigitalMenuSetting;
 use App\Models\Product;
 use App\Models\Promotion;
+use App\Services\DigitalMenuAnalytics;
 use App\Support\BusinessTime;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +15,7 @@ use Illuminate\View\View;
 
 class PublicMenuController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(DigitalMenuAnalytics $analytics): View
     {
         $business = BusinessSetting::current();
         $menuSettings = DigitalMenuSetting::current();
@@ -45,7 +46,7 @@ class PublicMenuController extends Controller
             ->unique('id')
             ->values();
         $featured = $menuSettings->show_featured
-            ? $this->featuredProducts($menuSettings, $catalogProducts)
+            ? $this->featuredProducts($analytics, $catalogProducts)
             : collect();
         $galleryImages = collect($menuSettings->show_gallery ? $menuSettings->galleryItems() : [])
             ->filter(fn (array $item) => Storage::disk('public')->exists($item['path']))
@@ -72,6 +73,7 @@ class PublicMenuController extends Controller
         $newProductCampaigns = $campaigns
             ->filter(fn (Promotion $campaign) => $campaign->isProductLaunch() && $campaign->primaryProduct)
             ->values();
+        $searchMetadata = $this->searchMetadata($catalogProducts, $featured, $campaigns);
 
         return view('public-menu.index', [
             'business' => $business,
@@ -85,12 +87,60 @@ class PublicMenuController extends Controller
             'promotions' => $promotions,
             'discountCampaigns' => $discountCampaigns,
             'newProductCampaigns' => $newProductCampaigns,
+            'searchMetadata' => $searchMetadata,
         ]);
     }
 
-    private function featuredProducts(DigitalMenuSetting $menuSettings, Collection $catalogProducts): Collection
+    /** @return Collection<int, array{badges: array<int, string>, keywords: string}> */
+    private function searchMetadata(Collection $catalogProducts, Collection $featured, Collection $campaigns): Collection
     {
-        $ids = collect($menuSettings->featured_product_ids)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        $metadata = $catalogProducts
+            ->mapWithKeys(fn (Product $product): array => [
+                (int) $product->id => ['badges' => [], 'keywords' => []],
+            ])
+            ->all();
+
+        $addContext = function (int $productId, string $badge, string $keywords = '') use (&$metadata): void {
+            if (! isset($metadata[$productId])) {
+                return;
+            }
+
+            $metadata[$productId]['badges'][] = $badge;
+            $metadata[$productId]['keywords'][] = $keywords;
+        };
+
+        $featured->each(fn (Product $product) => $addContext((int) $product->id, 'Favorito', 'favorito recomendado'));
+
+        $campaigns->each(function (Promotion $campaign) use ($addContext): void {
+            $keywords = collect([
+                $campaign->name,
+                $campaign->short_description,
+                $campaign->description,
+                $campaign->pricingRuleShortLabel(),
+            ])->filter()->implode(' ');
+
+            if ($campaign->presentation_type === 'discount' && $campaign->primaryProduct) {
+                $addContext((int) $campaign->primaryProduct->id, 'Descuento', $keywords.' descuento oferta');
+            } elseif ($campaign->isProductLaunch() && $campaign->primaryProduct) {
+                $addContext((int) $campaign->primaryProduct->id, 'Nuevo', $keywords.' nuevo novedad');
+            } else {
+                collect([$campaign->primaryProduct])
+                    ->concat($campaign->groups->flatMap(fn ($group) => $group->products))
+                    ->filter()
+                    ->unique('id')
+                    ->each(fn (Product $product) => $addContext((int) $product->id, 'Promoción', $keywords.' promoción oferta'));
+            }
+        });
+
+        return collect($metadata)->map(fn (array $item): array => [
+            'badges' => array_values(array_unique($item['badges'])),
+            'keywords' => implode(' ', array_filter($item['keywords'])),
+        ]);
+    }
+
+    private function featuredProducts(DigitalMenuAnalytics $analytics, Collection $catalogProducts): Collection
+    {
+        $ids = $analytics->topProductIds(5);
 
         $productsById = $catalogProducts->keyBy('id');
 

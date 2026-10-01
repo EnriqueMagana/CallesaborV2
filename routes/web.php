@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DigitalMenuTrackingController;
 use App\Http\Controllers\InventoryPurchaseTicketController;
 use App\Http\Controllers\KioskLaunchController;
 use App\Http\Controllers\KioskMediaController;
@@ -14,6 +15,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RequireOpenCashRegisterForConfiguredModules;
 use App\Livewire\Admin\BusinessSettingsManager;
+use App\Livewire\Admin\DigitalMenuAnalyticsPanel;
 use App\Livewire\Admin\DigitalMenuManager;
 use App\Livewire\Admin\DiscountManager;
 use App\Livewire\Admin\KioskSettings;
@@ -39,9 +41,9 @@ use App\Livewire\Mesas\MesaOrdenes;
 use App\Livewire\Mesas\SplitCuenta;
 use App\Livewire\Orders\OrderChangeRequestInbox;
 use App\Livewire\Orders\OrderChangeRequestWizard;
-use App\Livewire\Orders\OrderProductsEditor;
 use App\Livewire\Orders\OrderDetail;
 use App\Livewire\Orders\OrderList;
+use App\Livewire\Orders\OrderProductsEditor;
 use App\Livewire\Orders\SalesHistory;
 use App\Livewire\Orders\SalesHistoryDetail;
 use App\Livewire\Pos\PointOfSale;
@@ -58,6 +60,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', PublicHomeController::class)->name('public.home');
 Route::get('/menu', PublicMenuController::class)->name('public.menu');
+Route::post('/menu/analitica/vista', [DigitalMenuTrackingController::class, 'view'])
+    ->middleware('throttle:120,1')
+    ->name('public.menu.analytics.view');
+Route::post('/menu/analitica/productos/{product}', [DigitalMenuTrackingController::class, 'product'])
+    ->middleware('throttle:120,1')
+    ->name('public.menu.analytics.product');
 Route::redirect('/men', '/menu', 301);
 Route::get('/reservar', [PublicInfoController::class, 'reservation'])->name('public.reservation');
 Route::get('/horarios', [PublicInfoController::class, 'hours'])->name('public.hours');
@@ -110,6 +118,9 @@ Route::middleware(['auth', EnsureUserIsActive::class, PreventBackHistory::class,
         ->middleware(['can:gestionar variables de entorno', 'password.confirm'])
         ->name('super-admin.environment');
     Route::get('/menu-digital', DigitalMenuManager::class)->middleware('can:gestionar menu digital')->name('menu-digital');
+    Route::get('/menu-digital/analitica', DigitalMenuAnalyticsPanel::class)
+        ->middleware('can:ver analitica menu digital')
+        ->name('menu-analytics');
     Route::get('/promociones', PromotionManager::class)->middleware('can:ver promociones')->name('promociones');
     Route::get('/descuentos', DiscountManager::class)->middleware('can:ver descuentos')->name('descuentos');
     Route::get('/constructor-menu', MenuBuilder::class)->middleware('can:ver menu')->name('constructor-menu');

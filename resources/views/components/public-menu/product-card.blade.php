@@ -1,11 +1,21 @@
-@props(['product', 'featured' => false, 'rank' => null, 'badge' => null, 'imageOverride' => null, 'titleOverride' => null, 'descriptionOverride' => null, 'priceOverride' => null, 'originalPrice' => null, 'discountPercent' => null])
+@props(['product', 'featured' => false, 'rank' => null, 'badge' => null, 'imageOverride' => null, 'titleOverride' => null, 'descriptionOverride' => null, 'priceOverride' => null, 'originalPrice' => null, 'discountPercent' => null, 'searchBadges' => [], 'searchKeywords' => ''])
 
 @php
     $cardName = $titleOverride ?: $product->name;
     $cardDescription = $descriptionOverride ?: $product->description;
     $cardImage = $imageOverride ?: $product->image;
     $cardPrice = $priceOverride !== null ? (float) $priceOverride : (float) $product->price;
+    $ingredientKeywords = $product->ingredients
+        ->flatMap(fn ($ingredient) => [$ingredient->name, $ingredient->description])
+        ->filter()
+        ->implode(' ');
+    $addonKeywords = $product->addonGroups
+        ->flatMap(fn ($group) => collect([$group->name, $group->description])
+            ->concat($group->addons->flatMap(fn ($addon) => [$addon->name, $addon->description])))
+        ->filter()
+        ->implode(' ');
     $modalProduct = [
+        'id' => (int) $product->id,
         'name' => $cardName,
         'description' => $cardDescription ?: 'Consulta los detalles y opciones disponibles de este producto.',
         'price' => '$'.number_format($cardPrice, 2),
@@ -40,7 +50,8 @@
 <article
     {{ $attributes->class(['product-card', 'product-card--featured' => $featured, 'product-card--ranked' => $rank]) }}
     data-menu-product
-    data-search="{{ \Illuminate\Support\Str::lower($cardName.' '.$cardDescription.' '.$product->category?->name) }}"
+    data-product-id="{{ $product->id }}"
+    data-search="{{ \Illuminate\Support\Str::lower($cardName.' '.$cardDescription.' '.$product->category?->name.' '.$ingredientKeywords.' '.$addonKeywords.' '.$searchKeywords) }}"
 >
     <button
         type="button"
@@ -95,6 +106,22 @@
         @else
             @if($product->category)
                 <span class="product-card__category">{{ $product->category->name }}</span>
+            @endif
+            @if(count($searchBadges) > 0)
+                <div class="product-card__search-context" aria-label="Este platillo también aparece en">
+                    @foreach($searchBadges as $searchBadge)
+                        <span>
+                            <i @class([
+                                'bx',
+                                'bx-star' => $searchBadge === 'Favorito',
+                                'bx-purchase-tag' => $searchBadge === 'Descuento',
+                                'bx-purchase-tag-alt' => $searchBadge === 'Promoción',
+                                'bx-badge-check' => $searchBadge === 'Nuevo',
+                            ]) aria-hidden="true"></i>
+                            {{ $searchBadge }}
+                        </span>
+                    @endforeach
+                </div>
             @endif
             <div class="product-card__title-row">
                 <h3>{{ $cardName }}</h3>

@@ -62,7 +62,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'cancelar divisiones mesas',
             ],
             'caja' => ['ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'anular pagos', 'registrar gastos', 'registrar movimientos de caja'],
-            'reportes' => ['ver reportes', 'exportar reportes', 'ver reportes financieros'],
+            'reportes' => ['ver reportes', 'exportar reportes', 'ver reportes financieros', 'ver analitica menu digital'],
             'configuracion' => [
                 'ver configuracion', 'editar configuracion', 'gestionar configuracion negocio',
                 'ver menu sidebar', 'crear menu sidebar', 'editar menu sidebar', 'eliminar menu sidebar',
@@ -146,7 +146,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'crear mesas', 'editar mesas', 'eliminar mesas', 'cambiar estado mesas',
             'cancelar divisiones mesas',
             'ver caja', 'abrir caja', 'cerrar caja', 'aplicar descuentos', 'registrar gastos', 'registrar movimientos de caja',
-            'ver reportes', 'exportar reportes',
+            'ver reportes', 'exportar reportes', 'ver analitica menu digital',
             'ver delivery', 'reasignar pedidos delivery', 'gestionar delivery',
             'ver reservas', 'crear reservas', 'editar reservas', 'cambiar estado reservas', 'cancelar reservas',
             'ver inventario', 'gestionar insumos', 'ajustar inventario',
