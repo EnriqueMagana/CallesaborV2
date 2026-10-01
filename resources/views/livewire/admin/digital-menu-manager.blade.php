@@ -16,7 +16,7 @@
         <div>
             <span class="biz-eyebrow">Restaurante · Experiencia pública</span>
             <h1>Menú digital</h1>
-            <p>Ordena la portada, los favoritos, las categorías y la galería desde una sola fuente.</p>
+            <p>Configura la portada, los favoritos automáticos, las categorías y la galería desde una sola fuente.</p>
         </div>
         <a href="{{ route('public.menu') }}" target="_blank" rel="noopener noreferrer">
             <i class="bx bx-show"></i><span>Vista pública</span><i class="bx bx-link-external"></i>
@@ -34,7 +34,7 @@
             @foreach ([
                 'overview' => ['bx-slider-alt', 'General', 'Visibilidad y color'],
                 'banners' => ['bx-slideshow', 'Banners', 'Carrusel de portada'],
-                'featured' => ['bx-star', 'Favoritos', 'Ranking de productos'],
+                'featured' => ['bx-star', 'Favoritos', 'Ranking automático'],
                 'categories' => ['bx-category', 'Categorías', 'Estilo de navegación'],
                 'gallery' => ['bx-images', 'Galería', 'Fotos públicas'],
             ] as $key => $item)
@@ -60,7 +60,7 @@
                 <div class="digital-menu-overview-grid">
                     @foreach ([
                         ['banners', $showBanners, 'bx-slideshow', 'Carrusel de banners', 'Imágenes de portada y reproducción.'],
-                        ['featured', $showFeatured, 'bx-trophy', 'Favoritos ordenados', 'Productos destacados y su posición.'],
+                        ['featured', $showFeatured, 'bx-trophy', 'Favoritos automáticos', 'Los 5 productos con más clics.'],
                         ['categories', $showCategories, 'bx-category-alt', 'Navegación por categorías', 'Estilo de acceso al catálogo.'],
                         ['gallery', $showGallery, 'bx-images', 'Galería pública', 'Fotografías de espacios y platillos.'],
                     ] as $module)
@@ -122,43 +122,33 @@
                 @error('bannerPaths.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @elseif ($activeSection === 'featured')
                 <header class="digital-menu-section-heading">
-                    <span>03</span><div><h2>Favoritos con ranking</h2><p>El primer producto mostrará el número 1; usa las flechas para decidir 2, 3 y siguientes.</p></div>
-                    <strong>{{ count($featuredProductIds) }}/{{ $this->maxFeatured }}</strong>
+                    <span>03</span><div><h2>Favoritos automáticos</h2><p>La sección se actualiza con los 5 productos que más abren tus visitantes.</p></div>
+                    <strong>{{ $this->automaticFavorites->count() }}/5</strong>
                 </header>
                 <label class="digital-menu-section-switch">
                     <input type="checkbox" wire:model.live="showFeatured">
                     <span class="digital-menu-section-switch__icon" aria-hidden="true"><i class="bx bx-star"></i></span>
-                    <span class="digital-menu-section-switch__copy"><strong>Mostrar favoritos</strong><small>Oculta o publica toda la sección sin perder el orden.</small></span>
+                    <span class="digital-menu-section-switch__copy"><strong>Mostrar favoritos</strong><small>El ranking aparece cuando existan clics registrados.</small></span>
                     <span class="digital-menu-switch" aria-hidden="true"></span>
                 </label>
                 @error('showFeatured')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
-                <div class="digital-menu-ranking" aria-label="Orden actual de favoritos">
-                    @forelse ($this->selectedProducts as $index => $product)
-                        <article wire:key="ranked-product-{{ $product->id }}">
+                <div class="digital-menu-auto-note" role="note">
+                    <i class="bx bx-line-chart" aria-hidden="true"></i>
+                    <span><strong>El ranking se calcula con datos reales</strong><small>Ya no necesitas elegir ni ordenar productos manualmente. Cada apertura del detalle suma una interacción.</small></span>
+                    <a href="{{ route('app.menu-analytics') }}" wire:navigate>Ver analítica <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a>
+                </div>
+                <div class="digital-menu-ranking" aria-label="Ranking automático de favoritos">
+                    @forelse ($this->automaticFavorites as $index => $product)
+                        <article wire:key="automatic-favorite-{{ $product->id }}">
                             <b>{{ $index + 1 }}</b>
                             <span class="digital-menu-ranking__image">@if($product->image)<img src="{{ Storage::url($product->image) }}" alt="">@else<i class="bx bx-dish"></i>@endif</span>
                             <span><strong>{{ $product->name }}</strong><small>{{ $product->category?->name ?? 'Sin categoría' }} · ${{ number_format((float) $product->price, 2) }}</small></span>
-                            <div class="digital-menu-order-actions">
-                                <button type="button" wire:click="moveFeatured({{ $index }}, -1)" @disabled($loop->first) aria-label="Subir {{ $product->name }}"><i class="bx bx-up-arrow-alt"></i></button>
-                                <button type="button" wire:click="moveFeatured({{ $index }}, 1)" @disabled($loop->last) aria-label="Bajar {{ $product->name }}"><i class="bx bx-down-arrow-alt"></i></button>
-                                <button type="button" wire:click="toggleFeaturedProduct({{ $product->id }})" aria-label="Quitar {{ $product->name }}"><i class="bx bx-x"></i></button>
-                            </div>
+                            <span class="digital-menu-ranking__automatic"><i class="bx bx-trending-up" aria-hidden="true"></i> Por clics</span>
                         </article>
                     @empty
-                        <div class="digital-menu-empty"><i class="bx bx-star"></i><strong>Aún no hay favoritos</strong><span>Selecciona productos abajo; su orden se conservará.</span></div>
+                        <div class="digital-menu-empty"><i class="bx bx-bar-chart-alt-2"></i><strong>Aún no hay interacciones</strong><span>Los favoritos aparecerán aquí cuando tus clientes abran productos en el menú digital.</span></div>
                     @endforelse
                 </div>
-                <div class="digital-menu-products">
-                    @foreach ($this->availableProducts as $product)
-                        @php($selected = in_array($product->id, array_map('intval', $featuredProductIds), true))
-                        <button type="button" wire:click="toggleFeaturedProduct({{ $product->id }})" class="{{ $selected ? 'is-selected' : '' }}" aria-pressed="{{ $selected ? 'true' : 'false' }}" wire:key="available-product-{{ $product->id }}">
-                            <span>@if($product->image)<img src="{{ Storage::url($product->image) }}" alt="">@else<i class="bx bx-dish"></i>@endif</span>
-                            <span><strong>{{ $product->name }}</strong><small>{{ $product->category?->name ?? 'Sin categoría' }}</small></span><i class="bx {{ $selected ? 'bx-check' : 'bx-plus' }}"></i>
-                        </button>
-                    @endforeach
-                </div>
-                @error('featuredProductIds')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
-                @error('featuredProductIds.*')<p class="biz-form-error" role="alert">{{ $message }}</p>@enderror
             @elseif ($activeSection === 'categories')
                 <header class="digital-menu-section-heading">
                     <span>04</span><div><h2>Presentación de categorías</h2><p>El catálogo conserva sus categorías; aquí decides cómo se navegan.</p></div>

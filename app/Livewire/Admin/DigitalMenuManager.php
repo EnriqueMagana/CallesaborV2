@@ -6,11 +6,11 @@ use App\Models\BusinessSetting;
 use App\Models\Category;
 use App\Models\DigitalMenuSetting;
 use App\Models\Product;
+use App\Services\DigitalMenuAnalytics;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -25,8 +25,6 @@ class DigitalMenuManager extends Component
     use WithFileUploads;
 
     public const MAX_BANNERS = 8;
-
-    public const MAX_FEATURED = 8;
 
     public const MAX_GALLERY_IMAGES = 24;
 
@@ -47,8 +45,6 @@ class DigitalMenuManager extends Component
     public array $bannerUploadAlts = [];
 
     public bool $showFeatured = true;
-
-    public array $featuredProductIds = [];
 
     public bool $showCategories = true;
 
@@ -190,25 +186,12 @@ class DigitalMenuManager extends Component
     {
         $this->validateSection([
             'showFeatured' => 'boolean',
-            'featuredProductIds' => 'array|max:'.self::MAX_FEATURED,
-            'featuredProductIds.*' => [
-                'integer',
-                'distinct',
-                Rule::exists('products', 'id')->where(fn ($query) => $query->where('is_active', true)),
-            ],
         ]);
 
-        if ($this->showFeatured && $this->featuredProductIds === []) {
-            $this->rejectSection('showFeatured', 'Para mostrar favoritos, selecciona al menos un producto. También puedes dejar esta sección desactivada.');
-
-            return;
-        }
-
-        $featuredIds = array_values(array_map('intval', $this->featuredProductIds));
-        if (! $this->persistSection('Favoritos', function () use ($featuredIds): void {
+        if (! $this->persistSection('Favoritos', function (): void {
             DigitalMenuSetting::current()->update([
                 'show_featured' => $this->showFeatured,
-                'featured_product_ids' => $featuredIds,
+                'featured_product_ids' => [],
                 'updated_by' => auth()->id(),
             ]);
         })) {
@@ -216,7 +199,7 @@ class DigitalMenuManager extends Component
         }
 
         $this->loadSettings('featured');
-        $this->notify('success', 'Favoritos guardados', $this->showFeatured ? 'El orden de productos ya está publicado.' : 'La sección de favoritos quedó oculta.');
+        $this->notify('success', 'Favoritos guardados', $this->showFeatured ? 'Se publicarán automáticamente los 5 productos con más clics.' : 'La sección de favoritos quedó oculta.');
     }
 
     private function saveCategories(): void
@@ -308,30 +291,6 @@ class DigitalMenuManager extends Component
         $this->notify('success', 'Galería guardada', $this->showGallery ? 'Las fotografías ya están publicadas.' : 'La galería quedó oculta; sus fotografías se conservaron.');
     }
 
-    public function toggleFeaturedProduct(int $productId): void
-    {
-        $this->authorizeAccess();
-        abort_unless(Product::query()->whereKey($productId)->where('is_active', true)->exists(), 404);
-
-        $ids = array_values(array_map('intval', $this->featuredProductIds));
-        $position = array_search($productId, $ids, true);
-
-        if ($position !== false) {
-            array_splice($ids, $position, 1);
-        } elseif (count($ids) < self::MAX_FEATURED) {
-            $ids[] = $productId;
-        } else {
-            $this->addError('featuredProductIds', 'Solo puedes ordenar '.self::MAX_FEATURED.' favoritos.');
-        }
-
-        $this->featuredProductIds = $ids;
-    }
-
-    public function moveFeatured(int $index, int $direction): void
-    {
-        $this->swapItems($this->featuredProductIds, $index, $direction);
-    }
-
     public function moveBanner(int $index, int $direction): void
     {
         $this->swapItems($this->bannerPaths, $index, $direction);
@@ -363,23 +322,13 @@ class DigitalMenuManager extends Component
     }
 
     #[Computed]
-    public function availableProducts(): Collection
+    public function automaticFavorites(): Collection
     {
-        return Product::query()
-            ->where('is_active', true)
-            ->with('category')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get();
-    }
+        $ids = app(DigitalMenuAnalytics::class)->topProductIds(5);
+        $products = Product::query()->whereKey($ids)->with('category')->get()->keyBy('id');
 
-    #[Computed]
-    public function selectedProducts(): Collection
-    {
-        $products = $this->availableProducts->keyBy('id');
-
-        return collect($this->featuredProductIds)
-            ->map(fn (int|string $id) => $products->get((int) $id))
+        return $ids
+            ->map(fn (int $id) => $products->get($id))
             ->filter()
             ->values();
     }
@@ -388,12 +337,6 @@ class DigitalMenuManager extends Component
     public function maxBanners(): int
     {
         return self::MAX_BANNERS;
-    }
-
-    #[Computed]
-    public function maxFeatured(): int
-    {
-        return self::MAX_FEATURED;
     }
 
     #[Computed]
@@ -421,9 +364,6 @@ class DigitalMenuManager extends Component
         }
         if ($section === null || $section === 'featured') {
             $this->showFeatured = $setting->show_featured;
-            // Invalid IDs are not rendered in availableProducts. Keeping them in
-            // state would make them impossible to remove and block every save.
-            $this->featuredProductIds = $this->activeProductIds($setting->featured_product_ids ?? []);
         }
         if ($section === null || $section === 'categories') {
             $this->showCategories = $setting->show_categories;
@@ -433,31 +373,6 @@ class DigitalMenuManager extends Component
             $this->showGallery = $setting->show_gallery;
             $this->galleryPaths = $setting->galleryItems();
         }
-    }
-
-    private function activeProductIds(array $ids): array
-    {
-        $configuredIds = collect($ids)
-            ->map(fn (mixed $id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0)
-            ->unique()
-            ->values();
-
-        if ($configuredIds->isEmpty()) {
-            return [];
-        }
-
-        $activeIds = Product::query()
-            ->where('is_active', true)
-            ->whereIn('id', $configuredIds->all())
-            ->pluck('id')
-            ->map(fn (int $id): int => $id)
-            ->flip();
-
-        return $configuredIds
-            ->filter(fn (int $id): bool => $activeIds->has($id))
-            ->values()
-            ->all();
     }
 
     private function storeMediaUploads(array $current, array $uploads, array $texts, string $directory, string $textKey, array &$newMediaPaths): array
@@ -565,11 +480,6 @@ class DigitalMenuManager extends Component
             'bannerUploadAlts.array' => 'No pudimos leer las descripciones de los banners. Actualiza la página e inténtalo de nuevo.',
             'bannerUploadAlts.*.max' => 'La descripción de cada banner puede tener máximo 120 caracteres.',
             'showFeatured.boolean' => 'No pudimos reconocer si los favoritos deben mostrarse. Actualiza la página e inténtalo de nuevo.',
-            'featuredProductIds.array' => 'No pudimos leer los productos favoritos. Actualiza la página e inténtalo de nuevo.',
-            'featuredProductIds.max' => 'Puedes publicar un máximo de '.self::MAX_FEATURED.' productos favoritos.',
-            'featuredProductIds.*.integer' => 'Uno de los productos seleccionados no es válido. Quítalo y vuelve a seleccionarlo.',
-            'featuredProductIds.*.distinct' => 'Un producto está repetido en favoritos. Quítalo y vuelve a guardar.',
-            'featuredProductIds.*.exists' => 'Uno de los productos seleccionados ya no está disponible. Quítalo de favoritos y vuelve a guardar.',
             'showCategories.boolean' => 'No pudimos reconocer si las categorías deben mostrarse. Actualiza la página e inténtalo de nuevo.',
             'categoryStyle.required' => 'Elige cómo quieres mostrar las categorías.',
             'categoryStyle.in' => 'El estilo seleccionado ya no está disponible. Elige Tarjetas o Círculos.',

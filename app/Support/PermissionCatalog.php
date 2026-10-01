@@ -128,6 +128,7 @@ final class PermissionCatalog
                 'ver reportes' => 'Permite consultar reportes operativos generales disponibles en el sistema.',
                 'exportar reportes' => 'Permite descargar o exportar la información de los reportes.',
                 'ver reportes financieros' => 'Permite consultar reportes con ventas, costos, utilidad, caja y otros importes financieros sensibles.',
+                'ver analitica menu digital' => 'Permite consultar vistas, visitantes y productos más consultados en el menú digital.',
             ],
             'configuracion' => [
                 'ver configuracion' => 'Permite consultar la configuración del sistema sin modificarla.',

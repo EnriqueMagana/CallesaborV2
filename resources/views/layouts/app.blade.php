@@ -65,6 +65,7 @@
     <link rel="stylesheet" href="{{ asset('assets/css/role-permissions.css') }}?v={{ filemtime(public_path('assets/css/role-permissions.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/notification-center.css') }}?v={{ filemtime(public_path('assets/css/notification-center.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/developer-console.css') }}?v={{ filemtime(public_path('assets/css/developer-console.css')) }}" />
+    <link rel="stylesheet" href="{{ asset('assets/css/digital-menu-analytics.css') }}?v={{ filemtime(public_path('assets/css/digital-menu-analytics.css')) }}" />
     <link rel="stylesheet" href="{{ asset('assets/css/ticket-preview-modal.css') }}?v={{ filemtime(public_path('assets/css/ticket-preview-modal.css')) }}" />
 
     @stack('styles')
@@ -165,6 +166,7 @@
 
     <script src="{{ asset('assets/js/dashboard.js') }}?v={{ filemtime(public_path('assets/js/dashboard.js')) }}" data-navigate-once></script>
     <script src="{{ asset('assets/js/sales-history.js') }}?v={{ filemtime(public_path('assets/js/sales-history.js')) }}" data-navigate-once></script>
+    <script src="{{ asset('assets/js/digital-menu-analytics.js') }}?v={{ filemtime(public_path('assets/js/digital-menu-analytics.js')) }}" data-navigate-once></script>
     <script src="{{ asset('assets/js/notification-center.js') }}?v={{ filemtime(public_path('assets/js/notification-center.js')) }}" data-navigate-once></script>
 
     @stack('scripts')

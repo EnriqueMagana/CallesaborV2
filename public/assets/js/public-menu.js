@@ -4,6 +4,42 @@
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const scrollTweens = new WeakMap();
     const scrollInterruptionBound = new WeakSet();
+    const analyticsRoot = document.querySelector('[data-menu-analytics]');
+
+    const anonymousToken = (storage, key) => {
+        try {
+            let token = storage.getItem(key);
+            if (!token) {
+                token = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+                storage.setItem(key, token);
+            }
+            return token;
+        } catch (_) {
+            return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+        }
+    };
+
+    const analyticsIdentity = analyticsRoot ? {
+        visitor_token: anonymousToken(window.localStorage, 'calle-sabor-menu-visitor'),
+        session_token: anonymousToken(window.sessionStorage, 'calle-sabor-menu-session'),
+    } : null;
+
+    const sendAnalytics = (url) => {
+        if (!url || !analyticsIdentity) return;
+        window.fetch(url, {
+            method: 'POST',
+            keepalive: true,
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify(analyticsIdentity),
+        }).catch(() => {});
+    };
+
+    if (analyticsRoot) sendAnalytics(analyticsRoot.dataset.viewUrl);
 
     const cancelScrollTween = (scroller) => {
         const state = scrollTweens.get(scroller);
@@ -573,8 +609,12 @@
     const status = document.getElementById('menu-search-status');
     const empty = document.getElementById('menu-no-results');
     const form = document.getElementById('menu-search-form');
+    const emptyClear = document.querySelector('[data-search-empty-clear]');
     const cards = [...document.querySelectorAll('.menu-catalog [data-menu-product]')];
     const catalogSections = [...document.querySelectorAll('[data-menu-section]')];
+    const merchandisingSections = [...document.querySelectorAll('[data-search-merchandising]')];
+    const catalogHeading = document.querySelector('[data-catalog-heading]');
+    const searchResultsHeading = document.querySelector('[data-search-results-heading]');
     const sections = [...document.querySelectorAll('[data-menu-section], [data-category-section]')];
     const categoryNav = document.querySelector('.category-nav');
     const categoryRail = document.querySelector('[data-category-rail]');
@@ -687,6 +727,7 @@
         const filterMenu = () => {
             const query = normalizeSearch(input.value.trim());
             const terms = query.split(/\s+/).filter(Boolean);
+            const isSearching = terms.length > 0;
             let visible = 0;
 
             cards.forEach((card) => {
@@ -700,9 +741,17 @@
                 section.hidden = ![...section.querySelectorAll('[data-menu-product]')].some((card) => !card.hidden);
             });
 
-            clear.hidden = !query;
-            empty.hidden = visible > 0;
-            status.textContent = query ? `${visible} ${visible === 1 ? 'resultado' : 'resultados'} para “${input.value.trim()}”` : '';
+            analyticsRoot?.classList.toggle('is-searching', isSearching);
+            analyticsRoot?.setAttribute('aria-labelledby', isSearching ? 'menu-search-results-title' : 'catalog-title');
+            categoryNav?.toggleAttribute('hidden', isSearching);
+            merchandisingSections.forEach((section) => { section.hidden = isSearching; });
+            catalogHeading?.toggleAttribute('hidden', isSearching);
+            searchResultsHeading?.toggleAttribute('hidden', !isSearching);
+            clear.hidden = !isSearching;
+            empty.hidden = !isSearching || visible > 0;
+            status.textContent = isSearching
+                ? `${visible} ${visible === 1 ? 'resultado' : 'resultados'} en todo el menú para “${input.value.trim()}”`
+                : '';
             requestCategorySync();
         };
 
@@ -710,12 +759,17 @@
         form?.addEventListener('submit', (event) => {
             event.preventDefault();
             filterMenu();
-            animateWindowTo(document.getElementById('catalog-title'));
+            animateWindowTo(searchResultsHeading?.hidden ? document.getElementById('catalog-title') : searchResultsHeading);
         });
-        clear.addEventListener('click', () => {
+        const resetSearch = () => {
             input.value = '';
             filterMenu();
             input.focus();
+        };
+        clear.addEventListener('click', resetSearch);
+        emptyClear?.addEventListener('click', resetSearch);
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && input.value) resetSearch();
         });
     }
 
@@ -913,6 +967,10 @@
                 product = JSON.parse(trigger.dataset.productDetail);
             } catch {
                 return;
+            }
+
+            if (product.id && analyticsRoot?.dataset.productUrl) {
+                sendAnalytics(`${analyticsRoot.dataset.productUrl}/${encodeURIComponent(product.id)}`);
             }
 
             lastTrigger = trigger;

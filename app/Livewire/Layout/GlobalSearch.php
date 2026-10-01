@@ -35,6 +35,7 @@ class GlobalSearch extends Component
             ['label' => 'Configuración del negocio', 'icon' => 'bx-cog',       'route' => 'app.configuracion-negocio', 'keywords' => 'negocio empresa logo rfc whatsapp tickets impresora plantilla', 'permission' => 'gestionar configuracion negocio'],
             ['label' => 'Menú lateral',          'icon' => 'bx-list-ul',       'route' => 'app.configuracion-negocio.menu', 'keywords' => 'sidebar navegacion menu iconos ordenar agrupar', 'permission' => 'ver menu sidebar'],
             ['label' => 'Menú digital',          'icon' => 'bx-mobile-alt',    'route' => 'app.menu-digital', 'keywords' => 'menu digital banners favoritos categorias galeria publico', 'permission' => 'gestionar menu digital'],
+            ['label' => 'Analítica del menú',    'icon' => 'bx-bar-chart-alt-2', 'route' => 'app.menu-analytics', 'keywords' => 'menu digital analitica vistas visitantes clics productos favoritos', 'permission' => 'ver analitica menu digital'],
             ['label' => 'Mi Perfil',           'icon' => 'bx-user',           'route' => 'profile',              'keywords' => 'perfil cuenta avatar contraseña',               'permission' => null],
         ];
     }

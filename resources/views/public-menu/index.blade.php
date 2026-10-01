@@ -1,16 +1,13 @@
-<x-public-menu.site-layout
-    :business="$business"
-    :menu-settings="$menuSettings"
-    :title="'Menú | '.$business->business_name"
-    :description="'Consulta el menú, horarios y datos de '.$business->business_name.'.'"
-    :styles="['assets/css/promotions-public.css']"
+<x-public-menu.site-layout :business="$business" :menu-settings="$menuSettings" :title="'Menú | ' . $business->business_name" :description="'Consulta el menú, horarios y datos de ' . $business->business_name . '.'" :styles="['assets/css/promotions-public.css']"
     font-url="https://fonts.googleapis.com/css2?family=Parisienne&family=Poppins:wght@400;500;600;700;800&display=swap">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
         :action-href="route('public.home')" action-icon="bx-left-arrow-alt" />
 
     <main>
-        <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title">
+        <section class="menu-discovery" id="menu" tabindex="-1" aria-labelledby="catalog-title" data-menu-analytics
+            data-view-url="{{ route('public.menu.analytics.view') }}"
+            data-product-url="{{ url('/menu/analitica/productos') }}">
             <div class="menu-container menu-discovery__intro">
                 <div class="menu-discovery__heading">
                     <span class="menu-kicker">Menú del restaurante</span>
@@ -22,7 +19,7 @@
                     <label for="menu-search-input"><span class="sr-only">Buscar platillos en el menú</span></label>
                     <i class="bx bx-search menu-search__icon" aria-hidden="true"></i>
                     <input id="menu-search-input" type="search" placeholder="Buscar platillo o ingrediente"
-                        autocomplete="off" enterkeyhint="search">
+                        autocomplete="off" enterkeyhint="search" aria-describedby="menu-search-status">
                     <button class="menu-search__clear" type="button" id="menu-search-clear"
                         aria-label="Limpiar búsqueda" hidden><i class="bx bx-x" aria-hidden="true"></i></button>
                     <button class="menu-search__submit" type="submit" aria-label="Buscar en el menú"><i
@@ -31,11 +28,15 @@
                 <p class="menu-search__status" id="menu-search-status" aria-live="polite"></p>
             </div>
 
-            @if ($menuSettings->show_categories || $promotions->isNotEmpty() || $discountCampaigns->isNotEmpty() || $newProductCampaigns->isNotEmpty())
+            @if (
+                $menuSettings->show_categories ||
+                    $promotions->isNotEmpty() ||
+                    $discountCampaigns->isNotEmpty() ||
+                    $newProductCampaigns->isNotEmpty())
                 <nav @class([
                     'category-nav',
                     'category-nav--circles' => $menuSettings->category_style === 'circles',
-                ]) aria-label="Categorías del menú">
+                ]) aria-label="Categorías del menú" data-search-navigation>
                     <div class="menu-container category-nav__rail" data-category-rail>
                         <button class="category-nav__control category-nav__control--previous" type="button"
                             data-category-previous aria-label="Ver categorías anteriores"
@@ -76,42 +77,43 @@
                                 </a>
                             @endif
                             @if ($menuSettings->show_categories)
-                            @foreach ($categories as $category)
-                                @php
-                                    $categoryPreview = $category->products->first(
-                                        fn($product) => filled($product->image),
-                                    );
-                                @endphp
-                                <a href="#category-{{ $category->id }}" class="category-nav__item"
-                                    data-category-link="category-{{ $category->id }}">
-                                    <span @class([
-                                        'category-nav__icon',
-                                        'menu-image-shell is-image-loading' => $menuSettings->category_style === 'circles' && $categoryPreview,
-                                    ])
-                                        @if ($menuSettings->category_style === 'circles' && $categoryPreview) data-menu-image-shell @endif
-                                        style="--category-color: {{ $category->color ?: $business->primary_color }}">
-                                        @if ($menuSettings->category_style === 'circles' && $categoryPreview)
-                                            <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
-                                                width="64" height="64" loading="lazy" decoding="async"
-                                                data-menu-image>
-                                        @else
-                                            <i class="bx {{ $category->icon ?: 'bx-food-menu' }}"
-                                                aria-hidden="true"></i>
-                                        @endif
-                                    </span>
-                                    <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
-                                            {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
-                                </a>
-                            @endforeach
-                            @if ($uncategorized->isNotEmpty())
-                                <a href="#category-other" class="category-nav__item"
-                                    data-category-link="category-other">
-                                    <span class="category-nav__icon"><i class="bx bx-dish"
-                                            aria-hidden="true"></i></span>
-                                    <span><strong>Otros</strong><small>{{ $uncategorized->count() }}
-                                            opciones</small></span>
-                                </a>
-                            @endif
+                                @foreach ($categories as $category)
+                                    @php
+                                        $categoryPreview = $category->products->first(
+                                            fn($product) => filled($product->image),
+                                        );
+                                    @endphp
+                                    <a href="#category-{{ $category->id }}" class="category-nav__item"
+                                        data-category-link="category-{{ $category->id }}">
+                                        <span @class([
+                                            'category-nav__icon',
+                                            'menu-image-shell is-image-loading' =>
+                                                $menuSettings->category_style === 'circles' && $categoryPreview,
+                                        ])
+                                            @if ($menuSettings->category_style === 'circles' && $categoryPreview) data-menu-image-shell @endif
+                                            style="--category-color: {{ $category->color ?: $business->primary_color }}">
+                                            @if ($menuSettings->category_style === 'circles' && $categoryPreview)
+                                                <img src="{{ Storage::url($categoryPreview->image) }}" alt=""
+                                                    width="64" height="64" loading="lazy" decoding="async"
+                                                    data-menu-image>
+                                            @else
+                                                <i class="bx {{ $category->icon ?: 'bx-food-menu' }}"
+                                                    aria-hidden="true"></i>
+                                            @endif
+                                        </span>
+                                        <span><strong>{{ $category->name }}</strong><small>{{ $category->products->count() }}
+                                                {{ $category->products->count() === 1 ? 'opción' : 'opciones' }}</small></span>
+                                    </a>
+                                @endforeach
+                                @if ($uncategorized->isNotEmpty())
+                                    <a href="#category-other" class="category-nav__item"
+                                        data-category-link="category-other">
+                                        <span class="category-nav__icon"><i class="bx bx-dish"
+                                                aria-hidden="true"></i></span>
+                                        <span><strong>Otros</strong><small>{{ $uncategorized->count() }}
+                                                opciones</small></span>
+                                    </a>
+                                @endif
                             @endif
                         </div>
                         <button class="category-nav__control category-nav__control--next" type="button"
@@ -126,7 +128,7 @@
             @if ($promotions->isNotEmpty())
                 <section class="promotion-banners menu-container" id="digital-promotions"
                     aria-labelledby="digital-promotions-title" data-category-section data-promotion-carousel
-                    data-autoplay-interval="4500">
+                    data-autoplay-interval="4500" data-search-merchandising>
                     <div class="section-heading promotion-banners__heading">
                         <div><span class="menu-kicker">Beneficios por tiempo limitado</span>
                             <h2 id="digital-promotions-title">Promociones</h2>
@@ -220,7 +222,7 @@
 
             @if ($discountCampaigns->isNotEmpty())
                 <section class="discount-products menu-container" id="discount-products"
-                    aria-labelledby="discount-products-title" data-category-section>
+                    aria-labelledby="discount-products-title" data-category-section data-search-merchandising>
                     <div class="section-heading discount-products__heading">
                         <div><span class="menu-kicker">Precios especiales</span>
                             <h2 id="discount-products-title">Descuentos</h2>
@@ -266,7 +268,7 @@
 
             @if ($newProductCampaigns->isNotEmpty())
                 <section class="new-products menu-container" id="new-products" aria-labelledby="new-products-title"
-                    data-category-section>
+                    data-category-section data-search-merchandising>
                     <div class="section-heading">
                         <div><span class="menu-kicker">Recién llegados</span>
                             <h2 id="new-products-title">Nuevos productos</h2>
@@ -286,7 +288,8 @@
 
             @if ($featured->isNotEmpty())
                 <section class="featured-menu menu-container" aria-labelledby="featured-title" data-featured-carousel
-                    data-autoplay="true" data-interval="{{ ((int) $menuSettings->banner_interval_seconds) * 1000 }}">
+                    data-autoplay="true" data-interval="{{ ((int) $menuSettings->banner_interval_seconds) * 1000 }}"
+                    data-search-merchandising>
                     <div class="section-heading">
                         <div><span class="menu-kicker">Recomendados</span>
                             <h2 id="featured-title">Favoritos de la casa</h2>
@@ -303,9 +306,19 @@
             @endif
 
             <div class="menu-catalog menu-container">
-                <div class="section-heading section-heading--catalog">
+                <div class="section-heading section-heading--catalog" data-catalog-heading>
                     <div><span class="menu-kicker">Carta completa</span>
                         <h2 id="catalog-title">Explora por categoría</h2>
+                    </div>
+                </div>
+                <div class="menu-search-results-heading" data-search-results-heading hidden tabindex="-1">
+                    <span class="menu-search-results-heading__icon" aria-hidden="true"><i
+                            class="bx bx-search-alt"></i></span>
+                    <div>
+                        <span class="menu-kicker">Resultados en todo el menú</span>
+                        <h2 id="menu-search-results-title">Platillos encontrados</h2>
+                        <p>Mostramos cada platillo una sola vez. Las etiquetas indican si también es favorito, nuevo o
+                            tiene una promoción.</p>
                     </div>
                 </div>
 
@@ -326,7 +339,8 @@
                         </header>
                         <div class="product-grid">
                             @foreach ($category->products as $product)
-                                <x-public-menu.product-card :product="$product" />
+                                @php($productSearch = $searchMetadata->get($product->id, []))
+                                <x-public-menu.product-card :product="$product" :search-badges="$productSearch['badges'] ?? []" :search-keywords="$productSearch['keywords'] ?? ''" />
                             @endforeach
                         </div>
                     </section>
@@ -353,7 +367,8 @@
                         </header>
                         <div class="product-grid">
                             @foreach ($uncategorized as $product)
-                                <x-public-menu.product-card :product="$product" />
+                                @php($productSearch = $searchMetadata->get($product->id, []))
+                                <x-public-menu.product-card :product="$product" :search-badges="$productSearch['badges'] ?? []" :search-keywords="$productSearch['keywords'] ?? ''" />
                             @endforeach
                         </div>
                     </section>
@@ -362,7 +377,8 @@
                 <div class="menu-no-results" id="menu-no-results" hidden>
                     <i class="bx bx-search-alt" aria-hidden="true"></i>
                     <h2>No encontramos coincidencias</h2>
-                    <p>Prueba con otro nombre o explora las categorías.</p>
+                    <p>Prueba con otro nombre, ingrediente, promoción o categoría.</p>
+                    <button type="button" data-search-empty-clear>Limpiar búsqueda y ver todo el menú</button>
                 </div>
             </div>
         </section>
@@ -389,7 +405,9 @@
                                 data-promotion-modal-price></strong>
                             <p data-promotion-modal-summary></p>
                         </div>
-                        <div class="promotion-detail-modal__pricing"><i class="bx bx-purchase-tag-alt" aria-hidden="true"></i><span><small data-promotion-modal-offer-caption></small><strong data-promotion-modal-pricing></strong></span></div>
+                        <div class="promotion-detail-modal__pricing"><i class="bx bx-purchase-tag-alt"
+                                aria-hidden="true"></i><span><small data-promotion-modal-offer-caption></small><strong
+                                    data-promotion-modal-pricing></strong></span></div>
                         <div class="product-modal__limits">
                             <div class="product-modal__limit"><i class="bx bx-calendar-check"></i><span><small>Días
                                         válidos</small><strong data-promotion-modal-days></strong></span></div>
@@ -407,7 +425,8 @@
                         <div class="product-modal__groups" data-promotion-modal-groups></div>
                     </div>
                 </div>
-                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La disponibilidad y el beneficio se validan al realizar el pedido</span><button type="button"
+                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La
+                        disponibilidad y el beneficio se validan al realizar el pedido</span><button type="button"
                         data-promotion-modal-close>Cerrar detalle</button></footer>
             </div>
         </dialog>
@@ -451,6 +470,7 @@
     </dialog>
     <x-slot:scripts>
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" async></script>
-        <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}" defer></script>
+        <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}"
+            defer></script>
     </x-slot:scripts>
 </x-public-menu.site-layout>
