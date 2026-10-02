@@ -188,6 +188,7 @@ trait ManagesCart
     {
         $this->resetErrorBag();
         $this->resetCustomizationState();
+        $this->cancelAutomaticPromotionSelection();
     }
 
     private function resetCustomizationState(): void
@@ -538,6 +539,7 @@ trait ManagesCart
         $this->resetCustomizationState();
         unset($this->cartTotal, $this->cartCount);
         $this->saveCart();
+        $this->continueAutomaticPromotionSelection();
     }
 
     public function removeCartItem(string $cartId): void

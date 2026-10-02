@@ -113,8 +113,12 @@
     @php
         $automaticPromotion = $this->automaticPromotionPicker;
         $eligibleProducts = $automaticPromotion->groups->flatMap->products->unique('id')->values();
+        if ($eligibleProducts->isEmpty() && $automaticPromotion->primaryProduct?->is_active) {
+            $eligibleProducts = collect([$automaticPromotion->primaryProduct]);
+        }
         $automaticRule = $automaticPromotion->normalizedPricingRule();
         $automaticCycle = $automaticRule['buy_quantity'] + $automaticRule['reward_quantity'];
+        $automaticSelectedTotal = collect($automaticPromotionSelections)->sum();
     @endphp
     <div class="pos-modal-backdrop" wire:click="closeAutomaticPromotionPicker"></div>
     <div class="pos-modal-wrap is-open promotion-picker-wrap" role="dialog" aria-modal="true" aria-labelledby="automatic-promotion-picker-title">
@@ -127,19 +131,21 @@
             <div class="promotion-picker__body">
                 <div class="promotion-picker__terms"><span><i class="bx bx-info-circle"></i>En cada grupo de {{ $automaticCycle }}, {{ $automaticRule['reward_quantity'] }} producto(s) de menor precio reciben el beneficio.</span></div>
                 <fieldset class="promotion-picker__group">
-                    <legend><span><strong>Productos elegibles</strong><small>Puedes combinar sabores, presentaciones o repetir el mismo artículo.</small></span><b>{{ $eligibleProducts->count() }} opciones</b></legend>
+                    <legend><span><strong>Productos elegibles</strong><small>Selecciona {{ $automaticCycle }} en total; puedes combinar o repetir el mismo artículo.</small></span><b class="{{ $automaticSelectedTotal === $automaticCycle ? 'is-valid' : '' }}">{{ $automaticSelectedTotal }}/{{ $automaticCycle }}</b></legend>
                     <div>
                         @foreach($eligibleProducts as $product)
-                            <article class="promotion-choice">
+                            @php $automaticSelectedQuantity = (int) ($automaticPromotionSelections[$product->id] ?? 0); @endphp
+                            <article class="promotion-choice {{ $automaticSelectedQuantity > 0 ? 'is-selected' : '' }}" wire:key="automatic-promotion-{{ $automaticPromotion->id }}-product-{{ $product->id }}">
                                 @if($product->image)<img src="{{ Storage::url($product->image) }}" alt="" width="54" height="54">@else<span><i class="bx bx-dish"></i></span>@endif
                                 <strong>{{ $product->name }} · ${{ number_format($product->price, 2) }}</strong>
-                                <div><button type="button" wire:click="addEligiblePromotionProduct({{ $automaticPromotion->id }}, {{ $product->id }})" aria-label="Agregar {{ $product->name }}"><i class="bx bx-plus"></i></button></div>
+                                <div><button type="button" wire:click="removeEligiblePromotionProduct({{ $automaticPromotion->id }}, {{ $product->id }})" @disabled($automaticSelectedQuantity === 0) aria-label="Quitar {{ $product->name }}"><i class="bx bx-minus"></i></button><b>{{ $automaticSelectedQuantity }}</b><button type="button" wire:click="addEligiblePromotionProduct({{ $automaticPromotion->id }}, {{ $product->id }})" @disabled($automaticSelectedTotal >= $automaticCycle || $automaticSelectedQuantity >= 99) aria-label="Agregar {{ $product->name }}"><i class="bx bx-plus"></i></button></div>
                             </article>
                         @endforeach
                     </div>
                 </fieldset>
+                @error('automaticPromotionSelection')<p class="promotion-picker__error"><i class="bx bx-error-circle"></i>{{ $message }}</p>@enderror
             </div>
-            <footer class="promotion-picker__footer"><span>La promoción se aplica automáticamente en el carrito.</span><div><button type="button" class="pos-btn pos-btn-secondary" wire:click="closeAutomaticPromotionPicker">Cerrar</button></div></footer>
+            <footer class="promotion-picker__footer"><span>El grupo se agregará completo y la promoción se calculará en el carrito.</span><div><button type="button" class="pos-btn pos-btn-secondary" wire:click="closeAutomaticPromotionPicker">Cancelar</button><button type="button" class="pos-btn pos-btn-primary" wire:click="confirmAutomaticPromotionSelection({{ $automaticPromotion->id }})" @disabled($automaticSelectedTotal !== $automaticCycle)><i class="bx bx-check"></i>Agregar {{ $automaticCycle }} productos</button></div></footer>
         </section>
     </div>
 @endif
