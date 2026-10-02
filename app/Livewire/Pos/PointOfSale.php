@@ -23,10 +23,10 @@ use App\Models\OrderPayment;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\User;
+use App\Services\CashRegisterOpenService;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
 use App\Services\InventoryService;
-use App\Services\CashRegisterOpenService;
 use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
 use App\Services\OrderOperationalDataService;
@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -111,6 +112,16 @@ class PointOfSale extends Component
     public int $promotionQuantity = 1;
 
     public ?int $automaticPromotionPickerId = null;
+
+    /** @var array<int, int> */
+    public array $automaticPromotionSelections = [];
+
+    /** @var array<int, int> */
+    #[Locked]
+    public array $automaticPromotionProductQueue = [];
+
+    #[Locked]
+    public ?int $automaticPromotionQueueId = null;
 
     /** @var array<string, mixed>|null */
     public ?array $activePromotionNotice = null;
@@ -880,7 +891,6 @@ class PointOfSale extends Component
         $this->pickupPanelLoaded = true;
         unset($this->pickupOrders);
     }
-
 
     /**
      * El panel vive en su propio componente. El padre cierra los demás paneles
