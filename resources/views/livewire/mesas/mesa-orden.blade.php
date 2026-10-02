@@ -79,9 +79,16 @@
             </div>
 
             @if($this->activePromotions->isNotEmpty())
-                <section class="mo-promotions" aria-labelledby="mo-promotions-title"><header><div><span>Solo para comedor</span><h2 id="mo-promotions-title">Promociones disponibles</h2></div><small>Selecciona los productos incluidos.</small></header><div>
+                <section class="mo-promotions" aria-labelledby="mo-promotions-title"><header><div><span>Solo para comer aquí</span><h2 id="mo-promotions-title">Promociones</h2></div><small>Las ofertas automáticas se calculan al agregar los productos.</small></header><div>
                     @foreach($this->activePromotions as $promotion)
-                        <button type="button" wire:click="openPromotionModal({{ $promotion->id }})" wire:key="mesa-promotion-{{ $promotion->id }}"><span>@if($promotion->image)<img src="{{ Storage::url($promotion->image) }}" alt="" width="220" height="110" loading="lazy">@else<i class="bx bx-gift"></i>@endif</span><div><small>{{ $promotion->presentationLabel() }}</small><strong>{{ $promotion->name }}</strong><b>${{ number_format($promotion->price,2) }}</b></div></button>
+                        @php
+                            $isAutomatic = $promotion->hasAutomaticPricingRule();
+                            $promotionImage = $promotion->image ?: $promotion->primaryProduct?->image;
+                        @endphp
+                        <button type="button" wire:click="selectPromotionFromCatalog({{ $promotion->id }})" wire:key="mesa-promotion-{{ $promotion->id }}">
+                            <span>@if($promotionImage)<img src="{{ Storage::url($promotionImage) }}" alt="" width="220" height="110" loading="lazy">@else<i class="bx bx-gift"></i>@endif</span>
+                            <div><small>{{ $isAutomatic ? 'Automática' : 'Configurable' }}</small><strong>{{ $promotion->name }}</strong><b>{{ $isAutomatic ? $promotion->pricingRuleShortLabel() : '$'.number_format($promotion->price,2) }}</b></div>
+                        </button>
                     @endforeach
                 </div></section>
             @endif
@@ -184,6 +191,46 @@
         </div>
     @endif
 
+    @if($this->automaticPromotionPicker)
+        @php
+            $automaticPromotion = $this->automaticPromotionPicker;
+            $eligibleProducts = $automaticPromotion->groups->flatMap->products->unique('id')->values();
+            if ($eligibleProducts->isEmpty() && $automaticPromotion->primaryProduct?->is_active) {
+                $eligibleProducts = collect([$automaticPromotion->primaryProduct]);
+            }
+            $automaticRule = $automaticPromotion->normalizedPricingRule();
+            $automaticCycle = $automaticRule['buy_quantity'] + $automaticRule['reward_quantity'];
+            $automaticSelectedTotal = collect($automaticPromotionSelections)->sum();
+        @endphp
+        <div class="mo-promotion-backdrop" wire:click="closeAutomaticPromotionPicker"></div>
+        <div class="mo-promotion-wrap" role="dialog" aria-modal="true" aria-labelledby="mo-automatic-promotion-title">
+            <section class="mo-promotion-modal mo-automatic-promotion-modal">
+                <header>
+                    <div><small>Promoción automática</small><h2 id="mo-automatic-promotion-title">{{ $automaticPromotion->name }}</h2><p>{{ $automaticPromotion->pricingRuleLabel() }}</p></div>
+                    <button type="button" wire:click="closeAutomaticPromotionPicker" aria-label="Cerrar"><i class="bx bx-x"></i></button>
+                </header>
+                <div class="mo-promotion-body">
+                    <div class="mo-promotion-terms"><span><i class="bx bx-info-circle"></i> Selecciona {{ $automaticCycle }} productos en total. El beneficio se aplicará automáticamente en el pedido.</span></div>
+                    <fieldset>
+                        <legend><span><strong>Productos elegibles</strong><small>Puedes combinar o repetir productos.</small></span><b class="{{ $automaticSelectedTotal === $automaticCycle ? 'is-valid' : '' }}">{{ $automaticSelectedTotal }}/{{ $automaticCycle }}</b></legend>
+                        <div>
+                            @foreach($eligibleProducts as $product)
+                                @php $automaticSelectedQuantity = (int) ($automaticPromotionSelections[$product->id] ?? 0); @endphp
+                                <article class="{{ $automaticSelectedQuantity > 0 ? 'is-selected' : '' }}" wire:key="mesa-auto-promotion-{{ $automaticPromotion->id }}-{{ $product->id }}">
+                                    @if($product->image)<img src="{{ Storage::url($product->image) }}" alt="" width="64" height="64">@else<span><i class="bx bx-dish"></i></span>@endif
+                                    <strong>{{ $product->name }} · ${{ number_format($product->price, 2) }}</strong>
+                                    <div><button type="button" wire:click="removeEligiblePromotionProduct({{ $automaticPromotion->id }}, {{ $product->id }})" @disabled($automaticSelectedQuantity === 0) aria-label="Quitar {{ $product->name }}"><i class="bx bx-minus"></i></button><b>{{ $automaticSelectedQuantity }}</b><button type="button" wire:click="addEligiblePromotionProduct({{ $automaticPromotion->id }}, {{ $product->id }})" @disabled($automaticSelectedTotal >= $automaticCycle || $automaticSelectedQuantity >= 99) aria-label="Agregar {{ $product->name }}"><i class="bx bx-plus"></i></button></div>
+                                </article>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                    @error('automaticPromotionSelection')<p class="mo-promotion-error" role="alert">{{ $message }}</p>@enderror
+                </div>
+                <footer><span>El descuento se calcula con los precios vigentes.</span><div><button type="button" wire:click="closeAutomaticPromotionPicker">Cancelar</button><button type="button" class="is-primary" wire:click="confirmAutomaticPromotionSelection({{ $automaticPromotion->id }})" @disabled($automaticSelectedTotal !== $automaticCycle)><i class="bx bx-check"></i> Agregar productos</button></div></footer>
+            </section>
+        </div>
+    @endif
+
     {{-- ══ BACKDROP ══ --}}
     <div class="mo-cart-backdrop" :class="{ 'show': cartOpen }" @click="cartOpen = false" x-cloak></div>
 
@@ -220,6 +267,18 @@
                     <small><i class="bx bx-error me-1"></i>{{ $message }}</small>
                 </div>
             @enderror
+
+            @if($this->promotionOpportunities !== [])
+                <div class="mo-cart-opportunities" aria-label="Promociones por completar" aria-live="polite">
+                    @foreach($this->promotionOpportunities as $opportunity)
+                        <article wire:key="mesa-opportunity-{{ $opportunity['promotion_id'] }}">
+                            <span class="mo-cart-opportunities__icon" aria-hidden="true"><i class="bx bx-gift"></i></span>
+                            <span><small>Promoción detectada</small><strong>{{ $opportunity['message'] }}</strong></span>
+                            <button type="button" wire:click="completePromotionOpportunity({{ $opportunity['promotion_id'] }})" wire:loading.attr="disabled" wire:target="completePromotionOpportunity({{ $opportunity['promotion_id'] }})"><i class="bx bx-plus"></i> Completar</button>
+                        </article>
+                    @endforeach
+                </div>
+            @endif
 
             <div class="mo-cart-items" role="list" aria-label="Productos de la nueva orden">
                 @forelse($cart as $line)

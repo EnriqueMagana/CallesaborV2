@@ -63,7 +63,10 @@ class PublicMenuController extends Controller
                     ->with($this->productDetails()),
             ])
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->filter(fn (Promotion $campaign) => collect(['takeaway', 'delivery'])
+                ->contains(fn (string $fulfillment) => $campaign->appliesToFulfillment($fulfillment)))
+            ->values();
         $promotions = $campaigns
             ->where('presentation_type', 'promotion')
             ->values();
