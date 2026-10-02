@@ -139,6 +139,17 @@
                         aria-label="Carrusel de promociones">
                         @foreach ($promotions as $promotion)
                             @php
+                                $digitalFulfillmentLabels = collect([
+                                    'takeaway' => 'Para llevar',
+                                    'delivery' => 'Entrega a domicilio',
+                                ])->filter(
+                                    fn($label, $fulfillment) => $promotion->appliesToFulfillment($fulfillment),
+                                )->values()->all();
+                                $digitalFulfillmentSummary = count($digitalFulfillmentLabels) === 2
+                                    ? 'Disponible para llevar o entrega a domicilio'
+                                    : ($promotion->appliesToFulfillment('delivery')
+                                        ? 'Solo con entrega a domicilio'
+                                        : 'Solo para llevar');
                                 $modalPromotion = [
                                     'id' => (int) $promotion->id,
                                     'name' => $promotion->name,
@@ -160,8 +171,8 @@
                                     'validity' => $promotion->ends_on
                                         ? 'Válida hasta ' . $promotion->ends_on->translatedFormat('d M Y')
                                         : 'Sin fecha de finalización',
-                                    'fulfillment' => $promotion->fulfillmentLabels(),
-                                    'fulfillmentSummary' => $promotion->fulfillmentSummary(),
+                                    'fulfillment' => $digitalFulfillmentLabels,
+                                    'fulfillmentSummary' => $digitalFulfillmentSummary,
                                     'terms' => $promotion->terms_and_conditions,
                                     'groups' => $promotion->groups
                                         ->map(
@@ -205,7 +216,7 @@
                                     <h3>{{ $promotion->name }}</h3>
                                     <p>{{ $promotion->short_description }}</p><small
                                         class="promotion-banner__fulfillment"><i
-                                            class="bx bx-map-pin"></i>{{ $promotion->fulfillmentSummary() }}</small>
+                                            class="bx bx-map-pin"></i>{{ $digitalFulfillmentSummary }}</small>
                                     <div>
                                         <small>{{ $promotion->scheduleSummary() }}</small>
                                     </div>

@@ -17,6 +17,7 @@ use App\Services\PromotionSelectionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class MesaOrden extends Component
@@ -40,6 +41,18 @@ class MesaOrden extends Component
     public array $promotionSelections = [];
 
     public int $promotionQuantity = 1;
+
+    public ?int $automaticPromotionPickerId = null;
+
+    /** @var array<int, int> */
+    public array $automaticPromotionSelections = [];
+
+    /** @var array<int, int> */
+    #[Locked]
+    public array $automaticPromotionProductQueue = [];
+
+    #[Locked]
+    public ?int $automaticPromotionQueueId = null;
 
     public string $orderNotes = '';
 
@@ -143,13 +156,96 @@ class MesaOrden extends Component
     #[Computed]
     public function activePromotions()
     {
-        return Promotion::query()
-            ->available('pos', null, 'dine_in')
-            ->with(['groups.products' => fn ($query) => $query
+        $relations = [
+            'primaryProduct' => fn ($query) => $query
                 ->where('is_active', true)
-                ->select(['products.id', 'products.name', 'products.image'])])
-            ->orderBy('name')
+                ->select(['id', 'name', 'image', 'price', 'is_active', 'is_customizable']),
+            'groups.products' => fn ($query) => $query
+                ->where('is_active', true)
+                ->select(['products.id', 'products.name', 'products.image', 'products.price', 'products.is_customizable']),
+        ];
+
+        $manual = Promotion::query()
+            ->available('pos', null, 'dine_in')
+            ->with($relations)
             ->get();
+
+        $automatic = Promotion::query()
+            ->automaticPricingAvailable('pos', null, 'dine_in')
+            ->with($relations)
+            ->get();
+
+        return $manual->concat($automatic)->unique('id')->sortBy('name')->values();
+    }
+
+    #[Computed]
+    public function promotionOpportunities(): array
+    {
+        return app(PromotionPricingService::class)->opportunities($this->cart, 'pos', 'dine_in');
+    }
+
+    #[Computed]
+    public function automaticPromotionPicker(): ?Promotion
+    {
+        if (! $this->automaticPromotionPickerId) {
+            return null;
+        }
+
+        return Promotion::query()
+            ->automaticPricingAvailable('pos', null, 'dine_in')
+            ->with([
+                'primaryProduct:id,name,image,price,is_active,is_customizable',
+                'groups.products' => fn ($query) => $query->where('is_active', true)
+                    ->select(['products.id', 'products.name', 'products.image', 'products.price', 'products.is_customizable']),
+            ])
+            ->find($this->automaticPromotionPickerId);
+    }
+
+    public function selectPromotionFromCatalog(int $promotionId): void
+    {
+        $promotion = Promotion::query()
+            ->with(['primaryProduct', 'groups.products' => fn ($query) => $query->where('is_active', true)])
+            ->find($promotionId);
+
+        if (! $promotion) {
+            $this->addError('cart', 'Esta promoción ya no está disponible.');
+
+            return;
+        }
+
+        if (! $promotion->hasAutomaticPricingRule()) {
+            $this->openPromotionModal($promotionId);
+
+            return;
+        }
+
+        $available = Promotion::query()
+            ->automaticPricingAvailable('pos', null, 'dine_in')
+            ->whereKey($promotionId)
+            ->exists();
+        $eligibleProducts = $promotion->groups->flatMap->products->unique('id')->values();
+        if ($eligibleProducts->isEmpty() && $promotion->primaryProduct?->is_active) {
+            $eligibleProducts = collect([$promotion->primaryProduct]);
+        }
+
+        if (! $available || $eligibleProducts->isEmpty()) {
+            $this->addError('cart', 'Esta oferta no está disponible para comer aquí.');
+
+            return;
+        }
+
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT) {
+            $this->automaticPromotionPickerId = $promotion->id;
+            $this->automaticPromotionSelections = [];
+            $this->automaticPromotionProductQueue = [];
+            $this->automaticPromotionQueueId = null;
+            $this->resetErrorBag('automaticPromotionSelection');
+            unset($this->automaticPromotionPicker);
+
+            return;
+        }
+
+        $this->openCustomize((int) $eligibleProducts->first()->id);
     }
 
     #[Computed]
@@ -240,7 +336,171 @@ class MesaOrden extends Component
             'promotion_selections' => $snapshot,
         ];
         $this->closePromotionModal();
-        unset($this->cartTotal, $this->cartCount, $this->activePromotions);
+        $this->repriceCart();
+        unset($this->activePromotions);
+    }
+
+    public function closeAutomaticPromotionPicker(): void
+    {
+        $this->automaticPromotionPickerId = null;
+        $this->automaticPromotionSelections = [];
+        $this->automaticPromotionProductQueue = [];
+        $this->automaticPromotionQueueId = null;
+        $this->resetErrorBag('automaticPromotionSelection');
+        unset($this->automaticPromotionPicker);
+    }
+
+    public function addEligiblePromotionProduct(int $promotionId, int $productId): void
+    {
+        abort_unless($this->automaticPromotionPickerId === $promotionId, 422);
+        $promotion = $this->automaticPromotionPicker;
+        abort_unless(in_array($productId, $this->automaticPromotionEligibleIds($promotion), true), 422);
+
+        $cycle = $this->automaticPromotionCycle($promotion);
+        if (array_sum($this->automaticPromotionSelections) >= $cycle
+            || ($this->automaticPromotionSelections[$productId] ?? 0) >= self::MAX_ITEM_QUANTITY) {
+            return;
+        }
+
+        $this->automaticPromotionSelections[$productId] = ($this->automaticPromotionSelections[$productId] ?? 0) + 1;
+        $this->resetErrorBag('automaticPromotionSelection');
+    }
+
+    public function removeEligiblePromotionProduct(int $promotionId, int $productId): void
+    {
+        abort_unless($this->automaticPromotionPickerId === $promotionId, 422);
+        abort_unless(in_array($productId, $this->automaticPromotionEligibleIds($this->automaticPromotionPicker), true), 422);
+
+        $quantity = (int) ($this->automaticPromotionSelections[$productId] ?? 0);
+        if ($quantity <= 1) {
+            unset($this->automaticPromotionSelections[$productId]);
+        } else {
+            $this->automaticPromotionSelections[$productId] = $quantity - 1;
+        }
+        $this->resetErrorBag('automaticPromotionSelection');
+    }
+
+    public function confirmAutomaticPromotionSelection(int $promotionId): void
+    {
+        abort_unless($this->automaticPromotionPickerId === $promotionId, 422);
+        $promotion = $this->automaticPromotionPicker;
+        if (! $promotion) {
+            $this->closeAutomaticPromotionPicker();
+
+            return;
+        }
+
+        $eligibleIds = $this->automaticPromotionEligibleIds($promotion);
+        $selections = collect($this->automaticPromotionSelections)
+            ->filter(fn ($quantity, $productId) => in_array((int) $productId, $eligibleIds, true) && is_numeric($quantity) && (int) $quantity > 0)
+            ->mapWithKeys(fn ($quantity, $productId) => [(int) $productId => (int) $quantity]);
+        $cycle = $this->automaticPromotionCycle($promotion);
+
+        if ($selections->sum() !== $cycle) {
+            $this->addError('automaticPromotionSelection', "Selecciona exactamente {$cycle} productos para aplicar esta promoción.");
+
+            return;
+        }
+
+        $this->automaticPromotionProductQueue = $selections
+            ->flatMap(fn (int $quantity, int $productId) => array_fill(0, $quantity, $productId))
+            ->values()
+            ->all();
+        $this->automaticPromotionQueueId = $promotion->id;
+        $this->automaticPromotionPickerId = null;
+        $this->automaticPromotionSelections = [];
+        $this->resetErrorBag('automaticPromotionSelection');
+        unset($this->automaticPromotionPicker);
+
+        $this->continueAutomaticPromotionSelection();
+    }
+
+    public function completePromotionOpportunity(int $promotionId): void
+    {
+        $opportunity = collect($this->promotionOpportunities)->firstWhere('promotion_id', $promotionId);
+        if (! $opportunity) {
+            return;
+        }
+
+        if (count($opportunity['eligible_product_ids'] ?? []) > 1) {
+            $this->selectPromotionFromCatalog($promotionId);
+
+            return;
+        }
+
+        $product = Product::query()
+            ->where('is_active', true)
+            ->withCount(['addonGroups', 'ingredients'])
+            ->find($opportunity['product_id']);
+        if (! $product) {
+            $this->addError('cart', 'El producto de la oferta ya no está disponible.');
+
+            return;
+        }
+
+        $missing = max(1, min(self::MAX_ITEM_QUANTITY, (int) $opportunity['missing_quantity']));
+        if ($product->is_customizable || $product->addon_groups_count > 0 || $product->ingredients_count > 0) {
+            $this->openCustomize($product->id);
+            $this->itemQty = $missing;
+
+            return;
+        }
+
+        for ($unit = 0; $unit < $missing; $unit++) {
+            $this->addProductToCart($product);
+        }
+    }
+
+    /** @return array<int, int> */
+    private function automaticPromotionEligibleIds(?Promotion $promotion): array
+    {
+        $eligibleIds = $promotion?->groups
+            ->flatMap->products
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all() ?? [];
+
+        if ($eligibleIds === [] && $promotion?->primary_product_id) {
+            return [(int) $promotion->primary_product_id];
+        }
+
+        return $eligibleIds;
+    }
+
+    private function automaticPromotionCycle(?Promotion $promotion): int
+    {
+        $rule = $promotion?->normalizedPricingRule() ?? [];
+
+        return max(1, min(
+            self::MAX_ITEM_QUANTITY * 2,
+            (int) ($rule['buy_quantity'] ?? 1) + (int) ($rule['reward_quantity'] ?? 1)
+        ));
+    }
+
+    private function continueAutomaticPromotionSelection(): void
+    {
+        if (! $this->automaticPromotionQueueId) {
+            return;
+        }
+
+        while ($this->automaticPromotionProductQueue !== []) {
+            $productId = (int) array_shift($this->automaticPromotionProductQueue);
+            $this->openCustomize($productId);
+
+            if ($this->showCustomize) {
+                return;
+            }
+        }
+
+        $this->automaticPromotionQueueId = null;
+    }
+
+    private function cancelAutomaticPromotionSelection(): void
+    {
+        $this->automaticPromotionProductQueue = [];
+        $this->automaticPromotionQueueId = null;
     }
 
     #[Computed]
@@ -326,6 +586,7 @@ class MesaOrden extends Component
 
     public function closeCustomize(): void
     {
+        $this->cancelAutomaticPromotionSelection();
         $this->resetErrorBag();
         $this->resetCustomizationState();
     }
@@ -686,6 +947,7 @@ class MesaOrden extends Component
 
         $this->resetCustomizationState();
         $this->repriceCart();
+        $this->continueAutomaticPromotionSelection();
     }
 
     public function incrementQty(string $cartId): void
@@ -758,7 +1020,7 @@ class MesaOrden extends Component
     private function repriceCart(): void
     {
         $this->cart = app(PromotionPricingService::class)->apply($this->cart, 'pos', 'dine_in');
-        unset($this->cartTotal, $this->cartCount);
+        unset($this->cartTotal, $this->cartCount, $this->promotionOpportunities);
     }
 
     // ── Place order ──
