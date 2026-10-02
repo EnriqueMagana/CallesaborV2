@@ -23,6 +23,7 @@
         visitor_token: anonymousToken(window.localStorage, 'calle-sabor-menu-visitor'),
         session_token: anonymousToken(window.sessionStorage, 'calle-sabor-menu-session'),
     } : null;
+    const analyticsClickLocks = new Map();
 
     const sendAnalytics = (url) => {
         if (!url || !analyticsIdentity) return;
@@ -39,7 +40,17 @@
         }).catch(() => {});
     };
 
-    if (analyticsRoot) sendAnalytics(analyticsRoot.dataset.viewUrl);
+    if (analyticsRoot) {
+        const viewKey = 'calle-sabor-menu-view-sent';
+        try {
+            if (!window.sessionStorage.getItem(viewKey)) {
+                window.sessionStorage.setItem(viewKey, '1');
+                sendAnalytics(analyticsRoot.dataset.viewUrl);
+            }
+        } catch (_) {
+            sendAnalytics(analyticsRoot.dataset.viewUrl);
+        }
+    }
 
     const cancelScrollTween = (scroller) => {
         const state = scrollTweens.get(scroller);
@@ -970,7 +981,12 @@
             }
 
             if (product.id && analyticsRoot?.dataset.productUrl) {
-                sendAnalytics(`${analyticsRoot.dataset.productUrl}/${encodeURIComponent(product.id)}`);
+                const now = Date.now();
+                const lastSentAt = analyticsClickLocks.get(product.id) || 0;
+                if (now - lastSentAt >= 1500) {
+                    analyticsClickLocks.set(product.id, now);
+                    sendAnalytics(`${analyticsRoot.dataset.productUrl}/${encodeURIComponent(product.id)}`);
+                }
             }
 
             lastTrigger = trigger;

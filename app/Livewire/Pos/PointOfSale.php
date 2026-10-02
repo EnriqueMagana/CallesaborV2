@@ -112,6 +112,9 @@ class PointOfSale extends Component
 
     public ?int $automaticPromotionPickerId = null;
 
+    /** @var array<string, mixed>|null */
+    public ?array $activePromotionNotice = null;
+
     // ─── Customize product modal ───────────────────────────────────────────────
     public bool $showCustomizeModal = false;
 
@@ -1702,9 +1705,15 @@ class PointOfSale extends Component
 
         $this->pickupPayOrderId = $orderId;
         $this->pickupPayments = [];
-        $this->pickupPayMethod = 'cash';
+        $this->pickupPayMethod = match ($order->preferred_payment_method) {
+            'tarjeta' => 'card',
+            'transferencia' => 'transfer',
+            default => 'cash',
+        };
         $this->pickupPayAmount = '';
-        $this->pickupPayReceived = '';
+        $this->pickupPayReceived = $this->pickupPayMethod === 'cash' && $order->cash_tendered
+            ? number_format((float) $order->cash_tendered, 2, '.', '')
+            : '';
         $this->pickupPayCard = '';
         $this->pickupPayRef = '';
         $this->showPickupPayModal = true;

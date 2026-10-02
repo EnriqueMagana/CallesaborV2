@@ -196,6 +196,7 @@
                                         @endforeach
                                     </div>
                                     @error('fulfillmentModes')<p class="field-error">{{ $message }}</p>@enderror
+                                    @error('fulfillmentModes.*')<p class="field-error">{{ $message }}</p>@enderror
                                 </fieldset>
                                 <label class="promotion-terms"><span>Términos y condiciones visibles</span><textarea wire:model="termsAndConditions" rows="3" maxlength="1000" placeholder="Ej. Válido hasta agotar existencias. No acumulable con otras promociones."></textarea><small>Se mostrarán en el menú digital, kiosco y selector de la promoción.</small>@error('termsAndConditions')<small class="field-error">{{ $message }}</small>@enderror</label>
                                 <div class="promotion-channel-grid"><label><input type="checkbox" wire:model="showOnKiosk"><span><i class="bx bx-devices"></i><strong>Kiosco</strong><small>Visible después de que el cliente elija su modalidad.</small></span></label></div>

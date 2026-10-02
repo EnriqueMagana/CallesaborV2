@@ -399,6 +399,8 @@ class PromotionManager extends Component
 
     public function nextWizardStep(): void
     {
+        $this->normalizeCheckboxSelections();
+
         if ($this->wizardStep === 1) {
             $this->validateOnly('presentationType', [
                 'presentationType' => ['required', Rule::in(Promotion::PRESENTATION_TYPES)],
@@ -440,7 +442,7 @@ class PromotionManager extends Component
                     $rules += $this->pricingRuleValidationRules();
                 }
             }
-            $this->validate($rules);
+            $this->validate($rules, $this->validationMessages());
             $this->validateFixedProductPrice();
             foreach ($this->groups as $index => $group) {
                 if ((int) $group['min_selections'] > (int) $group['max_selections']) {
@@ -461,7 +463,7 @@ class PromotionManager extends Component
             if ($this->presentationType === 'new') {
                 $rules['primaryProductId'] = ['required', Rule::exists('products', 'id')->where('is_active', true)];
             }
-            $this->validate($rules);
+            $this->validate($rules, $this->validationMessages());
             if ($this->presentationType === 'promotion' && ! $this->image && ! $this->currentImage) {
                 throw ValidationException::withMessages(['image' => 'Carga una imagen horizontal para el banner promocional.']);
             }
@@ -495,7 +497,7 @@ class PromotionManager extends Component
                     'termsAndConditions' => ['nullable', 'string', 'max:1000'],
                 ];
             }
-            $this->validate($rules);
+            $this->validate($rules, $this->validationMessages());
             $this->validateChannelFulfillmentCompatibility();
             if (! $this->showOnPos && ! $this->showOnDigitalMenu && ! $this->showOnKiosk) {
                 throw ValidationException::withMessages(['channels' => 'Selecciona al menos un canal de publicación.']);
@@ -525,6 +527,7 @@ class PromotionManager extends Component
     public function save(): void
     {
         $this->authorize($this->editingId ? 'editar promociones' : 'crear promociones');
+        $this->normalizeCheckboxSelections();
 
         if ($this->usesEligibleProductGroup()) {
             $this->updatedEligibleProductIds();
@@ -607,7 +610,7 @@ class PromotionManager extends Component
             $rules['monthlyDay'] = ['required', 'integer', 'between:1,31'];
         }
 
-        $validated = $this->validate($rules, [], [
+        $validated = $this->validate($rules, $this->validationMessages(), [
             'name' => 'nombre',
             'price' => 'precio promocional',
             'startsOn' => 'fecha de inicio',
@@ -823,6 +826,41 @@ class PromotionManager extends Component
                 'channels' => 'El kiosco no maneja pedidos programados para pasar a buscar; habilita otra modalidad o desactiva ese canal.',
             ]);
         }
+    }
+
+    /**
+     * Livewire normally hydrates checkbox groups as value lists. A browser tab
+     * kept open across a deployment can still submit the legacy boolean-map
+     * shape, which looks selected in the UI but makes Rule::in validate `true`.
+     */
+    private function normalizeCheckboxSelections(): void
+    {
+        $this->fulfillmentModes = $this->normalizeCheckboxValues($this->fulfillmentModes);
+        $this->weekdays = array_values(array_unique(array_map(
+            'intval',
+            $this->normalizeCheckboxValues($this->weekdays)
+        )));
+    }
+
+    private function normalizeCheckboxValues(array $values): array
+    {
+        $isBooleanMap = $values !== [] && collect($values)->every(fn ($value) => is_bool($value));
+
+        return collect($isBooleanMap ? array_keys(array_filter($values)) : $values)
+            ->filter(fn ($value) => is_string($value) || is_int($value))
+            ->uniqueStrict()
+            ->values()
+            ->all();
+    }
+
+    private function validationMessages(): array
+    {
+        return [
+            'presentationType.in' => 'El objetivo seleccionado ya no está disponible. Vuelve al primer paso y elígelo nuevamente.',
+            'pricingMechanic.in' => 'La mecánica seleccionada no corresponde al tipo de campaña.',
+            'scheduleType.in' => 'Selecciona una frecuencia de publicación válida.',
+            'fulfillmentModes.*.in' => 'Una de las modalidades seleccionadas ya no es válida. Vuelve a seleccionarla.',
+        ];
     }
 
     private function pricingRuleValidationRules(): array

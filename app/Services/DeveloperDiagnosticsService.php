@@ -22,6 +22,7 @@ class DeveloperDiagnosticsService
         private readonly FirebaseConfiguration $firebase,
         private readonly FirebaseCustomTokenFactory $tokens,
         private readonly FirebaseRealtimeDatabase $realtime,
+        private readonly TrafficDiagnosticsService $traffic,
     ) {}
 
     /** @return array<string, mixed> */
@@ -69,6 +70,7 @@ class DeveloperDiagnosticsService
                 'cleanup' => config('firebase.realtime.cleanup_time').' · '.config('firebase.realtime.cleanup_timezone'),
             ],
             'notifications' => $this->notificationSummary(),
+            'traffic' => $this->traffic->snapshot(),
         ];
     }
 

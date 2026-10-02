@@ -4,6 +4,7 @@ use App\Http\Controllers\DigitalMenuTrackingController;
 use App\Http\Controllers\InventoryPurchaseTicketController;
 use App\Http\Controllers\KioskLaunchController;
 use App\Http\Controllers\KioskMediaController;
+use App\Http\Controllers\OnlineOrderController;
 use App\Http\Controllers\PublicHomeController;
 use App\Http\Controllers\PublicInfoController;
 use App\Http\Controllers\PublicMenuController;
@@ -60,11 +61,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', PublicHomeController::class)->name('public.home');
 Route::get('/menu', PublicMenuController::class)->name('public.menu');
+Route::post('/menu/pedidos', [OnlineOrderController::class, 'store'])->middleware('throttle:12,1')->name('online-orders.store');
+Route::get('/pedido-online/{publicToken}', [OnlineOrderController::class, 'track'])->name('online-orders.track');
+Route::get('/pedido-online/{publicToken}/whatsapp', [OnlineOrderController::class, 'whatsapp'])->middleware('throttle:30,1')->name('online-orders.whatsapp');
 Route::post('/menu/analitica/vista', [DigitalMenuTrackingController::class, 'view'])
-    ->middleware('throttle:120,1')
+    ->middleware('throttle:12,1')
     ->name('public.menu.analytics.view');
 Route::post('/menu/analitica/productos/{product}', [DigitalMenuTrackingController::class, 'product'])
-    ->middleware('throttle:120,1')
+    ->middleware('throttle:60,1')
     ->name('public.menu.analytics.product');
 Route::redirect('/men', '/menu', 301);
 Route::get('/reservar', [PublicInfoController::class, 'reservation'])->name('public.reservation');
