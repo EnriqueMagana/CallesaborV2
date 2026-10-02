@@ -177,6 +177,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // Mesero
         $mesero = Role::firstOrCreate(['name' => 'mesero', 'guard_name' => 'web']);
         $mesero->syncPermissions([
+            'ver promociones',
             'ver ordenes', 'crear ordenes', 'editar ordenes', 'solicitar cancelacion de ordenes', 'solicitar modificacion de ordenes', 'solicitar cambio de direccion', 'reimprimir tickets',
             'ver mesas', 'asignar mesas', 'ordenar mesas', 'cerrar mesas',
             'dividir mesas', 'cancelar divisiones mesas', 'reasignar mesas', 'gestionar grupos',
