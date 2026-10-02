@@ -67,6 +67,7 @@
 @include('livewire.pos.partials.panels.delivery')
 <livewire:pos.panels.balances-panel wire:key="pos-panel-balances" />
 <livewire:pos.panels.kitchen-panel wire:key="pos-panel-kitchen" />
+<livewire:pos.panels.online-orders-panel wire:key="pos-panel-online-orders" />
 @include('livewire.pos.partials.panels.reprint')
 
 {{-- Modals --}}
@@ -104,6 +105,10 @@ window.bindPosTicketEvents = function () {
             activeTab: 'cocina',
             frames: { cliente: html_cliente || '', cocina: html_cocina || '' },
         });
+    });
+
+    Livewire.on('online-order-print', ({ url }) => {
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
     });
 };
 

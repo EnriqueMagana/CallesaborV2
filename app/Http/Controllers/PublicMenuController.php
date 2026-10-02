@@ -8,6 +8,7 @@ use App\Models\DigitalMenuSetting;
 use App\Models\Product;
 use App\Models\Promotion;
 use App\Services\DigitalMenuAnalytics;
+use App\Services\OnlineSalesPolicy;
 use App\Support\BusinessTime;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -88,6 +89,7 @@ class PublicMenuController extends Controller
             'discountCampaigns' => $discountCampaigns,
             'newProductCampaigns' => $newProductCampaigns,
             'searchMetadata' => $searchMetadata,
+            'onlineSalesEnabled' => app(OnlineSalesPolicy::class)->enabled() && filled($business->whatsapp),
         ]);
     }
 

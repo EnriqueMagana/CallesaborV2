@@ -17,7 +17,7 @@ class Order extends Model
         'mesa_service_id',
         'folio',
         'customer_name', 'customer_phone', 'customer_address', 'customer_neighborhood', 'customer_references',
-        'served_by', 'type', 'source', 'fulfillment', 'table_identifier', 'delivery_method',
+        'served_by', 'type', 'source', 'fulfillment', 'preferred_payment_method', 'cash_tendered', 'table_identifier', 'delivery_method',
         'delivery_flow_mode', 'accounted_at', 'status', 'subtotal', 'total', 'notes',
         'cancelled_by', 'cancellation_reason', 'cancelled_at', 'paid_at',
     ];
@@ -26,6 +26,7 @@ class Order extends Model
         'folio' => 'integer',
         'subtotal' => 'decimal:2',
         'total' => 'decimal:2',
+        'cash_tendered' => 'decimal:2',
         'cancelled_at' => 'datetime',
         'paid_at' => 'datetime',
         'accounted_at' => 'datetime',
@@ -224,6 +225,10 @@ class Order extends Model
 
     public function getOriginLabelAttribute(): string
     {
+        if ($this->source === 'online') {
+            return 'Pedido en línea · WhatsApp';
+        }
+
         if ($this->source === 'kiosk') {
             return $this->kioskTerminal?->name
                 ? 'Kiosco · '.$this->kioskTerminal->name
@@ -306,6 +311,7 @@ class Order extends Model
     {
         return $this->type === 'delivery' && $this->delivery_method === 'contra_entrega';
     }
+
     public function getAmountToCollectAttribute(): float
     {
         if ($this->delivery_method !== 'contra_entrega') {

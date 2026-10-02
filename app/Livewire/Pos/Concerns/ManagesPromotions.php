@@ -48,7 +48,7 @@ use ManagesQuotations;
 
 /**
  * Promociones y descuentos automaticos.
- * 
+ *
  * Reglas de negocio puras: que promocion aplica, con que cantidades y a que
  * precio. El plan es explicito en que nada de esto puede mudarse al cliente — el
  * navegador solo anticipa el resultado visual.
@@ -147,6 +147,22 @@ trait ManagesPromotions
     {
         $this->automaticPromotionPickerId = null;
         unset($this->automaticPromotionPicker);
+    }
+
+    public function confirmActivePromotion(): void
+    {
+        if (! $this->activePromotionNotice) {
+            return;
+        }
+
+        $promotionName = (string) ($this->activePromotionNotice['promotion_name'] ?? 'Promoción');
+        $this->activePromotionNotice = null;
+        $this->dispatch('notify', type: 'success', message: "{$promotionName} aplicada al pedido.");
+    }
+
+    public function closeActivePromotionNotice(): void
+    {
+        $this->activePromotionNotice = null;
     }
 
     public function addEligiblePromotionProduct(int $promotionId, int $productId): void
@@ -346,6 +362,111 @@ trait ManagesPromotions
             'pick_up' => 'pickup',
             default => 'takeaway',
         };
+    }
+
+    /**
+     * Opens the cashier-facing explanation only when a rule gains a new benefit.
+     * Pricing remains server-authoritative; the modal confirms what was applied.
+     */
+    private function captureActivatedPromotion(array $before, array $after): void
+    {
+        $discountsBefore = $this->automaticPromotionDiscounts($before);
+        $discountsAfter = $this->automaticPromotionDiscounts($after);
+        $activatedPromotionId = collect($discountsAfter)
+            ->map(fn (float $discount, int $promotionId) => [
+                'promotion_id' => $promotionId,
+                'increase' => round($discount - ($discountsBefore[$promotionId] ?? 0.0), 2),
+            ])
+            ->filter(fn (array $candidate) => $candidate['increase'] > 0.0)
+            ->sortByDesc('increase')
+            ->first();
+
+        if (! $activatedPromotionId) {
+            return;
+        }
+
+        $promotion = Promotion::query()
+            ->with('groups.products:id,name')
+            ->find($activatedPromotionId['promotion_id']);
+        if (! $promotion) {
+            return;
+        }
+
+        $eligibleProductIds = $promotion->groups->flatMap->products->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        if ($eligibleProductIds === [] && $promotion->primary_product_id) {
+            $eligibleProductIds = [(int) $promotion->primary_product_id];
+        }
+
+        $eligibleLines = collect($after)->filter(
+            fn (array $line) => in_array((int) ($line['product_id'] ?? 0), $eligibleProductIds, true)
+                && empty($line['promotion_selections'])
+        );
+        $config = $promotion->normalizedPricingRule();
+        $cycle = $config['buy_quantity'] + $config['reward_quantity'];
+        $eligibleQuantity = (int) $eligibleLines->sum(fn (array $line) => max(1, (int) ($line['quantity'] ?? 1)));
+        $applications = $promotion->pricing_rule_type === Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT
+            ? intdiv($eligibleQuantity, $cycle)
+            : $eligibleQuantity;
+        if ($config['max_applications_per_order']) {
+            $applications = min($applications, $config['max_applications_per_order']);
+        }
+
+        $this->activePromotionNotice = [
+            'promotion_id' => $promotion->id,
+            'promotion_name' => $promotion->name,
+            'label' => $promotion->pricingRuleLabel(),
+            'explanation' => $this->activePromotionExplanation($promotion, $config, max(1, $applications)),
+            'eligible_quantity' => $eligibleQuantity,
+            'application_count' => max(1, $applications),
+            'new_savings' => (float) $activatedPromotionId['increase'],
+            'total_savings' => (float) $discountsAfter[$promotion->id],
+            'products' => $eligibleLines
+                ->groupBy(fn (array $line) => (int) $line['product_id'])
+                ->map(fn ($lines) => [
+                    'name' => (string) ($lines->first()['product_name'] ?? 'Producto'),
+                    'quantity' => (int) $lines->sum(fn (array $line) => max(1, (int) ($line['quantity'] ?? 1))),
+                ])
+                ->values()
+                ->all(),
+        ];
+
+        $this->dispatch(
+            'notify',
+            type: 'success',
+            message: 'Promoción activa: '.$promotion->name.'. Ahorro $'.number_format($activatedPromotionId['increase'], 2).'.'
+        );
+    }
+
+    /** @return array<int, float> */
+    private function automaticPromotionDiscounts(array $cart): array
+    {
+        return collect($cart)
+            ->filter(fn (array $line) => ! empty($line['auto_promotion_applied']) && ! empty($line['promotion_id']))
+            ->groupBy(fn (array $line) => (int) $line['promotion_id'])
+            ->map(fn ($lines) => round((float) $lines->sum('promotion_discount'), 2))
+            ->all();
+    }
+
+    private function activePromotionExplanation(Promotion $promotion, array $config, int $applications): string
+    {
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT) {
+            return "Se descuenta {$config['discount_percentage']}% del precio base de cada producto participante. Los extras conservan su precio.";
+        }
+
+        if ($promotion->pricing_rule_type === Promotion::PRICING_RULE_FIXED_PRODUCT_PRICE) {
+            return 'Cada producto participante queda en $'.number_format($config['fixed_price'], 2).'. Los extras se cobran por separado.';
+        }
+
+        $cycle = $config['buy_quantity'] + $config['reward_quantity'];
+        $benefit = $config['reward_discount_percentage'] === 100
+            ? "{$config['reward_quantity']} producto(s) de menor precio quedan sin costo"
+            : "{$config['reward_quantity']} producto(s) de menor precio reciben {$config['reward_discount_percentage']}% de descuento";
+
+        return "Por cada {$cycle} productos participantes, {$benefit}. Se completaron {$applications} aplicación(es).";
     }
 
     private function validatedPromotionSnapshot(Promotion $promotion, array $selections): array

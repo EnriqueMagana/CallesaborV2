@@ -1,4 +1,4 @@
-<x-public-menu.site-layout :business="$business" :menu-settings="$menuSettings" :title="'Menú | ' . $business->business_name" :description="'Consulta el menú, horarios y datos de ' . $business->business_name . '.'" :styles="['assets/css/promotions-public.css']"
+<x-public-menu.site-layout :business="$business" :menu-settings="$menuSettings" :title="'Menú | ' . $business->business_name" :description="'Consulta el menú, horarios y datos de ' . $business->business_name . '.'" :styles="['assets/css/promotions-public.css', 'assets/css/online-ordering.css']"
     font-url="https://fonts.googleapis.com/css2?family=Parisienne&family=Poppins:wght@400;500;600;700;800&display=swap">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
@@ -140,6 +140,7 @@
                         @foreach ($promotions as $promotion)
                             @php
                                 $modalPromotion = [
+                                    'id' => (int) $promotion->id,
                                     'name' => $promotion->name,
                                     'summary' =>
                                         $promotion->short_description ?:
@@ -150,6 +151,7 @@
                                     'description' => $promotion->description,
                                     'offerCaption' => $promotion->publicOfferCaption(),
                                     'offerValue' => $promotion->publicOfferValue(),
+                                    'priceValue' => (float) $promotion->price,
                                     'pricingExplanation' => $promotion->publicPricingExplanation(),
                                     'image' => $promotion->image ? Storage::url($promotion->image) : null,
                                     'badge' => $promotion->presentationLabel(),
@@ -164,11 +166,15 @@
                                     'groups' => $promotion->groups
                                         ->map(
                                             fn($group) => [
+                                                'id' => (int) $group->id,
                                                 'name' => $group->name,
+                                                'minimum' => (int) $group->min_selections,
+                                                'maximum' => (int) $group->max_selections,
                                                 'rule' => $promotion->publicGroupRule($group),
                                                 'products' => $group->products
                                                     ->map(
                                                         fn($product) => [
+                                                            'id' => (int) $product->id,
                                                             'name' => $product->name,
                                                             'description' => $product->description,
                                                             'image' => $product->image
@@ -294,6 +300,14 @@
                         <div><span class="menu-kicker">Recomendados</span>
                             <h2 id="featured-title">Favoritos de la casa</h2>
                         </div>
+                        @if($featured->count() > 1)
+                            <div class="featured-menu__controls" aria-label="Controles de favoritos">
+                                <button type="button" data-featured-previous aria-label="Ver favorito anterior"><i class="bx bx-chevron-left"></i></button>
+                                <span data-featured-status aria-live="polite">1 / {{ $featured->count() }}</span>
+                                <button type="button" data-featured-pause aria-label="Pausar carrusel" aria-pressed="false"><i class="bx bx-pause"></i></button>
+                                <button type="button" data-featured-next aria-label="Ver siguiente favorito"><i class="bx bx-chevron-right"></i></button>
+                            </div>
+                        @endif
                     </div>
                     <div class="featured-menu__rail" role="list" tabindex="0"
                         aria-label="Favoritos de la casa, carrusel horizontal">
@@ -425,9 +439,9 @@
                         <div class="product-modal__groups" data-promotion-modal-groups></div>
                     </div>
                 </div>
-                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La
-                        disponibilidad y el beneficio se validan al realizar el pedido</span><button type="button"
-                        data-promotion-modal-close>Cerrar detalle</button></footer>
+                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La disponibilidad y el beneficio se validan al realizar el pedido</span>
+                    @if($onlineSalesEnabled)<button type="button" class="online-add-button" data-online-add-promotion><i class="bx bx-cart"></i>Elegir combo</button>@endif
+                    <button type="button" data-promotion-modal-close>Cerrar detalle</button></footer>
             </div>
         </dialog>
     @endif
@@ -463,14 +477,19 @@
                 </div>
             </div>
             <footer class="product-modal__footer">
-                <span><i class="bx bx-check-shield" aria-hidden="true"></i>Esta vista es informativa</span>
+                <span><i class="bx bx-check-shield" aria-hidden="true"></i>{{ $onlineSalesEnabled ? 'Personaliza antes de agregar' : 'Esta vista es informativa' }}</span>
+                @if($onlineSalesEnabled)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar al pedido</button>@endif
                 <button type="button" data-modal-close>Cerrar detalle</button>
             </footer>
         </div>
     </dialog>
+    @if($onlineSalesEnabled)
+        <x-public-menu.online-ordering :business="$business" />
+    @endif
     <x-slot:scripts>
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" async></script>
         <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}"
             defer></script>
+        @if($onlineSalesEnabled)<script src="{{ asset('assets/js/online-ordering.js') }}?v={{ filemtime(public_path('assets/js/online-ordering.js')) }}" defer></script>@endif
     </x-slot:scripts>
 </x-public-menu.site-layout>

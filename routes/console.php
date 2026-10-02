@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AppNotification;
+use App\Models\DigitalMenuEvent;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -26,3 +27,16 @@ Schedule::command('notifications:clear-realtime')
     ->name('notifications:clear-realtime')
     ->appendOutputTo(storage_path('logs/firebase-cleanup.log'))
     ->withoutOverlapping();
+
+Schedule::call(function (): void {
+    if (! Schema::hasTable('digital_menu_events')) {
+        return;
+    }
+
+    DigitalMenuEvent::query()
+        ->where('created_at', '<', now()->subDays(180))
+        ->select('id')
+        ->chunkById(1000, function ($events): void {
+            DigitalMenuEvent::query()->whereKey($events->pluck('id'))->delete();
+        });
+})->dailyAt('03:40')->name('digital-menu-analytics:prune')->withoutOverlapping();

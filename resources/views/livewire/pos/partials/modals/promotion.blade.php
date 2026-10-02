@@ -42,6 +42,73 @@
     </div>
 @endif
 
+@if($activePromotionNotice)
+    <div class="pos-modal-backdrop"></div>
+    <div class="pos-modal-wrap is-open promotion-picker-wrap" role="dialog" aria-modal="true"
+        aria-labelledby="active-promotion-title" aria-describedby="active-promotion-description">
+        <section class="promotion-picker active-promotion-modal">
+            <header class="promotion-picker__header active-promotion-modal__header">
+                <div>
+                    <span aria-hidden="true"><i class="bx bx-check"></i></span>
+                    <div>
+                        <small>Aplicar promociones</small>
+                        <h2 id="active-promotion-title">Promoción activa</h2>
+                        <p>{{ $activePromotionNotice['promotion_name'] }}</p>
+                    </div>
+                </div>
+                <strong>{{ $activePromotionNotice['label'] }}</strong>
+                <button type="button" wire:click="closeActivePromotionNotice" aria-label="Cerrar aviso de promoción">
+                    <i class="bx bx-x" aria-hidden="true"></i>
+                </button>
+            </header>
+
+            <div class="promotion-picker__body active-promotion-modal__body">
+                <div class="active-promotion-modal__success" role="status" aria-live="polite">
+                    <span aria-hidden="true"><i class="bx bx-purchase-tag-alt"></i></span>
+                    <div>
+                        <strong>El pedido ya cumple las condiciones</strong>
+                        <p id="active-promotion-description">{{ $activePromotionNotice['explanation'] }}</p>
+                    </div>
+                </div>
+
+                <div class="active-promotion-modal__summary" aria-label="Resumen de la promoción">
+                    <div>
+                        <span>Productos participantes</span>
+                        <strong>{{ $activePromotionNotice['eligible_quantity'] }}</strong>
+                    </div>
+                    <div>
+                        <span>Veces aplicada</span>
+                        <strong>{{ $activePromotionNotice['application_count'] }}</strong>
+                    </div>
+                    <div class="is-saving">
+                        <span>Ahorro en el pedido</span>
+                        <strong>−${{ number_format($activePromotionNotice['total_savings'], 2) }}</strong>
+                    </div>
+                </div>
+
+                <section class="active-promotion-modal__products" aria-labelledby="active-promotion-products-title">
+                    <h3 id="active-promotion-products-title">Así se completa</h3>
+                    <div>
+                        @foreach($activePromotionNotice['products'] as $product)
+                            <span><i class="bx bx-check-circle" aria-hidden="true"></i><strong>{{ $product['quantity'] }}×</strong> {{ $product['name'] }}</span>
+                        @endforeach
+                    </div>
+                </section>
+            </div>
+
+            <footer class="promotion-picker__footer active-promotion-modal__footer">
+                <span><i class="bx bx-shield-quarter" aria-hidden="true"></i> El cálculo se validó con los precios actuales.</span>
+                <div>
+                    <button type="button" class="pos-btn pos-btn-secondary" wire:click="closeActivePromotionNotice">Cerrar</button>
+                    <button type="button" class="pos-btn pos-btn-primary" wire:click="confirmActivePromotion">
+                        <i class="bx bx-check" aria-hidden="true"></i>Confirmar promoción
+                    </button>
+                </div>
+            </footer>
+        </section>
+    </div>
+@endif
+
 @if($this->automaticPromotionPicker)
     @php
         $automaticPromotion = $this->automaticPromotionPicker;

@@ -1,5 +1,14 @@
 <nav class="pos-toolbar-bottom" aria-label="Áreas del punto de venta">
     @can('ver pedidos en punto de venta')
+    <button type="button" class="tb-btn tb-btn--delivery" :class="panels.online ? 'is-active' : ''"
+        @click="showOnlyPanel('online'); Livewire.dispatch('open-online-orders')" data-pos-panel="online"
+        aria-label="Abrir pedidos en línea" title="Pedidos recibidos desde el menú digital">
+        <span class="tb-btn__icon"><i class="bx bxl-whatsapp"></i></span>
+        <span class="tb-btn__copy"><strong>Pedidos en línea</strong><small>Confirmar y enviar a cocina</small></span>
+    </button>
+    @endcan
+
+    @can('ver pedidos en punto de venta')
     <button type="button" class="tb-btn tb-btn--window" :class="panels.pickup ? 'is-active' : ''"
         @click="showOnlyPanel('pickup'); $wire.openPickupPanel()" data-pos-panel="pickup" aria-keyshortcuts="F6"
         aria-label="Abrir pedidos no pagados" title="Abrir pedidos por cobrar (F6)">

@@ -128,6 +128,7 @@ trait ManagesCart
 
     private function saveCart(): void
     {
+        $cartBeforePromotionPricing = $this->cart;
         $discounts = app(DiscountPricingService::class);
         $this->cart = $discounts->clear($this->cart);
         $this->cart = app(PromotionPricingService::class)->apply(
@@ -135,6 +136,7 @@ trait ManagesCart
             'pos',
             $this->promotionFulfillmentForOrderType($this->orderType)
         );
+        $this->captureActivatedPromotion($cartBeforePromotionPricing, $this->cart);
         $this->cart = $discounts->apply(
             $this->cart,
             $this->promotionFulfillmentForOrderType($this->orderType),

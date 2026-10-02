@@ -94,6 +94,21 @@
         </div>
     </section>
 
+    @php
+        $onlineSales = $this->onlineSalesState;
+    @endphp
+    <section class="developer-panel developer-module-control {{ $onlineSales['enabled'] ? 'is-enabled' : 'is-manual' }}" aria-labelledby="online-sales-title">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div><span class="developer-panel__icon"><i class="bx bx-cart" aria-hidden="true"></i></span><div><h2 id="online-sales-title">Ventas en línea</h2><p>Controla el carrito público, el wizard de compra, WhatsApp y la bandeja de confirmación del POS.</p></div></div>
+            <span class="developer-module-control__state" role="status"><i class="bx {{ $onlineSales['enabled'] && $onlineSales['configured'] ? 'bx-check-shield' : 'bx-pause-circle' }}"></i>{{ !$onlineSales['configured'] ? 'Falta WhatsApp' : ($onlineSales['enabled'] ? 'Aceptando pedidos' : 'Carrito desactivado') }}</span>
+        </header>
+        <div class="developer-module-control__body">
+            <div class="developer-module-control__summary"><strong>{{ $onlineSales['enabled'] && $onlineSales['configured'] ? 'El menú permite armar y enviar pedidos' : 'El menú permanece únicamente informativo' }}</strong><p>Las solicitudes no afectan caja ni cocina hasta que un operador confirme que el pedido se concretó.</p>@if(!$onlineSales['configured'])<small>Configura el número de WhatsApp en <a href="{{ route('app.configuracion-negocio') }}">Configuración del negocio</a> para mostrar el carrito.</small>@endif</div>
+            <dl class="developer-module-control__metrics"><div><dt>Por confirmar</dt><dd>{{ $onlineSales['pending'] }}</dd></div><div><dt>Canal</dt><dd><i class="bx bxl-whatsapp"></i></dd></div></dl>
+            <div class="developer-module-control__action"><button type="button" class="developer-module-switch" role="switch" aria-checked="{{ $onlineSales['enabled'] ? 'true' : 'false' }}" wire:click="confirmToggleOnlineSales" wire:loading.attr="disabled"><span><i class="bx {{ $onlineSales['enabled'] ? 'bx-x' : 'bx-check' }}"></i></span><strong>{{ $onlineSales['enabled'] ? 'Desactivar ventas' : 'Activar ventas' }}</strong></button><p>Las solicitudes existentes nunca se eliminan al cambiar este interruptor.</p></div>
+        </div>
+    </section>
+
     <section class="developer-health-grid" aria-label="Estado general de servicios">
         @php
             $healthCards = [
@@ -110,6 +125,73 @@
                 <span class="developer-status"><i class="bx {{ $card['ok'] ? 'bx-check' : 'bx-error' }}" aria-hidden="true"></i>{{ $card['ok'] ? 'OK' : 'Revisar' }}</span>
             </article>
         @endforeach
+    </section>
+
+    @php
+        $traffic = $diagnostics['traffic'];
+        $menuTraffic = $traffic['digital_menu'];
+        $pulseTraffic = $traffic['pulse'];
+        $polling = $traffic['polling'];
+    @endphp
+    <section class="developer-panel developer-traffic" aria-labelledby="developer-traffic-title">
+        <header class="developer-panel__header developer-panel__header--split">
+            <div>
+                <span class="developer-panel__icon"><i class="bx bx-tachometer" aria-hidden="true"></i></span>
+                <div>
+                    <h2 id="developer-traffic-title">Tráfico y rendimiento</h2>
+                    <p>Diagnóstico bajo demanda para detectar presión del menú digital sin añadir carga periódica al POS.</p>
+                </div>
+            </div>
+            <span class="developer-state {{ $traffic['status'] === 'healthy' ? 'is-announced' : 'is-pending' }}">
+                {{ $traffic['status'] === 'healthy' ? 'Sin alertas activas' : 'Requiere revisión' }}
+            </span>
+        </header>
+
+        <div class="developer-traffic__summary">
+            <article class="developer-traffic__metric {{ $polling['detected'] === 0 ? 'is-ok' : 'is-warning' }}">
+                <span><i class="bx bx-refresh" aria-hidden="true"></i> Polling detectado</span>
+                <strong>{{ $polling['detected'] }}</strong>
+                <small>{{ $polling['message'] }}</small>
+            </article>
+            <article class="developer-traffic__metric">
+                <span><i class="bx bx-show" aria-hidden="true"></i> Eventos del menú · 24 h</span>
+                <strong>{{ number_format((int) ($menuTraffic['last_24h'] ?? 0)) }}</strong>
+                <small>{{ number_format((int) ($menuTraffic['views_24h'] ?? 0)) }} vistas · {{ number_format((int) ($menuTraffic['clicks_24h'] ?? 0)) }} clics</small>
+            </article>
+            <article class="developer-traffic__metric {{ (int) ($pulseTraffic['slow_requests_24h'] ?? 0) === 0 ? 'is-ok' : 'is-warning' }}">
+                <span><i class="bx bx-time-five" aria-hidden="true"></i> Solicitudes lentas · 24 h</span>
+                <strong>{{ number_format((int) ($pulseTraffic['slow_requests_24h'] ?? 0)) }}</strong>
+                <small>Pico {{ number_format((int) ($pulseTraffic['peak_request_ms'] ?? 0)) }} ms según Laravel Pulse</small>
+            </article>
+            <article class="developer-traffic__metric {{ (int) ($pulseTraffic['slow_queries_24h'] ?? 0) === 0 ? 'is-ok' : 'is-warning' }}">
+                <span><i class="bx bx-data" aria-hidden="true"></i> Consultas lentas · 24 h</span>
+                <strong>{{ number_format((int) ($pulseTraffic['slow_queries_24h'] ?? 0)) }}</strong>
+                <small>Pico {{ number_format((int) ($pulseTraffic['peak_query_ms'] ?? 0)) }} ms · umbral Pulse</small>
+            </article>
+        </div>
+
+        <div class="developer-traffic__details">
+            <div class="developer-traffic__controls">
+                <h3>Controles activos</h3>
+                <ul>
+                    <li><i class="bx bx-check-shield" aria-hidden="true"></i><span>Sin actualización automática: este diagnóstico solo cambia al pulsar <strong>Actualizar diagnóstico</strong>.</span></li>
+                    <li><i class="bx bx-check-shield" aria-hidden="true"></i><span>Ranking y gráficas en caché durante {{ $traffic['controls']['analytics_cache_seconds'] }} segundos.</span></li>
+                    <li><i class="bx bx-check-shield" aria-hidden="true"></i><span>Límites por IP: {{ $traffic['controls']['view_limit_per_minute'] }} vistas y {{ $traffic['controls']['click_limit_per_minute'] }} clics por minuto.</span></li>
+                    <li><i class="bx bx-check-shield" aria-hidden="true"></i><span>Retención de analítica: {{ $traffic['controls']['analytics_retention_days'] }} días. Registro Laravel: {{ $traffic['log']['size_mb'] }} MB.</span></li>
+                </ul>
+            </div>
+            <div class="developer-traffic__slow">
+                <h3>Rutas lentas recientes</h3>
+                @forelse ($pulseTraffic['top_slow_requests'] ?? [] as $request)
+                    <div class="developer-traffic__route">
+                        <code>{{ $request['method'] }} {{ $request['path'] }}</code>
+                        <span>{{ number_format($request['peak_ms']) }} ms · {{ $request['incidents'] }} incidencia(s)</span>
+                    </div>
+                @empty
+                    <p>No hay solicitudes lentas registradas por Pulse en las últimas 24 horas.</p>
+                @endforelse
+            </div>
+        </div>
     </section>
 
     @php

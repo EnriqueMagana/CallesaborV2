@@ -4,11 +4,14 @@ namespace App\Livewire\SuperAdmin;
 
 use App\Mail\DeveloperTestMail;
 use App\Models\AppNotification;
+use App\Models\BusinessSetting;
 use App\Models\DeliveryModuleAudit;
+use App\Models\OnlineOrder;
 use App\Services\DeliveryModuleManager;
 use App\Services\DeliveryModulePolicy;
 use App\Services\DeveloperDiagnosticsService;
 use App\Services\Firebase\FirebaseRealtimeDatabase;
+use App\Services\OnlineSalesPolicy;
 use App\Support\BusinessTime;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -174,6 +177,36 @@ class DeveloperConsole extends Component
         );
     }
 
+    #[Computed]
+    public function onlineSalesState(): array
+    {
+        $settings = BusinessSetting::current();
+
+        return [
+            'enabled' => app(OnlineSalesPolicy::class)->enabled(),
+            'configured' => filled($settings->whatsapp),
+            'pending' => OnlineOrder::query()->where('status', 'pending_confirmation')->count(),
+        ];
+    }
+
+    public function confirmToggleOnlineSales(): void
+    {
+        $this->authorizeDiagnostics();
+        $enable = ! $this->onlineSalesState['enabled'];
+        $this->dispatch(
+            'open-confirm',
+            type: $enable ? 'warning' : 'danger',
+            title: $enable ? 'Activar ventas en línea' : 'Desactivar ventas en línea',
+            message: $enable
+                ? 'El menú digital mostrará el carrito y permitirá enviar nuevas solicitudes por WhatsApp.'
+                : 'El carrito desaparecerá del menú. Las solicitudes ya creadas seguirán disponibles en el POS.',
+            action: 'toggle-online-sales',
+            params: ['enabled' => $enable],
+            confirmText: $enable ? 'Activar ventas' : 'Desactivar carrito',
+            cancelText: 'Cancelar',
+        );
+    }
+
     #[On('modal-confirmed')]
     public function handleModalConfirmed(string $action, array $params = []): void
     {
@@ -185,7 +218,24 @@ class DeveloperConsole extends Component
 
         if ($action === 'toggle-delivery-module') {
             $this->toggleDeliveryModule((bool) ($params['enabled'] ?? false));
+
+            return;
         }
+
+        if ($action === 'toggle-online-sales') {
+            $this->toggleOnlineSales((bool) ($params['enabled'] ?? false));
+        }
+    }
+
+    public function toggleOnlineSales(bool $enabled): void
+    {
+        $this->authorizeDiagnostics();
+        BusinessSetting::current()->update(['online_sales_enabled' => $enabled]);
+        OnlineSalesPolicy::flush();
+        unset($this->onlineSalesState);
+        $this->lastAction = ['ok' => true, 'message' => $enabled
+            ? 'Ventas en línea activadas: el carrito ya está disponible en el menú digital.'
+            : 'Ventas en línea desactivadas: no se aceptarán nuevas solicitudes.'];
     }
 
     public function toggleDeliveryModule(bool $enabled): void

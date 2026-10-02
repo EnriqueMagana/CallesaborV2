@@ -51,6 +51,7 @@ html.dark-style #pos-loading-screen{background:#11131a;color:#a8b0bf}
 <link rel="stylesheet" href="@assetVersion('assets/css/notification-center.min.css')"/>
 <link rel="stylesheet" href="@assetVersion('assets/css/pos-mobile-navigation.min.css')"/>
 <link rel="stylesheet" href="@assetVersion('assets/css/ticket-preview-modal.min.css')"/>
+<link rel="stylesheet" href="@assetVersion('assets/css/online-ordering.css')"/>
 
 <!-- Helpers -->
 <script src="@assetVersion('assets/vendor/js/helpers.min.js')"></script>

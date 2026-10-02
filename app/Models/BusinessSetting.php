@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\DeliveryModulePolicy;
+use App\Services\OnlineSalesPolicy;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ class BusinessSetting extends Model
         'gallery_paths' => 'array',
         'featured_product_ids' => 'array',
         'delivery_management_enabled' => 'boolean',
+        'online_sales_enabled' => 'boolean',
         'ticket_font_size' => 'integer',
     ];
 
@@ -35,8 +37,14 @@ class BusinessSetting extends Model
     {
         // Cualquier escritura de la configuracion invalida el interruptor del
         // modulo de delivery, que el POS lee cacheado en cada render.
-        static::saved(fn () => DeliveryModulePolicy::flush());
-        static::deleted(fn () => DeliveryModulePolicy::flush());
+        static::saved(function (): void {
+            DeliveryModulePolicy::flush();
+            OnlineSalesPolicy::flush();
+        });
+        static::deleted(function (): void {
+            DeliveryModulePolicy::flush();
+            OnlineSalesPolicy::flush();
+        });
     }
 
     public static function current(): self
