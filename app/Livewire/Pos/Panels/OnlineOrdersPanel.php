@@ -4,6 +4,7 @@ namespace App\Livewire\Pos\Panels;
 
 use App\Models\OnlineOrder;
 use App\Services\OnlineOrderService;
+use App\Services\OnlineSalesPolicy;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -20,7 +21,7 @@ class OnlineOrdersPanel extends Component
     #[On('open-online-orders')]
     public function open(): void
     {
-        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
+        $this->authorizeAccess();
         $this->loaded = true;
         unset($this->orders, $this->pendingCount);
     }
@@ -34,6 +35,7 @@ class OnlineOrdersPanel extends Component
 
     public function setTab(string $tab): void
     {
+        $this->authorizeAccess();
         abort_unless(in_array($tab, ['pending', 'history'], true), 422);
         $this->tab = $tab;
         unset($this->orders);
@@ -41,13 +43,13 @@ class OnlineOrdersPanel extends Component
 
     public function refreshOrders(): void
     {
-        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
+        $this->authorizeAccess();
         unset($this->orders, $this->pendingCount);
     }
 
     public function confirmOrder(int $id, OnlineOrderService $service): void
     {
-        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
+        $this->authorizeAccess();
         try {
             $order = $service->confirm(OnlineOrder::findOrFail($id), auth()->user());
         } catch (ValidationException $exception) {
@@ -66,7 +68,7 @@ class OnlineOrdersPanel extends Component
 
     public function rejectOrder(int $id): void
     {
-        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
+        $this->authorizeAccess();
         $order = OnlineOrder::query()->whereNull('order_id')->whereIn('status', ['awaiting_whatsapp', 'pending_confirmation'])->findOrFail($id);
         $order->update(['status' => 'rejected', 'rejection_reason' => 'El pedido no se concretó por WhatsApp.', 'rejected_at' => now()]);
         unset($this->orders, $this->pendingCount);
@@ -76,7 +78,7 @@ class OnlineOrdersPanel extends Component
     #[Computed]
     public function orders()
     {
-        if (! $this->loaded) {
+        if (! $this->loaded || ! app(OnlineSalesPolicy::class)->enabled()) {
             return collect();
         }
 
@@ -93,7 +95,7 @@ class OnlineOrdersPanel extends Component
     #[Computed]
     public function pendingCount(): int
     {
-        if (! $this->loaded) {
+        if (! $this->loaded || ! app(OnlineSalesPolicy::class)->enabled()) {
             return 0;
         }
 
@@ -103,5 +105,11 @@ class OnlineOrdersPanel extends Component
     public function render()
     {
         return view('livewire.pos.panels.online-orders-panel');
+    }
+
+    private function authorizeAccess(): void
+    {
+        abort_unless(auth()->user()?->can('ver pedidos en punto de venta'), 403);
+        app(OnlineSalesPolicy::class)->assertEnabled();
     }
 }

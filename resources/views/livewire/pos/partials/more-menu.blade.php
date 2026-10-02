@@ -32,13 +32,15 @@
         </header>
 
         <div class="pos-more-grid">
-            @can('ver pedidos en punto de venta')
+            @if ($this->onlineSalesEnabled)
+                @can('ver pedidos en punto de venta')
                 <button type="button" class="pos-more-action" data-tone="green"
                     @click="closeMore(false); showOnlyPanel('online'); Livewire.dispatch('open-online-orders')">
                     <span class="pos-more-action__icon"><i class="bx bxl-whatsapp" aria-hidden="true"></i></span>
                     <strong>Pedidos en línea</strong><small>Confirmar solicitudes</small>
                 </button>
-            @endcan
+                @endcan
+            @endif
 
             @can('gestionar borradores en punto de venta')
                 <button type="button" class="pos-more-action" data-tone="violet"
