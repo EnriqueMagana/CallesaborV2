@@ -29,6 +29,7 @@ use App\Services\DeliveryWorkflow;
 use App\Services\InventoryService;
 use App\Services\ManualDeliveryAccountingService;
 use App\Services\MesaServiceManager;
+use App\Services\OnlineSalesPolicy;
 use App\Services\OrderOperationalDataService;
 use App\Services\ThermalTicketRenderer;
 use App\Support\BusinessTime;
@@ -331,6 +332,12 @@ class PointOfSale extends Component
     public function deliveryModuleEnabled(): bool
     {
         return app(DeliveryModulePolicy::class)->enabled();
+    }
+
+    #[Computed]
+    public function onlineSalesEnabled(): bool
+    {
+        return app(OnlineSalesPolicy::class)->enabled();
     }
 
     #[Computed]

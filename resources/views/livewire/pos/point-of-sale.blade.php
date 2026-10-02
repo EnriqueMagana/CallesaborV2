@@ -67,7 +67,9 @@
 @include('livewire.pos.partials.panels.delivery')
 <livewire:pos.panels.balances-panel wire:key="pos-panel-balances" />
 <livewire:pos.panels.kitchen-panel wire:key="pos-panel-kitchen" />
-<livewire:pos.panels.online-orders-panel wire:key="pos-panel-online-orders" />
+@if ($this->onlineSalesEnabled)
+    <livewire:pos.panels.online-orders-panel wire:key="pos-panel-online-orders" />
+@endif
 @include('livewire.pos.partials.panels.reprint')
 
 {{-- Modals --}}
