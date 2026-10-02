@@ -105,7 +105,7 @@
                         <li @class(['is-active'=>$wizardStep===$step,'is-complete'=>$wizardStep>$step]) @if($wizardStep===$step) aria-current="step" @endif><span><i class="bx {{ $stepData[0] }}"></i></span><strong>{{ $stepData[1] }}</strong></li>
                     @endforeach
                 </ol>
-                <div class="promotion-modal__body">
+                <div class="promotion-modal__body" wire:key="promotion-wizard-body-{{ $wizardStep }}-{{ $presentationType }}-{{ $pricingMechanic }}-{{ $scheduleType }}">
                     @if($errors->any())<div class="promotion-error-summary" role="alert"><i class="bx bx-error-circle"></i><span><strong>Revisa la información indicada.</strong><small>{{ $errors->first() }}</small></span></div>@endif
 
                     @if($wizardStep === 1)
