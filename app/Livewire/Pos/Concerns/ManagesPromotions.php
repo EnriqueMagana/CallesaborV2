@@ -539,9 +539,10 @@ trait ManagesPromotions
         }
 
         $cycle = $config['buy_quantity'] + $config['reward_quantity'];
+        $target = $config['reward_price_target'] === 'most_expensive' ? 'mayor' : 'menor';
         $benefit = $config['reward_discount_percentage'] === 100
-            ? "{$config['reward_quantity']} producto(s) de menor precio quedan sin costo"
-            : "{$config['reward_quantity']} producto(s) de menor precio reciben {$config['reward_discount_percentage']}% de descuento";
+            ? "{$config['reward_quantity']} producto(s) de {$target} precio quedan sin costo"
+            : "{$config['reward_quantity']} producto(s) de {$target} precio reciben {$config['reward_discount_percentage']}% de descuento";
 
         return "Por cada {$cycle} productos participantes, {$benefit}. Se completaron {$applications} aplicación(es).";
     }

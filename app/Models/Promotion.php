@@ -131,6 +131,9 @@ class Promotion extends Model
                 ? max(1, min(99, (int) $config['max_applications_per_order']))
                 : null,
             'apply_to_addons' => false,
+            'reward_price_target' => ($config['reward_price_target'] ?? 'cheapest') === 'most_expensive'
+                ? 'most_expensive'
+                : 'cheapest',
             'reward_scope' => ($config['reward_scope'] ?? 'same_product') === 'eligible_group'
                 ? 'eligible_group'
                 : 'same_product',
@@ -241,7 +244,8 @@ class Promotion extends Model
         }
 
         if ($rule['reward_scope'] === 'eligible_group') {
-            $explanation .= ' Puedes combinarlos o repetirlos; el beneficio se aplica a los de menor precio.';
+            $target = $rule['reward_price_target'] === 'most_expensive' ? 'mayor' : 'menor';
+            $explanation .= " Puedes combinarlos o repetirlos; el beneficio se aplica a los de {$target} precio.";
         }
 
         return $explanation;
@@ -296,8 +300,7 @@ class Promotion extends Model
         string $channel,
         ?CarbonInterface $at = null,
         ?string $fulfillment = null,
-    ): Builder
-    {
+    ): Builder {
         $at ??= BusinessTime::now();
         $column = match ($channel) {
             'digital_menu' => 'show_on_digital_menu',

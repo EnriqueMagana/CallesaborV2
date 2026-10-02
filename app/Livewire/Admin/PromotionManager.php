@@ -54,6 +54,8 @@ class PromotionManager extends Component
 
     public int $rewardDiscountPercentage = 50;
 
+    public string $rewardPriceTarget = 'cheapest';
+
     public string $maxApplicationsPerOrder = '';
 
     public string $startsOn = '';
@@ -206,6 +208,7 @@ class PromotionManager extends Component
         $this->buyQuantity = $pricingRule['buy_quantity'];
         $this->rewardQuantity = $pricingRule['reward_quantity'];
         $this->rewardDiscountPercentage = $pricingRule['reward_discount_percentage'];
+        $this->rewardPriceTarget = $pricingRule['reward_price_target'];
         $this->maxApplicationsPerOrder = (string) ($pricingRule['max_applications_per_order'] ?? '');
         $this->pricingMechanic = match ($promotion->pricing_rule_type) {
             Promotion::PRICING_RULE_PERCENTAGE_DISCOUNT => 'percentage_discount',
@@ -304,10 +307,15 @@ class PromotionManager extends Component
         $this->launchOfferEnabled = $this->isAutomaticMechanic();
         if ($mechanic === 'two_for_one') {
             [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [1, 1, 100];
+            $this->rewardPriceTarget = 'cheapest';
         } elseif ($mechanic === 'three_for_two') {
             [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [2, 1, 100];
+            $this->rewardPriceTarget = 'cheapest';
         } elseif ($mechanic === 'second_half') {
             [$this->buyQuantity, $this->rewardQuantity, $this->rewardDiscountPercentage] = [1, 1, 50];
+            $this->rewardPriceTarget = 'most_expensive';
+        } elseif ($mechanic === 'custom_quantity') {
+            $this->rewardPriceTarget = 'cheapest';
         }
 
         if ($mechanic === 'fixed_price' && $this->groups === []) {
@@ -692,6 +700,9 @@ class PromotionManager extends Component
                             'buy_quantity' => (int) $validated['buyQuantity'],
                             'reward_quantity' => (int) $validated['rewardQuantity'],
                             'reward_discount_percentage' => (int) $validated['rewardDiscountPercentage'],
+                            'reward_price_target' => $this->pricingMechanic === 'second_half'
+                                ? $validated['rewardPriceTarget']
+                                : 'cheapest',
                             'max_applications_per_order' => filled($validated['maxApplicationsPerOrder'] ?? null)
                                 ? (int) $validated['maxApplicationsPerOrder']
                                 : null,
@@ -788,7 +799,7 @@ class PromotionManager extends Component
             'editingId', 'name', 'description', 'shortDescription', 'presentationType',
             'primaryProductId', 'eligibleProductIds', 'wizardStep', 'previewDevice', 'discountPercentage', 'price', 'pricingMechanic',
             'startsOn', 'endsOn', 'weekdays', 'scheduleType', 'monthlyDay',
-            'launchOfferEnabled', 'buyQuantity', 'rewardQuantity', 'rewardDiscountPercentage', 'maxApplicationsPerOrder',
+            'launchOfferEnabled', 'buyQuantity', 'rewardQuantity', 'rewardDiscountPercentage', 'rewardPriceTarget', 'maxApplicationsPerOrder',
             'fulfillmentModes', 'termsAndConditions', 'showOnPos', 'showOnDigitalMenu', 'showOnKiosk',
             'isActive', 'image', 'currentImage', 'groups',
         ]);
@@ -806,6 +817,7 @@ class PromotionManager extends Component
         $this->buyQuantity = 1;
         $this->rewardQuantity = 1;
         $this->rewardDiscountPercentage = 50;
+        $this->rewardPriceTarget = 'cheapest';
         $this->resetValidation();
     }
 
@@ -813,12 +825,6 @@ class PromotionManager extends Component
     {
         if ($this->presentationType === 'new' && ! $this->launchOfferEnabled) {
             return;
-        }
-
-        if ($this->showOnPos && array_intersect($this->fulfillmentModes, Promotion::POS_FULFILLMENT_MODES) === []) {
-            throw ValidationException::withMessages([
-                'channels' => 'El punto de venta solo admite Para llevar, Pasar a buscar o Entrega a domicilio.',
-            ]);
         }
 
         if ($this->showOnKiosk && array_intersect($this->fulfillmentModes, Promotion::KIOSK_FULFILLMENT_MODES) === []) {
@@ -870,6 +876,7 @@ class PromotionManager extends Component
             'buyQuantity' => ['required', 'integer', 'between:1,99'],
             'rewardQuantity' => ['required', 'integer', 'between:1,99'],
             'rewardDiscountPercentage' => ['required', 'integer', 'between:1,100'],
+            'rewardPriceTarget' => ['required', Rule::in(['cheapest', 'most_expensive'])],
             'maxApplicationsPerOrder' => ['nullable', 'integer', 'between:1,99'],
         ];
     }

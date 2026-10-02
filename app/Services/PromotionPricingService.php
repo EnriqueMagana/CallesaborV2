@@ -323,8 +323,8 @@ class PromotionPricingService
     }
 
     /**
-     * Sorts eligible units from highest to lowest, forms complete cycles, and
-     * rewards the cheapest unit(s) inside each cycle. Add-ons never participate.
+     * Forms complete price-ordered cycles and rewards the configured price
+     * target inside each cycle. Add-ons never participate.
      */
     private function rewardUnitCounts(array $cart, array $indexes, array $config): array
     {
@@ -334,7 +334,10 @@ class PromotionPricingService
                 $units[] = ['index' => $index, 'price' => $this->basePrice($cart[$index])];
             }
         }
-        usort($units, fn (array $left, array $right) => $right['price'] <=> $left['price'] ?: $left['index'] <=> $right['index']);
+        $mostExpensive = ($config['reward_price_target'] ?? 'cheapest') === 'most_expensive';
+        usort($units, fn (array $left, array $right) => $mostExpensive
+            ? ($left['price'] <=> $right['price'] ?: $left['index'] <=> $right['index'])
+            : ($right['price'] <=> $left['price'] ?: $left['index'] <=> $right['index']));
 
         $cycle = $config['buy_quantity'] + $config['reward_quantity'];
         $applications = intdiv(count($units), $cycle);
