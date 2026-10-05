@@ -5,6 +5,14 @@
 
     RewriteEngine On
 
+    # Preserve the HTTP method when canonicalizing requests. Livewire updates
+    # are POST requests; a 301/302 may be retried as GET by browsers and proxies,
+    # which turns a harmless redirect into a 405 on /livewire/update.
+    RewriteCond %{HTTP_HOST} ^(?:www\.)?restaurantecallesabor\.(?:com|site)$ [NC]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=308]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -16,7 +24,7 @@
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
+    RewriteRule ^ %1 [L,R=308]
 
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d

@@ -16,6 +16,7 @@ use App\Services\OperationalNotificationService;
 use App\Services\ThermalTicketRenderer;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class GestionMesas extends Component
@@ -67,6 +68,19 @@ class GestionMesas extends Component
     {
         $this->search = '';
         unset($this->mesas);
+    }
+
+    #[On('realtime-tables-changed')]
+    #[On('realtime-orders-changed')]
+    public function refreshFromRealtime(): void
+    {
+        unset(
+            $this->mesas,
+            $this->pendingHelpRequests,
+            $this->myActiveMesaCount,
+            $this->availableCount,
+            $this->kioskCount,
+        );
     }
 
     // ── Assign modal ──

@@ -10,9 +10,11 @@ class OnlineSalesPolicy
 {
     public const CACHE_KEY = 'online-sales.enabled';
 
+    private static ?bool $schemaSupportsToggle = null;
+
     public function enabled(): bool
     {
-        if (! Schema::hasTable('business_settings') || ! Schema::hasColumn('business_settings', 'online_sales_enabled')) {
+        if (! $this->schemaSupportsToggle()) {
             return false;
         }
 
@@ -26,6 +28,13 @@ class OnlineSalesPolicy
 
     public static function flush(): void
     {
+        self::$schemaSupportsToggle = null;
         Cache::forget(self::CACHE_KEY);
+    }
+
+    private function schemaSupportsToggle(): bool
+    {
+        return self::$schemaSupportsToggle ??= Schema::hasTable('business_settings')
+            && Schema::hasColumn('business_settings', 'online_sales_enabled');
     }
 }

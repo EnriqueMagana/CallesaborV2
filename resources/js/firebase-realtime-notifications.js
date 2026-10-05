@@ -6,9 +6,17 @@ const state = window.AppRealtimeNotifications ??= {
     starting: false,
     started: false,
     refreshPending: false,
+    flushTimer: null,
+    pendingEventKeys: new Set(),
+    seenSignalIds: new Set(),
     unsubscribeNotification: null,
     unsubscribeConnection: null,
 };
+
+// Vite/HMR can preserve an older state object between module evaluations.
+state.pendingEventKeys ??= new Set();
+state.seenSignalIds ??= new Set();
+state.flushTimer ??= null;
 
 function emitStatus(status, detail = {}) {
     window.dispatchEvent(new CustomEvent('app-realtime-notification-status', {
@@ -16,14 +24,42 @@ function emitStatus(status, detail = {}) {
     }));
 }
 
-function refreshNotificationCenter() {
+function dispatchRealtimeChanges(eventKeys) {
+    const events = new Set(['notifications-check']);
+
+    eventKeys.forEach(eventKey => {
+        if (eventKey.startsWith('order.')) events.add('realtime-orders-changed');
+        if (eventKey.startsWith('delivery.')) {
+            events.add('realtime-orders-changed');
+            events.add('realtime-delivery-changed');
+        }
+        if (eventKey.startsWith('table.')) events.add('realtime-tables-changed');
+    });
+
+    events.forEach(event => window.Livewire.dispatch(event));
+}
+
+function flushRealtimeChanges() {
+    state.flushTimer = null;
+
     if (!window.Livewire) {
         state.refreshPending = true;
         return;
     }
 
     state.refreshPending = false;
-    window.Livewire.dispatch('notifications-check');
+    const eventKeys = [...state.pendingEventKeys];
+    state.pendingEventKeys.clear();
+    dispatchRealtimeChanges(eventKeys);
+}
+
+function queueRealtimeChange(eventKey = null) {
+    if (eventKey) state.pendingEventKeys.add(eventKey);
+    if (state.flushTimer !== null) return;
+
+    // One-shot debounce: a burst of Firebase child_added events results in one
+    // batched Livewire update instead of one request per notification.
+    state.flushTimer = window.setTimeout(flushRealtimeChanges, 150);
 }
 
 function stopRealtimeNotifications() {
@@ -66,9 +102,15 @@ async function startRealtimeNotifications() {
         );
 
         state.unsubscribeNotification = onChildAdded(signals, snapshot => {
+            if (state.seenSignalIds.has(snapshot.key)) return;
+            state.seenSignalIds.add(snapshot.key);
+            if (state.seenSignalIds.size > 2_000) {
+                state.seenSignalIds.delete(state.seenSignalIds.values().next().value);
+            }
+
             const createdAt = Number(snapshot.val()?.created_at_ms ?? 0);
             if (createdAt === 0 || createdAt >= listenerStartedAt - 60_000) {
-                refreshNotificationCenter();
+                queueRealtimeChange(String(snapshot.val()?.event_key ?? ''));
             }
         }, error => {
             stopRealtimeNotifications();
@@ -82,7 +124,7 @@ async function startRealtimeNotifications() {
         });
 
         state.started = true;
-        refreshNotificationCenter();
+        queueRealtimeChange();
     } catch (error) {
         stopRealtimeNotifications();
         emitStatus('fallback', { reason: 'initialization_error' });
@@ -95,7 +137,7 @@ async function startRealtimeNotifications() {
 function resumeRealtimeNotifications() {
     if (document.visibilityState === 'hidden') return;
 
-    if (state.refreshPending) refreshNotificationCenter();
+    if (state.refreshPending) queueRealtimeChange();
     startRealtimeNotifications();
 }
 

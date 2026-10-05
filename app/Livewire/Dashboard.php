@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Services\DashboardDataBuilder;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -17,6 +18,12 @@ class Dashboard extends Component
     }
 
     public function refreshDashboard(): void
+    {
+        $this->dispatch('dashboard-refreshed');
+    }
+
+    #[On('realtime-orders-changed')]
+    public function refreshFromRealtime(): void
     {
         $this->dispatch('dashboard-refreshed');
     }

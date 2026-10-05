@@ -47,6 +47,12 @@ class OnlineOrdersPanel extends Component
         unset($this->orders, $this->pendingCount);
     }
 
+    #[On('realtime-orders-changed')]
+    public function refreshFromRealtime(): void
+    {
+        unset($this->orders, $this->pendingCount);
+    }
+
     public function confirmOrder(int $id, OnlineOrderService $service): void
     {
         $this->authorizeAccess();
