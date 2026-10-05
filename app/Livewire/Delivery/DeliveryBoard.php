@@ -12,6 +12,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class DeliveryBoard extends Component
@@ -115,6 +116,12 @@ class DeliveryBoard extends Component
     {
         $this->clearComputedData();
         $this->lastCheckedAt = BusinessTime::format(BusinessTime::now(), 'g:i:s A');
+    }
+
+    #[On('realtime-delivery-changed')]
+    public function refreshFromRealtime(): void
+    {
+        $this->refreshBoard();
     }
 
     public function takeOrder(int $orderId, DeliveryWorkflow $workflow): void

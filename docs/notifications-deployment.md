@@ -1,8 +1,9 @@
 # Centro de notificaciones: despliegue
 
 MySQL sigue siendo la fuente de verdad. Firebase Realtime Database funciona únicamente como
-canal efímero para avisar al navegador; no hay polling, Reverb ni workers obligatorios. Si Firebase
-falla o está desactivado, el centro continúa usando los eventos y la navegación de Livewire.
+canal efímero para avisar al navegador; no hay polling ni Reverb. La publicación a Firebase usa
+la cola para no bloquear las respuestas de Livewire. Si Firebase falla o está desactivado, el
+centro continúa usando los eventos y la navegación de Livewire.
 
 ## Publicación
 
@@ -12,6 +13,10 @@ falla o está desactivado, el centro continúa usando los eventos y la navegaci�
 4. Ejecutar `npm ci && npm run build`.
 5. Limpiar cachés con `php artisan optimize:clear`.
 6. Confirmar que el cron de Laravel ejecute `php artisan schedule:run` cada minuto.
+7. Mantener un worker de cola activo con `php artisan queue:work --tries=1 --timeout=20`.
+
+La publicación de señales en Firebase se ejecuta en la cola `default`. El worker es
+obligatorio: evita que OAuth/Firebase ocupen el proceso HTTP que responde a Livewire.
 
 El scheduler elimina a las 23:59 (America/Mexico_City) todas las señales bajo `/notifications`
 en Realtime Database y a las 03:20 las notificaciones MySQL con más de 30 días. Si el cron no

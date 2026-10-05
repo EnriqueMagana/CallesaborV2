@@ -8,6 +8,7 @@ use App\Models\OrderChangeRequest;
 use App\Support\BusinessTime;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -158,6 +159,12 @@ class OrderList extends Component
         $this->reset(['search', 'statusFilter', 'typeFilter', 'dateFrom', 'dateTo', 'cashRegisterFilter']);
         $this->resetPage();
         unset($this->orders);
+    }
+
+    #[On('realtime-orders-changed')]
+    public function refreshFromRealtime(): void
+    {
+        unset($this->orders, $this->channelCounts, $this->statusCounts, $this->activeCashRegister);
     }
 
     public function openStatusModal(int $id): void

@@ -4,9 +4,13 @@ namespace App\Services;
 
 use App\Models\Promotion;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class PromotionPricingService
 {
+    /** @var array<string, Collection<int, Promotion>> */
+    private array $rules = [];
+
     /**
      * Recalculates automatic commercial rules from trusted catalog prices.
      * Explicit fixed-price bundle rows are intentionally left untouched.
@@ -27,16 +31,7 @@ class PromotionPricingService
             return $cart;
         }
 
-        $rules = Promotion::query()
-            ->automaticPricingAvailable($channel, null, $fulfillment)
-            ->where(function (Builder $eligible) use ($productIds): void {
-                $eligible->whereIn('primary_product_id', $productIds)
-                    ->orWhereHas('groups.products', fn (Builder $products) => $products->whereIn('products.id', $productIds));
-            })
-            ->with('groups.products:id,name,image,is_active,is_customizable')
-            ->orderByDesc('starts_on')
-            ->orderByDesc('id')
-            ->get();
+        $rules = $this->rulesFor($productIds, $channel, $fulfillment);
 
         $candidates = $rules->map(function (Promotion $promotion) use ($cart) {
             $eligibleProductIds = $this->eligibleProductIds($promotion);
@@ -82,58 +77,50 @@ class PromotionPricingService
             return [];
         }
 
-        $rules = Promotion::query()
-            ->automaticPricingAvailable($channel, null, $fulfillment)
+        $rules = $this->rulesFor($productIds, $channel, $fulfillment)
             ->where('pricing_rule_type', Promotion::PRICING_RULE_BUY_X_GET_Y_DISCOUNT)
-            ->where(function (Builder $eligible) use ($productIds): void {
-                $eligible->whereIn('primary_product_id', $productIds)
-                    ->orWhereHas('groups.products', fn (Builder $products) => $products->whereIn('products.id', $productIds));
-            })
-            ->with(['primaryProduct:id,name,image,is_active,is_customizable', 'groups.products:id,name,image,is_active,is_customizable'])
-            ->orderByDesc('starts_on')
-            ->orderByDesc('id')
-            ->get();
+            ->values();
 
         return $rules->map(function (Promotion $promotion) use ($cart) {
-                    $eligibleProductIds = $this->eligibleProductIds($promotion);
-                    $eligibleProducts = $promotion->groups->flatMap->products
-                        ->filter(fn ($product) => $product->is_active)
-                        ->unique('id')
-                        ->values();
-                    $product = $eligibleProducts->first() ?: $promotion->primaryProduct;
-                    $quantity = collect($this->eligibleIndexes($cart, $eligibleProductIds))
-                        ->sum(fn (int $index) => $this->quantity($cart[$index]));
-                    $config = $promotion->normalizedPricingRule();
-                    $cycle = $config['buy_quantity'] + $config['reward_quantity'];
-                    $completed = intdiv($quantity, $cycle);
-                    $remainder = $quantity % $cycle;
+            $eligibleProductIds = $this->eligibleProductIds($promotion);
+            $eligibleProducts = $promotion->groups->flatMap->products
+                ->filter(fn ($product) => $product->is_active)
+                ->unique('id')
+                ->values();
+            $product = $eligibleProducts->first() ?: $promotion->primaryProduct;
+            $quantity = collect($this->eligibleIndexes($cart, $eligibleProductIds))
+                ->sum(fn (int $index) => $this->quantity($cart[$index]));
+            $config = $promotion->normalizedPricingRule();
+            $cycle = $config['buy_quantity'] + $config['reward_quantity'];
+            $completed = intdiv($quantity, $cycle);
+            $remainder = $quantity % $cycle;
 
-                    if (! $product?->is_active
-                        || $remainder < $config['buy_quantity']
-                        || ($config['max_applications_per_order'] && $completed >= $config['max_applications_per_order'])) {
-                        return null;
-                    }
+            if (! $product?->is_active
+                || $remainder < $config['buy_quantity']
+                || ($config['max_applications_per_order'] && $completed >= $config['max_applications_per_order'])) {
+                return null;
+            }
 
-                    $missing = $cycle - $remainder;
+            $missing = $cycle - $remainder;
 
-                    return [
-                        'promotion_id' => $promotion->id,
-                        'promotion_name' => $promotion->name,
-                        'promotion_label' => $promotion->pricingRuleLabel(),
-                        'product_id' => $product->id,
-                        'product_name' => $product->name,
-                        'product_image' => $product->image,
-                        'eligible_product_ids' => $eligibleProductIds,
-                        'eligible_product_names' => $eligibleProducts->pluck('name')->all(),
-                        'missing_quantity' => $missing,
-                        'message' => count($eligibleProductIds) === 1
-                            ? ($missing === 1
-                                ? "Agrega 1 {$product->name} y activa {$promotion->pricingRuleLabel()}."
-                                : "Agrega {$missing} unidades de {$product->name} y activa {$promotion->pricingRuleLabel()}.")
-                            : ($missing === 1
-                                ? 'Agrega 1 producto elegible y activa '.$promotion->pricingRuleLabel().'.'
-                                : "Agrega {$missing} productos elegibles y activa {$promotion->pricingRuleLabel()}."),
-                    ];
+            return [
+                'promotion_id' => $promotion->id,
+                'promotion_name' => $promotion->name,
+                'promotion_label' => $promotion->pricingRuleLabel(),
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'product_image' => $product->image,
+                'eligible_product_ids' => $eligibleProductIds,
+                'eligible_product_names' => $eligibleProducts->pluck('name')->all(),
+                'missing_quantity' => $missing,
+                'message' => count($eligibleProductIds) === 1
+                    ? ($missing === 1
+                        ? "Agrega 1 {$product->name} y activa {$promotion->pricingRuleLabel()}."
+                        : "Agrega {$missing} unidades de {$product->name} y activa {$promotion->pricingRuleLabel()}.")
+                    : ($missing === 1
+                        ? 'Agrega 1 producto elegible y activa '.$promotion->pricingRuleLabel().'.'
+                        : "Agrega {$missing} productos elegibles y activa {$promotion->pricingRuleLabel()}."),
+            ];
         })->filter()->values()->all();
     }
 
@@ -154,6 +141,30 @@ class PromotionPricingService
         }
 
         return $cart;
+    }
+
+    /**
+     * @param  Collection<int, int>  $productIds
+     * @return Collection<int, Promotion>
+     */
+    private function rulesFor(Collection $productIds, string $channel, string $fulfillment): Collection
+    {
+        $ids = $productIds->sort()->values();
+        $key = $channel.'|'.$fulfillment.'|'.$ids->implode(',');
+
+        return $this->rules[$key] ??= Promotion::query()
+            ->automaticPricingAvailable($channel, null, $fulfillment)
+            ->where(function (Builder $eligible) use ($ids): void {
+                $eligible->whereIn('primary_product_id', $ids)
+                    ->orWhereHas('groups.products', fn (Builder $products) => $products->whereIn('products.id', $ids));
+            })
+            ->with([
+                'primaryProduct:id,name,image,is_active,is_customizable',
+                'groups.products:id,name,image,is_active,is_customizable',
+            ])
+            ->orderByDesc('starts_on')
+            ->orderByDesc('id')
+            ->get();
     }
 
     private function potentialDiscount(Promotion $promotion, array $cart, array $indexes): float
@@ -316,8 +327,7 @@ class PromotionPricingService
 
     private function eligibleIndexes(array $cart, array $productIds): array
     {
-        return collect($cart)->keys()->filter(fn (int $index) =>
-            in_array((int) ($cart[$index]['product_id'] ?? 0), $productIds, true)
+        return collect($cart)->keys()->filter(fn (int $index) => in_array((int) ($cart[$index]['product_id'] ?? 0), $productIds, true)
             && empty($cart[$index]['promotion_selections'])
         )->values()->all();
     }

@@ -51,6 +51,31 @@ class PointOfSale extends Component
     use ManagesPromotions;
     use ManagesQuotations;
 
+    #[On('realtime-orders-changed')]
+    #[On('realtime-tables-changed')]
+    public function refreshFromRealtime(): void
+    {
+        unset(
+            $this->activeCashRegister,
+            $this->recentOrders,
+            $this->editableOrderDataOrders,
+            $this->deliveryDispatchOrders,
+            $this->selectedDeliveryDispatchOrder,
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
+            $this->tableTrackingServices,
+            $this->toolbarPendingCounts,
+            $this->pickupOrders,
+            $this->pickupPayOrder,
+            $this->deliveryOrders,
+            $this->kioskDineInOrders,
+            $this->mesasPendientes,
+        );
+
+        $this->dispatch('pos-orders-changed');
+    }
+
     private const DRAFT_STATE_VERSION = 1;
 
     private const MAX_ITEM_QUANTITY = 99;

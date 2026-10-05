@@ -12,6 +12,7 @@ use App\Models\DeliveryAssignment;
 use App\Models\Order;
 use App\Observers\DeliveryAssignmentObserver;
 use App\Observers\OrderObserver;
+use App\Services\PromotionPricingService;
 use App\Support\AssetVersion;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Blade;
@@ -29,7 +30,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Reuse promotion rules across a Livewire action and its following
+        // render, without leaking cached Eloquent models into later requests.
+        $this->app->scoped(PromotionPricingService::class);
     }
 
     /**
@@ -41,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
         // la version del asset una vez y la memoriza, en vez de leer el disco
         // por cada etiqueta <link> y <script> (doce por request en el POS).
         Blade::directive('assetVersion', function (string $expression): string {
-            return "<?php echo \\".AssetVersion::class."::url({$expression}); ?>";
+            return '<?php echo \\'.AssetVersion::class."::url({$expression}); ?>";
         });
 
         // Owner y super-admin bypassan todos los permisos.
