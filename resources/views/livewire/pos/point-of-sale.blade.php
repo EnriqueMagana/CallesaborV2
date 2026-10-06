@@ -1,9 +1,11 @@
 {{-- Punto de Venta --}}
-{{-- El estado raíz vive en `assets/js/pos-root.js`: son 6.3 KB que Livewire
-     reenviaba en cada respuesta sin que cambiaran nunca. --}}
-<div x-data="posRoot(@js($this->cartProductQuantities))"
+{{-- El estado raíz vive en `assets/js/pos-root.js`; la plantilla sólo entrega
+     los valores iniciales del carrito y los contadores operativos. --}}
+<div x-data="posRoot(@js($this->cartProductQuantities), @js($this->toolbarPendingCounts))" wire:ignore.self data-pos-root
     @resize.window.debounce.150ms="syncSearchBreakpoint()"
     @pos-cart-quantities.window="cartQuantities = $event.detail.quantities ?? {}"
+    @pos-pending-counts-updated.window="updatePendingCounts($event.detail.counts ?? {})"
+    @pos-realtime-refresh-requested.window="requestRealtimeRefresh($event.detail.event)"
     @keydown.window="handleKeyboardShortcut($event)" @keydown.escape.window="closeTransientLayers()" class="pos-root">
 
 {{-- Toast --}}

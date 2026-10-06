@@ -16,9 +16,10 @@
         aria-label="Abrir pedidos no pagados" title="Abrir pedidos por cobrar (F6)">
         <span class="tb-btn__icon"><i class="bx bx-receipt"></i></span>
         <span class="tb-btn__copy"><strong>Por cobrar</strong><small>Ventanilla y recoger</small></span>
-        @if ($this->toolbarPendingCounts['pickup'] > 0)
-            <span class="tb-btn__badge" aria-label="{{ $this->toolbarPendingCounts['pickup'] }} pedidos pendientes">{{ $this->toolbarPendingCounts['pickup'] }}</span>
-        @endif
+        <span class="tb-btn__badge" x-show="pendingCounts.pickup > 0" x-cloak
+            aria-label="{{ $this->toolbarPendingCounts['pickup'] }} pedidos pendientes"
+            :aria-label="`${pendingCounts.pickup} pedidos pendientes`"
+            x-text="pendingCounts.pickup">{{ $this->toolbarPendingCounts['pickup'] }}</span>
         <kbd class="tb-btn__shortcut" aria-hidden="true">F6</kbd>
     </button>
     @endcan
@@ -29,9 +30,10 @@
         aria-label="Abrir mesas y comandas" title="Abrir mesas y comandas (F7)">
         <span class="tb-btn__icon"><i class="bx bx-dish"></i></span>
         <span class="tb-btn__copy"><strong>Mesas y comandas</strong><small>Seguimiento y cobro</small></span>
-        @if ($this->toolbarPendingCounts['tables'] > 0)
-            <span class="tb-btn__badge" aria-label="{{ $this->toolbarPendingCounts['tables'] }} servicios de mesa pendientes">{{ $this->toolbarPendingCounts['tables'] }}</span>
-        @endif
+        <span class="tb-btn__badge" x-show="pendingCounts.tables > 0" x-cloak
+            aria-label="{{ $this->toolbarPendingCounts['tables'] }} servicios de mesa pendientes"
+            :aria-label="`${pendingCounts.tables} servicios de mesa pendientes`"
+            x-text="pendingCounts.tables">{{ $this->toolbarPendingCounts['tables'] }}</span>
         <kbd class="tb-btn__shortcut" aria-hidden="true">F7</kbd>
     </button>
     @endcanany
@@ -42,23 +44,25 @@
         aria-label="Abrir pedidos para entrega a domicilio" title="Abrir Delivery (F8)">
         <span class="tb-btn__icon"><i class="bx bx-cycling"></i></span>
         <span class="tb-btn__copy"><strong>Delivery</strong><small>Contra entrega</small></span>
-        @if ($this->toolbarPendingCounts['delivery'] > 0)
-            <span class="tb-btn__badge" aria-label="{{ $this->toolbarPendingCounts['delivery'] }} entregas nuevas sin enviar a cocina">{{ $this->toolbarPendingCounts['delivery'] }}</span>
-        @endif
+        <span class="tb-btn__badge" x-show="pendingCounts.delivery > 0" x-cloak
+            aria-label="{{ $this->toolbarPendingCounts['delivery'] }} entregas nuevas sin enviar a cocina"
+            :aria-label="`${pendingCounts.delivery} entregas nuevas sin enviar a cocina`"
+            x-text="pendingCounts.delivery">{{ $this->toolbarPendingCounts['delivery'] }}</span>
         <kbd class="tb-btn__shortcut" aria-hidden="true">F8</kbd>
     </button>
     @endcan
 
     @can('ver pedidos en punto de venta')
-    @if ($this->toolbarPendingCounts['balances'] > 0)
     <button type="button" class="tb-btn tb-btn--balances" :class="panels.balances ? 'is-active' : ''"
+        x-show="pendingCounts.balances > 0" x-cloak
         @click="showOnlyPanel('balances'); $wire.openBalancesPanel()" data-pos-panel="balances"
         aria-label="Abrir saldos pendientes" title="Órdenes con saldo por cobrar">
         <span class="tb-btn__icon"><i class="bx bx-time-five"></i></span>
         <span class="tb-btn__copy"><strong>Pendientes</strong><small>Saldos por cobrar</small></span>
-        <span class="tb-btn__badge" aria-label="{{ $this->toolbarPendingCounts['balances'] }} órdenes con saldo pendiente">{{ $this->toolbarPendingCounts['balances'] }}</span>
+        <span class="tb-btn__badge" aria-label="{{ $this->toolbarPendingCounts['balances'] }} órdenes con saldo pendiente"
+            :aria-label="`${pendingCounts.balances} órdenes con saldo pendiente`"
+            x-text="pendingCounts.balances">{{ $this->toolbarPendingCounts['balances'] }}</span>
     </button>
-    @endif
     @endcan
 
     @can('reimprimir tickets')

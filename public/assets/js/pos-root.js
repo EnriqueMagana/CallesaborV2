@@ -6,10 +6,11 @@
  * respuesta —el 12 % del payload por click— aunque el código nunca cambia.
  *
  * Aquí se carga una vez, el navegador lo cachea, y la plantilla solo pasa el
- * único dato que sí depende del servidor: las cantidades del carrito.
+ * estado que sí depende del servidor: cantidades del carrito y contadores
+ * operativos. Después se sincronizan con eventos pequeños del navegador.
  */
 document.addEventListener("alpine:init", () => {
-    Alpine.data("posRoot", (initialCartQuantities = {}) => ({
+    Alpine.data("posRoot", (initialCartQuantities = {}, initialPendingCounts = {}) => ({
         showCart: false,
         showSaved: false,
         showMore: false,
@@ -19,13 +20,27 @@ document.addEventListener("alpine:init", () => {
         overlayTrigger: null,
         panels: { tables: false, pickup: false, delivery: false, online: false, balances: false, orders: false, reprint: false, kitchen: false },
         cartQuantities: initialCartQuantities,
+        pendingCounts: { pickup: 0, tables: 0, delivery: 0, balances: 0, ...initialPendingCounts },
+        pendingRealtimeEvents: new Set(),
+        realtimeRefreshTimer: null,
+        realtimeRefreshInFlight: false,
         cartQtyFor(productId) {
             return this.cartQuantities[productId] ?? 0;
         },
+        updatePendingCounts(counts = {}) {
+            this.pendingCounts = { ...this.pendingCounts, ...counts };
+        },
         init() {
             this.$watch('showCart', () => this.syncOverlayLock());
-            this.$watch('showMore', () => this.syncOverlayLock());
+            this.$watch('showMore', () => {
+                this.syncOverlayLock();
+                if (!this.showMore) this.scheduleRealtimeRefresh(0);
+            });
             this.syncSearchBreakpoint();
+        },
+        destroy() {
+            window.clearTimeout(this.realtimeRefreshTimer);
+            document.documentElement.classList.remove('pos-overlay-open');
         },
         syncOverlayLock() {
             document.documentElement.classList.toggle('pos-overlay-open', this.showCart || this.showMore);
@@ -107,6 +122,42 @@ document.addEventListener("alpine:init", () => {
             }
             if (!this.isDesktop && this.searchExpanded) this.closeCatalogSearch(false);
             else if (this.closeAllPanels()) this.$wire.closeOperationalPanels();
+        },
+        requestRealtimeRefresh(eventName) {
+            if (!['realtime-orders-changed', 'realtime-tables-changed'].includes(eventName)) return;
+            this.pendingRealtimeEvents.add(eventName);
+            this.scheduleRealtimeRefresh();
+        },
+        scheduleRealtimeRefresh(delay = 180) {
+            window.clearTimeout(this.realtimeRefreshTimer);
+            this.realtimeRefreshTimer = window.setTimeout(() => this.flushRealtimeRefresh(), delay);
+        },
+        hasBlockingModal() {
+            return this.showMore || Boolean(document.querySelector('.pos-modal-wrap.is-open, .pos-modal-wrap.show, dialog[open]'));
+        },
+        async flushRealtimeRefresh() {
+            this.realtimeRefreshTimer = null;
+            if (!this.pendingRealtimeEvents.size || this.realtimeRefreshInFlight) return;
+
+            if (this.hasBlockingModal()) {
+                this.scheduleRealtimeRefresh(250);
+                return;
+            }
+
+            const events = Array.from(this.pendingRealtimeEvents);
+            const visiblePanels = Object.entries(this.panels)
+                .filter(([, visible]) => visible)
+                .map(([panel]) => panel);
+
+            this.pendingRealtimeEvents.clear();
+            this.realtimeRefreshInFlight = true;
+
+            try {
+                await this.$wire.refreshFromRealtime(events, visiblePanels);
+            } finally {
+                this.realtimeRefreshInFlight = false;
+                if (this.pendingRealtimeEvents.size) this.scheduleRealtimeRefresh(0);
+            }
         },
         trapFocus(event, container) {
             const items = Array.from(container.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'))

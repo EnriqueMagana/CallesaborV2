@@ -36,7 +36,18 @@ function dispatchRealtimeChanges(eventKeys) {
         if (eventKey.startsWith('table.')) events.add('realtime-tables-changed');
     });
 
-    events.forEach(event => window.Livewire.dispatch(event));
+    const posRoot = document.querySelector('[data-pos-root]');
+
+    events.forEach(event => {
+        if (posRoot && ['realtime-orders-changed', 'realtime-tables-changed'].includes(event)) {
+            window.dispatchEvent(new CustomEvent('pos-realtime-refresh-requested', {
+                detail: { event },
+            }));
+            return;
+        }
+
+        window.Livewire.dispatch(event);
+    });
 }
 
 function flushRealtimeChanges() {

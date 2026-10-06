@@ -7,6 +7,9 @@ use App\Livewire\Pos\Concerns\ManagesCheckout;
 use App\Livewire\Pos\Concerns\ManagesCustomers;
 use App\Livewire\Pos\Concerns\ManagesPromotions;
 use App\Livewire\Pos\Concerns\ManagesQuotations;
+use App\Livewire\Pos\Panels\BalancesPanel;
+use App\Livewire\Pos\Panels\KitchenPanel;
+use App\Livewire\Pos\Panels\OnlineOrdersPanel;
 use App\Models\CashMovement;
 use App\Models\CashRegister;
 use App\Models\Customer;
@@ -51,29 +54,79 @@ class PointOfSale extends Component
     use ManagesPromotions;
     use ManagesQuotations;
 
-    #[On('realtime-orders-changed')]
-    #[On('realtime-tables-changed')]
-    public function refreshFromRealtime(): void
+    /**
+     * Refresca una sola vez el estado que realmente pudo cambiar y avisa
+     * exclusivamente a los paneles Livewire que el navegador tiene abiertos.
+     * Los modales bloqueantes difieren esta llamada desde Alpine para no
+     * interrumpir una captura o un cobro en curso.
+     *
+     * @param  list<string>  $events
+     * @param  list<string>  $visiblePanels
+     */
+    public function refreshFromRealtime(array $events = [], array $visiblePanels = []): void
     {
-        unset(
-            $this->activeCashRegister,
-            $this->recentOrders,
-            $this->editableOrderDataOrders,
-            $this->deliveryDispatchOrders,
-            $this->selectedDeliveryDispatchOrder,
-            $this->tableWorkspaceAllServices,
-            $this->tableWorkspaceServices,
-            $this->tableWorkspaceCounts,
-            $this->tableTrackingServices,
-            $this->toolbarPendingCounts,
-            $this->pickupOrders,
-            $this->pickupPayOrder,
-            $this->deliveryOrders,
-            $this->kioskDineInOrders,
-            $this->mesasPendientes,
-        );
+        $events = array_values(array_intersect($events, [
+            'realtime-orders-changed',
+            'realtime-tables-changed',
+        ]));
+        $visiblePanels = array_values(array_intersect($visiblePanels, [
+            'tables', 'pickup', 'delivery', 'online', 'balances', 'orders', 'reprint', 'kitchen',
+        ]));
 
-        $this->dispatch('pos-orders-changed');
+        if ($events === []) {
+            $this->skipRender();
+
+            return;
+        }
+
+        unset($this->activeCashRegister, $this->toolbarPendingCounts);
+
+        if (in_array('realtime-orders-changed', $events, true)) {
+            unset(
+                $this->recentOrders,
+                $this->editableOrderDataOrders,
+                $this->deliveryDispatchOrders,
+                $this->selectedDeliveryDispatchOrder,
+                $this->pickupOrders,
+                $this->pickupPayOrder,
+                $this->deliveryOrders,
+                $this->kioskDineInOrders,
+                $this->mesasPendientes,
+                $this->tableWorkspaceAllServices,
+                $this->tableWorkspaceServices,
+                $this->tableWorkspaceCounts,
+                $this->tableTrackingServices,
+            );
+
+            if (in_array('balances', $visiblePanels, true)) {
+                $this->dispatch('pos-realtime-refresh')->to(BalancesPanel::class);
+            }
+            if (in_array('kitchen', $visiblePanels, true)) {
+                $this->dispatch('pos-realtime-refresh')->to(KitchenPanel::class);
+            }
+            if (in_array('online', $visiblePanels, true)) {
+                $this->dispatch('pos-realtime-refresh')->to(OnlineOrdersPanel::class);
+            }
+        }
+
+        if (in_array('realtime-tables-changed', $events, true)) {
+            unset(
+                $this->tableWorkspaceAllServices,
+                $this->tableWorkspaceServices,
+                $this->tableWorkspaceCounts,
+                $this->tableTrackingServices,
+            );
+        }
+
+        $this->dispatch('pos-pending-counts-updated', counts: $this->toolbarPendingCounts);
+
+        // Los contadores viajan como un evento pequeño. El HTML completo del
+        // POS sólo se vuelve a generar cuando hay un panel que pertenece al
+        // componente padre y necesita mostrar los datos que se invalidaron.
+        $parentPanels = ['tables', 'pickup', 'delivery', 'orders', 'reprint'];
+        if (array_intersect($visiblePanels, $parentPanels) === []) {
+            $this->skipRender();
+        }
     }
 
     private const DRAFT_STATE_VERSION = 1;

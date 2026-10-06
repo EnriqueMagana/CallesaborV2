@@ -45,8 +45,15 @@ class KitchenPanel extends Component
      * El padre avisa cuando una orden cambia de estado desde cualquier panel.
      */
     #[On('pos-orders-changed')]
+    #[On('pos-realtime-refresh')]
     public function refreshOrders(): void
     {
+        if (! $this->loaded) {
+            $this->skipRender();
+
+            return;
+        }
+
         unset($this->kitchenOrders, $this->kitchenPendingCount);
     }
 

@@ -47,9 +47,15 @@ class OnlineOrdersPanel extends Component
         unset($this->orders, $this->pendingCount);
     }
 
-    #[On('realtime-orders-changed')]
+    #[On('pos-realtime-refresh')]
     public function refreshFromRealtime(): void
     {
+        if (! $this->loaded) {
+            $this->skipRender();
+
+            return;
+        }
+
         unset($this->orders, $this->pendingCount);
     }
 
