@@ -21,6 +21,7 @@ class PublicMenuController extends Controller
         $business = BusinessSetting::current();
         $menuSettings = DigitalMenuSetting::current();
         $moment = BusinessTime::now();
+        $openingStatus = $business->openingStatus($moment);
         $categories = Category::query()
             ->where('is_active', true)
             ->whereHas('products', fn ($query) => $query->where('is_active', true))
@@ -86,13 +87,15 @@ class PublicMenuController extends Controller
             'uncategorized' => $uncategorized,
             'featured' => $featured,
             'galleryImages' => $galleryImages,
-            'openingStatus' => $business->openingStatus($moment),
+            'openingStatus' => $openingStatus,
             'totalProducts' => $catalogProducts->count(),
             'promotions' => $promotions,
             'discountCampaigns' => $discountCampaigns,
             'newProductCampaigns' => $newProductCampaigns,
             'searchMetadata' => $searchMetadata,
-            'onlineSalesEnabled' => app(OnlineSalesPolicy::class)->enabled() && filled($business->whatsapp),
+            'onlineOrderingAvailable' => app(OnlineSalesPolicy::class)->enabled()
+                && filled($business->whatsapp)
+                && $openingStatus['is_open'],
         ]);
     }
 

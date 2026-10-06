@@ -451,7 +451,7 @@
                     </div>
                 </div>
                 <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La disponibilidad y el beneficio se validan al realizar el pedido</span>
-                    @if($onlineSalesEnabled)<button type="button" class="online-add-button" data-online-add-promotion><i class="bx bx-cart"></i>Elegir combo</button>@endif
+                    @if($onlineOrderingAvailable)<button type="button" class="online-add-button" data-online-add-promotion><i class="bx bx-cart"></i>Elegir combo</button>@endif
                     <button type="button" data-promotion-modal-close>Cerrar detalle</button></footer>
             </div>
         </dialog>
@@ -488,19 +488,19 @@
                 </div>
             </div>
             <footer class="product-modal__footer">
-                <span><i class="bx bx-check-shield" aria-hidden="true"></i>{{ $onlineSalesEnabled ? 'Personaliza antes de agregar' : 'Esta vista es informativa' }}</span>
-                @if($onlineSalesEnabled)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar</button>@endif
+                <span><i class="bx bx-check-shield" aria-hidden="true"></i>{{ $onlineOrderingAvailable ? 'Personaliza antes de agregar' : 'Esta vista es informativa' }}</span>
+                @if($onlineOrderingAvailable)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar</button>@endif
                 <button type="button" data-modal-close>Cerrar detalle</button>
             </footer>
         </div>
     </dialog>
-    @if($onlineSalesEnabled)
+    @if($onlineOrderingAvailable)
         <x-public-menu.online-ordering :business="$business" />
     @endif
     <x-slot:scripts>
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" async></script>
         <script src="{{ asset('assets/js/public-menu.js') }}?v={{ filemtime(public_path('assets/js/public-menu.js')) }}"
             defer></script>
-        @if($onlineSalesEnabled)<script src="{{ asset('assets/js/online-ordering.js') }}?v={{ filemtime(public_path('assets/js/online-ordering.js')) }}" defer></script>@endif
+        @if($onlineOrderingAvailable)<script src="{{ asset('assets/js/online-ordering.js') }}?v={{ filemtime(public_path('assets/js/online-ordering.js')) }}" defer></script>@endif
     </x-slot:scripts>
 </x-public-menu.site-layout>
