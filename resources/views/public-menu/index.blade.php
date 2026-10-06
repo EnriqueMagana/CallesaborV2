@@ -450,9 +450,12 @@
                         <div class="product-modal__groups" data-promotion-modal-groups></div>
                     </div>
                 </div>
-                <footer class="product-modal__footer"><span><i class="bx bx-check-shield" aria-hidden="true"></i>La disponibilidad y el beneficio se validan al realizar el pedido</span>
-                    @if($onlineOrderingAvailable)<button type="button" class="online-add-button" data-online-add-promotion><i class="bx bx-cart"></i>Elegir combo</button>@endif
-                    <button type="button" data-promotion-modal-close>Cerrar detalle</button></footer>
+                <footer class="product-modal__footer">
+                    <div class="product-modal__footer-actions">
+                        <button type="button" data-promotion-modal-close>Cerrar detalle</button>
+                        @if($onlineOrderingAvailable)<button type="button" class="online-add-button" data-online-add-promotion><i class="bx bx-cart"></i>Elegir combo</button>@endif
+                    </div>
+                </footer>
             </div>
         </dialog>
     @endif
@@ -476,6 +479,7 @@
                         <p data-modal-description></p>
                     </div>
                     <div class="product-modal__limits" data-modal-limits></div>
+                    <div class="product-modal__groups" data-modal-groups></div>
                     <section class="product-modal__section" data-modal-ingredients-section hidden>
                         <div><i class="bx bx-list-ul" aria-hidden="true"></i><span>
                                 <h3>Ingredientes disponibles</h3>
@@ -483,14 +487,13 @@
                             </span></div>
                         <ul data-modal-ingredients></ul>
                     </section>
-                    <div class="product-modal__groups" data-modal-groups></div>
-
                 </div>
             </div>
             <footer class="product-modal__footer">
-                <span><i class="bx bx-check-shield" aria-hidden="true"></i>{{ $onlineOrderingAvailable ? 'Personaliza antes de agregar' : 'Esta vista es informativa' }}</span>
-                @if($onlineOrderingAvailable)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar</button>@endif
-                <button type="button" data-modal-close>Cerrar detalle</button>
+                <div class="product-modal__footer-actions">
+                    <button type="button" data-modal-close>Cerrar detalle</button>
+                    @if($onlineOrderingAvailable)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar</button>@endif
+                </div>
             </footer>
         </div>
     </dialog>
