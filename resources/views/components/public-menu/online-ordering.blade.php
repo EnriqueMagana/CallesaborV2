@@ -6,9 +6,18 @@
 
     <dialog class="online-dialog online-customizer" id="online-customizer-dialog" aria-labelledby="online-customizer-title">
         <form method="dialog" class="online-dialog__shell" data-online-customizer-form>
-            <header><div><span>Personaliza tu pedido</span><h2 id="online-customizer-title" data-customizer-title></h2></div><button value="cancel" aria-label="Cerrar"><i class="bx bx-x"></i></button></header>
+            <header><div><span>Personaliza tu pedido</span><h2 id="online-customizer-title" data-customizer-title></h2><p data-customizer-context>Completa las opciones obligatorias para continuar.</p></div><button value="cancel" aria-label="Cerrar personalización"><i class="bx bx-x"></i></button></header>
             <div class="online-dialog__body" data-customizer-options></div>
-            <footer><label>Cantidad <input type="number" min="1" max="99" value="1" data-customizer-quantity></label><strong data-customizer-total></strong><button type="button" class="online-primary" data-customizer-add>Agregar</button></footer>
+            <footer class="online-customizer-footer">
+                <div class="online-order-quantity" role="group" aria-label="Cantidad del producto">
+                    <span>Cantidad</span>
+                    <button type="button" data-customizer-quantity-minus aria-label="Quitar una unidad"><i class="bx bx-minus"></i></button>
+                    <input type="number" min="1" max="99" value="1" readonly data-customizer-quantity aria-label="Cantidad seleccionada">
+                    <button type="button" data-customizer-quantity-plus aria-label="Agregar una unidad"><i class="bx bx-plus"></i></button>
+                </div>
+                <strong data-customizer-total></strong>
+                <button type="button" class="online-primary" data-customizer-add><span data-customizer-action-label>Agregar</span><i class="bx bx-cart-add"></i></button>
+            </footer>
         </form>
     </dialog>
 

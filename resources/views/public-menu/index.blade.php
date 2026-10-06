@@ -1,4 +1,4 @@
-<x-public-menu.site-layout :business="$business" :menu-settings="$menuSettings" :title="'Menú | ' . $business->business_name" :description="'Consulta el menú, horarios y datos de ' . $business->business_name . '.'" :styles="['assets/css/promotions-public.css', 'assets/css/online-ordering.css']"
+<x-public-menu.site-layout :business="$business" :menu-settings="$menuSettings" :title="'Menú | ' . $business->business_name" :description="'Consulta el menú, horarios y datos de ' . $business->business_name . '.'" :styles="['assets/css/promotions-public.css', 'assets/css/online-ordering.css', 'assets/css/online-ordering-customizer.css']"
     font-url="https://fonts.googleapis.com/css2?family=Parisienne&family=Poppins:wght@400;500;600;700;800&display=swap">
     <a class="menu-skip-link" href="#menu">Saltar al menú</a>
     <x-public-menu.brand-header :business="$business" :menu-settings="$menuSettings" :opening-status="$openingStatus" action-label="Volver al inicio"
@@ -489,7 +489,7 @@
             </div>
             <footer class="product-modal__footer">
                 <span><i class="bx bx-check-shield" aria-hidden="true"></i>{{ $onlineSalesEnabled ? 'Personaliza antes de agregar' : 'Esta vista es informativa' }}</span>
-                @if($onlineSalesEnabled)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar al pedido</button>@endif
+                @if($onlineSalesEnabled)<button type="button" class="online-add-button" data-online-add-product><i class="bx bx-cart"></i>Agregar</button>@endif
                 <button type="button" data-modal-close>Cerrar detalle</button>
             </footer>
         </div>
