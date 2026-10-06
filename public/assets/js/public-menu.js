@@ -1005,14 +1005,13 @@
             }
 
             limits.replaceChildren();
-            if (product.customizable) addLimit('bx-slider-alt', 'Preparación', 'Personalizable');
+            if (product.maxAddons) addLimit('bx-plus-circle', 'Complementos', `Hasta ${product.maxAddons}`);
             if (product.maxIngredients) {
                 const range = product.minIngredients > 0
                     ? `${product.minIngredients} a ${product.maxIngredients}`
                     : `Hasta ${product.maxIngredients}`;
                 addLimit('bx-food-menu', 'Ingredientes', range);
             }
-            if (product.maxAddons) addLimit('bx-plus-circle', 'Complementos', `Hasta ${product.maxAddons}`);
 
             ingredientsList.replaceChildren();
             ingredientsSection.hidden = product.ingredients.length === 0;

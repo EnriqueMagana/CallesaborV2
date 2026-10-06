@@ -71,13 +71,6 @@
 
     function productOptions(product) {
         let html = '';
-        if (product.ingredients?.length) {
-            const minimum = Number(product.minIngredients || 0);
-            const maximum = Number(product.maxIngredients || 0);
-            html += groupStart('ingredient', '', 'Ingredientes', minimum, maximum, minimum > 0, 'Personaliza los ingredientes de tu platillo.');
-            product.ingredients.forEach(item => { html += quantityOption('ingredient', item); });
-            html += '</div></section>';
-        }
         (product.addonGroups || []).forEach(group => {
             const minimum = group.required ? Math.max(1, Number(group.minimum || 0)) : Number(group.minimum || 0);
             const maximum = Math.max(1, Number(group.maximum || 1));
@@ -85,7 +78,14 @@
             group.options.forEach(item => { html += quantityOption('addon', item); });
             html += '</div></section>';
         });
-        return html || '<p class="online-empty-options"><i class="bx bx-check-shield"></i>Este producto no requiere personalizaci\u00f3n.</p>';
+        if (product.ingredients?.length) {
+            const minimum = Number(product.minIngredients || 0);
+            const maximum = Number(product.maxIngredients || 0);
+            html += groupStart('ingredient', '', 'Ingredientes', minimum, maximum, minimum > 0, 'Personaliza los ingredientes de tu platillo.');
+            product.ingredients.forEach(item => { html += quantityOption('ingredient', item); });
+            html += '</div></section>';
+        }
+        return html;
     }
 
     function promotionOptions(promotion) {
@@ -98,7 +98,7 @@
 
     function groupStart(kind, id, name, minimum, maximum, required, description) {
         const limit = maximum > 0 ? maximum : 'Sin l\u00edmite';
-        return `<section class="online-option-group ${maximum === 1 ? 'is-single' : ''}" data-option-group data-group-kind="${kind}" data-group-id="${id}" data-min="${minimum}" data-max="${maximum}">
+        return `<section class="online-option-group" data-option-group data-group-kind="${kind}" data-group-id="${id}" data-min="${minimum}" data-max="${maximum}">
             <header><div><span class="online-option-group__icon"><i class="bx bx-list-check"></i></span><span><h3>${escape(name)}</h3><p>${escape(description)}</p></span></div><b data-group-status>${required ? 'Obligatorio' : 'Opcional'}</b></header>
             <div class="online-option-group__progress" aria-live="polite"><span data-group-count>0 de ${limit}</span><span data-group-message>${minimum > 0 ? `Elige al menos ${minimum}` : 'Puedes omitir este grupo'}</span></div>
             <div class="online-option-grid">`;
@@ -114,7 +114,7 @@
             <span class="online-quantity-option__copy"><strong>${escape(item.name)}</strong><small>${escape(item.description || price || 'Incluido')}</small>${item.description && price ? `<b>${escape(price)}</b>` : ''}</span>
             <div class="online-option-stepper" role="group" aria-label="Cantidad de ${escape(item.name)}">
                 <button type="button" data-option-decrement aria-label="Quitar ${escape(item.name)}" disabled><i class="bx bx-minus"></i></button>
-                <input type="number" value="0" min="0" max="99" readonly data-kind="${kind}" data-option-id="${item.id}" aria-label="Cantidad seleccionada de ${escape(item.name)}">
+                <input type="number" value="0" min="0" max="99" inputmode="numeric" data-kind="${kind}" data-option-id="${item.id}" aria-label="Cantidad seleccionada de ${escape(item.name)}">
                 <button type="button" data-option-increment aria-label="Agregar ${escape(item.name)}"><i class="bx bx-plus"></i></button>
             </div>
         </article>`;
@@ -177,6 +177,33 @@
         refreshCustomizerState();
     }
 
+    function setOptionValue(input, requestedValue) {
+        const group = input.closest('[data-option-group]');
+        if (!group) return;
+        const maximum = Number(group.dataset.max || 0);
+        const current = Number(input.value || 0);
+        let requested = Math.max(0, Math.min(99, Number.isFinite(requestedValue) ? Math.trunc(requestedValue) : 0));
+
+        if (maximum === 1 && requested > 0) {
+            groupInputs(group).forEach(option => { option.value = 0; });
+            input.value = 1;
+            return;
+        }
+
+        const groupWithoutCurrent = groupTotal(group) - current;
+        if (maximum > 0) requested = Math.min(requested, Math.max(0, maximum - groupWithoutCurrent));
+
+        const globalMaximum = input.dataset.kind === 'ingredient'
+            ? Number(activeItem?.data?.maxIngredients || 0)
+            : (input.dataset.kind === 'addon' ? Number(activeItem?.data?.maxAddons || 0) : 0);
+        if (globalMaximum > 0) {
+            const kindWithoutCurrent = kindTotal(input.dataset.kind) - current;
+            requested = Math.min(requested, Math.max(0, globalMaximum - kindWithoutCurrent));
+        }
+
+        input.value = requested;
+    }
+
     function isCustomizerValid() {
         return [...optionsRoot.querySelectorAll('[data-option-group]')].every(group => {
             const count = groupTotal(group);
@@ -204,10 +231,6 @@
                 row.classList.toggle('is-selected', Number(input.value || 0) > 0);
                 row.querySelector('[data-option-decrement]').disabled = Number(input.value || 0) === 0;
                 row.querySelector('[data-option-increment]').disabled = !canIncrement(input);
-                const selectionIcon = row.querySelector('[data-option-increment] i');
-                if (maximum === 1 && selectionIcon) {
-                    selectionIcon.className = Number(input.value || 0) > 0 ? 'bx bx-radio-circle-marked' : 'bx bx-radio-circle';
-                }
             });
         });
         const addonMaximum = Number(activeItem?.type === 'product' ? activeItem.data.maxAddons || 0 : 0);
@@ -229,12 +252,31 @@
         if (decrement) adjustOption(decrement, -1);
         if (increment) adjustOption(increment, 1);
     });
+    optionsRoot.addEventListener('focusin', event => {
+        if (event.target.matches('[data-kind]')) event.target.select();
+    });
+    optionsRoot.addEventListener('click', event => {
+        if (event.target.matches('[data-kind]')) event.target.select();
+    });
+    optionsRoot.addEventListener('input', event => {
+        const input = event.target.closest('[data-kind]');
+        if (!input) return;
+        setOptionValue(input, Number(input.value));
+        clearCustomizerError();
+        refreshCustomizerState();
+    });
     root.querySelector('[data-customizer-quantity-minus]').addEventListener('click', () => {
         customizerQuantity.value = Math.max(1, Number(customizerQuantity.value || 1) - 1);
         refreshCustomizerState();
     });
     root.querySelector('[data-customizer-quantity-plus]').addEventListener('click', () => {
         customizerQuantity.value = Math.min(99, Number(customizerQuantity.value || 1) + 1);
+        refreshCustomizerState();
+    });
+    customizerQuantity.addEventListener('focus', () => customizerQuantity.select());
+    customizerQuantity.addEventListener('click', () => customizerQuantity.select());
+    customizerQuantity.addEventListener('input', () => {
+        customizerQuantity.value = Math.max(1, Math.min(99, Math.trunc(Number(customizerQuantity.value) || 1)));
         refreshCustomizerState();
     });
 

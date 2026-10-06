@@ -25,7 +25,7 @@
                 <div class="online-order-quantity" role="group" aria-label="Cantidad del producto">
                     <span>Cantidad</span>
                     <button type="button" data-customizer-quantity-minus aria-label="Quitar una unidad"><i class="bx bx-minus"></i></button>
-                    <input type="number" min="1" max="99" value="1" readonly data-customizer-quantity aria-label="Cantidad seleccionada">
+                    <input type="number" min="1" max="99" value="1" inputmode="numeric" data-customizer-quantity aria-label="Cantidad seleccionada">
                     <button type="button" data-customizer-quantity-plus aria-label="Agregar una unidad"><i class="bx bx-plus"></i></button>
                 </div>
                 <strong data-customizer-total></strong>
