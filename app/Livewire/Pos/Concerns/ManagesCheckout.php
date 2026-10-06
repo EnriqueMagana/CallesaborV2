@@ -515,7 +515,19 @@ trait ManagesCheckout
         $this->cart = [];
         $this->saveCart();
         $this->resetOrderForm();
-        unset($this->cartTotal, $this->cartCount, $this->activeCashRegister, $this->recentOrders);
+        unset(
+            $this->cartTotal,
+            $this->cartCount,
+            $this->activeCashRegister,
+            $this->recentOrders,
+            $this->pickupOrders,
+            $this->deliveryOrders,
+            $this->mesasPendientes,
+            $this->tableWorkspaceAllServices,
+            $this->tableWorkspaceServices,
+            $this->tableWorkspaceCounts,
+        );
+        $this->dispatchPendingCounts();
         $this->dispatch('notify', type: 'success', message: "Orden {$order->display_folio} creada.");
 
         if ($openTicket) {

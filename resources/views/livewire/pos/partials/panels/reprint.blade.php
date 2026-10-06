@@ -28,12 +28,21 @@
                 <input type="search" class="pos-input" wire:model.live.debounce.600ms="reprintSearch" placeholder="Número de pedido o cliente">
             </label>
             <div class="pos-reprint-result-count" aria-live="polite">
-                <strong>{{ $reprintResults->count() }}</strong>
-                <span>{{ $reprintResults->count() === 1 ? rtrim($reprintResultLabel, 's') : $reprintResultLabel }}</span>
+                <strong wire:loading.remove wire:target="openReprintPanel">{{ $reprintResults->count() }}</strong>
+                <strong wire:loading wire:target="openReprintPanel" aria-hidden="true">—</strong>
+                <span wire:loading.remove wire:target="openReprintPanel">{{ $reprintResults->count() === 1 ? rtrim($reprintResultLabel, 's') : $reprintResultLabel }}</span>
+                <span wire:loading wire:target="openReprintPanel">consultando</span>
             </div>
         </x-slot:tools>
 
-        <div class="pos-reprint-results" role="list" tabindex="0"
+        <div wire:loading.flex wire:target="openReprintPanel"
+            class="pos-skeleton-list" aria-label="Consultando tickets disponibles">
+            @for ($s = 0; $s < 3; $s++)
+                <div class="pos-table-skeleton"><span></span><div><i></i><i></i><i></i></div></div>
+            @endfor
+        </div>
+
+        <div class="pos-reprint-results" role="list" tabindex="0" wire:loading.remove wire:target="openReprintPanel"
              aria-label="Resultados disponibles para reimpresión">
             @if ($reprintType === 'mesas')
                 @forelse ($reprintResults as $service)
