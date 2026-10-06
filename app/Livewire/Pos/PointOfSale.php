@@ -118,7 +118,7 @@ class PointOfSale extends Component
             );
         }
 
-        $this->dispatch('pos-pending-counts-updated', counts: $this->toolbarPendingCounts);
+        $this->dispatchPendingCounts();
 
         // Los contadores viajan como un evento pequeño. El HTML completo del
         // POS sólo se vuelve a generar cuando hay un panel que pertenece al
@@ -707,6 +707,16 @@ class PointOfSale extends Component
             'delivery' => (int) ($counts->delivery_count ?? 0),
             'balances' => (int) ($counts->balances_count ?? 0),
         ];
+    }
+
+    /**
+     * Mantiene sincronizados los badges Alpine sin depender de que Firebase
+     * notifique al mismo usuario que originó el cambio.
+     */
+    protected function dispatchPendingCounts(): void
+    {
+        unset($this->activeCashRegister, $this->toolbarPendingCounts);
+        $this->dispatch('pos-pending-counts-updated', counts: $this->toolbarPendingCounts);
     }
 
     /**
@@ -1355,7 +1365,8 @@ class PointOfSale extends Component
     #[On('pos-balances-changed')]
     public function refreshBalanceCounters(): void
     {
-        unset($this->toolbarPendingCounts, $this->deliveryOrders);
+        unset($this->deliveryOrders);
+        $this->dispatchPendingCounts();
     }
 
     #[On('modal-confirmed')]
@@ -1777,6 +1788,7 @@ class PointOfSale extends Component
 
         $this->closeConvertDeliveryModal();
         unset($this->pickupOrders, $this->deliveryOrders, $this->recentOrders);
+        $this->dispatchPendingCounts();
         $this->dispatch('notify', type: 'success', message: "Pedido {$order->display_folio} enviado a Delivery.");
     }
 
@@ -2013,6 +2025,7 @@ class PointOfSale extends Component
             });
 
             unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
+            $this->dispatchPendingCounts();
             $this->dispatch('mesa-payment-completed', mesaId: $mesa->id, released: true);
             $this->dispatch('notify', type: 'success', message: "Subcuenta sin consumo eliminada; {$mesa->display_name} quedó disponible.");
 
@@ -2072,6 +2085,7 @@ class PointOfSale extends Component
         }
 
         unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
+        $this->dispatchPendingCounts();
         $this->dispatch('notify', type: 'success', message: "Servicio sin consumo de {$mesa->display_name} cancelado; mesa disponible.");
     }
 
@@ -2378,6 +2392,7 @@ class PointOfSale extends Component
         $this->mesaPayId = null;
         $this->mesaPayments = [];
         unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
+        $this->dispatchPendingCounts();
         $label = $service?->service_label ?? $mesa->display_name;
         $this->dispatch('notify', type: 'success', message: "{$label} cobrado y liberado.");
     }
@@ -2538,6 +2553,7 @@ class PointOfSale extends Component
         $this->mesaPayId = null;
         $this->mesaPayments = [];
         unset($this->mesasPendientes, $this->tableTrackingServices, $this->tableWorkspaceAllServices, $this->tableWorkspaceServices, $this->tableWorkspaceCounts, $this->mesaServiceHistory);
+        $this->dispatchPendingCounts();
         $this->dispatch('mesa-payment-completed', mesaId: $mesa->id, released: $allPaid);
 
         $msg = $allPaid
@@ -2911,6 +2927,7 @@ HTML;
             $this->tableWorkspaceServices,
             $this->tableWorkspaceCounts,
         );
+        $this->dispatchPendingCounts();
         $message = $mesaWasReleased
             ? "Orden {$order->display_folio} cobrada. Era la última nota y la mesa quedó disponible."
             : "Orden {$order->display_folio} cobrada.";
@@ -2971,6 +2988,7 @@ HTML;
         // El panel de cocina es un componente hijo y no se entera de que el
         // padre cambió una orden: este evento es su única señal para recargar.
         $this->dispatch('pos-orders-changed');
+        $this->dispatchPendingCounts();
 
         if ($nextStatus === 'en_preparacion') {
             $this->dispatch('pos-reprint-show-cocina',

@@ -8,7 +8,12 @@
                 <span class="visually-hidden">Buscar pedido de delivery</span>
                 <input type="search" class="pos-input" wire:model.live.debounce.600ms="deliverySearch" placeholder="Pedido, cliente, teléfono o dirección">
             </label>
-            <div class="pos-area-summary"><strong>{{ $this->deliveryOrders->count() }}</strong><span>entregas activas</span></div>
+            <div class="pos-area-summary" aria-live="polite">
+                <strong wire:loading.remove wire:target="openDeliveryPanel">{{ $this->deliveryOrders->count() }}</strong>
+                <strong wire:loading wire:target="openDeliveryPanel" aria-hidden="true">—</strong>
+                <span wire:loading.remove wire:target="openDeliveryPanel">entregas activas</span>
+                <span wire:loading wire:target="openDeliveryPanel">consultando</span>
+            </div>
             @if(! $this->deliveryModuleEnabled)
                 <span class="app-status app-status--warning"><i class="bx bx-wallet"></i> Corte global</span>
             @endif

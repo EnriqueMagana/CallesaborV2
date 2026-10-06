@@ -8,9 +8,22 @@
                 <span class="visually-hidden">Buscar pedido de ventanilla</span>
                 <input type="search" class="pos-input" wire:model.live.debounce.600ms="pickupSearch" placeholder="Pedido, nombre o teléfono">
             </label>
-            <div class="pos-area-summary"><strong>{{ $this->pickupOrders->count() }}</strong><span>órdenes activas</span></div>
+            <div class="pos-area-summary" aria-live="polite">
+                <strong wire:loading.remove wire:target="openPickupPanel">{{ $this->pickupOrders->count() }}</strong>
+                <strong wire:loading wire:target="openPickupPanel" aria-hidden="true">—</strong>
+                <span wire:loading.remove wire:target="openPickupPanel">órdenes activas</span>
+                <span wire:loading wire:target="openPickupPanel">consultando</span>
+            </div>
         </x-slot:tools>
 
+        <div wire:loading.flex wire:target="openPickupPanel"
+            class="pos-skeleton-list" aria-label="Consultando pedidos por cobrar">
+            @for ($s = 0; $s < 2; $s++)
+                <div class="pos-table-skeleton"><span></span><div><i></i><i></i><i></i></div></div>
+            @endfor
+        </div>
+
+        <div wire:loading.remove wire:target="openPickupPanel">
             @forelse ($this->pickupOrders as $po)
                 @include('livewire.pos.partials.order-flow-card', [
                     'flowOrder' => $po,
@@ -27,4 +40,5 @@
                     <p>No hay pedidos pendientes para preparar o cobrar.</p>
                 </div>
             @endforelse
+        </div>
 </x-pos.area-panel>

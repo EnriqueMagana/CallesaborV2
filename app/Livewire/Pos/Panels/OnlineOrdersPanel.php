@@ -72,6 +72,7 @@ class OnlineOrdersPanel extends Component
 
         unset($this->orders, $this->pendingCount);
         $this->dispatch('pos-orders-changed');
+        $this->dispatch('pos-parent-refresh-requested');
         $this->dispatch('notify', message: "Pedido {$order->display_folio} confirmado y enviado a cocina.", type: 'success');
         if (auth()->user()?->can('reimprimir tickets')) {
             $this->dispatch('online-order-print', url: route('print.cocina', $order));

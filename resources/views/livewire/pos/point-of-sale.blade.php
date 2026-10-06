@@ -6,6 +6,7 @@
     @pos-cart-quantities.window="cartQuantities = $event.detail.quantities ?? {}"
     @pos-pending-counts-updated.window="updatePendingCounts($event.detail.counts ?? {})"
     @pos-realtime-refresh-requested.window="requestRealtimeRefresh($event.detail.event)"
+    @pos-parent-refresh-requested.window="requestRealtimeRefresh('realtime-orders-changed')"
     @keydown.window="handleKeyboardShortcut($event)" @keydown.escape.window="closeTransientLayers()" class="pos-root">
 
 {{-- Toast --}}
