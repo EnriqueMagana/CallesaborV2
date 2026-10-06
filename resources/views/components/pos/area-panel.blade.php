@@ -16,7 +16,7 @@
     $dismiss = $closeAction ?: "panels.{$panel} = false";
 @endphp
 
-<div class="pos-overlay-panel" :class="panels.{{ $panel }} ? 'show' : ''">
+<div class="pos-overlay-panel" :class="panels.{{ $panel }} ? 'show' : ''" wire:ignore.self>
     <div class="pos-overlay-backdrop" x-on:click="{{ $dismiss }}"></div>
     <section
         {{ $attributes->class(['pos-panel', 'pos-area-panel', 'pos-floating-panel', $panelClass]) }}

@@ -1,5 +1,5 @@
 <div class="pos-more-layer" x-cloak>
-    <button type="button" class="pos-more-backdrop" tabindex="-1"
+    <button type="button" class="pos-more-backdrop" tabindex="-1" wire:ignore.self
         x-show="showMore"
         x-transition:enter="pos-backdrop-enter"
         x-transition:enter-start="pos-backdrop-enter-start"
@@ -9,7 +9,7 @@
         x-transition:leave-end="pos-backdrop-leave-end"
         @click="closeMore()" aria-label="Cerrar más opciones"></button>
 
-    <section id="pos-more-menu" class="pos-more-sheet" role="dialog" aria-modal="true"
+    <section id="pos-more-menu" class="pos-more-sheet" role="dialog" aria-modal="true" wire:ignore.self
         aria-labelledby="pos-more-title" aria-describedby="pos-more-description"
         x-show="showMore"
         x-transition:enter="pos-sheet-enter"

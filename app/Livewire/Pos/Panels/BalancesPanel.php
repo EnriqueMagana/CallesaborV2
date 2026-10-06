@@ -36,8 +36,15 @@ class BalancesPanel extends Component
     }
 
     #[On('pos-orders-changed')]
+    #[On('pos-realtime-refresh')]
     public function refreshOrders(): void
     {
+        if (! $this->loaded) {
+            $this->skipRender();
+
+            return;
+        }
+
         unset($this->orders);
     }
 

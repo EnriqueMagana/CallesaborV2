@@ -7,11 +7,10 @@
             data-pos-panel="pickup" aria-label="Abrir pedidos por cobrar">
             <span class="pos-mobile-nav__icon"><i class="bx bx-receipt" aria-hidden="true"></i></span>
             <span>Por cobrar</span>
-            @if ($this->toolbarPendingCounts['pickup'] > 0)
-                <strong class="pos-mobile-nav__badge" aria-label="{{ $this->toolbarPendingCounts['pickup'] }} pedidos pendientes">
-                    {{ $this->toolbarPendingCounts['pickup'] }}
-                </strong>
-            @endif
+            <strong class="pos-mobile-nav__badge" x-show="pendingCounts.pickup > 0" x-cloak
+                aria-label="{{ $this->toolbarPendingCounts['pickup'] }} pedidos pendientes"
+                :aria-label="`${pendingCounts.pickup} pedidos pendientes`"
+                x-text="pendingCounts.pickup">{{ $this->toolbarPendingCounts['pickup'] }}</strong>
         </button>
     @endcan
 
@@ -23,11 +22,10 @@
             data-pos-panel="tables" aria-label="Abrir mesas y comandas">
             <span class="pos-mobile-nav__icon"><i class="bx bx-dish" aria-hidden="true"></i></span>
             <span>Mesas</span>
-            @if ($this->toolbarPendingCounts['tables'] > 0)
-                <strong class="pos-mobile-nav__badge" aria-label="{{ $this->toolbarPendingCounts['tables'] }} servicios de mesa pendientes">
-                    {{ $this->toolbarPendingCounts['tables'] }}
-                </strong>
-            @endif
+            <strong class="pos-mobile-nav__badge" x-show="pendingCounts.tables > 0" x-cloak
+                aria-label="{{ $this->toolbarPendingCounts['tables'] }} servicios de mesa pendientes"
+                :aria-label="`${pendingCounts.tables} servicios de mesa pendientes`"
+                x-text="pendingCounts.tables">{{ $this->toolbarPendingCounts['tables'] }}</strong>
         </button>
     @endcanany
 
@@ -50,11 +48,10 @@
             data-pos-panel="delivery" aria-label="Abrir pedidos para entrega">
             <span class="pos-mobile-nav__icon"><i class="bx bx-cycling" aria-hidden="true"></i></span>
             <span>Pedidos</span>
-            @if ($this->toolbarPendingCounts['delivery'] > 0)
-                <strong class="pos-mobile-nav__badge" aria-label="{{ $this->toolbarPendingCounts['delivery'] }} entregas pendientes">
-                    {{ $this->toolbarPendingCounts['delivery'] }}
-                </strong>
-            @endif
+            <strong class="pos-mobile-nav__badge" x-show="pendingCounts.delivery > 0" x-cloak
+                aria-label="{{ $this->toolbarPendingCounts['delivery'] }} entregas pendientes"
+                :aria-label="`${pendingCounts.delivery} entregas pendientes`"
+                x-text="pendingCounts.delivery">{{ $this->toolbarPendingCounts['delivery'] }}</strong>
         </button>
     @endcan
 
