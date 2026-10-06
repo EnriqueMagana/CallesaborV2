@@ -47,6 +47,6 @@ class OnlineOrder extends Model
 
     public function getDisplayFolioAttribute(): string
     {
-        return 'Orden número -'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT).'- MenuDigital';
+        return 'Orden número -'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
     }
 }

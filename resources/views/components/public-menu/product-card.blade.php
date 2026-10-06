@@ -46,6 +46,7 @@
                 'id' => (int) $addon->id,
                 'name' => $addon->name,
                 'description' => $addon->description,
+                'image' => $addon->image ? Storage::url($addon->image) : null,
                 'extraPrice' => (float) $addon->extra_price > 0 ? '+$'.number_format((float) $addon->extra_price, 2) : 'Incluido',
                 'extraPriceValue' => (float) $addon->extra_price,
             ])->values(),
