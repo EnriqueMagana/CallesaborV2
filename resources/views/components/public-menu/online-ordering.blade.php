@@ -6,7 +6,20 @@
 
     <dialog class="online-dialog online-customizer" id="online-customizer-dialog" aria-labelledby="online-customizer-title">
         <form method="dialog" class="online-dialog__shell" data-online-customizer-form>
-            <header><div><span>Personaliza tu pedido</span><h2 id="online-customizer-title" data-customizer-title></h2><p data-customizer-context>Completa las opciones obligatorias para continuar.</p></div><button value="cancel" aria-label="Cerrar personalización"><i class="bx bx-x"></i></button></header>
+            <header>
+                <div class="online-customizer-heading">
+                    <span class="online-customizer-heading__media" data-customizer-media>
+                        <img src="" alt="" width="64" height="64" data-customizer-image hidden>
+                        <i class="bx bx-dish" data-customizer-fallback aria-hidden="true"></i>
+                    </span>
+                    <span class="online-customizer-heading__copy">
+                        <b>Personalizar producto</b>
+                        <h2 id="online-customizer-title" data-customizer-title></h2>
+                        <p data-customizer-context>Completa las opciones obligatorias para continuar.</p>
+                    </span>
+                </div>
+                <button value="cancel" aria-label="Cerrar personalización"><i class="bx bx-x"></i></button>
+            </header>
             <div class="online-dialog__body" data-customizer-options></div>
             <footer class="online-customizer-footer">
                 <div class="online-order-quantity" role="group" aria-label="Cantidad del producto">

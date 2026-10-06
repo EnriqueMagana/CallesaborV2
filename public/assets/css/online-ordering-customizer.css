@@ -11,6 +11,57 @@
 
 .online-customizer .online-dialog__shell > header {
     flex: 0 0 auto;
+    align-items: center;
+}
+
+.online-customizer-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 14px;
+}
+
+.online-customizer .online-dialog__shell > header .online-customizer-heading,
+.online-customizer .online-dialog__shell > header .online-customizer-heading__media,
+.online-customizer .online-dialog__shell > header .online-customizer-heading__copy {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.online-customizer-heading__media {
+    display: grid;
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid #dce8e0;
+    border-radius: 17px;
+    background: #eff6f1;
+    color: #087f3e;
+    font-size: 27px;
+}
+
+.online-customizer-heading__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.online-customizer-heading__copy {
+    display: grid;
+    min-width: 0;
+}
+
+.online-customizer-heading__copy > b {
+    color: #087f3e;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .1em;
+    text-transform: uppercase;
 }
 
 .online-customizer .online-dialog__shell > header p {
@@ -22,10 +73,13 @@
 .online-customizer .online-dialog__body {
     flex: 1 1 auto;
     min-height: 0;
-    padding-block: 18px 110px;
+    align-content: start;
+    grid-auto-rows: max-content;
+    padding-block: 18px;
 }
 
 .online-option-group {
+    min-height: max-content;
     padding: 0;
     overflow: hidden;
     border-color: #dbe8df;
@@ -118,6 +172,13 @@
     font-weight: 750;
 }
 
+.online-option-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 16px 16px;
+}
+
 .online-quantity-option {
     display: grid;
     min-height: 80px;
@@ -125,13 +186,16 @@
     align-items: center;
     gap: 12px;
     padding: 11px 16px;
-    border-top: 1px solid #edf2ef;
-    background: #fff;
+    border: 1px solid #e1e9e4;
+    border-radius: 15px;
+    background: #f8faf9;
     transition: background 160ms ease;
 }
 
 .online-quantity-option.is-selected {
+    border-color: #4da274;
     background: #f2faf5;
+    box-shadow: 0 0 0 2px rgba(8, 127, 62, .08);
 }
 
 .online-quantity-option__media {
@@ -229,6 +293,45 @@
     opacity: .34;
 }
 
+.online-option-group.is-single .online-quantity-option {
+    grid-template-columns: 52px 28px minmax(0, 1fr);
+}
+
+.online-option-group.is-single .online-quantity-option__media {
+    grid-column: 1;
+}
+
+.online-option-group.is-single .online-quantity-option__copy {
+    grid-column: 3;
+    grid-row: 1;
+}
+
+.online-option-group.is-single .online-option-stepper {
+    grid-column: 2;
+    grid-row: 1;
+    display: block;
+    border: 0;
+    background: transparent;
+}
+
+.online-option-group.is-single .online-option-stepper [data-option-decrement],
+.online-option-group.is-single .online-option-stepper input {
+    display: none;
+}
+
+.online-option-group.is-single .online-option-stepper [data-option-increment] {
+    width: 28px;
+    height: 44px;
+    border-radius: 999px;
+    color: #84948b;
+    font-size: 25px;
+    opacity: 1;
+}
+
+.online-option-group.is-single .online-quantity-option.is-selected [data-option-increment] {
+    color: #087f3e;
+}
+
 .online-notes {
     padding: 16px;
     border: 1px solid #dbe8df;
@@ -320,8 +423,29 @@
 }
 
 @media (max-width: 620px) {
-    .online-customizer .online-dialog__body {
-        padding-bottom: 130px;
+    .online-customizer-heading {
+        gap: 10px;
+    }
+
+    .online-customizer-heading__media {
+        width: 56px;
+        height: 56px;
+        flex-basis: 56px;
+        border-radius: 15px;
+    }
+
+    .online-customizer-heading__copy > b {
+        font-size: 10px;
+    }
+
+    .online-customizer .online-dialog__shell > header h2 {
+        font-size: 21px;
+        line-height: 1.18;
+    }
+
+    .online-customizer .online-dialog__shell > header p {
+        max-width: 28ch;
+        font-size: 11px;
     }
 
     .online-option-group > header {
@@ -340,6 +464,11 @@
         padding-inline: 14px;
     }
 
+    .online-option-grid {
+        grid-template-columns: 1fr;
+        padding-inline: 14px;
+    }
+
     .online-quantity-option__media {
         width: 48px;
         height: 48px;
@@ -348,6 +477,10 @@
     .online-option-stepper {
         grid-column: 1 / -1;
         justify-self: end;
+    }
+
+    .online-option-group.is-single .online-quantity-option {
+        grid-template-columns: 48px 28px minmax(0, 1fr);
     }
 
     .online-customizer-footer {

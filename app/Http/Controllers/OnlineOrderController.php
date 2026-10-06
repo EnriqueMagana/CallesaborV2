@@ -7,6 +7,7 @@ use App\Models\DigitalMenuSetting;
 use App\Models\OnlineOrder;
 use App\Services\OnlineOrderService;
 use App\Services\OnlineSalesPolicy;
+use App\Support\BusinessTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,11 @@ class OnlineOrderController extends Controller
     public function store(Request $request, OnlineOrderService $service): JsonResponse
     {
         app(OnlineSalesPolicy::class)->assertEnabled();
+        abort_unless(
+            BusinessSetting::current()->openingStatus(BusinessTime::now())['is_open'],
+            403,
+            'El restaurante está cerrado. Podrás realizar tu pedido cuando abramos.'
+        );
         $data = $request->validate([
             'fulfillment' => ['required', 'in:takeaway,delivery'],
             'customer_name' => ['required', 'string', 'max:160'],

@@ -1010,7 +1010,7 @@
                 const range = product.minIngredients > 0
                     ? `${product.minIngredients} a ${product.maxIngredients}`
                     : `Hasta ${product.maxIngredients}`;
-                addLimit('bx-leaf', 'Ingredientes', range);
+                addLimit('bx-food-menu', 'Ingredientes', range);
             }
             if (product.maxAddons) addLimit('bx-plus-circle', 'Complementos', `Hasta ${product.maxAddons}`);
 
@@ -1034,7 +1034,7 @@
                         ingredientImage.loading = 'lazy';
                         media.append(ingredientImage);
                     } else {
-                        const ingredientIcon = createElement('i', 'bx bx-leaf');
+                        const ingredientIcon = createElement('i', 'bx bx-food-menu');
                         ingredientIcon.setAttribute('aria-hidden', 'true');
                         media.append(ingredientIcon);
                     }

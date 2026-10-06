@@ -8,6 +8,8 @@
     const optionsRoot = root.querySelector('[data-customizer-options]');
     const customizerTitle = root.querySelector('[data-customizer-title]');
     const customizerContext = root.querySelector('[data-customizer-context]');
+    const customizerImage = root.querySelector('[data-customizer-image]');
+    const customizerFallback = root.querySelector('[data-customizer-fallback]');
     const customizerQuantity = root.querySelector('[data-customizer-quantity]');
     const customizerTotal = root.querySelector('[data-customizer-total]');
     const customizerAdd = root.querySelector('[data-customizer-add]');
@@ -50,6 +52,15 @@
         document.getElementById(type === 'product' ? 'product-detail-modal' : 'promotion-detail-modal')?.close();
         editingIndex = Number.isInteger(lineIndex) ? lineIndex : null;
         customizerTitle.textContent = activeItem.data.name;
+        customizerImage.hidden = !activeItem.data.image;
+        customizerFallback.hidden = Boolean(activeItem.data.image);
+        if (activeItem.data.image) {
+            customizerImage.src = activeItem.data.image;
+            customizerImage.alt = activeItem.data.name;
+        } else {
+            customizerImage.removeAttribute('src');
+            customizerImage.alt = '';
+        }
         customizerActionLabel.textContent = editingIndex === null ? 'Agregar' : 'Guardar cambios';
         optionsRoot.innerHTML = type === 'product' ? productOptions(activeItem.data) : promotionOptions(activeItem.data);
         optionsRoot.insertAdjacentHTML('beforeend', '<label class="online-notes"><span>Indicaciones especiales <small>Opcional</small></span><textarea data-line-notes maxlength="300" placeholder="Ej. sin cebolla, salsa aparte"></textarea></label>');
@@ -65,14 +76,14 @@
             const maximum = Number(product.maxIngredients || 0);
             html += groupStart('ingredient', '', 'Ingredientes', minimum, maximum, minimum > 0, 'Personaliza los ingredientes de tu platillo.');
             product.ingredients.forEach(item => { html += quantityOption('ingredient', item); });
-            html += '</section>';
+            html += '</div></section>';
         }
         (product.addonGroups || []).forEach(group => {
             const minimum = group.required ? Math.max(1, Number(group.minimum || 0)) : Number(group.minimum || 0);
             const maximum = Math.max(1, Number(group.maximum || 1));
             html += groupStart('addon', group.id, group.name, minimum, maximum, minimum > 0, group.description || 'Elige las opciones que prefieras.');
             group.options.forEach(item => { html += quantityOption('addon', item); });
-            html += '</section>';
+            html += '</div></section>';
         });
         return html || '<p class="online-empty-options"><i class="bx bx-check-shield"></i>Este producto no requiere personalizaci\u00f3n.</p>';
     }
@@ -81,15 +92,16 @@
         return (promotion.groups || []).map(group => {
             const minimum = Number(group.minimum || 0);
             const maximum = Math.max(1, Number(group.maximum || 1));
-            return `${groupStart('promotion', group.id, group.name, minimum, maximum, minimum > 0, group.rule || 'Completa este grupo.')}${group.products.map(product => quantityOption('promotion', product)).join('')}</section>`;
+            return `${groupStart('promotion', group.id, group.name, minimum, maximum, minimum > 0, group.rule || 'Completa este grupo.')}${group.products.map(product => quantityOption('promotion', product)).join('')}</div></section>`;
         }).join('');
     }
 
     function groupStart(kind, id, name, minimum, maximum, required, description) {
         const limit = maximum > 0 ? maximum : 'Sin l\u00edmite';
-        return `<section class="online-option-group" data-option-group data-group-kind="${kind}" data-group-id="${id}" data-min="${minimum}" data-max="${maximum}">
+        return `<section class="online-option-group ${maximum === 1 ? 'is-single' : ''}" data-option-group data-group-kind="${kind}" data-group-id="${id}" data-min="${minimum}" data-max="${maximum}">
             <header><div><span class="online-option-group__icon"><i class="bx bx-list-check"></i></span><span><h3>${escape(name)}</h3><p>${escape(description)}</p></span></div><b data-group-status>${required ? 'Obligatorio' : 'Opcional'}</b></header>
-            <div class="online-option-group__progress" aria-live="polite"><span data-group-count>0 de ${limit}</span><span data-group-message>${minimum > 0 ? `Elige al menos ${minimum}` : 'Puedes omitir este grupo'}</span></div>`;
+            <div class="online-option-group__progress" aria-live="polite"><span data-group-count>0 de ${limit}</span><span data-group-message>${minimum > 0 ? `Elige al menos ${minimum}` : 'Puedes omitir este grupo'}</span></div>
+            <div class="online-option-grid">`;
     }
 
     function quantityOption(kind, item) {
@@ -192,13 +204,19 @@
                 row.classList.toggle('is-selected', Number(input.value || 0) > 0);
                 row.querySelector('[data-option-decrement]').disabled = Number(input.value || 0) === 0;
                 row.querySelector('[data-option-increment]').disabled = !canIncrement(input);
+                const selectionIcon = row.querySelector('[data-option-increment] i');
+                if (maximum === 1 && selectionIcon) {
+                    selectionIcon.className = Number(input.value || 0) > 0 ? 'bx bx-radio-circle-marked' : 'bx bx-radio-circle';
+                }
             });
         });
         const addonMaximum = Number(activeItem?.type === 'product' ? activeItem.data.maxAddons || 0 : 0);
         const addonLimitReached = addonMaximum > 0 && kindTotal('addon') >= addonMaximum;
+        const basePrice = money(activeItem?.data?.priceValue || 0);
+        const productLimit = addonMaximum > 0 ? ` \u00b7 M\u00e1ximo ${addonMaximum} complementos` : '';
         customizerContext.textContent = addonLimitReached
-            ? `L\u00edmite general alcanzado: ${addonMaximum} complementos.`
-            : 'Completa las opciones obligatorias para continuar.';
+            ? `${basePrice} base${productLimit} \u00b7 L\u00edmite alcanzado`
+            : `${basePrice} base${productLimit}`;
         customizerAdd.disabled = !isCustomizerValid();
         root.querySelector('[data-customizer-quantity-minus]').disabled = Number(customizerQuantity.value) <= 1;
         root.querySelector('[data-customizer-quantity-plus]').disabled = Number(customizerQuantity.value) >= 99;
