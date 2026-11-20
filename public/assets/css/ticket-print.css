@@ -36,6 +36,9 @@ body.ticket-document { margin: 0 auto; color: #000; background: #fff; font-famil
 hr { margin: 6px 0; border: 0; border-top: 1px dashed #000; }
 .ticket-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
 .ticket-row > :last-child { text-align: right; }
+.ticket-discount-summary { margin-bottom: 5px; break-inside: avoid; }
+.ticket-global-discount > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.ticket-global-discount > :last-child { flex-shrink: 0; white-space: nowrap; }
 .ticket-note, .ticket-sub { padding-left: 8px; font-size: .9em; }
 .ticket-item { margin-bottom: 6px; }
 .ticket-item-main { font-size: 1.02em; }

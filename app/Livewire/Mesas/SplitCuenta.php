@@ -330,6 +330,8 @@ class SplitCuenta extends Component
                     'qty' => $i->quantity,
                     'subtotal' => $equalItemShares[$i->id]['subtotal'][$idx] ?? 0,
                     'discount_amount' => $equalItemShares[$i->id]['discount_amount'][$idx] ?? 0,
+                    'discount_id' => $i->discount_id,
+                    'discount_snapshot' => $i->discount_snapshot,
                 ])->toArray();
             } else {
                 foreach ($account['item_ids'] as $itemId) {
@@ -341,6 +343,8 @@ class SplitCuenta extends Component
                             'qty' => $item->quantity,
                             'subtotal' => (float) $item->subtotal,
                             'discount_amount' => (float) $item->discount_amount,
+                            'discount_id' => $item->discount_id,
+                            'discount_snapshot' => $item->discount_snapshot,
                         ];
                     }
                 }

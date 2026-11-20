@@ -1119,9 +1119,13 @@ class GestionMesas extends Component
 
             $label = (string) ($account['label'] ?? 'Cuenta '.($accountIndex + 1));
             $items = collect($account['items'] ?? [])->map(fn (array $item) => [
+                'id' => $item['id'] ?? null,
                 'qty' => (float) ($item['qty'] ?? 1),
                 'name' => (string) ($item['name'] ?? 'Producto'),
                 'subtotal' => (float) ($item['subtotal'] ?? 0),
+                'discount_id' => $item['discount_id'] ?? null,
+                'discount_amount' => (float) ($item['discount_amount'] ?? 0),
+                'discount_snapshot' => $item['discount_snapshot'] ?? null,
             ])->values()->all();
             $total = (float) ($account['total'] ?? 0);
             $payments = (array) ($account['payments'] ?? []);
@@ -1141,6 +1145,9 @@ class GestionMesas extends Component
                     'qty' => (float) $item->quantity,
                     'name' => $item->product_name,
                     'subtotal' => (float) $item->subtotal,
+                    'discount_id' => $item->discount_id,
+                    'discount_amount' => (float) $item->discount_amount,
+                    'discount_snapshot' => $item->discount_snapshot,
                 ]))->values()->all();
         }
 

@@ -11,6 +11,7 @@ use App\Models\MesaAssignment;
 use App\Models\MesaService;
 use App\Models\Order;
 use App\Models\OrderChangeRequest;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\TicketTemplate;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -123,6 +124,9 @@ class ThermalTicketRenderer
                 'quantity' => $item->quantity,
                 'subtotal' => (float) $item->subtotal,
                 'is_cancelled' => $isCancelled || (bool) $item->is_cancelled,
+                'discount_id' => $item->discount_id,
+                'discount_amount' => (float) $item->discount_amount,
+                'discount_snapshot' => $item->discount_snapshot,
                 'notes' => $item->notes,
                 'benefits' => $type === 'kitchen_area' ? [] : $benefitSummary->forItem($item),
                 'modifiers' => $item->addons->map(fn ($addon) => [
@@ -347,6 +351,16 @@ class ThermalTicketRenderer
 
         $paymentPayload = $this->mesaPaymentsPayload($payments);
 
+        // Older split snapshots kept the allocation and item ID but not the
+        // discount description. Recover only the persisted sale snapshot.
+        $missingSnapshotIds = collect($items)
+            ->filter(fn ($item) => (float) ($item['discount_amount'] ?? 0) > 0
+                && empty($item['discount_snapshot']) && ! empty($item['id']))
+            ->pluck('id')->unique();
+        $snapshots = $missingSnapshotIds->isEmpty()
+            ? collect()
+            : OrderItem::whereIn('id', $missingSnapshotIds)->get(['id', 'discount_snapshot'])->keyBy('id');
+
         return $this->render('customer', [
             'title' => 'TICKET DE MESA',
             'folio' => $accountLabel,
@@ -359,6 +373,11 @@ class ThermalTicketRenderer
                 'name' => $item['name'] ?? 'Producto',
                 'quantity' => $item['qty'] ?? $item['quantity'] ?? 1,
                 'subtotal' => (float) ($item['subtotal'] ?? 0),
+                'is_cancelled' => (bool) ($item['is_cancelled'] ?? false),
+                'discount_id' => $item['discount_id'] ?? null,
+                'discount_amount' => (float) ($item['discount_amount'] ?? 0),
+                'discount_snapshot' => $item['discount_snapshot']
+                    ?? $snapshots->get($item['id'] ?? null)?->discount_snapshot,
                 'modifiers' => [],
                 'notes' => null,
             ])->all(),
@@ -407,6 +426,9 @@ class ThermalTicketRenderer
                 'quantity' => $item->quantity,
                 'subtotal' => (float) $item->subtotal,
                 'is_cancelled' => (bool) $item->is_cancelled,
+                'discount_id' => $item->discount_id,
+                'discount_amount' => (float) $item->discount_amount,
+                'discount_snapshot' => $item->discount_snapshot,
                 'modifiers' => [],
                 'notes' => null,
             ]))->all(),
@@ -611,6 +633,10 @@ class ThermalTicketRenderer
 
     public function render(string $type, array $payload, ?TicketTemplate $template = null, ?BusinessSetting $business = null): string
     {
+        if (in_array($type, ['customer', 'counter', 'delivery'], true)) {
+            $payload = $this->withGlobalDiscountSummary($payload);
+        }
+
         $business ??= BusinessSetting::current();
         $template ??= TicketTemplate::current($type);
         $qrDataUri = $template->show_qr && ! empty($payload['tracking_url'])
@@ -618,6 +644,58 @@ class ThermalTicketRenderer
             : null;
 
         return view('print.ticket-document', compact('business', 'template', 'payload', 'qrDataUri'))->render();
+    }
+
+    private function withGlobalDiscountSummary(array $payload): array
+    {
+        $discounts = [];
+        $subtotalCents = 0;
+
+        $payload['items'] = collect($payload['items'] ?? [])->map(function (array $item) use (&$discounts, &$subtotalCents): array {
+            $snapshot = $item['discount_snapshot'] ?? [];
+            $amountCents = max(0, (int) round((float) ($item['discount_amount'] ?? 0) * 100));
+
+            if (($snapshot['scope'] ?? null) === 'order' && $amountCents > 0) {
+                // Lines are stored net of the account allocation. Display the
+                // base once and deduct the account benefit only in totals.
+                $item['subtotal'] = round((float) $item['subtotal'] + $amountCents / 100, 2);
+                $item['benefits'] = collect($item['benefits'] ?? [])
+                    ->reject(fn (array $benefit) => ($benefit['type'] ?? null) === 'discount')->values()->all();
+
+                if (! ($item['is_cancelled'] ?? false)) {
+                    $name = $snapshot['name'] ?? 'Descuento aplicado';
+                    $percentage = null;
+                    if (($snapshot['value_type'] ?? null) === 'percentage' && isset($snapshot['value'])) {
+                        $percentage = (float) $snapshot['value'];
+                    } elseif (! isset($snapshot['value_type'])
+                        && preg_match('/([0-9]+(?:[.,][0-9]+)?)\s*%/u', $snapshot['label'] ?? '', $match)) {
+                        $percentage = (float) str_replace(',', '.', $match[1]);
+                    }
+
+                    $label = $percentage !== null
+                        ? 'Descuento del '.rtrim(rtrim(number_format($percentage, 2, '.', ''), '0'), '.').'%'
+                        : 'Descuento';
+                    $label .= ' por "'.$name.'"';
+                    $key = json_encode([$snapshot['discount_id'] ?? $item['discount_id'] ?? null, $label]);
+                    $discounts[$key] ??= ['label' => $label, 'amount_cents' => 0];
+                    $discounts[$key]['amount_cents'] += $amountCents;
+                }
+            }
+
+            if (! ($item['is_cancelled'] ?? false)) {
+                $subtotalCents += (int) round((float) ($item['subtotal'] ?? 0) * 100);
+            }
+
+            return $item;
+        })->all();
+
+        $payload['global_discounts'] = collect($discounts)->map(fn (array $discount) => [
+            'label' => $discount['label'],
+            'amount' => $discount['amount_cents'] / 100,
+        ])->values()->all();
+        $payload['subtotal_before_global_discount'] = $subtotalCents / 100;
+
+        return $payload;
     }
 
     private function renderBatch(string $type, array $payloads, bool $autoPrint = true): string

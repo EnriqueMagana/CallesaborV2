@@ -2429,6 +2429,10 @@ class PointOfSale extends Component
             'qty' => $i->quantity,
             'name' => $i->product_name,
             'subtotal' => (float) $i->subtotal,
+            'is_cancelled' => (bool) $i->is_cancelled,
+            'discount_id' => $i->discount_id,
+            'discount_amount' => (float) $i->discount_amount,
+            'discount_snapshot' => $i->discount_snapshot,
         ]))->toArray();
 
         $this->dispatch('pos-reprint-show',
@@ -2583,9 +2587,13 @@ class PointOfSale extends Component
 
         // Build ticket items from split_data snapshot
         $ticketItems = collect($accountItems)->map(fn ($i) => [
+            'id' => $i['id'] ?? null,
             'qty' => $i['qty'],
             'name' => $i['name'],
             'subtotal' => (float) $i['subtotal'],
+            'discount_id' => $i['discount_id'] ?? null,
+            'discount_amount' => (float) ($i['discount_amount'] ?? 0),
+            'discount_snapshot' => $i['discount_snapshot'] ?? null,
         ])->toArray();
 
         $this->dispatch('pos-reprint-show',
@@ -3140,6 +3148,9 @@ HTML;
                 'qty' => (float) $item->quantity,
                 'name' => $item->product_name,
                 'subtotal' => (float) $item->subtotal,
+                'discount_id' => $item->discount_id,
+                'discount_amount' => (float) $item->discount_amount,
+                'discount_snapshot' => $item->discount_snapshot,
             ]))->values()->all();
 
         if (! $mesa || $items === []) {

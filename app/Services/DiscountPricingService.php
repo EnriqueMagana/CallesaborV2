@@ -177,10 +177,12 @@ class DiscountPricingService
             $cart[$index]['discount_id'] = $discount->id;
             $cart[$index]['discount_amount'] = $lineDiscount;
             $cart[$index]['discount_snapshot'] = [
-                'version' => 1,
+                'version' => 2,
                 'discount_id' => $discount->id,
                 'name' => $discount->name,
                 'label' => $discount->benefitLabel(),
+                'value_type' => $discount->value_type,
+                'value' => (float) $discount->value,
                 'category' => $discount->category,
                 'audience' => $discount->audience,
                 'scope' => $discount->scope,
