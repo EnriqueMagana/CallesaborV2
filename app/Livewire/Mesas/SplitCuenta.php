@@ -5,9 +5,12 @@ namespace App\Livewire\Mesas;
 use App\Models\CashRegister;
 use App\Models\Mesa;
 use App\Models\MesaSplit;
+use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\MesaAccountDiscountService;
 use App\Services\MesaServiceManager;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -67,6 +70,24 @@ class SplitCuenta extends Component
             return;
         }
 
+        if ($register) {
+            DB::transaction(function () use ($mesa, $register, $service): void {
+                $orders = Order::query()
+                    ->when(
+                        $service,
+                        fn ($query) => $query->where('mesa_service_id', $service->id),
+                        fn ($query) => $query->where('mesa_id', $mesa->id)
+                            ->where('cash_register_id', $register->id)
+                            ->whereNull('mesa_service_id')
+                    )
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->lockForUpdate()
+                    ->get();
+
+                app(MesaAccountDiscountService::class)->reprice($orders, 'dine_in');
+            }, 3);
+        }
+
         $this->accounts = [
             ['label' => 'Cuenta 1', 'item_ids' => [], 'paid' => false],
             ['label' => 'Cuenta 2', 'item_ids' => [], 'paid' => false],
@@ -94,6 +115,7 @@ class SplitCuenta extends Component
                 // Solo excluimos las que ya fueron cobradas o canceladas.
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada']);
         })
+            ->where('is_cancelled', false)
             ->with(['order', 'addons'])
             ->get();
     }
@@ -117,9 +139,14 @@ class SplitCuenta extends Component
     {
         $totals = [];
         foreach ($this->accounts as $idx => $account) {
+            if ($this->confirmed !== null) {
+                $totals[$idx] = (float) ($account['total'] ?? 0);
+
+                continue;
+            }
             $sum = 0;
             if ($this->mode === 'igual') {
-                $sum = $this->grandTotal / max(1, $this->equalParts);
+                $sum = $this->splitMoneyEvenly($this->grandTotal, $this->equalParts)[$idx] ?? 0;
             } else {
                 foreach ($account['item_ids'] as $itemId) {
                     $item = $this->allItems->firstWhere('id', $itemId);
@@ -132,6 +159,12 @@ class SplitCuenta extends Component
         }
 
         return $totals;
+    }
+
+    #[Computed]
+    public function discountTotal(): float
+    {
+        return round((float) $this->allItems->sum('discount_amount'), 2);
     }
 
     // ── Accounts management ──
@@ -272,6 +305,21 @@ class SplitCuenta extends Component
 
         $splitData = [];
         $totals = $this->accountTotals;
+        $equalItemShares = [];
+        if ($this->mode === 'igual') {
+            $subtotalOffset = 0;
+            $discountOffset = 0;
+            foreach ($this->allItems as $item) {
+                $subtotalCents = max(0, (int) round((float) $item->subtotal * 100));
+                $discountCents = max(0, (int) round((float) $item->discount_amount * 100));
+                $equalItemShares[$item->id] = [
+                    'subtotal' => $this->splitMoneyEvenly((float) $item->subtotal, $this->equalParts, $subtotalOffset),
+                    'discount_amount' => $this->splitMoneyEvenly((float) $item->discount_amount, $this->equalParts, $discountOffset),
+                ];
+                $subtotalOffset = ($subtotalOffset + ($subtotalCents % $this->equalParts)) % $this->equalParts;
+                $discountOffset = ($discountOffset + ($discountCents % $this->equalParts)) % $this->equalParts;
+            }
+        }
 
         foreach ($this->accounts as $idx => $account) {
             $items = [];
@@ -280,7 +328,10 @@ class SplitCuenta extends Component
                     'id' => $i->id,
                     'name' => $i->product_name,
                     'qty' => $i->quantity,
-                    'subtotal' => round((float) $i->subtotal / $this->equalParts, 2),
+                    'subtotal' => $equalItemShares[$i->id]['subtotal'][$idx] ?? 0,
+                    'discount_amount' => $equalItemShares[$i->id]['discount_amount'][$idx] ?? 0,
+                    'discount_id' => $i->discount_id,
+                    'discount_snapshot' => $i->discount_snapshot,
                 ])->toArray();
             } else {
                 foreach ($account['item_ids'] as $itemId) {
@@ -291,6 +342,9 @@ class SplitCuenta extends Component
                             'name' => $item->product_name,
                             'qty' => $item->quantity,
                             'subtotal' => (float) $item->subtotal,
+                            'discount_amount' => (float) $item->discount_amount,
+                            'discount_id' => $item->discount_id,
+                            'discount_snapshot' => $item->discount_snapshot,
                         ];
                     }
                 }
@@ -300,6 +354,9 @@ class SplitCuenta extends Component
                 'label' => $account['label'],
                 'items' => $items,
                 'total' => $totals[$idx],
+                'discount_amount' => $this->mode === 'igual'
+                    ? ($this->splitMoneyEvenly($this->discountTotal, $this->equalParts)[$idx] ?? 0)
+                    : round((float) collect($items)->sum('discount_amount'), 2),
                 'paid' => false,
             ];
         }
@@ -315,10 +372,14 @@ class SplitCuenta extends Component
             'created_by' => auth()->id(),
             'split_data' => $splitData,
             'status' => 'pendiente',
-            'total' => $this->grandTotal,
+            'total' => round((float) collect($totals)->sum(), 2),
         ]);
 
         $this->confirmed = $split->id;
+        $this->accounts = collect($splitData)->map(fn (array $account): array => [
+            ...$account,
+            'item_ids' => collect($account['items'])->pluck('id')->all(),
+        ])->all();
         $memberIds = $service?->mesas()->pluck('mesas.id')->all() ?: [$this->mesaId];
         Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
         if ($register) {
@@ -388,6 +449,22 @@ class SplitCuenta extends Component
     private function ensureEditable(): void
     {
         abort_if($this->confirmed !== null, 409, 'La división ya fue confirmada. Reabre la mesa antes de modificarla.');
+    }
+
+    /** @return array<int, float> */
+    private function splitMoneyEvenly(float $amount, int $parts, int $offset = 0): array
+    {
+        $parts = max(1, $parts);
+        $cents = max(0, (int) round($amount * 100));
+        $base = intdiv($cents, $parts);
+        $remainder = $cents % $parts;
+        $shares = array_fill(0, $parts, $base);
+        $offset = $offset % $parts;
+        for ($index = 0; $index < $remainder; $index++) {
+            $shares[($offset + $index) % $parts]++;
+        }
+
+        return array_map(fn (int $share): float => $share / 100, $shares);
     }
 
     private function activeSplitQuery()

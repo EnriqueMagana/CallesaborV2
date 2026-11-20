@@ -66,6 +66,7 @@
         optionsRoot.insertAdjacentHTML('beforeend', '<label class="online-notes"><span>Indicaciones especiales <small>Opcional</small></span><textarea data-line-notes maxlength="300" placeholder="Ej. sin cebolla, salsa aparte"></textarea></label>');
         hydrateCustomizer(editingIndex === null ? null : cart[editingIndex]);
         refreshCustomizerState();
+        optionsRoot.scrollTop = 0;
         customizer.showModal();
     }
 
@@ -381,6 +382,8 @@
         root.querySelector('[data-online-next]').hidden = step === 4;
         root.querySelector('[data-online-submit]').hidden = step !== 4;
         errorBox.hidden = true;
+        const activeStep = root.querySelector(`[data-online-step="${step}"]`);
+        if (activeStep) activeStep.scrollTop = 0;
     }
     root.querySelector('[data-online-next]').addEventListener('click', () => { if (step === 1 && !cart.length) return; if (step === 3 && !validateContact()) return; step = Math.min(4, step + 1); showStep(); });
     root.querySelector('[data-online-prev]').addEventListener('click', () => { step = Math.max(1, step - 1); showStep(); });

@@ -81,6 +81,9 @@
                     $serviceTotal = $activeSplit
                         ? collect($activeSplit->split_data)->reject(fn ($account) => (bool) ($account['paid'] ?? false))->sum('total')
                         : (float) $service->orders->sum('total');
+                    $serviceHasDiscount = $service->orders->flatMap(fn ($order) => $order->items)
+                        ->reject(fn ($item) => (bool) $item->is_cancelled)->sum('discount_amount') > 0;
+                    $serviceIsEmpty = $serviceTotal <= 0.009 && !$serviceHasDiscount;
                     $pendingSplitAccounts = $activeSplit
                         ? collect($activeSplit->split_data)->reject(fn ($account) => (bool) ($account['paid'] ?? false))
                         : collect();
@@ -141,7 +144,7 @@
                             </div>
                         @endif
 
-                        @if ($activeSplit && $serviceTotal <= 0.009)
+                        @if ($activeSplit && $serviceIsEmpty)
                             <section class="pos-split-zero-state" role="status" aria-label="Subcuenta restante sin consumo">
                                 <span class="pos-split-zero-state__icon"><i class="bx bx-check-circle"></i></span>
                                 <div>
@@ -167,7 +170,7 @@
                         @endif
 
                         @if ($service->status === 'en_cuenta' && auth()->user()?->canAny(['cobrar mesas', 'reimprimir tickets']))
-                            @if ($activeSplit && $serviceTotal > 0.009 && auth()->user()?->can('cobrar mesas'))
+                            @if ($activeSplit && !$serviceIsEmpty && auth()->user()?->can('cobrar mesas'))
                                 <section class="pos-table-split-list pos-table-split-list--primary" aria-label="Subcuentas pendientes">
                                     <div class="pos-table-split-list__title">
                                         <span><i class="bx bx-git-branch"></i> Cobrar cuenta dividida</span>
@@ -195,8 +198,8 @@
                             <footer class="pos-table-group__footer pos-workspace-service__footer">
                                 <div class="pos-table-group__close-copy">
                                     @can('cobrar mesas')
-                                        <strong>{{ $serviceTotal <= 0.009 ? 'Servicio sin consumo' : ($allOrdersReady ? 'Cuenta lista para cobrar' : 'Esperando comandas') }}</strong>
-                                        <small>{{ $serviceTotal <= 0.009 ? 'Cancela el servicio o reabre la mesa.' : ($allOrdersReady ? 'Elige cobro completo o una subcuenta.' : 'Marca todas las órdenes como listas antes de cobrar.') }}</small>
+                                        <strong>{{ $serviceIsEmpty ? 'Servicio sin consumo' : ($allOrdersReady ? 'Cuenta lista para cobrar' : 'Esperando comandas') }}</strong>
+                                        <small>{{ $serviceIsEmpty ? 'Cancela el servicio o reabre la mesa.' : ($allOrdersReady ? 'Elige cobro completo o una subcuenta.' : 'Marca todas las órdenes como listas antes de cobrar.') }}</small>
                                     @else
                                         <strong>Cuenta vigente</strong>
                                         <small>Consulta o imprime la venta global sin modificar el servicio.</small>
@@ -217,7 +220,7 @@
                                             <button type="button" wire:click="reopenMesa({{ $primaryMesa->id }})" class="pos-btn pos-btn-secondary">
                                                 <i class="bx bx-lock-open-alt"></i><span>Reabrir</span>
                                             </button>
-                                            @if ($serviceTotal <= 0.009)
+                                            @if ($serviceIsEmpty)
                                                 <button type="button" wire:click="requestDiscardEmptyMesaAccount({{ $primaryMesa->id }})" class="pos-btn pos-btn-danger">
                                                     <i class="bx bx-x-circle"></i><span>Cancelar servicio</span>
                                                 </button>
@@ -255,6 +258,9 @@
                     $legacyReady = $legacyMesa->orders->isNotEmpty()
                         && $legacyMesa->orders->every(fn ($order) => in_array($order->status, ['lista', 'entregada'], true));
                     $legacySplit = $legacyMesa->active_split ?? $legacyMesa->splits->first();
+                    $legacyHasDiscount = $legacyMesa->orders->flatMap(fn ($order) => $order->items)
+                        ->reject(fn ($item) => (bool) $item->is_cancelled)->sum('discount_amount') > 0;
+                    $legacyIsEmpty = (float) $legacyMesa->mesa_total <= 0.009 && !$legacyHasDiscount;
                     $legacyPendingSplitAccounts = $legacySplit
                         ? collect($legacySplit->split_data)->reject(fn ($account) => (bool) ($account['paid'] ?? false))
                         : collect();
@@ -279,7 +285,7 @@
                             </small>
                         </div>
                     </header>
-                    @if ($legacySplit && (float) $legacyMesa->mesa_total <= 0.009)
+                    @if ($legacySplit && $legacyIsEmpty)
                         <section class="pos-split-zero-state" aria-label="Subcuenta restante sin consumo">
                             <span><i class="bx bx-receipt"></i></span>
                             <div>
@@ -302,14 +308,14 @@
                     @endif
                     <footer class="pos-table-group__footer pos-workspace-service__footer">
                         <div class="pos-table-group__close-copy">
-                            <strong>{{ (float) $legacyMesa->mesa_total <= 0.009 ? 'Servicio sin consumo' : 'Cuenta anterior recuperada' }}</strong>
+                            <strong>{{ $legacyIsEmpty ? 'Servicio sin consumo' : 'Cuenta anterior recuperada' }}</strong>
                             <small>{{ $legacyReady ? 'Lista para cobrar.' : 'Las comandas deben estar listas antes del cobro.' }}</small>
                         </div>
                         <div class="pos-workspace-service__actions">
                             <button type="button" wire:click="reopenMesa({{ $legacyMesa->id }})" class="pos-btn pos-btn-secondary">
                                 <i class="bx bx-lock-open-alt"></i><span>Reabrir</span>
                             </button>
-                            @if ((float) $legacyMesa->mesa_total <= 0.009)
+                            @if ($legacyIsEmpty)
                                 <button type="button" wire:click="requestDiscardEmptyMesaAccount({{ $legacyMesa->id }})" class="pos-btn pos-btn-danger">
                                     <i class="bx bx-x-circle"></i><span>Cancelar servicio</span>
                                 </button>

@@ -32,9 +32,16 @@
                                     <div data-ui="xui-1u6iimp">{{ $item['notes'] }}</div>
                                 @endif
                             </div>
-                            <div class="co-sum-price">${{ number_format($item['subtotal'], 2) }}</div>
+                            <div class="co-sum-price">${{ number_format((float) $item['subtotal'] + (float) ($item['discount_amount'] ?? 0), 2) }}</div>
                         </div>
                     @endforeach
+                    @if($this->cartDiscountTotal > 0)
+                        @php
+                            $checkoutDiscount = collect($cart)->first(fn ($line) => !empty($line['discount_id']));
+                        @endphp
+                        <div class="total-row"><span>Subtotal</span><span>${{ number_format($this->cartTotal + $this->cartDiscountTotal, 2) }}</span></div>
+                        <div class="total-row pos-discount-total"><span>{{ data_get($checkoutDiscount, 'discount_snapshot.name', 'Descuento de cuenta') }}</span><span>−${{ number_format($this->cartDiscountTotal, 2) }}</span></div>
+                    @endif
                     <div class="co-sum-total">
                         <span>Total</span>
                         <span>${{ number_format($this->cartTotal, 2) }}</span>
