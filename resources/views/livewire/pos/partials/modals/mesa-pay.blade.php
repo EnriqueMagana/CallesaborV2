@@ -6,12 +6,13 @@
     $mpAccountLabel = $mpContext['accountLabel'];
     $mpOrders = $mpContext['orders'];
     $mpTotal = $mpContext['total'];
+    $mpDiscountTotal = $mpContext['discountTotal'] ?? 0;
     $mpItems = $mpContext['items'];
     $mpIsSplit = $mpContext['isSplit'];
 
     $mpPaid      = collect($mesaPayments)->sum('amount');
     $mpRem       = max(0, $mpTotal - $mpPaid);
-    $mpCanPay    = !empty($mesaPayments) && round($mpPaid * 100) === round($mpTotal * 100);
+    $mpCanPay    = (!empty($mesaPayments) || ($mpTotal <= 0 && $mpDiscountTotal > 0)) && round($mpPaid * 100) === round($mpTotal * 100);
     $assignment  = $mpMesa?->currentAssignment;
 @endphp
 <div class="pos-modal-wrap show pos-modal-shell" data-ui="xui-6jaq3m" wire:click.self="closeMesaPayModal" role="dialog" aria-modal="true" aria-labelledby="mesa-pay-title">
@@ -49,7 +50,7 @@
                     @foreach($mpItems as $item)
                         <div data-ui="xui-16zjevx">
                             <span>{{ $item['qty'] }}x {{ $item['name'] }}</span>
-                            <span data-ui="xui-y9mhin">${{ number_format((float)$item['subtotal'], 2) }}</span>
+                            <span data-ui="xui-y9mhin">${{ number_format((float)$item['subtotal'] + (float) ($item['discount_amount'] ?? 0), 2) }}</span>
                         </div>
                     @endforeach
                     @if($mpItems->isEmpty())
@@ -67,11 +68,17 @@
                             @foreach($order->items as $item)
                                 <div data-ui="xui-1wennv6">
                                     <span>{{ $item->quantity }}x {{ $item->product_name }}</span>
-                                    <span data-ui="xui-y9mhin">${{ number_format($item->subtotal, 2) }}</span>
+                                    <span data-ui="xui-y9mhin">${{ number_format((float) $item->subtotal + (float) $item->discount_amount, 2) }}</span>
                                 </div>
                             @endforeach
                         </div>
                     @endforeach
+                @endif
+                @if($mpDiscountTotal > 0)
+                    <div class="total-row pos-discount-total" role="status">
+                        <span>Descuento de cuenta</span>
+                        <span>−${{ number_format($mpDiscountTotal, 2) }}</span>
+                    </div>
                 @endif
                 <div data-ui="xui-1s0et43">
                     <span>Total</span>
@@ -99,7 +106,7 @@
             @endif
 
             {{-- Payment input --}}
-            @if($mpRem > 0 || empty($mesaPayments))
+            @if($mpRem > 0)
                 <div class="pos-payment-methods" data-ui="xui-1qqbkl9" role="group" aria-label="Forma de pago">
                     @foreach(['cash'=>'Efectivo','card'=>'Tarjeta','transfer'=>'Transferencia'] as $m => $label)
                         <button type="button" wire:click="$set('mesaPayMethod','{{ $m }}')"
@@ -207,7 +214,7 @@
                 </button>
             @endif
 
-            @if(empty($mesaPayments))
+            @if(empty($mesaPayments) && $mpTotal > 0)
                 <div class="pos-payment-required" role="status">
                     <i class="bx bx-info-circle" aria-hidden="true"></i>
                     <span>Agrega al menos un pago para habilitar el cobro.</span>

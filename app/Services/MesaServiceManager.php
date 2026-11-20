@@ -5,7 +5,10 @@ namespace App\Services;
 use App\Models\CashRegister;
 use App\Models\KioskTerminal;
 use App\Models\Mesa;
+use App\Models\MesaAssignment;
 use App\Models\MesaService;
+use App\Models\MesaSplit;
+use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -85,20 +88,20 @@ class MesaServiceManager
     {
         $memberIds = $service->mesas()->pluck('mesas.id')->all();
 
-        \App\Models\Order::query()
+        Order::query()
             ->where('cash_register_id', $cashRegisterId)
             ->whereIn('mesa_id', $memberIds)
             ->whereNull('mesa_service_id')
             ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
             ->update(['mesa_service_id' => $service->id]);
 
-        \App\Models\MesaAssignment::query()
+        MesaAssignment::query()
             ->whereIn('mesa_id', $memberIds)
             ->whereNull('mesa_service_id')
             ->whereNull('released_at')
             ->update(['mesa_service_id' => $service->id]);
 
-        \App\Models\MesaSplit::query()
+        MesaSplit::query()
             ->whereIn('mesa_id', $memberIds)
             ->whereNull('mesa_service_id')
             ->whereIn('status', ['pendiente', 'parcial'])
@@ -107,13 +110,28 @@ class MesaServiceManager
 
     public function markInAccount(Mesa $mesa, int $cashRegisterId): ?MesaService
     {
-        $service = $this->findActiveForMesa($mesa, $cashRegisterId);
-        $service?->update([
-            'status' => 'en_cuenta',
-            'in_account_at' => $service->in_account_at ?? now(),
-        ]);
+        return DB::transaction(function () use ($mesa, $cashRegisterId): ?MesaService {
+            $service = $this->findActiveForMesa($mesa, $cashRegisterId);
+            if (! $service) {
+                return null;
+            }
 
-        return $service;
+            $service = MesaService::query()->lockForUpdate()->findOrFail($service->id);
+            if (! $service->splits()->whereIn('status', ['pendiente', 'parcial'])->exists()) {
+                $orders = $service->orders()
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->lockForUpdate()
+                    ->get();
+                app(MesaAccountDiscountService::class)->reprice($orders);
+            }
+
+            $service->update([
+                'status' => 'en_cuenta',
+                'in_account_at' => $service->in_account_at ?? now(),
+            ]);
+
+            return $service;
+        }, 3);
     }
 
     public function reopen(Mesa $mesa, int $cashRegisterId): ?MesaService

@@ -25,6 +25,8 @@
             @forelse ($this->mesasPendientes as $mesa)
                 @php
                     $allOrdersReady = $mesa->orders->isNotEmpty() && $mesa->orders->every(fn ($order) => in_array($order->status, ['lista', 'entregada'], true));
+                    $hasAccountDiscount = $mesa->orders->flatMap(fn ($order) => $order->items)
+                        ->reject(fn ($item) => (bool) $item->is_cancelled)->sum('discount_amount') > 0;
                     $pendingSplitAccounts = $mesa->active_split
                         ? collect($mesa->active_split->split_data)->reject(fn ($account) => (bool) ($account['paid'] ?? false))
                         : collect();
@@ -64,7 +66,7 @@
                         x-show="openMesa === {{ $mesa->id }}" x-cloak
                         x-transition:enter.opacity.duration.180ms
                         x-transition:leave.opacity.duration.120ms>
-                    @if ($mesa->active_split && (float) $mesa->mesa_total > 0.009)
+                    @if ($mesa->active_split && ((float) $mesa->mesa_total > 0.009 || $hasAccountDiscount))
                         <section class="pos-table-split-list pos-table-split-list--primary" aria-label="Subcuentas pendientes de {{ $mesa->display_name }}">
                             <div class="pos-table-split-list__title">
                                 <span><i class="bx bx-git-branch"></i> Cobrar cuenta dividida</span>
@@ -118,7 +120,7 @@
                     @endunless
 
                     <footer class="pos-table-group__footer">
-                        @if ((float) $mesa->mesa_total <= 0.009)
+                        @if ((float) $mesa->mesa_total <= 0.009 && !$hasAccountDiscount)
                             <div class="pos-table-group__close-copy">
                                 <strong>Servicio sin consumo</strong>
                                 <small>Puede cancelarse sin generar venta ni movimiento de caja.</small>

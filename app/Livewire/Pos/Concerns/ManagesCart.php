@@ -130,7 +130,7 @@ trait ManagesCart
     {
         $cartBeforePromotionPricing = $this->cart;
         $discounts = app(DiscountPricingService::class);
-        $this->cart = $discounts->clear($this->cart);
+        $this->cart = $discounts->clear($this->cart, recalculateFromQuantity: true);
         $this->cart = app(PromotionPricingService::class)->apply(
             $this->cart,
             'pos',

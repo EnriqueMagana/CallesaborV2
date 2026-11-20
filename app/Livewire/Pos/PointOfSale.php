@@ -31,6 +31,7 @@ use App\Services\DeliveryModulePolicy;
 use App\Services\DeliveryWorkflow;
 use App\Services\InventoryService;
 use App\Services\ManualDeliveryAccountingService;
+use App\Services\MesaAccountDiscountService;
 use App\Services\MesaServiceManager;
 use App\Services\OnlineSalesPolicy;
 use App\Services\OrderOperationalDataService;
@@ -1170,7 +1171,7 @@ class PointOfSale extends Component
                 'mesas',
                 'orders' => fn ($query) => $query
                     ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                    ->with('items'),
+                    ->with(['items' => fn ($items) => $items->where('is_cancelled', false)]),
                 'splits' => fn ($query) => $query
                     ->whereIn('status', ['pendiente', 'parcial'])
                     ->latest('id'),
@@ -1216,7 +1217,7 @@ class PointOfSale extends Component
                 ->where('cash_register_id', $cashRegisterId)
                 ->whereNull('mesa_service_id')
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->with('items'),
+                ->with(['items' => fn ($items) => $items->where('is_cancelled', false)]),
             'splits' => fn ($query) => $query
                 ->whereNull('mesa_service_id')
                 ->whereIn('status', ['pendiente', 'parcial'])
@@ -1261,6 +1262,7 @@ class PointOfSale extends Component
             'orders' => collect(),
             'items' => collect(),
             'total' => 0.0,
+            'discountTotal' => 0.0,
             'isSplit' => false,
         ];
 
@@ -1299,6 +1301,8 @@ class PointOfSale extends Component
                 'accountLabel' => (string) ($account['label'] ?? ''),
                 'items' => collect($account['items'] ?? []),
                 'total' => (float) ($account['total'] ?? 0),
+                'discountTotal' => (float) ($account['discount_amount']
+                    ?? collect($account['items'] ?? [])->sum('discount_amount')),
                 'isSplit' => true,
             ];
         }
@@ -1306,12 +1310,12 @@ class PointOfSale extends Component
         $orders = $service
             ? $service->orders()
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->with('items')
+                ->with(['items' => fn ($items) => $items->where('is_cancelled', false)])
                 ->get()
             : $mesa->orders()
                 ->where('cash_register_id', $cashRegisterId)
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->with('items')
+                ->with(['items' => fn ($items) => $items->where('is_cancelled', false)])
                 ->get();
 
         return [
@@ -1321,6 +1325,7 @@ class PointOfSale extends Component
             'accountLabel' => $service?->service_label ?? $mesa->display_name,
             'orders' => $orders,
             'total' => (float) $orders->sum('total'),
+            'discountTotal' => round((float) $orders->flatMap(fn (Order $order) => $order->items)->sum('discount_amount'), 2),
         ];
     }
 
@@ -1850,6 +1855,47 @@ class PointOfSale extends Component
     {
         abort_unless(auth()->user()?->can('cobrar mesas'), 403);
         $this->resetErrorBag();
+
+        $cashRegisterId = $this->activeCashRegister?->id;
+        $mesa = Mesa::find($mesaId);
+        if ($mesa && $cashRegisterId) {
+            DB::transaction(function () use ($mesaId, $cashRegisterId): void {
+                $lockedMesa = Mesa::query()->lockForUpdate()->find($mesaId);
+                if (! $lockedMesa || $lockedMesa->status !== 'en_cuenta') {
+                    return;
+                }
+
+                $service = app(MesaServiceManager::class)->findActiveForMesa($lockedMesa, $cashRegisterId);
+                if ($service) {
+                    MesaService::query()->whereKey($service->id)->lockForUpdate()->first();
+                }
+                $hasSplit = MesaSplit::query()
+                    ->when(
+                        $service,
+                        fn ($query) => $query->where('mesa_service_id', $service->id),
+                        fn ($query) => $query->where('mesa_id', $mesaId)->whereNull('mesa_service_id')
+                    )
+                    ->whereIn('status', ['pendiente', 'parcial'])
+                    ->exists();
+                if ($hasSplit) {
+                    return;
+                }
+
+                $orders = Order::query()
+                    ->where('cash_register_id', $cashRegisterId)
+                    ->when(
+                        $service,
+                        fn ($query) => $query->where('mesa_service_id', $service->id),
+                        fn ($query) => $query->where('mesa_id', $mesaId)->whereNull('mesa_service_id')
+                    )
+                    ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
+                    ->lockForUpdate()
+                    ->get();
+
+                app(MesaAccountDiscountService::class)->reprice($orders, 'dine_in');
+            }, 3);
+        }
+
         $this->mesaPayId = $mesaId;
         $this->mesaSplitId = null;
         $this->mesaSplitAccountIdx = null;
@@ -1889,10 +1935,11 @@ class PointOfSale extends Component
                 return null;
             }
 
-            $service->update([
-                'status' => 'en_cuenta',
-                'in_account_at' => $service->in_account_at ?? now(),
-            ]);
+            $primaryMesa = $service->primaryMesa ?: $service->mesas()->first();
+            if (! $primaryMesa) {
+                return null;
+            }
+            app(MesaServiceManager::class)->markInAccount($primaryMesa, $cashRegisterId);
 
             $memberIds = $service->mesas()->pluck('mesas.id')->all();
             Mesa::whereIn('id', $memberIds)->update(['status' => 'en_cuenta']);
@@ -2209,7 +2256,8 @@ class PointOfSale extends Component
     private function hasValidMesaPayments(): bool
     {
         if (empty($this->mesaPayments)) {
-            return false;
+            return $this->moneyInCents($this->mesaPaymentContext['total'] ?? 0) === 0
+                && (float) ($this->mesaPaymentContext['discountTotal'] ?? 0) > 0;
         }
 
         $total = (float) ($this->mesaPaymentContext['total'] ?? 0);
@@ -2325,18 +2373,27 @@ class PointOfSale extends Component
         $orders = $service
             ? $service->orders()
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->with('items')
+                ->with(['items' => fn ($items) => $items->where('is_cancelled', false)])
                 ->get()
             : $mesa->orders()
                 ->where('cash_register_id', $cashRegisterId)
                 ->whereIn('status', ['pendiente', 'en_preparacion', 'lista', 'entregada'])
-                ->with('items')
+                ->with(['items' => fn ($items) => $items->where('is_cancelled', false)])
                 ->get();
         if ($orders->isEmpty()) {
             return;
         }
         if ($orders->contains(fn (Order $order) => ! in_array($order->status, ['lista', 'entregada'], true))) {
             $this->dispatch('notify', type: 'warning', message: 'Todas las comandas deben estar listas antes de cobrar.');
+
+            return;
+        }
+        $previousTotalCents = $this->moneyInCents($orders->sum('total'));
+        app(MesaAccountDiscountService::class)->reprice($orders, 'dine_in');
+        if ($previousTotalCents !== $this->moneyInCents($orders->sum('total'))) {
+            $this->mesaPayments = [];
+            unset($this->mesaPaymentContext);
+            $this->dispatch('notify', type: 'warning', message: 'El descuento de la cuenta cambió. Revisa el total actualizado y agrega el pago.');
 
             return;
         }

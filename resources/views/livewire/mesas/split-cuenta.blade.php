@@ -22,6 +22,9 @@
                 <p>
                     <span class="mh-stat"><i class="bx bx-map-pin"></i> {{ $this->mesa->area->name ?? '–' }}</span>
                     <span class="mh-stat"><i class="bx bx-money"></i> Total: ${{ number_format($this->grandTotal, 2) }}</span>
+                    @if($this->discountTotal > 0)
+                        <span class="mh-stat"><i class="bx bx-purchase-tag-alt"></i> Descuento de cuenta: −${{ number_format($this->discountTotal, 2) }}</span>
+                    @endif
                     @if($this->mesa->currentAssignment)
                         <span class="mh-stat"><i class="bx bx-user"></i> {{ $this->mesa->currentAssignment->waiter?->name }}</span>
                     @endif
@@ -74,7 +77,7 @@
                         <div class="detail-item">
                             <span class="detail-item-qty">{{ $item->quantity }}×</span>
                             <span class="detail-item-name">{{ $item->product_name }}</span>
-                            <span class="detail-item-price">${{ number_format($item->subtotal, 2) }}</span>
+                            <span class="detail-item-price">${{ number_format((float) $item->subtotal + (float) $item->discount_amount, 2) }}</span>
                         </div>
                     @endforeach
                 </div>
@@ -82,7 +85,7 @@
                 <div class="split-pay-items">
                     <small class="text-muted">
                         <i class="bx bx-info-circle me-1"></i>
-                        Partes iguales: ${{ number_format($this->grandTotal / max(1, $equalParts), 2) }} c/u
+                         Partes iguales: ${{ number_format($this->accountTotals[$idx] ?? 0, 2) }} c/u
                     </small>
                 </div>
                 @endif
@@ -157,7 +160,7 @@
                                     <div class="split-item-info">
                                         <span class="split-item-qty">{{ $item->quantity }}×</span>
                                         <span class="split-item-name">{{ $item->product_name }}</span>
-                                        <span class="split-item-price">${{ number_format($item->subtotal, 2) }}</span>
+                                        <span class="split-item-price">${{ number_format((float) $item->subtotal + (float) $item->discount_amount, 2) }}</span>
                                     </div>
                                     <div class="split-item-assign-btns">
                                         @foreach($accounts as $idx => $acc)
@@ -180,7 +183,7 @@
                                     <div class="split-item-info">
                                         <span class="split-item-qty">{{ $item->quantity }}×</span>
                                         <span class="split-item-name">{{ $item->product_name }}</span>
-                                        <span class="split-item-price">${{ number_format($item->subtotal, 2) }}</span>
+                                        <span class="split-item-price">${{ number_format((float) $item->subtotal + (float) $item->discount_amount, 2) }}</span>
                                     </div>
                                     <button class="split-unassign-btn" wire:click="unassignItem({{ $item->id }})"
                                             title="Quitar asignación">
@@ -198,7 +201,7 @@
                                 <div class="split-item-info">
                                     <span class="split-item-qty">{{ $item->quantity }}×</span>
                                     <span class="split-item-name">{{ $item->product_name }}</span>
-                                    <span class="split-item-price">${{ number_format($item->subtotal, 2) }}</span>
+                                    <span class="split-item-price">${{ number_format((float) $item->subtotal + (float) $item->discount_amount, 2) }}</span>
                                 </div>
                             </div>
                             @endforeach
@@ -264,6 +267,16 @@
 
                 {{-- Grand total recap --}}
                 <div class="split-grand-recap">
+                    <div class="split-grand-row">
+                        <span>Subtotal de artículos:</span>
+                        <strong>${{ number_format($this->grandTotal + $this->discountTotal, 2) }}</strong>
+                    </div>
+                    @if($this->discountTotal > 0)
+                        <div class="split-grand-row">
+                            <span>Descuento de cuenta:</span>
+                            <strong>−${{ number_format($this->discountTotal, 2) }}</strong>
+                        </div>
+                    @endif
                     <div class="split-grand-row">
                         <span>Total mesa:</span>
                         <strong>${{ number_format($this->grandTotal, 2) }}</strong>

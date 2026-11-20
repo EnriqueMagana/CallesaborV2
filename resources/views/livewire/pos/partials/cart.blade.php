@@ -62,7 +62,7 @@
                 <div class="cart-item-detail">
                     <div class="cart-item__heading">
                         <div class="cart-item-name">{{ $item['product_name'] }}</div>
-                        <span class="cart-item-price">${{ number_format($item['subtotal'], 2) }}</span>
+                        <span class="cart-item-price">${{ number_format((float) $item['subtotal'] + (float) ($item['discount_amount'] ?? 0), 2) }}</span>
                     </div>
 
                     @if (!empty($item['promotion_selections']) || !empty($item['addons']) || !empty($item['ingredients']) || !empty($item['notes']))
@@ -119,7 +119,7 @@
                     @if(!empty($item['promotion_discount']))
                         <div class="pos-cart-promotion-saving"><i class="bx bx-purchase-tag-alt"></i><span>{{ data_get($item, 'promotion_rule_snapshot.label', 'Promoción automática') }}</span><strong>−${{ number_format($item['promotion_discount'], 2) }}</strong></div>
                     @endif
-                    @if(!empty($item['discount_amount']))
+                    @if(!empty($item['discount_amount']) && data_get($item, 'discount_snapshot.scope') !== 'order')
                         <div class="pos-cart-discount-saving"><i class="bx bx-purchase-tag-alt"></i><span>{{ data_get($item, 'discount_snapshot.name', 'Descuento automático') }}</span><strong>−${{ number_format($item['discount_amount'], 2) }}</strong></div>
                     @endif
 
@@ -180,7 +180,11 @@
                     <span>Total a cobrar</span>
                 </div>
                 @if($this->cartDiscountTotal > 0)
-                    <div class="total-row pos-discount-total"><span>Descuento automático</span><span>−${{ number_format($this->cartDiscountTotal, 2) }}</span></div>
+                    @php
+                        $appliedDiscount = collect($cart)->first(fn ($line) => !empty($line['discount_id']));
+                    @endphp
+                    <div class="total-row"><span>Subtotal</span><span>${{ number_format($this->cartTotal + $this->cartDiscountTotal, 2) }}</span></div>
+                    <div class="total-row pos-discount-total"><span>{{ data_get($appliedDiscount, 'discount_snapshot.name', 'Descuento de cuenta') }}</span><span>−${{ number_format($this->cartDiscountTotal, 2) }}</span></div>
                 @endif
                 <div class="total-row main">
                     <span>Total</span>
